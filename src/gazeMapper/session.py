@@ -30,10 +30,11 @@ utils.register_type(utils.CustomTypeEntry(Recording,'__session.Recording__',lamb
 
 
 class SessionDefinition:
-    def __init__(self, recordings: list[RecordingDefinition]=None, sync_ref: str = None):
+    def __init__(self, recordings: list[RecordingDefinition]=None, sync_ref: str=None):
         if recordings is None:
             recordings = []
         self.recordings = recordings
+
         self.sync_ref: str = None
         self.set_sync_ref(sync_ref)
 
