@@ -73,7 +73,7 @@ class Session:
         if not self.working_directory.is_dir():
             self.working_directory.mkdir()
 
-    def import_and_add_recording(self, which: str, rec_info: EyeTrackerRecording|camera_recording.Recording):
+    def import_and_add_recording(self, which: str, rec_info: EyeTrackerRecording|camera_recording.Recording, copy_video = True) -> Recording:
         rec_def = self.definition.get_recording(which)
         if rec_def.type==RecordingType.EyeTracker:
             assert isinstance(rec_info,EyeTrackerRecording), f"The provided rec_info is not for an eye tracker recording, but {which} is an eye tracker recording"
@@ -83,9 +83,9 @@ class Session:
         # do import
         rec_info.working_directory = self.working_directory / rec_def.name
         if rec_def.type==RecordingType.EyeTracker:
-            rec_info = importing.do_import(rec_info=rec_info)
+            rec_info = importing.do_import(rec_info=rec_info, copy_scene_video=copy_video)
         else:
-            rec_info = camera_recording.do_import(rec_info=rec_info)
+            rec_info = camera_recording.do_import(rec_info=rec_info, copy_video=copy_video)
 
         # add recording
         self.recordings[which] = Recording(rec_def, rec_info)
