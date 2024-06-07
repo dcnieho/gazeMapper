@@ -2,6 +2,7 @@ from enum import auto
 import pathlib
 import cv2
 import json
+import numpy as np
 
 from glassesTools import plane, utils
 from glassesValidator.config import get_validation_setup
@@ -17,7 +18,7 @@ utils.register_type(utils.CustomTypeEntry(Type,'__enum.plane.Type__',str, lambda
 class Definition:
     default_json_file_name = 'plane_def.json'
 
-    def __init__(self, type:Type, name:str=None, use_default:bool=False, marker_file: str|pathlib.Path=None, marker_size: float=None, marker_border_bits: int=1, unit: str=None, aruco_dict: int=cv2.aruco.DICT_4X4_250, ref_image_width: int=1920):
+    def __init__(self, type:Type, name:str=None, use_default:bool=False, marker_file: str|pathlib.Path=None, marker_size: float=None, marker_border_bits: int=1, center: np.ndarray=None, unit: str=None, aruco_dict: int=cv2.aruco.DICT_4X4_250, ref_image_width: int=1920):
         self.type                                       = type
         self.name                                       = name
         self.use_default            : bool              = use_default           # applies only to glassesValidator planes. If False, denotes this is the default/built-in glassesValidator plane, if True, denotes custom settings are expected
@@ -25,6 +26,7 @@ class Definition:
         self.marker_file            : str|pathlib.Path  = marker_file           # if str or Path: file from which to read markers. Else direction N_markerx4 array. Should contain centers of markers
         self.marker_size            : float             = marker_size           # in "unit" units
         self.marker_border_bits     : int               = marker_border_bits
+        self.center                 : np.ndarray        = center                # center of plane, in coordinates of the input file
         self.unit                   : str               = unit
         self.aruco_dict             : int               = aruco_dict
         self.ref_image_width        : int               = ref_image_width
@@ -65,6 +67,7 @@ class Definition:
             'marker_file': self.marker_file,
             'marker_size': self.marker_size,
             'marker_border_bits': self.marker_border_bits,
+            'center': self.center,
             'unit': self.unit,
             'aruco_dict': self.aruco_dict,
             'ref_image_width': self.ref_image_width
@@ -87,7 +90,7 @@ def get_plane_from_definition(plane_def: Definition, path: str | pathlib.Path) -
         validation_setup = get_validation_setup(validator_config_dir)
         return Poster(validator_config_dir, validation_setup, ref_image_store_path=path / plane.Plane.default_ref_image_name)
     else:
-        return plane.Plane(
+        pl = plane.Plane(
             markers             = path / plane_def.marker_file,
             marker_size         = plane_def.marker_size,
             aruco_dict          = plane_def.aruco_dict,
@@ -96,3 +99,6 @@ def get_plane_from_definition(plane_def: Definition, path: str | pathlib.Path) -
             ref_image_store_path= path / plane.Plane.default_ref_image_name,
             ref_image_width     = plane_def.ref_image_width
         )
+        if plane_def.center is not None:
+            pl.set_center(plane_def.center)
+        return pl
