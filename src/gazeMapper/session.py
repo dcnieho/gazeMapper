@@ -130,8 +130,8 @@ class Session:
         self.check_recording_info(which, rec_info)
         self.recordings[which] = Recording(rec_def, rec_info)
 
-    def has_all_recordings(self):
-        return all([r in self.recordings for r in self.definition.recordings])
+    def has_all_recordings(self) -> bool:
+        return all([r.name in self.recordings for r in self.definition.recordings])
 
     def store_as_json(self, path: str | pathlib.Path = None):
         if path is None:
@@ -145,16 +145,24 @@ class Session:
             json.dump(to_dump, f, cls=utils.CustomTypeEncoder, indent=2)
 
     @staticmethod
-    def load_from_json(path: str | pathlib.Path):
+    def load_from_json(path: str | pathlib.Path) -> 'Session':
         path = pathlib.Path(path)
         if path.is_dir():
             path /= Session.default_json_file_name
         # load session setup
         with open(path, 'r') as f:
-            sess = Session(**json.load(f, object_hook=utils.json_reconstitute), name=path.name, working_directory=path.parent)
+            sess = Session(**json.load(f, object_hook=utils.json_reconstitute), name=path.parent.name, working_directory=path.parent)
         # load recordings that are present
         sess.load_existing_recordings()
 
+        return sess
+
+    @staticmethod
+    def from_definition(definition: SessionDefinition, path: str | pathlib.Path) -> 'Session':
+        # for loading a recording directory that doesn't contain a session json file
+        # use the provided definition instead
+        sess = Session(definition, name=path.name, working_directory=path)
+        sess.load_existing_recordings()
         return sess
 
 
