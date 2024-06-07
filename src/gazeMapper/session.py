@@ -30,13 +30,20 @@ utils.register_type(utils.CustomTypeEntry(Recording,'__session.Recording__',lamb
 
 
 class SessionDefinition:
-    def __init__(self, recordings: list[RecordingDefinition]=None):
+    def __init__(self, recordings: list[RecordingDefinition]=None, sync_ref: str = None):
         if recordings is None:
             recordings = []
         self.recordings = recordings
+        self.sync_ref: str = None
+        self.set_sync_ref(sync_ref)
 
     def add_recording(self, recording: RecordingDefinition):
         self.recordings.append(recording)
+
+    def set_sync_ref(self, which: str):
+        if not any([r.name==which for r in self.recordings]):
+            raise ValueError(f'recording "{which}" not known')
+        self.sync_ref = which
 
     def get_recording(self, which: str) -> RecordingDefinition:
         for r in self.recordings:
