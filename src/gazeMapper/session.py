@@ -57,11 +57,11 @@ class SessionDefinition:
             json.dump(self, f, cls=utils.CustomTypeEncoder, indent=2)
 
     @staticmethod
-    def load_from_json(path: str | pathlib.Path):
+    def load_from_json(path: str | pathlib.Path) -> 'Session':
         path = pathlib.Path(path)
         with open(path, 'r') as f:
             return json.load(f, object_hook=utils.json_reconstitute)
-utils.register_type(utils.CustomTypeEntry(SessionDefinition,'__session.SessionDefinition__',lambda x: x.recordings, lambda x: SessionDefinition(x)))
+utils.register_type(utils.CustomTypeEntry(SessionDefinition,'__session.SessionDefinition__',lambda x: {'recordings': x.recordings, 'sync_ref': x.sync_ref}, lambda x: SessionDefinition(**x)))
 
 
 class Session:
@@ -82,10 +82,7 @@ class Session:
 
     def import_and_add_recording(self, which: str, rec_info: EyeTrackerRecording|camera_recording.Recording, copy_video = True) -> Recording:
         rec_def = self.definition.get_recording(which)
-        if rec_def.type==RecordingType.EyeTracker:
-            assert isinstance(rec_info,EyeTrackerRecording), f"The provided rec_info is not for an eye tracker recording, but {which} is an eye tracker recording"
-        elif rec_def.type==RecordingType.Camera:
-            assert isinstance(rec_info,camera_recording.Recording), f"The provided rec_info is not for a camera recording, but {which} is a camera recording"
+        self.check_recording_info(which, rec_info)
 
         # do import
         rec_info.working_directory = self.working_directory / rec_def.name
@@ -95,11 +92,16 @@ class Session:
             rec_info = camera_recording.do_import(rec_info=rec_info, copy_video=copy_video)
 
         # add recording
-        self.recordings[which] = Recording(rec_def, rec_info)
+        self.add_recording_from_info(which, rec_info)
+        return self.recordings[which]
 
-        return rec_info
+    def load_existing_recordings(self):
+        # load recordings that are present
+        for r in self.definition.recordings:
+            if (self.working_directory / r.name).is_dir():
+                self.add_existing_recording(r.name)
 
-    def add_existing_recording(self, which: str):
+    def add_existing_recording(self, which: str) -> Recording:
         r_fold = self.working_directory / which
         if not r_fold.is_dir():
             return
@@ -112,7 +114,23 @@ class Session:
             rec_info = camera_recording.Recording.load_from_json(r_fold)
 
         # add recording
+        self.add_recording_from_info(which, rec_info)
+        return self.recordings[which]
+
+    def check_recording_info(self, which: str, rec_info: EyeTrackerRecording|camera_recording.Recording):
+        rec_def = self.definition.get_recording(which)
+        if rec_def.type==RecordingType.EyeTracker:
+            assert isinstance(rec_info,EyeTrackerRecording), f"The provided rec_info is not for an eye tracker recording, but {which} is an eye tracker recording"
+        elif rec_def.type==RecordingType.Camera:
+            assert isinstance(rec_info,camera_recording.Recording), f"The provided rec_info is not for a camera recording, but {which} is a camera recording"
+
+    def add_recording_from_info(self, which: str, rec_info: EyeTrackerRecording|camera_recording.Recording):
+        rec_def = self.definition.get_recording(which)
+        self.check_recording_info(which, rec_info)
         self.recordings[which] = Recording(rec_def, rec_info)
+
+    def has_all_recordings(self):
+        return all([r in self.recordings for r in self.definition.recordings])
 
     def store_as_json(self, path: str | pathlib.Path = None):
         if path is None:
@@ -134,8 +152,25 @@ class Session:
         with open(path, 'r') as f:
             sess = Session(**json.load(f, object_hook=utils.json_reconstitute), name=path.name, working_directory=path.parent)
         # load recordings that are present
-        for r in sess.definition.recordings:
-            if (sess.working_directory / r.name).is_dir():
-                sess.add_existing_recording(r.name)
+        sess.load_existing_recordings()
 
         return sess
+
+
+def get_sessions_from_directory(path: str|pathlib.Path, session_json_name=Session.default_json_file_name) -> list[Session]:
+    path = pathlib.Path(path)
+
+    # iterate through all folders in the provided path and check if the folder contains a file with the session_json_name
+    # then its potentially a session
+    sessions: list[Session] = []
+    for d in path.iterdir():
+        if not d.is_dir():
+            continue
+
+        f = d / session_json_name
+        if not f.is_file():
+            continue
+
+        sessions.append(Session.load_from_json(f))
+
+    return sessions
