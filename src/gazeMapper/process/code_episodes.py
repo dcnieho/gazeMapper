@@ -12,11 +12,11 @@ isMacOS = sys.platform.startswith("darwin")
 if isMacOS:
     import AppKit
 
-from glassesTools import drawing, gaze_headref, gaze_worldref, ocv, plane, recording, timestamps
+from glassesTools import drawing, gaze_headref, gaze_worldref, ocv, plane, timestamps
 from glassesTools.video_gui import GUI, generic_tooltip_drawer
 
 
-from .. import camera_recording, episode, session
+from .. import  episode, session
 
 # This script shows a video player that is used to indicate the interval(s)
 # during which the poster should be found in the video and in later
