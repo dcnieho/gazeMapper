@@ -28,6 +28,14 @@ class Recording:
         self.info       = info
 utils.register_type(utils.CustomTypeEntry(Recording,'__session.Recording__',lambda x: {'defition': x.defition, 'info': x.info}, lambda x: Recording(**x)))
 
+def read_recording_info(working_dir: pathlib.Path, rec_type: RecordingType) -> tuple[EyeTrackerRecording|camera_recording.Recording, pathlib.Path]:
+    if rec_type==RecordingType.Camera:
+        rec_info = camera_recording.Recording.load_from_json(working_dir)
+        in_video = rec_info.get_video_path()
+    elif rec_type==RecordingType.EyeTracker:
+        rec_info = EyeTrackerRecording.load_from_json(working_dir)
+        in_video = rec_info.get_scene_video_path()
+    return rec_info, in_video
 
 class SessionDefinition:
     def __init__(self, recordings: list[RecordingDefinition]=None, sync_ref: str=None):

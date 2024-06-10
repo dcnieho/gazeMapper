@@ -77,14 +77,10 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
     global stopAllProcessing
 
     # get info about recording
+    _, in_video = session.read_recording_info(working_dir, rec_type)
     if rec_type==session.RecordingType.Camera:
-        recInfo = camera_recording.Recording.load_from_json(working_dir)
-        inVideo = recInfo.get_video_path()
         hasGaze, hasPosterGaze, hasPosterPose = False, False, False
     elif rec_type==session.RecordingType.EyeTracker:
-        recInfo = recording.Recording.load_from_json(working_dir)
-        inVideo = recInfo.get_scene_video_path()
-
         # Read gaze data
         hasGaze = True
         gazes = gaze_headref.read_dict_from_file(working_dir / 'gazeData.tsv')[0]
@@ -129,7 +125,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
     i2t = timestamps.Idx2Timestamp( working_dir / 'frameTimestamps.tsv' )
     # 2. mediaplayer for the actual video playback, with sound if available
     ff_opts = {'volume': 1., 'sync': 'audio', 'framedrop': True}
-    player = MediaPlayer(str(inVideo), ff_opts=ff_opts)
+    player = MediaPlayer(str(in_video), ff_opts=ff_opts)
 
     # show
     subPixelFac = 8   # for sub-pixel positioning
