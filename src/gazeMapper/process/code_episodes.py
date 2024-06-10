@@ -77,7 +77,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
     global stopAllProcessing
 
     # get info about recording
-    _, in_video = session.read_recording_info(working_dir, rec_type)
+    in_video = session.read_recording_info(working_dir, rec_type)[1]
     if rec_type==session.RecordingType.Camera:
         hasGaze, hasPosterGaze, hasPosterPose = False, False, False
     elif rec_type==session.RecordingType.EyeTracker:
