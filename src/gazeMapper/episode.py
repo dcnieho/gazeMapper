@@ -65,22 +65,28 @@ def write_list_to_file(episodes: list[Episode],
 def get_empty_marker_dict() -> dict[Event,list[int]]:
     return {e:[] for e in Event}
 
-def list_to_marker_dict(episodes: list[Episode]) -> dict[Event,list[int]]:
+def list_to_marker_dict(episodes: list[Episode]) -> dict[Event,list[list[int]]]:
     e_dict = get_empty_marker_dict()
     for e in episodes:
-        e_dict[e.event].append(e.start_frame)
         if e.end_frame is not None:
-            e_dict[e.event].append(e.end_frame)
+            e_dict[e.event].append([e.start_frame, e.end_frame])
+        else:
+            e_dict[e.event].append([e.start_frame])
     return e_dict
 
-def marker_dict_to_list(episodes: dict[Event,list[int]]) -> list[Episode]:
+def marker_dict_to_list(episodes: dict[Event,list[int]]|dict[Event,list[list[int]]]) -> list[Episode]:
     e_list: list[Episode] = []
     for e in episodes:
-        if type_map[e]==Type.Interval:
-            for m in range(0,len(episodes[e])-1,2): # read in batches of two, and run until -1 to make sure we don't pick up incomplete intervals
-                e_list.append(Episode(e, *episodes[e][m:m+2]))
+        if not episodes[e]:
+            continue
+        if isinstance(episodes[e][0],list):
+            e_list.extend([Episode(e, *v) for v in episodes[e]])
         else:
-            e_list.extend([Episode(e,m) for m in episodes[e]])
+            if type_map[e]==Type.Interval:
+                for m in range(0,len(episodes[e])-1,2): # read in batches of two, and run until -1 to make sure we don't pick up incomplete intervals
+                    e_list.append(Episode(e, *episodes[e][m:m+2]))
+            else:
+                e_list.extend([Episode(e,m) for m in episodes[e]])
 
     return sorted(e_list, key=lambda x: x.start_frame)
 

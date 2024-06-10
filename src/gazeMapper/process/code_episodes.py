@@ -115,6 +115,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
     coding_file = working_dir / 'coding.tsv'
     if coding_file.is_file():
         episodes = episode.list_to_marker_dict(episode.read_list_from_file(coding_file))
+        # flatten
+        for e in episodes:
+            episodes[e] = [i for iv in episodes[e] for i in iv]
     else:
         episodes = episode.get_empty_marker_dict()
     gui.register_draw_callback('status',lambda: my_tooltip(episodes, _key_tooltip))
