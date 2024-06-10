@@ -18,7 +18,7 @@ utils.register_type(utils.CustomTypeEntry(Type,'__enum.plane.Type__',str, lambda
 class Definition:
     default_json_file_name = 'plane_def.json'
 
-    def __init__(self, type:Type, name:str=None, use_default:bool=False, marker_file: str|pathlib.Path=None, marker_size: float=None, marker_border_bits: int=1, center: np.ndarray=None, unit: str=None, aruco_dict: int=cv2.aruco.DICT_4X4_250, ref_image_width: int=1920):
+    def __init__(self, type:Type, name:str=None, use_default:bool=False, marker_file: str|pathlib.Path=None, marker_size: float=None, marker_border_bits: int=1, min_num_markers: int=3, center: np.ndarray=None, unit: str=None, aruco_dict: int=cv2.aruco.DICT_4X4_250, ref_image_width: int=1920):
         self.type                                       = type
         self.name                                       = name
         self.use_default            : bool              = use_default           # applies only to glassesValidator planes. If False, denotes this is the default/built-in glassesValidator plane, if True, denotes custom settings are expected
@@ -26,6 +26,7 @@ class Definition:
         self.marker_file            : str|pathlib.Path  = marker_file           # if str or Path: file from which to read markers. Else direction N_markerx4 array. Should contain centers of markers
         self.marker_size            : float             = marker_size           # in "unit" units
         self.marker_border_bits     : int               = marker_border_bits
+        self.min_num_markers        : int               = min_num_markers       # minimum number of markers that should be to run pose estimation w.r.t. the plane
         self.center                 : np.ndarray        = center                # center of plane, in coordinates of the input file
         self.unit                   : str               = unit
         self.aruco_dict             : int               = aruco_dict
@@ -67,6 +68,7 @@ class Definition:
             'marker_file': self.marker_file,
             'marker_size': self.marker_size,
             'marker_border_bits': self.marker_border_bits,
+            'min_num_markers': self.min_num_markers,
             'center': self.center,
             'unit': self.unit,
             'aruco_dict': self.aruco_dict,
@@ -81,7 +83,7 @@ def get_plane_from_path(path: str|pathlib.Path) -> plane.Plane:
     return get_plane_from_definition(plane_def, path)
 
 def get_plane_from_definition(plane_def: Definition, path: str | pathlib.Path) -> plane.Plane:
-    # for loading a plane from a directory that doesn't contain a plane defition json file
+    # for loading a plane from a directory that doesn't contain a plane definition json file
     # use the provided definition instead
     if plane_def.type==Type.GlassesValidator:
         validator_config_dir = None # use glassesValidator built-in/default
