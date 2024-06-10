@@ -115,7 +115,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
     cameraParams= ocv.CameraParams.readFromFile(working_dir / "calibration.xml")
     hasCamCal   = cameraParams.has_intrinsics()
 
-    # get interval coded to be analyzed, if available
+    # get previous interval coding, if available
     coding_file = working_dir / 'coding.tsv'
     if coding_file.is_file():
         episodes = episode.list_to_marker_dict(episode.read_list_from_file(coding_file))
