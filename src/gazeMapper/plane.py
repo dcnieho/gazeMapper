@@ -32,6 +32,9 @@ class Definition:
         self.aruco_dict             : int               = aruco_dict
         self.ref_image_width        : int               = ref_image_width
 
+        if isinstance(self.center,list):
+            self.center = np.array(self.center)
+
         # check provided info
         if self.type==Type.GlassesValidator:
             # prevent bugs
