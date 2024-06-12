@@ -22,14 +22,16 @@ def get_marker_dict_from_list(markers: list[Marker]) -> dict[int,dict[str,Any]]:
 class Study:
     default_json_file_name = 'study_def.json'
 
-    def __init__(self, session_def: session.SessionDefinition, planes: list[plane.Definition], planes_per_interval: dict[episode.Event,list[str]], individual_markers: list[Marker], working_directory: str|pathlib.Path):
+    def __init__(self, session_def: session.SessionDefinition, planes: list[plane.Definition], planes_per_interval: dict[episode.Event,list[str]], individual_markers: list[Marker], sync_ref_recording: str, working_directory: str|pathlib.Path):
         self.session_def        = session_def
         self.planes             = planes
         self.planes_per_interval= planes_per_interval
         self.working_directory  = working_directory
+        self.sync_ref_recording = sync_ref_recording
         self.individual_markers = individual_markers
 
         self._check_planes_per_interval()
+        self._check_sync_ref_recording()
 
     def _check_planes_per_interval(self):
         for e in self.planes_per_interval:
@@ -37,13 +39,22 @@ class Study:
                 if not any([p==pl.name for pl in self.planes]):
                     raise ValueError(f'plane {p} not known')
 
+    def _check_sync_ref_recording(self, which=None):
+        if not which:
+            which = self.sync_ref_recording
+        if not any([r.name==which for r in self.session_def.recordings]):
+            raise ValueError(f'recording "{which}" not known')
+    def set_sync_ref_recording(self, which: str):
+        self._check_sync_ref_recording(which)
+        self.sync_ref_recording = which
+
     def store_as_json(self, path: str | pathlib.Path):
         path = pathlib.Path(path)
         # this stores only the planes_per_interval variable to json, rest is read from other files
         # instead to remain flexible and make it easy for users to rename, etc
         d_path = path / self.default_json_file_name
         with open(d_path, 'w') as f:
-            to_dump = {k:getattr(self,k) for k in ['planes_per_interval','individual_markers']}    # only these fields. Name will be populated from name of session/provided folder, recordings from each subfolder in the session/provided folder, and working_directory as the provided path
+            to_dump = {k:getattr(self,k) for k in ['planes_per_interval','individual_markers','sync_ref_recording']}    # only these fields. Name will be populated from name of session/provided folder, recordings from each subfolder in the session/provided folder, and working_directory as the provided path
             to_dump['planes_per_interval'] = [(k, to_dump['planes_per_interval'][k]) for k in to_dump['planes_per_interval']]   # pack as list of tuples for storage
             # dump to file
             json.dump(to_dump, f, cls=utils.CustomTypeEncoder, indent=2)

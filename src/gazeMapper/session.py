@@ -38,21 +38,13 @@ def read_recording_info(working_dir: pathlib.Path, rec_type: RecordingType) -> t
     return rec_info, in_video
 
 class SessionDefinition:
-    def __init__(self, recordings: list[RecordingDefinition]=None, sync_ref: str=None):
+    def __init__(self, recordings: list[RecordingDefinition]=None):
         if recordings is None:
             recordings = []
         self.recordings = recordings
 
-        self.sync_ref: str = None
-        self.set_sync_ref(sync_ref)
-
     def add_recording(self, recording: RecordingDefinition):
         self.recordings.append(recording)
-
-    def set_sync_ref(self, which: str):
-        if not any([r.name==which for r in self.recordings]):
-            raise ValueError(f'recording "{which}" not known')
-        self.sync_ref = which
 
     def get_recording(self, which: str) -> RecordingDefinition:
         for r in self.recordings:
@@ -70,7 +62,7 @@ class SessionDefinition:
         path = pathlib.Path(path)
         with open(path, 'r') as f:
             return json.load(f, object_hook=utils.json_reconstitute)
-utils.register_type(utils.CustomTypeEntry(SessionDefinition,'__session.SessionDefinition__',lambda x: {'recordings': x.recordings, 'sync_ref': x.sync_ref}, lambda x: SessionDefinition(**x)))
+utils.register_type(utils.CustomTypeEntry(SessionDefinition,'__session.SessionDefinition__',lambda x: {'recordings': x.recordings}, lambda x: SessionDefinition(**x)))
 
 
 class Session:
