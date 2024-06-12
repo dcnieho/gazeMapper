@@ -22,31 +22,30 @@ def get_marker_dict_from_list(markers: list[Marker]) -> dict[int,dict[str,Any]]:
 class Study:
     default_json_file_name = 'study_def.json'
 
-    def __init__(self, session_def: session.SessionDefinition, planes: list[plane.Definition], planes_per_interval: dict[episode.Event,list[str]], individual_markers: list[Marker], sync_ref_recording: str, working_directory: str|pathlib.Path):
-        self.session_def        = session_def
-        self.planes             = planes
-        self.planes_per_interval= planes_per_interval
-        self.working_directory  = working_directory
-        self.sync_ref_recording = sync_ref_recording
-        self.individual_markers = individual_markers
+    def __init__(self, session_def: session.SessionDefinition, planes: list[plane.Definition], planes_per_interval: dict[episode.Event,list[str]], individual_markers: list[Marker], sync_ref_recording: str, sync_average_recordings: list[str], working_directory: str|pathlib.Path):
+        self.session_def            = session_def
+        self.planes                 = planes
+        self.planes_per_interval    = planes_per_interval
+        self.working_directory      = working_directory
+        self.sync_ref_recording     = sync_ref_recording
+        self.sync_average_recordings= sync_average_recordings
+        self.individual_markers     = individual_markers
 
         self._check_planes_per_interval()
-        self._check_sync_ref_recording()
+        self._check_recordings([self.sync_ref_recording], 'sync_ref_recording')
+        self._check_recordings(self.sync_average_recordings, 'sync_average_recordings')
+        assert self.sync_ref_recording not in self.sync_average_recordings, f'Recording {self.sync_ref_recording} is the reference recording for sync, should not be specified sync_average_recordings'
 
     def _check_planes_per_interval(self):
         for e in self.planes_per_interval:
             for p in self.planes_per_interval[e]:
                 if not any([p==pl.name for pl in self.planes]):
-                    raise ValueError(f'plane {p} not known')
+                    raise ValueError(f'Plane {p} not known')
 
-    def _check_sync_ref_recording(self, which=None):
-        if not which:
-            which = self.sync_ref_recording
-        if not any([r.name==which for r in self.session_def.recordings]):
-            raise ValueError(f'recording "{which}" not known')
-    def set_sync_ref_recording(self, which: str):
-        self._check_sync_ref_recording(which)
-        self.sync_ref_recording = which
+    def _check_recordings(self, which, field):
+        for w in which:
+            if not any([r.name==w for r in self.session_def.recordings]):
+                raise ValueError(f'Recording "{w}" not known, check {field}')
 
     def store_as_json(self, path: str | pathlib.Path):
         path = pathlib.Path(path)
@@ -54,7 +53,7 @@ class Study:
         # instead to remain flexible and make it easy for users to rename, etc
         d_path = path / self.default_json_file_name
         with open(d_path, 'w') as f:
-            to_dump = {k:getattr(self,k) for k in ['planes_per_interval','individual_markers','sync_ref_recording']}    # only these fields. Name will be populated from name of session/provided folder, recordings from each subfolder in the session/provided folder, and working_directory as the provided path
+            to_dump = {k:getattr(self,k) for k in ['planes_per_interval','individual_markers','sync_ref_recording','sync_average_recordings']}    # only these fields. Name will be populated from name of session/provided folder, recordings from each subfolder in the session/provided folder, and working_directory as the provided path
             to_dump['planes_per_interval'] = [(k, to_dump['planes_per_interval'][k]) for k in to_dump['planes_per_interval']]   # pack as list of tuples for storage
             # dump to file
             json.dump(to_dump, f, cls=utils.CustomTypeEncoder, indent=2)
