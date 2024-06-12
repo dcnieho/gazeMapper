@@ -19,7 +19,6 @@ from .. import config, episode, session
 
 stopAllProcessing = False
 def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path):
-    # if show_poster, also draw poster with gaze overlaid on it (if available)
     working_dir = pathlib.Path(working_dir)
     config_dir  = pathlib.Path(config_dir)
 
