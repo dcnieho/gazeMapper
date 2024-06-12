@@ -47,7 +47,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI):
     pl = planes[0]
 
     # get interval coding
-    coding_file = working_dir / 'coding.tsv'
+    coding_file = working_dir / naming.coding_file
     assert coding_file.is_file(), f'A coding file must be available to run sync_VOR, but it is not. Run code_episodes and code at least one {episode.Event.Sync_VOR.value} episode. Not found: {coding_file}'
     episodes = episode.list_to_marker_dict(episode.read_list_from_file(coding_file))[episode.Event.Sync_VOR]
     assert episodes, f'No {episode.Event.Sync_VOR.value} episodes found for this recording. Run code_episodes and code at least one {episode.Event.Sync_VOR.value} episode.'

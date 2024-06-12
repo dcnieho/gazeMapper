@@ -16,6 +16,7 @@ from glassesTools import drawing, gaze_headref, gaze_worldref, ocv, plane, times
 from glassesTools.video_gui import GUI, generic_tooltip_drawer
 
 
+from . import naming
 from .. import  episode, session
 
 # This script shows a video player that is used to indicate the interval(s)
@@ -112,7 +113,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
     hasCamCal   = cameraParams.has_intrinsics()
 
     # get previous interval coding, if available
-    coding_file = working_dir / 'coding.tsv'
+    coding_file = working_dir / naming.coding_file
     if coding_file.is_file():
         episodes = episode.list_to_marker_dict(episode.read_list_from_file(coding_file))
         # flatten
