@@ -10,7 +10,7 @@ If you use this tool or any of the code in this repository, please cite:<br>
 Niehorster, D.C., Hessels, R.S., Nyström, M., Benjamins, J.S. and Hooge, I.T.C. (in prep). gazeMapper: A tool for automated world-based analysis of wearable eye tracker data
 
 # How to acquire
-GlassesValidator is available from `https://github.com/dcnieho/gazeMapper`, and supports Python 3.10 and 3.11 on Windows, MacOS and Linux.
+GazeMapper is available from `https://github.com/dcnieho/gazeMapper`, and supports Python 3.10 and 3.11 on Windows, MacOS and Linux.
 
 For Windows users who wish to use the gazeMapper GUI, the easiest way to acquire gazeMapper is to [download
 a standalone executable](https://github.com/dcnieho/gazeMapper/releases/latest). The standalone executable is not
