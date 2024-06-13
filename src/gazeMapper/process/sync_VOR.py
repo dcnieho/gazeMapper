@@ -8,7 +8,7 @@ isMacOS = sys.platform.startswith("darwin")
 if isMacOS:
     import AppKit
 
-from glassesTools import gaze_headref, ocv, plane, timestamps
+from glassesTools import gaze_headref, ocv, plane, timestamps, video_utils
 from glassesTools.signal_gui import GUI, TargetPos
 
 
@@ -18,7 +18,9 @@ from .. import config, episode, session
 
 
 stopAllProcessing = False
-def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path):
+def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path, apply_average=True):
+    # apply_average: if True: the average offset for all VOR sync episodes will be applied to the timestamps
+    # if False, the VOR offset for the first episode will be applied, the rest are taken as checks
     working_dir = pathlib.Path(working_dir)
     config_dir  = pathlib.Path(config_dir)
 
@@ -27,14 +29,14 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path):
     # We run processing in a separate thread (GUI needs to be on the main thread for OSX, see https://github.com/pthom/hello_imgui/issues/33)
     gui = GUI(use_thread = False)
 
-    proc_thread = threading.Thread(target=do_the_work, args=(working_dir, config_dir, gui))
+    proc_thread = threading.Thread(target=do_the_work, args=(working_dir, config_dir, gui, apply_average))
     proc_thread.start()
     gui.start()
     proc_thread.join()
     return stopAllProcessing
 
 
-def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI):
+def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, apply_average: bool):
     # get info about the study it is a part of
     study_config = config.Study.load_from_json(config_dir)
 
@@ -128,5 +130,31 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI):
 
     # store to file
     VOR_sync.to_csv(VOR_sync_file, sep='\t', float_format="%.4f") # .1 ms resolution
+
+    # apply offset to gaze
+    if apply_average:
+        toff = VOR_sync['offset_t'].mean()
+    else:
+        toff = VOR_sync.iloc[0,'offset_t']
+    # just read whole gaze dataframe so we can apply things vectorized
+    df = pd.read_csv(working_dir / 'gazeData.tsv', delimiter='\t', index_col=False)
+    # resync gaze timestamps using VOR, and get correct scene camera frame numbers
+    ts_VOR = df['timestamp'].to_numpy() + toff*1000.   # s -> ms
+    fr_VOR = video_utils.tssToFrameNumber(ts_VOR,video_ts.timestamps,trim=True)["frame_idx"].to_numpy()
+    # write into df
+    ts_idx = list(gaze_headref.Gaze._columns_compressed.keys()).index('timestamp_VOR')
+    fr_idx = list(gaze_headref.Gaze._columns_compressed.keys()).index('frame_idx_VOR')
+    cols = ['timestamp','frame_idx']
+    if ts_idx>fr_idx:
+        cols = [cols[1], cols[0]]
+    for c in cols:
+        v = ts_VOR if c=='timestamp' else fr_VOR
+        i = ts_idx if c=='timestamp' else fr_idx
+        if f'{c}_VOR' in df.columns:
+            df[f'{c}_VOR'] = v
+        else:
+            df.insert(i, f'{c}_VOR', v)
+    # store to file
+    df.to_csv(working_dir / 'gazeData.tsv', index=False, sep='\t', na_rep='nan', float_format="%.8f")
 
     return stopAllProcessing
