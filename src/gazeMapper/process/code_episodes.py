@@ -54,10 +54,9 @@ _key_tooltip = {
 
 
 stopAllProcessing = False
-def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path, rec_type: session.RecordingType):
+def process(working_dir: str|pathlib.Path, rec_type: session.RecordingType):
     # if show_poster, also draw poster with gaze overlaid on it (if available)
     working_dir = pathlib.Path(working_dir)
-    config_dir  = pathlib.Path(config_dir)
 
     print('processing: {}'.format(working_dir.name))
 
@@ -67,14 +66,14 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path, rec_typ
     gui.set_interesting_keys(list(_key_tooltip.keys()))
     main_win_id = gui.add_window(working_dir.name)
 
-    proc_thread = threading.Thread(target=do_the_work, args=(working_dir, config_dir, gui, main_win_id, rec_type))
+    proc_thread = threading.Thread(target=do_the_work, args=(working_dir, gui, main_win_id, rec_type))
     proc_thread.start()
     gui.start()
     proc_thread.join()
     return stopAllProcessing
 
 
-def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, main_win_id: int, rec_type: session.RecordingType):
+def do_the_work(working_dir: pathlib.Path, gui: GUI, main_win_id: int, rec_type: session.RecordingType):
     global stopAllProcessing
 
     # get info about recording
