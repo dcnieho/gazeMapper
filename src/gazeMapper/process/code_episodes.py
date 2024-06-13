@@ -83,13 +83,13 @@ def do_the_work(working_dir: pathlib.Path, gui: GUI, main_win_id: int, rec_type:
     elif rec_type==session.RecordingType.EyeTracker:
         # Read gaze data
         hasGaze = True
-        gazes = gaze_headref.read_dict_from_file(working_dir / 'gazeData.tsv')[0]
+        gazes = gaze_headref.read_dict_from_file(working_dir / 'gazeData.tsv', ts_column_suffixes=['VOR',''])[0]
 
         # Read gaze on poster data, if available
         hasPosterGaze = False
         if (working_dir / 'gazePosterPos.tsv').is_file():
             try:
-                gazesPoster = gaze_worldref.read_dict_from_file(working_dir / 'gazePosterPos.tsv')
+                gazesPoster = gaze_worldref.read_dict_from_file(working_dir / 'gazePosterPos.tsv', ts_column_suffixes=['VOR',''])
                 hasPosterGaze = True
             except:
                 # ignore when file can't be read or is empty
