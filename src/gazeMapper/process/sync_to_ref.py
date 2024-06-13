@@ -1,17 +1,23 @@
 import pathlib
+import numpy as np
 import pandas as pd
 
-from glassesTools import data_files, gaze_headref, timestamps, video_utils
+from glassesTools import gaze_headref, timestamps, video_utils
 
 
 from . import naming, _utils
 from .. import config, episode, session
 
 
-def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path, do_time_stretch=True):
+def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path, do_time_stretch=True, stretch_which='ref'):
     # if do_time_stretch is True, time is stretched by a linear scale factor
     # based on differences in elapsed time for the reference and the used camera
     # if False, one single offset is applied. If there are multiple sync points, the average is used
+    # stretch_which='ref' means that the time of the reference is judged to be unreliable and will be stretched
+    # you may wish to do this if you has as ref and overview camera and are syncing one or two eye trackers to it,
+    # so that the timing of your eye tracker events does not change (and the timing of some webcam recording may
+    # indeed be unreliable).
+    # TODO: option to average the stretch_fac of multiple cameras (e.g. two identical eye trackers)
     working_dir = pathlib.Path(working_dir) # working directory of a session, not of a recording
     config_dir  = pathlib.Path(config_dir)
     print('processing: {}'.format(working_dir.name))
@@ -24,7 +30,8 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path, do_time
 
     # get info from reference recording
     ref_episodes = _get_coding_file(working_dir / study_config.sync_ref_recording)
-    video_ts_ref = timestamps.VideoTimestamps(working_dir / study_config.sync_ref_recording / 'frameTimestamps.tsv')
+    ref_vid_ts_file = working_dir / study_config.sync_ref_recording / 'frameTimestamps.tsv'
+    video_ts_ref = timestamps.VideoTimestamps(ref_vid_ts_file)
 
     # check input
     if do_time_stretch:
@@ -67,9 +74,9 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path, do_time
     if do_time_stretch:
         # get stretch factor for each interval between two sync points
         if study_config.sync_average_recordings:
-            recs = [r for r in recs if r not in study_config.sync_average_recordings]
-            recs.append(study_config.sync_average_recordings)
-        for r in recs:
+            recs_gr = [r for r in recs if r not in study_config.sync_average_recordings]
+            recs_gr.append(study_config.sync_average_recordings)
+        for r in recs_gr:
             for ival in range(len(episodes)-1):
                 sync.loc[(r,ival),'t_ref_elapsed'] = sync.loc[(r,ival+1),'t_ref' ].droplevel('interval')-sync.loc[(r,ival),'t_ref' ]
                 sync.loc[(r,ival),'diff_offset']   = sync.loc[(r,ival+1),'offset'].droplevel('interval')-sync.loc[(r,ival),'offset']
@@ -85,10 +92,52 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path, do_time
         ts_col = 'timestamp_VOR' if 'timestamp_VOR' in df else 'timestamp'
         # get gaze timestamps and camera frame numbers _in reference video timeline_
         if do_time_stretch:
-            pass
+            ref_vid_ts = np.array(video_ts_ref.timestamps)
+            ts_ref     = df[ts_col].to_numpy()
+            for ival in range(len(episodes)-1):
+                # set up the problem - piecewise linear scale
+                # 1. get known good location for this interval, and the stretch factor
+                pivot       = sync.loc[(r,ival),'t_ref']
+                stretch_fac = sync.loc[(r,ival),'stretch_fac']
+                # 2. determine data range to apply stretch for this interval to
+                if ival==0:
+                    # first interval, apply all the way from start of data
+                    start = df[ts_col].min()
+                else:
+                    start = sync.loc[(r,ival),'t_ref']
+                if ival==len(episodes)-2:
+                    # last interval, apply all the way to end of data
+                    end = df[ts_col].max()
+                else:
+                    end = sync.loc[(r,ival+1),'t_ref']
+                data_sel = (ts_ref >= start) & (ts_ref <= end)
+                # calculate new timestamps
+                # 1. first translate gaze ts to reference timestamps
+                ts_ref[data_sel] += sync.loc[(r,ival),'offset']*1000.   # s -> ms
+                # 2. apply scaling
+                if stretch_which=='ref':
+                    data_sel = (ref_vid_ts >= start) & (ref_vid_ts <= end)
+                    ref_vid_ts[data_sel] = (ref_vid_ts[data_sel]-pivot)*(1-stretch_fac)+pivot
+                elif stretch_which=='other':
+                    raise NotImplementedError()
+            # store new time signal if one was made
+            if stretch_which=='ref':
+                vid_ts_df = pd.read_csv(ref_vid_ts_file, delimiter='\t', index_col='frame_idx')
+                should_store = False
+                if 'timestamp_stretched' not in vid_ts_df.columns:
+                    # doesn't exist, insert
+                    vid_ts_df.insert(1,'timestamp_stretched', ref_vid_ts)
+                    should_store = True
+                elif max(vid_ts_df['timestamp_stretched'].to_numpy()-ref_vid_ts)<10e-5:
+                    # exists but what we just computed is different, update
+                    vid_ts_df['timestamp_stretched'] = ref_vid_ts
+                    should_store = True
+                if should_store:
+                    vid_ts_df.to_csv(ref_vid_ts_file, sep='\t')
         else:
             ts_ref = df[ts_col].to_numpy() + sync.loc[(r,0),'mean_off']*1000.   # s -> ms
-        fr_ref = video_utils.tssToFrameNumber(ts_ref,video_ts_ref.timestamps,trim=True)['frame_idx'].to_numpy()
+            ref_vid_ts = video_ts_ref.timestamps
+        fr_ref = video_utils.tssToFrameNumber(ts_ref,ref_vid_ts,trim=True)['frame_idx'].to_numpy()
         # write into df
         df = _utils.insert_ts_fridx_in_df(df, gaze_headref.Gaze, 'ref', ts_ref, fr_ref)
         df.to_csv(working_dir / r / 'gazeData.tsv', index=False, sep='\t', na_rep='nan', float_format="%.8f")
