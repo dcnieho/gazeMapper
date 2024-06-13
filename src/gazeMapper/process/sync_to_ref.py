@@ -1,10 +1,10 @@
 import pathlib
 import pandas as pd
 
-from glassesTools import timestamps
+from glassesTools import data_files, gaze_headref, timestamps, video_utils
 
 
-from . import naming
+from . import naming, _utils
 from .. import config, episode, session
 
 
@@ -61,8 +61,8 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path, do_time
             sync.loc[(r,ival),'t_this'] =   video_ts  .get_timestamp(    episodes[ival])/1000.  # ms -> s
             sync.loc[(r,ival),'offset'] = sync.loc[(r,ival),'t_ref']-sync.loc[(r,ival),'t_this']
         if not do_time_stretch:
-            # no time stretching, get average offset
-            sync.loc[(r,slice(None)),'mean_off'] = sync.loc[(r,slice(None)),'offset'].mean()
+            # no time stretching, get average offset. Applies to whole file, store only for first interval
+            sync.loc[(r,0),'mean_off'] = sync.loc[(r,slice(None)),'offset'].mean()
 
     if do_time_stretch:
         # get stretch factor for each interval between two sync points
@@ -75,7 +75,23 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path, do_time
                 sync.loc[(r,ival),'diff_offset']   = sync.loc[(r,ival+1),'offset'].droplevel('interval')-sync.loc[(r,ival),'offset']
                 sync.loc[(r,ival),'stretch_fac']   = sync.loc[(r,ival),'diff_offset'].mean()/sync.loc[(r,ival),'t_ref_elapsed'].mean()
 
-    a=3
+    # store sync info
+    sync.to_csv(working_dir / 'ref_sync.tsv', sep='\t', na_rep='nan', float_format="%.16f")
+
+    # now that we have determined how to sync, apply
+    for r in recs:
+        # just read whole gaze dataframe so we can apply things vectorized
+        df = pd.read_csv(working_dir / r / 'gazeData.tsv', delimiter='\t', index_col=False)
+        ts_col = 'timestamp_VOR' if 'timestamp_VOR' in df else 'timestamp'
+        # get gaze timestamps and camera frame numbers _in reference video timeline_
+        if do_time_stretch:
+            pass
+        else:
+            ts_ref = df[ts_col].to_numpy() + sync.loc[(r,0),'mean_off']*1000.   # s -> ms
+        fr_ref = video_utils.tssToFrameNumber(ts_ref,video_ts_ref.timestamps,trim=True)['frame_idx'].to_numpy()
+        # write into df
+        df = _utils.insert_ts_fridx_in_df(df, gaze_headref.Gaze, 'ref', ts_ref, fr_ref)
+        df.to_csv(working_dir / r / 'gazeData.tsv', index=False, sep='\t', na_rep='nan', float_format="%.8f")
 
 def _get_coding_file(working_dir: str|pathlib.Path):
     coding_file = working_dir / naming.coding_file
