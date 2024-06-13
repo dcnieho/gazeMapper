@@ -24,7 +24,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path, do_time
 
     # get info from reference recording
     ref_episodes = _get_coding_file(working_dir / study_config.sync_ref_recording)
-    i2t_ref = timestamps.Idx2Timestamp(working_dir / study_config.sync_ref_recording / 'frameTimestamps.tsv')
+    video_ts_ref = timestamps.VideoTimestamps(working_dir / study_config.sync_ref_recording / 'frameTimestamps.tsv')
 
     # check input
     if do_time_stretch:
@@ -53,12 +53,12 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path, do_time
         assert len(episodes)==len(ref_episodes), f"The number of sync points for this recording ({len(episodes)}, {r}) is not equal to that for the reference recording ({len(episodes)}, {study_config.sync_ref_recording}). Cannot continue, fix your coding"
 
         # get time information
-        i2t     = timestamps.Idx2Timestamp(working_dir / r / 'frameTimestamps.tsv')
+        video_ts = timestamps.VideoTimestamps(working_dir / r / 'frameTimestamps.tsv')
 
         # get timestamps corresponding to sync frames
         for ival in range(len(episodes)):
-            sync.loc[(r,ival),'t_ref']  = i2t_ref.get(ref_episodes[ival])/1000.    # ms -> s
-            sync.loc[(r,ival),'t_this'] =   i2t  .get(    episodes[ival])/1000.    # ms -> s
+            sync.loc[(r,ival),'t_ref']  = video_ts_ref.get_timestamp(ref_episodes[ival])/1000.  # ms -> s
+            sync.loc[(r,ival),'t_this'] =   video_ts  .get_timestamp(    episodes[ival])/1000.  # ms -> s
             sync.loc[(r,ival),'offset'] = sync.loc[(r,ival),'t_ref']-sync.loc[(r,ival),'t_this']
         if not do_time_stretch:
             # no time stretching, get average offset

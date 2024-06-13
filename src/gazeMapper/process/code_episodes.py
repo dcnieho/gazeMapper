@@ -124,8 +124,7 @@ def do_the_work(working_dir: pathlib.Path, gui: GUI, main_win_id: int, rec_type:
 
     # set up video playback
     # 1. timestamp info for relating audio to video frames
-    t2i = timestamps.Timestamp2Index( working_dir / 'frameTimestamps.tsv' )
-    i2t = timestamps.Idx2Timestamp( working_dir / 'frameTimestamps.tsv' )
+    video_ts = timestamps.VideoTimestamps( working_dir / 'frameTimestamps.tsv' )
     # 2. mediaplayer for the actual video playback, with sound if available
     ff_opts = {'volume': 1., 'sync': 'audio', 'framedrop': True}
     player = MediaPlayer(str(in_video), ff_opts=ff_opts)
@@ -147,7 +146,7 @@ def do_the_work(working_dir: pathlib.Path, gui: GUI, main_win_id: int, rec_type:
 
         if frame is not None:
             # the audio is my shepherd and nothing shall I lack :-)
-            frame_idx = t2i.find(pts*1000)  # pts is in seconds, our frame timestamps are in ms
+            frame_idx = video_ts.find_frame(pts*1000)  # pts is in seconds, our frame timestamps are in ms
 
             # if we have poster pose, draw poster origin on video
             if hasPosterPose and frame_idx in poses and hasCamCal:
@@ -175,12 +174,12 @@ def do_the_work(working_dir: pathlib.Path, gui: GUI, main_win_id: int, rec_type:
         # seek: don't ask me why, but relative seeking works best for backward,
         # and seeking to absolute pts best for forward seeking.
         if 'j' in keys:
-            step = (i2t.get(frame_idx)-i2t.get(max(0,frame_idx-1)))/1000
+            step = (video_ts.get_timestamp(frame_idx)-video_ts.get_timestamp(max(0,frame_idx-1)))/1000
             player.seek(-step)                              # back one frame
         if 'k' in keys:
-            nextTs = i2t.get(frame_idx+1)
+            nextTs = video_ts.get_timestamp(frame_idx+1)
             if nextTs != -1.:
-                step = (nextTs-i2t.get(max(0,frame_idx)))/1000
+                step = (nextTs-video_ts.get_timestamp(max(0,frame_idx)))/1000
                 player.seek(pts+step, relative=False)       # forward one frame
         if 'h' in keys or 'H' in keys:
             step = 1 if 'h' in keys else 10

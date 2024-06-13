@@ -63,7 +63,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI):
     cameraParams.has_intrinsics()
 
     # time info
-    i2t = timestamps.Idx2Timestamp(working_dir / 'frameTimestamps.tsv')
+    video_ts = timestamps.VideoTimestamps(working_dir / 'frameTimestamps.tsv')
 
     # get previous sync settings, if any
     VOR_sync_file = working_dir / 'VOR_sync.tsv'
@@ -83,7 +83,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI):
             t_pos = poses[frame_idx].planeToCamPose(np.zeros((3,)), cameraParams)
         elif poses[frame_idx].homography_N_markers>0:
             t_pos = poses[frame_idx].planeToCamHomography(np.zeros((3,)), cameraParams)
-        target_positions[frame_idx] = TargetPos(i2t.get(frame_idx), frame_idx, t_pos)
+        target_positions[frame_idx] = TargetPos(video_ts.get_timestamp(frame_idx), frame_idx, t_pos)
 
     # show
     hasRequestedFocus = not isMacOS # False only if on Mac OS, else True since its a no-op
