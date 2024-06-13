@@ -12,7 +12,7 @@ from glassesTools import gaze_headref, ocv, plane, timestamps, video_utils
 from glassesTools.signal_gui import GUI, TargetPos
 
 
-from . import naming
+from . import naming, _utils
 from .. import config, episode, session
 
 
@@ -140,21 +140,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, a
     df = pd.read_csv(working_dir / 'gazeData.tsv', delimiter='\t', index_col=False)
     # resync gaze timestamps using VOR, and get correct scene camera frame numbers
     ts_VOR = df['timestamp'].to_numpy() + toff*1000.   # s -> ms
-    fr_VOR = video_utils.tssToFrameNumber(ts_VOR,video_ts.timestamps,trim=True)["frame_idx"].to_numpy()
+    fr_VOR = video_utils.tssToFrameNumber(ts_VOR,video_ts.timestamps,trim=True)['frame_idx'].to_numpy()
     # write into df
-    ts_idx = list(gaze_headref.Gaze._columns_compressed.keys()).index('timestamp_VOR')
-    fr_idx = list(gaze_headref.Gaze._columns_compressed.keys()).index('frame_idx_VOR')
-    cols = ['timestamp','frame_idx']
-    if ts_idx>fr_idx:
-        cols = [cols[1], cols[0]]
-    for c in cols:
-        v = ts_VOR if c=='timestamp' else fr_VOR
-        i = ts_idx if c=='timestamp' else fr_idx
-        if f'{c}_VOR' in df.columns:
-            df[f'{c}_VOR'] = v
-        else:
-            df.insert(i, f'{c}_VOR', v)
-    # store to file
+    df = _utils.insert_ts_fridx_in_df(df, gaze_headref.Gaze, 'ref', ts_VOR, fr_VOR)
     df.to_csv(working_dir / 'gazeData.tsv', index=False, sep='\t', na_rep='nan', float_format="%.8f")
 
     return stopAllProcessing
