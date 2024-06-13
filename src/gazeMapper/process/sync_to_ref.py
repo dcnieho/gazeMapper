@@ -62,7 +62,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path, do_time
             sync.loc[(r,ival),'offset'] = sync.loc[(r,ival),'t_ref']-sync.loc[(r,ival),'t_this']
         if not do_time_stretch:
             # no time stretching, get average offset
-            sync.loc[(r,slice(None)),'mean_off'] = sync.loc[(r,ival),'offset'].mean()
+            sync.loc[(r,slice(None)),'mean_off'] = sync.loc[(r,slice(None)),'offset'].mean()
 
     if do_time_stretch:
         # get stretch factor for each interval between two sync points
