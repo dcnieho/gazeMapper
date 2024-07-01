@@ -10,21 +10,29 @@ from . import naming, _utils
 from .. import config, episode, session
 
 
-def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path, do_time_stretch=True, stretch_which='ref'):
-    # if do_time_stretch is True, time is stretched by a linear scale factor
-    # based on differences in elapsed time for the reference and the used camera
-    # if False, one single offset is applied. If there are multiple sync points, the average is used
-    # stretch_which='ref' means that the time of the reference is judged to be unreliable and will be stretched
-    # you may wish to do this if you has as ref and overview camera and are syncing one or two eye trackers to it,
-    # so that the timing of your eye tracker events does not change (and the timing of some webcam recording may
-    # indeed be unreliable).
-    # TODO: option to average the stretch_fac of multiple cameras (e.g. two identical eye trackers)
+def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path):
     working_dir = pathlib.Path(working_dir) # working directory of a session, not of a recording
     config_dir  = pathlib.Path(config_dir)
     print('processing: {}'.format(working_dir.name))
 
     # get info about the study it is a part of
     study_config = config.Study.load_from_json(config_dir)
+    # documentation for some settings in the json file:
+    # 1. sync_ref_recording. Name of one of the recordings that is part of the session, the one w.r.t. which
+    #    the other recordings are synced.
+    # 2. If do_time_stretch is True, time is offset, and stretched by a linear scale factor based on
+    #    differences in elapsed time for the reference and the other camera. Requires at least two sync
+    #    points to determine the stretch factor. If there are more, piecewise linear scaling is done for
+    #    timestamps falling between each pair of sync points. If False, one single offset is applied. If
+    #    there are multiple sync points, the average is used.
+    # 3. stretch_which='ref' means that the time of the reference is judged to be unreliable and will be
+    #    stretched. You may wish to do this if you have an overview camera as ref and are syncing one or two
+    #    eye trackers to it, so that the timing of your eye tracker events does not change (and the timing of
+    #    some webcam recording may indeed be unreliable). If 'other', the other signals get stretched.
+    # 4. sync_average_recordings. If a non-empty list, the stretch_fac w.r.t. multiple others (e.g. two
+    #    identical eye trackers) is used, instead of for individual recordings. This can be useful with
+    #    stretch_which='ref' if the ref is deemed unreliable and the other sources are deemed similar. Then
+    #    the average may provide a better estimate of the stretch factor to use.
 
     # get session info
     session_info = session.Session.load_from_json(working_dir)
@@ -35,7 +43,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path, do_time
     video_ts_ref = timestamps.VideoTimestamps(ref_vid_ts_file)
 
     # check input
-    if do_time_stretch:
+    if study_config.do_time_stretch:
         assert len(ref_episodes)>1, f"You requested to do time stretching when syncing the recordings, but there is only one camera sync point. At least two sync points are required for time stretching"
         if study_config.sync_average_recordings:
             for r in study_config.sync_average_recordings:
@@ -44,7 +52,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path, do_time
 
     # prep for sync info
     cols    = ['t_ref','t_this','offset']
-    if do_time_stretch:
+    if study_config.do_time_stretch:
         cols += ['t_ref_elapsed','diff_offset','stretch_fac']
     else:
         cols += ['mean_off']
@@ -68,11 +76,11 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path, do_time
             sync.loc[(r,ival),'t_ref']  = video_ts_ref.get_timestamp(ref_episodes[ival])/1000.  # ms -> s
             sync.loc[(r,ival),'t_this'] =   video_ts  .get_timestamp(    episodes[ival])/1000.  # ms -> s
             sync.loc[(r,ival),'offset'] = sync.loc[(r,ival),'t_ref']-sync.loc[(r,ival),'t_this']
-        if not do_time_stretch:
+        if not study_config.do_time_stretch:
             # no time stretching, get average offset. Applies to whole file, store only for first interval
             sync.loc[(r,0),'mean_off'] = sync.loc[(r,slice(None)),'offset'].mean()
 
-    if do_time_stretch:
+    if study_config.do_time_stretch:
         # get stretch factor for each interval between two sync points
         if study_config.sync_average_recordings:
             recs_gr = [r for r in recs if r not in study_config.sync_average_recordings]
@@ -94,7 +102,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path, do_time
         # get gaze timestamps and camera frame numbers _in reference video timeline_
         ref_vid_ts = np.array(video_ts_ref.timestamps)
         ts_ref     = df[ts_col].to_numpy().copy()
-        if do_time_stretch:
+        if study_config.do_time_stretch:
             for ival in range(len(episodes)-1):
                 # set up the problem - piecewise linear scale
                 # 1. get known good location for this interval, and the stretch factor
@@ -116,13 +124,13 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path, do_time
                 # 1. first translate gaze ts to reference timestamps
                 ts_ref[data_sel] += sync.loc[(r,ival),'offset']*1000.   # s -> ms
                 # 2. apply scaling
-                if stretch_which=='ref':
+                if study_config.stretch_which=='ref':
                     data_sel = (ref_vid_ts >= start) & (ref_vid_ts <= end)
                     ref_vid_ts[data_sel] = (ref_vid_ts[data_sel]-pivot)*(1-stretch_fac)+pivot
-                elif stretch_which=='other':
+                elif study_config.stretch_which=='other':
                     raise NotImplementedError()
             # store new time signal if one was made
-            if stretch_which=='ref':
+            if study_config.stretch_which=='ref':
                 vid_ts_df = pd.read_csv(ref_vid_ts_file, delimiter='\t', index_col='frame_idx')
                 should_store = False
                 if 'timestamp_stretched' not in vid_ts_df.columns:
