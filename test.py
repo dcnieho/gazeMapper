@@ -9,20 +9,21 @@ from src.gazeMapper.process.sync_VOR import process as sync_VOR
 from src.gazeMapper.process.sync_to_ref import process as sync_to_ref
 
 
-base = pathlib.Path(r'C:\dat\projects\Roy Japanese Lego\pilot 3\data\J00')
-proj = pathlib.Path(r'C:\dat\projects\gazeMapper\test_proj')
+# base = pathlib.Path(r'C:\dat\projects\Roy Japanese Lego\pilot 3\data\J13')
+# base = pathlib.Path(r'C:\dat\projects\Roy Japanese Lego\pilot 3\data\N24')
+proj = pathlib.Path(r'C:\dat\projects\gazeMapper\projs\roy japan')
 
 
-# # create session
+# create session
 # sess_def = session.SessionDefinition.load_from_json(proj/'config'/'session_def.json')
 # sess = session.Session(sess_def,'N24')
 # sess.create_working_directory(proj)
 # # import recordings
-# #rec_info = importing.get_recording_info(base/'J13A'/'20231019T081115Z', eyetracker.EyeTracker.Tobii_Glasses_3)
+# rec_info = importing.get_recording_info(base/'J13A'/'20231019T081115Z', eyetracker.EyeTracker.Tobii_Glasses_3)
 # rec_info = importing.get_recording_info(base/'N24A'/'2023-11-30_10-10-47-d1aa2982', eyetracker.EyeTracker.Pupil_Invisible)
 # rec = sess.import_and_add_recording('et1',rec_info[0],False)
 
-# #rec_info = importing.get_recording_info(base/'J13D'/'20231019T081031Z', eyetracker.EyeTracker.Tobii_Glasses_3)
+# rec_info = importing.get_recording_info(base/'J13D'/'20231019T081031Z', eyetracker.EyeTracker.Tobii_Glasses_3)
 # rec_info = importing.get_recording_info(base/'N24D'/'2023-11-30_10-10-31-cc2e58e9', eyetracker.EyeTracker.Pupil_Invisible)
 # rec = sess.import_and_add_recording('et2',rec_info[0],False)
 
