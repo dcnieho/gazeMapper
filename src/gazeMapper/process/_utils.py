@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from typing import Any
 
-from glassesTools import data_files, gaze_headref
+from glassesTools import data_files
 
 
 def insert_ts_fridx_in_df(df: pd.DataFrame, object: Any, suffix: str, ts: np.ndarray, fridxs: np.ndarray):
