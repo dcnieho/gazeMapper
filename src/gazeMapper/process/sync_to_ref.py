@@ -94,7 +94,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path, do_time
         # get gaze timestamps and camera frame numbers _in reference video timeline_
         if do_time_stretch:
             ref_vid_ts = np.array(video_ts_ref.timestamps)
-            ts_ref     = df[ts_col].to_numpy()
+            ts_ref     = df[ts_col].to_numpy().copy()
             for ival in range(len(episodes)-1):
                 # set up the problem - piecewise linear scale
                 # 1. get known good location for this interval, and the stretch factor
