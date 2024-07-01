@@ -145,7 +145,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, a
     ts_VOR = df['timestamp'].to_numpy() + toff*1000.   # s -> ms
     fr_VOR = video_utils.tssToFrameNumber(ts_VOR,video_ts.timestamps,trim=True)['frame_idx'].to_numpy()
     # write into df (use polars as that library saves to file waaay faster)
-    df = _utils.insert_ts_fridx_in_df(df, gaze_headref.Gaze, 'ref', ts_VOR, fr_VOR)
+    df = _utils.insert_ts_fridx_in_df(df, gaze_headref.Gaze, 'VOR', ts_VOR, fr_VOR)
     df = pl.from_pandas(df)
     df.write_csv(working_dir / 'gazeData.tsv', separator='\t', null_value='nan', float_precision=8)
 
