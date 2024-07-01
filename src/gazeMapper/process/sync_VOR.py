@@ -25,7 +25,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path, apply_a
     working_dir = pathlib.Path(working_dir)
     config_dir  = pathlib.Path(config_dir)
 
-    print('processing: {}'.format(working_dir.name))
+    print(f'processing: {working_dir.parent.name}/{working_dir.name}')
 
     # We run processing in a separate thread (GUI needs to be on the main thread for OSX, see https://github.com/pthom/hello_imgui/issues/33)
     gui = GUI(use_thread = False)
