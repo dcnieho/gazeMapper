@@ -59,7 +59,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, a
     gazes = gaze_headref.read_dict_from_file(working_dir / 'gazeData.tsv', episodes)[0]
 
     # Read pose w.r.t plane
-    poses = plane.read_dict_from_file(working_dir/f'{naming.plane_pose_prefix}{pln}.tsv', episodes)
+    pln_file = working_dir/f'{naming.plane_pose_prefix}{pln}.tsv'
+    assert pln_file.is_file(), f'A planePose file for the {pln} plane is not found, but is needed. Run detect_markers to create this file.'
+    poses = plane.read_dict_from_file(pln_file, episodes)
 
     # get camera calibration info
     cameraParams= ocv.CameraParams.readFromFile(working_dir / "calibration.xml")
