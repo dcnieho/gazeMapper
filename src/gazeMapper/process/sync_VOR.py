@@ -2,6 +2,7 @@ import pathlib
 import threading
 import numpy as np
 import pandas as pd
+import polars as pl
 
 import sys
 isMacOS = sys.platform.startswith("darwin")
@@ -46,7 +47,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, a
 
     planes = study_config.planes_per_interval[episode.Event.Sync_VOR]
     assert len(planes)==1, "sync_VOR only supports a single plane being used for VOR sync, contact developer if this is an issue"
-    pl = planes[0]
+    pln = planes[0]
 
     # get interval coding
     coding_file = working_dir / naming.coding_file
@@ -58,7 +59,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, a
     gazes = gaze_headref.read_dict_from_file(working_dir / 'gazeData.tsv', episodes)[0]
 
     # Read pose w.r.t plane
-    poses = plane.read_dict_from_file(working_dir/f'{naming.plane_pose_prefix}{pl}.tsv', episodes)
+    poses = plane.read_dict_from_file(working_dir/f'{naming.plane_pose_prefix}{pln}.tsv', episodes)
 
     # get camera calibration info
     cameraParams= ocv.CameraParams.readFromFile(working_dir / "calibration.xml")
@@ -141,8 +142,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, a
     # resync gaze timestamps using VOR, and get correct scene camera frame numbers
     ts_VOR = df['timestamp'].to_numpy() + toff*1000.   # s -> ms
     fr_VOR = video_utils.tssToFrameNumber(ts_VOR,video_ts.timestamps,trim=True)['frame_idx'].to_numpy()
-    # write into df
+    # write into df (use polars as that library saves to file waaay faster)
     df = _utils.insert_ts_fridx_in_df(df, gaze_headref.Gaze, 'ref', ts_VOR, fr_VOR)
-    df.to_csv(working_dir / 'gazeData.tsv', index=False, sep='\t', na_rep='nan', float_format="%.8f")
+    df = pl.from_pandas(df)
+    df.write_csv(working_dir / 'gazeData.tsv', separator='\t', null_value='nan', float_precision=8)
 
     return stopAllProcessing

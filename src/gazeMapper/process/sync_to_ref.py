@@ -1,6 +1,7 @@
 import pathlib
 import numpy as np
 import pandas as pd
+import polars as pl
 
 from glassesTools import gaze_headref, timestamps, video_utils
 
@@ -138,9 +139,10 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path, do_time
             ts_ref = df[ts_col].to_numpy() + sync.loc[(r,0),'mean_off']*1000.   # s -> ms
             ref_vid_ts = video_ts_ref.timestamps
         fr_ref = video_utils.tssToFrameNumber(ts_ref,ref_vid_ts,trim=True)['frame_idx'].to_numpy()
-        # write into df
+        # write into df (use polars as that library saves to file waaay faster)
         df = _utils.insert_ts_fridx_in_df(df, gaze_headref.Gaze, 'ref', ts_ref, fr_ref)
-        df.to_csv(working_dir / r / 'gazeData.tsv', index=False, sep='\t', na_rep='nan', float_format="%.8f")
+        df = pl.from_pandas(df)
+        df.write_csv(working_dir / r / 'gazeData.tsv', separator='\t', null_value='nan', float_precision=8)
 
 def _get_coding_file(working_dir: str|pathlib.Path):
     coding_file = working_dir / naming.coding_file
