@@ -92,9 +92,9 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path, do_time
         df = pd.read_csv(working_dir / r / 'gazeData.tsv', delimiter='\t', index_col=False)
         ts_col = 'timestamp_VOR' if 'timestamp_VOR' in df else 'timestamp'
         # get gaze timestamps and camera frame numbers _in reference video timeline_
+        ref_vid_ts = np.array(video_ts_ref.timestamps)
+        ts_ref     = df[ts_col].to_numpy().copy()
         if do_time_stretch:
-            ref_vid_ts = np.array(video_ts_ref.timestamps)
-            ts_ref     = df[ts_col].to_numpy().copy()
             for ival in range(len(episodes)-1):
                 # set up the problem - piecewise linear scale
                 # 1. get known good location for this interval, and the stretch factor
@@ -136,8 +136,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path, do_time
                 if should_store:
                     vid_ts_df.to_csv(ref_vid_ts_file, sep='\t')
         else:
-            ts_ref = df[ts_col].to_numpy() + sync.loc[(r,0),'mean_off']*1000.   # s -> ms
-            ref_vid_ts = video_ts_ref.timestamps
+            ts_ref += sync.loc[(r,0),'mean_off']*1000.   # s -> ms
         fr_ref = video_utils.tssToFrameNumber(ts_ref,ref_vid_ts,trim=True)['frame_idx'].to_numpy()
         # write into df (use polars as that library saves to file waaay faster)
         df = _utils.insert_ts_fridx_in_df(df, gaze_headref.Gaze, 'ref', ts_ref, fr_ref)
