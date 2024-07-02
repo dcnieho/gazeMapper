@@ -47,16 +47,16 @@ proj = pathlib.Path(r'C:\dat\projects\gazeMapper\projs\roy japan')
 
 sessions = session.get_sessions_from_directory(proj)
 
-# do_coding(sessions[0].recordings['et1'].info.working_directory,session.RecordingType.EyeTracker)
-# do_coding(sessions[0].recordings['et2'].info.working_directory,session.RecordingType.EyeTracker)
-# do_coding(sessions[0].recordings['cam'].info.working_directory,session.RecordingType.Camera)
+# do_coding(sessions[0].recordings['et1'].info.working_directory)
+# do_coding(sessions[0].recordings['et2'].info.working_directory)
+# do_coding(sessions[0].recordings['cam'].info.working_directory)
 
 # for s in sessions:
-#     detect_markers(s.recordings['cam'].info.working_directory,proj/'config',session.RecordingType.Camera)
-#     detect_markers(s.recordings['et1'].info.working_directory,proj/'config',session.RecordingType.EyeTracker)
-#     detect_markers(s.recordings['et2'].info.working_directory,proj/'config',session.RecordingType.EyeTracker)
+#     detect_markers(s.recordings['cam'].info.working_directory)
+#     detect_markers(s.recordings['et1'].info.working_directory)
+#     detect_markers(s.recordings['et2'].info.working_directory)
 
 for s in sessions:
-    sync_VOR(s.recordings['et1'].info.working_directory,proj/'config')
-    sync_VOR(s.recordings['et2'].info.working_directory,proj/'config')
-    sync_to_ref(s.working_directory,proj/'config',do_time_stretch=True)
+    sync_VOR(s.recordings['et1'].info.working_directory)
+    sync_VOR(s.recordings['et2'].info.working_directory)
+    sync_to_ref(s.working_directory)
