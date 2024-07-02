@@ -43,10 +43,10 @@ class SessionDefinition:
             recordings = []
         self.recordings = recordings
 
-    def add_recording(self, recording: RecordingDefinition):
+    def add_recording_def(self, recording: RecordingDefinition):
         self.recordings.append(recording)
 
-    def get_recording(self, which: str) -> RecordingDefinition:
+    def get_recording_def(self, which: str) -> RecordingDefinition:
         for r in self.recordings:
             if r.name==which:
                 return r
@@ -82,7 +82,7 @@ class Session:
             self.working_directory.mkdir()
 
     def import_and_add_recording(self, which: str, rec_info: EyeTrackerRecording|camera_recording.Recording, copy_video = True) -> Recording:
-        rec_def = self.definition.get_recording(which)
+        rec_def = self.definition.get_recording_def(which)
         self.check_recording_info(which, rec_info)
 
         # do import
@@ -108,7 +108,7 @@ class Session:
             return
 
         # get info about recording
-        rec_def = self.definition.get_recording(which)
+        rec_def = self.definition.get_recording_def(which)
         if rec_def.type==RecordingType.EyeTracker:
             rec_info = EyeTrackerRecording.load_from_json(r_fold)
         else:
@@ -119,14 +119,14 @@ class Session:
         return self.recordings[which]
 
     def check_recording_info(self, which: str, rec_info: EyeTrackerRecording|camera_recording.Recording):
-        rec_def = self.definition.get_recording(which)
+        rec_def = self.definition.get_recording_def(which)
         if rec_def.type==RecordingType.EyeTracker:
             assert isinstance(rec_info,EyeTrackerRecording), f"The provided rec_info is not for an eye tracker recording, but {which} is an eye tracker recording"
         elif rec_def.type==RecordingType.Camera:
             assert isinstance(rec_info,camera_recording.Recording), f"The provided rec_info is not for a camera recording, but {which} is a camera recording"
 
     def add_recording_from_info(self, which: str, rec_info: EyeTrackerRecording|camera_recording.Recording):
-        rec_def = self.definition.get_recording(which)
+        rec_def = self.definition.get_recording_def(which)
         self.check_recording_info(which, rec_info)
         self.recordings[which] = Recording(rec_def, rec_info)
 
