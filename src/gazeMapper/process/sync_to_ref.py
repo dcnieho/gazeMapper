@@ -15,7 +15,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):
     if config_dir is None:
         config_dir = config.guess_config_dir(working_dir)
     config_dir  = pathlib.Path(config_dir)
-    print('processing: {}'.format(working_dir.name))
+    print(f'processing: {working_dir.name}')
 
     # get info about the study it is a part of
     study_config = config.Study.load_from_json(config_dir)
