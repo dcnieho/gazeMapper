@@ -65,7 +65,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path):
     gui = GUI(use_thread = False)
 
     gui.set_interesting_keys(list(_key_tooltip.keys()))
-    main_win_id = gui.add_window(working_dir.name)
+    main_win_id = gui.add_window(f'{working_dir.parent.name}, {working_dir.name}')
 
     proc_thread = threading.Thread(target=do_the_work, args=(working_dir, config_dir, gui, main_win_id))
     proc_thread.start()
