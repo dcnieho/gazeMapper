@@ -17,7 +17,7 @@ from glassesTools.video_gui import GUI, generic_tooltip_drawer
 
 
 from . import naming
-from .. import  episode, session
+from .. import config, episode, session
 
 # This script shows a video player that is used to indicate the interval(s)
 # during which the poster should be found in the video and in later
@@ -54,9 +54,10 @@ _key_tooltip = {
 
 
 stopAllProcessing = False
-def process(working_dir: str|pathlib.Path, rec_type: session.RecordingType):
+def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path):
     # if show_poster, also draw poster with gaze overlaid on it (if available)
     working_dir = pathlib.Path(working_dir)
+    config_dir  = pathlib.Path(config_dir)
 
     print('processing: {}'.format(working_dir.name))
 
@@ -66,17 +67,22 @@ def process(working_dir: str|pathlib.Path, rec_type: session.RecordingType):
     gui.set_interesting_keys(list(_key_tooltip.keys()))
     main_win_id = gui.add_window(working_dir.name)
 
-    proc_thread = threading.Thread(target=do_the_work, args=(working_dir, gui, main_win_id, rec_type))
+    proc_thread = threading.Thread(target=do_the_work, args=(working_dir, config_dir, gui, main_win_id))
     proc_thread.start()
     gui.start()
     proc_thread.join()
     return stopAllProcessing
 
 
-def do_the_work(working_dir: pathlib.Path, gui: GUI, main_win_id: int, rec_type: session.RecordingType):
+def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, main_win_id: int):
     global stopAllProcessing
 
+    # get info about the study the recording is a part of
+    study_config = config.Study.load_from_json(config_dir)
+
     # get info about recording
+    rec_def  = study_config.session_def.get_recording_def(working_dir.name)
+    rec_type = rec_def.type
     in_video = session.read_recording_info(working_dir, rec_type)[1]
     if rec_type==session.RecordingType.Camera:
         hasGaze, hasPosterGaze, hasPosterPose = False, False, False

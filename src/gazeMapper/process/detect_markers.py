@@ -10,8 +10,8 @@ from .. import config, episode, plane, session
 
 
 stopAllProcessing = False
-def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path, rec_type: session.RecordingType, show_visualization=False, show_rejected_markers=False):
-    # if show_visualization, each frame is shown in a viewer, overlaid with info about detected markers and poster
+def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path, show_visualization=False, show_rejected_markers=False):
+    # if show_visualization, each frame is shown in a viewer, overlaid with info about detected markers and planes
     # if show_rejected_markers, rejected ArUco marker candidates are also shown in the viewer. Possibly useful for debug
     working_dir = pathlib.Path(working_dir)
     config_dir  = pathlib.Path(config_dir)
@@ -25,23 +25,24 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path, rec_typ
         gui.register_draw_callback('status',lambda: generic_tooltip_drawer(qns_tooltip()))
         gui.add_window(working_dir.name)
 
-        proc_thread = threading.Thread(target=do_the_work, args=(working_dir, config_dir, gui, show_rejected_markers, rec_type))
+        proc_thread = threading.Thread(target=do_the_work, args=(working_dir, config_dir, gui, show_rejected_markers))
         proc_thread.start()
         gui.start()
         proc_thread.join()
         return stopAllProcessing
     else:
-        return do_the_work(working_dir, config_dir, None, False, rec_type)
+        return do_the_work(working_dir, config_dir, None, False)
 
 
-def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, show_rejected_markers: bool, rec_type: session.RecordingType):
+def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, show_rejected_markers: bool):
     global stopAllProcessing
 
-    # get info about recording
-    in_video = session.read_recording_info(working_dir, rec_type)[1]
-
-    # get info about the study it is a part of
+    # get info about the study the recording is a part of
     study_config = config.Study.load_from_json(config_dir)
+
+    # get info about recording
+    rec_def = study_config.session_def.get_recording_def(working_dir.name)
+    in_video = session.read_recording_info(working_dir, rec_def.type)[1]
 
     # get interval(s) coded to be analyzed, if any
     episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / 'coding.tsv'))
