@@ -54,9 +54,11 @@ _key_tooltip = {
 
 
 stopAllProcessing = False
-def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path):
+def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):
     # if show_poster, also draw poster with gaze overlaid on it (if available)
     working_dir = pathlib.Path(working_dir)
+    if config_dir is None:
+        config_dir = config.guess_config_dir(working_dir)
     config_dir  = pathlib.Path(config_dir)
 
     print('processing: {}'.format(working_dir.name))

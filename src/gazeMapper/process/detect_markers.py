@@ -10,10 +10,12 @@ from .. import config, episode, plane, session
 
 
 stopAllProcessing = False
-def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path, show_visualization=False, show_rejected_markers=False):
+def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show_visualization=False, show_rejected_markers=False):
     # if show_visualization, each frame is shown in a viewer, overlaid with info about detected markers and planes
     # if show_rejected_markers, rejected ArUco marker candidates are also shown in the viewer. Possibly useful for debug
     working_dir = pathlib.Path(working_dir)
+    if config_dir is None:
+        config_dir = config.guess_config_dir(working_dir)
     config_dir  = pathlib.Path(config_dir)
 
     print('processing: {}'.format(working_dir.name))

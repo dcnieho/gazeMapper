@@ -10,8 +10,10 @@ from . import naming, _utils
 from .. import config, episode, session
 
 
-def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path):
+def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):
     working_dir = pathlib.Path(working_dir) # working directory of a session, not of a recording
+    if config_dir is None:
+        config_dir = config.guess_config_dir(working_dir)
     config_dir  = pathlib.Path(config_dir)
     print('processing: {}'.format(working_dir.name))
 

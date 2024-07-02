@@ -92,3 +92,17 @@ class Study:
             planes.append(plane.Definition.load_from_json(p_file))
 
         return Study(sess_def, planes, working_directory=path, **kwds)
+
+def guess_config_dir(working_dir: str|pathlib.Path, config_dir_name: str = "config", json_file_name: str = Study.default_json_file_name) -> pathlib.Path:
+    # can be either in a session's working directory, or in a recording's in such
+    # a session's working directory. So try two levels
+    for _ in range(2):
+        working_dir = working_dir.parent
+        test_dir = working_dir / config_dir_name
+        if not test_dir.is_dir():
+            continue
+        test_file = test_dir / json_file_name
+        if test_file.is_file():
+            return test_dir
+
+    raise RuntimeError('config directory not found')

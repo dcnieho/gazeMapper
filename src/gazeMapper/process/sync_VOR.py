@@ -19,10 +19,12 @@ from .. import config, episode, session
 
 
 stopAllProcessing = False
-def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path, apply_average=True):
+def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, apply_average=True):
     # apply_average: if True: the average offset for all VOR sync episodes will be applied to the timestamps
     # if False, the VOR offset for the first episode will be applied, the rest are taken as checks
     working_dir = pathlib.Path(working_dir)
+    if config_dir is None:
+        config_dir = config.guess_config_dir(working_dir)
     config_dir  = pathlib.Path(config_dir)
 
     print(f'processing: {working_dir.parent.name}/{working_dir.name}')
