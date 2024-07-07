@@ -1,9 +1,7 @@
 import pathlib
 import threading
-import cv2
-import numpy as np
 
-from glassesTools import drawing, gaze_headref, gaze_worldref, intervals, ocv, plane as gt_plane, timestamps
+from glassesTools import gaze_headref, gaze_worldref, ocv, plane as gt_plane, worldgaze_gui
 from glassesTools.video_gui import GUI, generic_tooltip_drawer, qns_tooltip
 
 
@@ -67,7 +65,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, f
 
     # load gaze data and poses
     processing_intervals = [e for p in mapping_setup for e in mapping_setup[p]] # NB: doesn't need to be sorted
-    gazes,maxFrameIdx = gaze_headref.read_dict_from_file(working_dir / 'gazeData.tsv', processing_intervals if not gui or show_only_intervals else None)
+    head_gazes = gaze_headref.read_dict_from_file(working_dir / 'gazeData.tsv', processing_intervals if not gui or show_only_intervals else None)[0]
     poses = {p:gt_plane.read_dict_from_file(working_dir/f'{naming.plane_pose_prefix}{p}.tsv', mapping_setup[p]) for p in mapping_setup}
 
     # get camera calibration info
@@ -77,89 +75,17 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, f
     # transform gaze to plane(s)
     plane_gazes: dict[str, dict[int,list[gaze_worldref.Gaze]]] = {}
     for p in planes:
-        plane_gazes[p] = gaze_worldref.gazes_head_to_world(poses[p], gazes, cameraParams)
+        plane_gazes[p] = gaze_worldref.gazes_head_to_world(poses[p], head_gazes, cameraParams)
         gaze_worldref.write_dict_to_file(plane_gazes[p], working_dir/f'{naming.world_gaze_prefix}{p}.tsv', skip_missing=True)
 
     # done if no visualization wanted
     if gui is None:
         return False
 
-
-    # prep visualizations
-    # open video
-    in_video        = session.read_recording_info(working_dir, rec_def.type)[1]
-    cap             = ocv.CV2VideoReader(in_video, timestamps.VideoTimestamps(working_dir / 'frameTimestamps.tsv').timestamps)
-    width           = cap.get_prop(cv2.CAP_PROP_FRAME_WIDTH)
-    height          = cap.get_prop(cv2.CAP_PROP_FRAME_HEIGHT)
-
-    # add windows for planes, if wanted
-    if show_planes:
-        plane_win_id = {p: gui.add_window(p) for p in planes}
-
-    subPixelFac = 8   # for sub-pixel positioning
-    stopAllProcessing = False
-    for frame_idx in range(maxFrameIdx+1):
-        done, frame, frame_idx, frame_ts = cap.read_frame(report_gap=True)
-        if done or intervals.beyond_last_interval(frame_idx, mapping_setup):
-            break
-
-        keys = gui.get_key_presses()
-        if 'q' in keys:
-            # quit fully
-            stopAllProcessing = True
-            break
-        if 'n' in keys:
-            # goto next
-            break
-
-        # check we're in a current interval, else skip processing
-        # NB: have to spool through like this, setting specific frame to read
-        # with cap.get(cv2.CAP_PROP_POS_FRAMES) doesn't seem to work reliably
-        # for VFR video files
-        if show_only_intervals and not intervals.is_in_interval(frame_idx, mapping_setup):
-            # no need to show this frame
-            continue
-
-        refImg: dict[str: np.ndarray]
-        if show_planes:
-            refImg = {p: planes[p].get_ref_image(400) for p in planes}
-
-        if frame_idx in gazes:
-            for gaze_head in gazes[frame_idx]:
-                # draw gaze point on scene video
-                gaze_head.draw(frame, cameraParams, subPixelFac)
-
-                # draw plane gazes on video and plane
-                for p in planes:
-                    if frame_idx in plane_gazes[p]:
-                        for gaze_world in plane_gazes[p][frame_idx]:
-                            gaze_world.drawOnWorldVideo(frame, cameraParams, subPixelFac)
-                            if show_planes:
-                                gaze_world.drawOnPlane(refImg[p], planes[p], subPixelFac)
-
-        if show_planes:
-            for p in planes:
-                gui.update_image(refImg[p], frame_ts/1000., frame_idx, window_id = plane_win_id[p])
-
-        # if we have poster pose, draw poster origin on video
-        for p in planes:
-            if frame_idx in poses[p]:
-                a = poses[p][frame_idx].getOriginOnImage(cameraParams)
-                drawing.openCVCircle(frame, a, 3, (0,255,0), -1, subPixelFac)
-                drawing.openCVLine(frame, (a[0],0), (a[0],height), (0,255,0), 1, subPixelFac)
-                drawing.openCVLine(frame, (0,a[1]), (width,a[1]) , (0,255,0), 1, subPixelFac)
-
-        # keys is populated above
-        if 's' in keys:
-            # screenshot
-            cv2.imwrite(working_dir / f'project_frame_{frame_idx}.png', frame)
-
-        gui.update_image(frame, frame_ts/1000., frame_idx, window_id = frame_win_id)
-        closed, = gui.get_state()
-        if closed:
-            stopAllProcessing = True
-            break
-
-    gui.stop()
-
-    return stopAllProcessing
+    in_video = session.read_recording_info(working_dir, rec_def.type)[1]
+    return worldgaze_gui.show_visualization(
+        working_dir,
+        in_video, working_dir / 'frameTimestamps.tsv', working_dir / "calibration.xml",
+        planes, poses, head_gazes, plane_gazes, mapping_setup,
+        gui, frame_win_id, show_planes, show_only_intervals, 8
+    )
