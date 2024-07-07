@@ -73,7 +73,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, s
         gaze_worldref.write_dict_to_file(plane_gazes, working_dir/f'{naming.world_gaze_prefix}{p}.tsv', skip_missing=True)
 
     # done if no visualization wanted
-    if not gui is not None:
+    if gui is None:
         return False
 
     return stopAllProcessing
