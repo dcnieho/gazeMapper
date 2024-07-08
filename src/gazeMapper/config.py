@@ -22,10 +22,11 @@ def get_marker_dict_from_list(markers: list[Marker]) -> dict[int,dict[str,Any]]:
 class Study:
     default_json_file_name = 'study_def.json'
 
-    def __init__(self, session_def: session.SessionDefinition, planes: list[plane.Definition], planes_per_episode: dict[episode.Event,list[str]], individual_markers: list[Marker], sync_ref_recording: str, do_time_stretch: bool, stretch_which: str, sync_average_recordings: list[str], working_directory: str|pathlib.Path):
+    def __init__(self, session_def: session.SessionDefinition, planes: list[plane.Definition], planes_per_episode: dict[episode.Event,list[str]], episodes_to_code: list[episode.Event], individual_markers: list[Marker], sync_ref_recording: str, do_time_stretch: bool, stretch_which: str, sync_average_recordings: list[str], working_directory: str|pathlib.Path):
         self.session_def            = session_def
         self.planes                 = planes
         self.planes_per_episode     = planes_per_episode
+        self.episodes_to_code       = episodes_to_code
         self.working_directory      = working_directory
         self.sync_ref_recording     = sync_ref_recording
         self.do_time_stretch        = do_time_stretch
@@ -55,7 +56,7 @@ class Study:
         # instead to remain flexible and make it easy for users to rename, etc
         d_path = path / self.default_json_file_name
         with open(d_path, 'w') as f:
-            to_dump = {k:getattr(self,k) for k in ['planes_per_episode','individual_markers','sync_ref_recording','do_time_stretch','stretch_which','sync_average_recordings']}    # only these fields. Name will be populated from name of session/provided folder, recordings from each subfolder in the session/provided folder, and working_directory as the provided path
+            to_dump = {k:getattr(self,k) for k in ['planes_per_episode','episodes_to_code','individual_markers','sync_ref_recording','do_time_stretch','stretch_which','sync_average_recordings']}    # only these fields. session_def and planes will be populated from contents in the provided folder, and working_directory as the provided path
             to_dump['planes_per_episode'] = [(k, to_dump['planes_per_episode'][k]) for k in to_dump['planes_per_episode']]   # pack as list of tuples for storage
             # dump to file
             json.dump(to_dump, f, cls=utils.CustomTypeEncoder, indent=2)

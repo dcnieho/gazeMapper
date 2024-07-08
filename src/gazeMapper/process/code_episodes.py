@@ -37,21 +37,6 @@ _key_to_event_type_map = {
 }
 _event_type_to_key_map = {v: k for k, v in _key_to_event_type_map.items()}
 
-_key_tooltip = {
-    "h": "Back 1 s, shift+H: back 10 s",
-    "l": "Forward 1 s, shift+L: forward 10 s",
-    "j": "Back 1 frame",
-    "k": "Forward 1 frame",
-    "p": "Pause or resume playback",
-    _event_type_to_key_map[episode.Event.Validate]: "Mark frame as start or end of validation episode",
-    _event_type_to_key_map[episode.Event.Sync_Camera]: "Mark frame as camera sync point",
-    _event_type_to_key_map[episode.Event.Sync_VOR]: "Mark frame as start or end of VOR synchronization episode",
-    _event_type_to_key_map[episode.Event.Map]: "Mark frame as start or end of analysis (gaze-to-world mapping) episode",
-    "d": "Delete frame marking(s)",
-    "q": "Quit",
-    'n': 'Next'
-}
-
 
 stopAllProcessing = False
 def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):
@@ -65,8 +50,6 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):
 
     # We run processing in a separate thread (GUI needs to be on the main thread for OSX, see https://github.com/pthom/hello_imgui/issues/33)
     gui = GUI(use_thread = False)
-
-    gui.set_interesting_keys(list(_key_tooltip.keys()))
     main_win_id = gui.add_window(f'{working_dir.parent.name}, {working_dir.name}')
 
     proc_thread = threading.Thread(target=do_the_work, args=(working_dir, config_dir, gui, main_win_id))
@@ -126,9 +109,14 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
         # flatten
         for e in episodes:
             episodes[e] = [i for iv in episodes[e] for i in iv]
+            if episodes[e]:
+                assert e in study_config.episodes_to_code, f"episodes of type {e.name} found in the coding file, but should not be coded for this study according to the study setup. aborting."
+            episodes = {e: episodes[e] for e in episodes if e in study_config.episodes_to_code}
     else:
-        episodes = episode.get_empty_marker_dict()
-    gui.register_draw_callback('status',lambda: my_tooltip(episodes, _key_tooltip))
+        episodes = episode.get_empty_marker_dict(study_config.episodes_to_code)
+    key_tooltip = get_key_tooltip(episodes)
+    gui.set_interesting_keys(list(key_tooltip.keys()))
+    gui.register_draw_callback('status',lambda: my_tooltip(episodes, key_tooltip))
 
     # set up video playback
     # 1. timestamp info for relating audio to video frames
@@ -250,6 +238,33 @@ def markers_to_string(episodes: dict[episode.Event,list[int]]):
             descs.append(f'{e.value}: {marks}')
 
     return ', '.join(descs)
+
+def get_key_tooltip(episodes: dict[episode.Event]):
+    key_tooltip = {
+        "h": "Back 1 s, shift+H: back 10 s",
+        "l": "Forward 1 s, shift+L: forward 10 s",
+        "j": "Back 1 frame",
+        "k": "Forward 1 frame",
+        "p": "Pause or resume playback"
+    }
+
+    event_type_tooltips = {
+        episode.Event.Validate: "Mark frame as start or end of validation episode",
+        episode.Event.Sync_Camera: "Mark frame as camera sync point",
+        episode.Event.Sync_VOR: "Mark frame as start or end of VOR synchronization episode",
+        episode.Event.Map: "Mark frame as start or end of analysis (gaze-to-world mapping) episode"
+    }
+
+    for e in [episode.Event.Validate, episode.Event.Sync_Camera, episode.Event.Sync_VOR, episode.Event.Map]:
+        if e in episodes:
+            key_tooltip[_event_type_to_key_map[e]] = event_type_tooltips[e]
+
+    key_tooltip |= {
+        "d": "Delete frame marking(s)",
+        "q": "Quit",
+        'n': 'Next'
+    }
+    return key_tooltip
 
 def my_tooltip(episodes: dict[episode.Event,list[int]], key_info_dict: dict[str,str]):
     imgui.same_line()
