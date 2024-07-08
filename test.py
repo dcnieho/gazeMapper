@@ -7,6 +7,7 @@ from src.gazeMapper.process.code_episodes import process as do_coding
 from src.gazeMapper.process.detect_markers import process as detect_markers
 from src.gazeMapper.process.sync_VOR import process as sync_VOR
 from src.gazeMapper.process.sync_to_ref import process as sync_to_ref
+from src.gazeMapper.process.gaze_to_plane import process as gaze_to_plane
 
 
 # base = pathlib.Path(r'C:\dat\projects\Roy Japanese Lego\pilot 3\data\J13')
@@ -47,16 +48,21 @@ proj = pathlib.Path(r'C:\dat\projects\gazeMapper\projs\roy japan')
 
 sessions = session.get_sessions_from_directory(proj)
 
-# do_coding(sessions[0].recordings['et1'].info.working_directory)
-# do_coding(sessions[0].recordings['et2'].info.working_directory)
-# do_coding(sessions[0].recordings['cam'].info.working_directory)
+# for s in sessions:
+#     do_coding(s.recordings['et1'].info.working_directory)
+#     do_coding(s.recordings['et2'].info.working_directory)
+#     do_coding(s.recordings['cam'].info.working_directory)
 
 # for s in sessions:
 #     detect_markers(s.recordings['cam'].info.working_directory)
 #     detect_markers(s.recordings['et1'].info.working_directory)
 #     detect_markers(s.recordings['et2'].info.working_directory)
 
+# for s in sessions:
+#     sync_VOR(s.recordings['et1'].info.working_directory)
+#     sync_VOR(s.recordings['et2'].info.working_directory)
+#     sync_to_ref(s.working_directory)
+
 for s in sessions:
-    sync_VOR(s.recordings['et1'].info.working_directory)
-    sync_VOR(s.recordings['et2'].info.working_directory)
-    sync_to_ref(s.working_directory)
+    gaze_to_plane(s.recordings['et1'].info.working_directory)
+    gaze_to_plane(s.recordings['et2'].info.working_directory)
