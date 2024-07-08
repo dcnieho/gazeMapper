@@ -50,7 +50,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, s
     episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / 'coding.tsv'))
 
     # process the above into a dict of plane definitions and a dict with frame number intervals for which to use each
-    planes = {v for k in study_config.planes_per_interval for v in study_config.planes_per_interval[k]}
+    planes = {v for k in study_config.planes_per_episode for v in study_config.planes_per_episode[k]}
     planes_setup = {}
     analyze_frames = {}
     for p in planes:
@@ -58,7 +58,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, s
         pl = plane.get_plane_from_definition(p_def, config_dir/p)
         planes_setup[p] = {'plane': pl, 'aruco_dict': p_def.aruco_dict, 'aruco_params': {'markerBorderBits': p_def.marker_border_bits}, 'min_num_markers': p_def.min_num_markers}
         # determine for which frames this plane should be used
-        anal_episodes = [k for k in study_config.planes_per_interval if p in study_config.planes_per_interval[k]]
+        anal_episodes = [k for k in study_config.planes_per_episode if p in study_config.planes_per_episode[k]]
         all_episodes = [ep for k in anal_episodes for ep in episodes[k]]
         analyze_frames[p] = sorted(all_episodes, key = lambda x: x[1])
 

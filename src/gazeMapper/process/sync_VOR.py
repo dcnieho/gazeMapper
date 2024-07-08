@@ -47,7 +47,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, a
     rec_def = study_config.session_def.get_recording_def(working_dir.name)
     assert rec_def.type==session.RecordingType.EyeTracker, f'You can only run sync_VOR on eye tracker recordings, not on a {str(rec_def.type).split(".")[1]} recording'
 
-    planes = study_config.planes_per_interval[episode.Event.Sync_VOR]
+    planes = study_config.planes_per_episode[episode.Event.Sync_VOR]
     assert len(planes)==1, "sync_VOR only supports a single plane being used for VOR sync, contact developer if this is an issue"
     pln = planes[0]
 

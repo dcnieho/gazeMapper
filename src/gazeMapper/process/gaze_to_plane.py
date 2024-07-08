@@ -51,8 +51,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, f
     episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / 'coding.tsv'))
     mapping_setup: dict[str, list[list[int]]] = {}
     for e in [episode.Event.Validate, episode.Event.Map]:
-        if e in study_config.planes_per_interval:
-            for p in study_config.planes_per_interval[e]:
+        if e in study_config.planes_per_episode:
+            for p in study_config.planes_per_episode[e]:
                 if p not in mapping_setup:
                     mapping_setup[p] = []
                 mapping_setup[p].extend(episodes[e])
