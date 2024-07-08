@@ -81,16 +81,16 @@ class Session:
         if not self.working_directory.is_dir():
             self.working_directory.mkdir()
 
-    def import_and_add_recording(self, which: str, rec_info: EyeTrackerRecording|camera_recording.Recording, copy_video = True) -> Recording:
+    def import_and_add_recording(self, which: str, rec_info: EyeTrackerRecording|camera_recording.Recording, copy_video = True, cam_cal_file: str|pathlib.Path=None) -> Recording:
         rec_def = self.definition.get_recording_def(which)
         self.check_recording_info(which, rec_info)
 
         # do import
         rec_info.working_directory = self.working_directory / rec_def.name
         if rec_def.type==RecordingType.EyeTracker:
-            rec_info = importing.do_import(rec_info=rec_info, copy_scene_video=copy_video)
+            rec_info = importing.do_import(rec_info=rec_info, copy_scene_video=copy_video, cam_cal_file=cam_cal_file)
         else:
-            rec_info = camera_recording.do_import(rec_info=rec_info, copy_video=copy_video)
+            rec_info = camera_recording.do_import(rec_info=rec_info, copy_video=copy_video, cam_cal_file=cam_cal_file)
 
         # add recording
         self.add_recording_from_info(which, rec_info)
