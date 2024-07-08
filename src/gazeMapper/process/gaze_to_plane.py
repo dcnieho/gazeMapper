@@ -65,8 +65,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, f
 
     # load gaze data and poses
     processing_intervals = [e for p in mapping_setup for e in mapping_setup[p]] # NB: doesn't need to be sorted
-    head_gazes = gaze_headref.read_dict_from_file(working_dir / 'gazeData.tsv', processing_intervals if not gui or show_only_intervals else None)[0]
-    poses = {p:gt_plane.read_dict_from_file(working_dir/f'{naming.plane_pose_prefix}{p}.tsv', mapping_setup[p]) for p in mapping_setup}
+    should_load_part = not gui or show_only_intervals
+    head_gazes = gaze_headref.read_dict_from_file(working_dir / 'gazeData.tsv', processing_intervals if should_load_part else None)[0]
+    poses = {p:gt_plane.read_dict_from_file(working_dir/f'{naming.plane_pose_prefix}{p}.tsv', mapping_setup[p] if should_load_part else None) for p in mapping_setup}
 
     # get camera calibration info
     cameraParams = ocv.CameraParams.readFromFile(working_dir / "calibration.xml")
