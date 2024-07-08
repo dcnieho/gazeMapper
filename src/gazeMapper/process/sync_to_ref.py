@@ -144,7 +144,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):
                     vid_ts_df['timestamp_stretched'] = ref_vid_ts
                     should_store = True
                 if should_store:
-                    vid_ts_df.to_csv(ref_vid_ts_file, sep='\t')
+                    vid_ts_df.to_csv(ref_vid_ts_file, sep='\t', float_format="%.8f")
         else:
             ts_ref += sync.loc[(r,0),'mean_off']*1000.   # s -> ms
         fr_ref = video_utils.tssToFrameNumber(ts_ref,ref_vid_ts,trim=True)['frame_idx'].to_numpy()
