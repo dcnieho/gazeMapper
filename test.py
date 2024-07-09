@@ -8,6 +8,7 @@ from src.gazeMapper.process.detect_markers import process as detect_markers
 from src.gazeMapper.process.sync_VOR import process as sync_VOR
 from src.gazeMapper.process.sync_to_ref import process as sync_to_ref
 from src.gazeMapper.process.gaze_to_plane import process as gaze_to_plane
+from src.gazeMapper.process.export_mapped import process as export_mapped
 
 
 # base = pathlib.Path(r'C:\dat\projects\Roy Japanese Lego\pilot 3\data\J13')
@@ -62,6 +63,10 @@ sessions = session.get_sessions_from_directory(proj)
 #     sync_VOR(s.recordings['et1'].info.working_directory)
 #     sync_VOR(s.recordings['et2'].info.working_directory)
 #     sync_to_ref(s.working_directory)
+
+# for s in sessions:
+#     gaze_to_plane(s.recordings['et1'].info.working_directory)
+#     gaze_to_plane(s.recordings['et2'].info.working_directory)
 
 for s in sessions:
     gaze_to_plane(s.recordings['et1'].info.working_directory)
