@@ -62,8 +62,11 @@ def write_list_to_file(episodes: list[Episode],
     df.to_csv(str(fileName), index=False, sep='\t', na_rep='nan')
 
 
-def get_empty_marker_dict() -> dict[Event,list[int]]:
-    return {e:[] for e in Event}
+def get_empty_marker_dict(episodes: list[Event]=None) -> dict[Event,list[int]]:
+    if not episodes:
+        return {e:[] for e in Event}
+    else:
+        return {e:[] for e in episodes}
 
 def list_to_marker_dict(episodes: list[Episode]) -> dict[Event,list[list[int]]]:
     e_dict = get_empty_marker_dict()
