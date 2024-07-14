@@ -49,14 +49,14 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None,
                                               pose_file_name=f'{naming.plane_pose_prefix}{p}.tsv',
                                               world_gaze_file_name=f'{naming.world_gaze_prefix}{p}.tsv',
                                               output_gaze_offset_file_name=output_gaze_offset_file_name)
-        
+
         output_analysis_interval_file_name = f'{naming.validation_prefix}{p}_fixation_intervals.tsv'
         gv_process.determine_fixation_intervals(working_dir, validator_config_dir, do_global_shift, max_dist_fac,
                                                 marker_interval_file_name=marker_interval_file_name,
                                                 world_gaze_file_name=f'{naming.world_gaze_prefix}{p}.tsv',
                                                 fixation_detection_file_name_prefix=f'{naming.validation_prefix}{p}_targetSelection_I2MC_',
                                                 output_analysis_interval_file_name=output_analysis_interval_file_name)
-        
+
         gv_process.calculate_data_quality(working_dir, dq_types, allow_dq_fallback, include_data_loss,
                                           analysis_interval_file_name=output_analysis_interval_file_name,
                                           gaze_offset_file_name=output_gaze_offset_file_name,
