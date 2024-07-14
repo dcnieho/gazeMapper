@@ -18,7 +18,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
 
     # get info about the study it is a part of
     study_config = config.Study.load_from_json(config_dir)
-    assert episode.Event.Map in study_config.planes_per_episode
+    assert episode.Event.Map in study_config.planes_per_episode, 'No planes to use mapping are specified for the study, nothing to export'
     planes = study_config.planes_per_episode[episode.Event.Map]
 
     # get session info
