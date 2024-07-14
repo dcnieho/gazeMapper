@@ -5,69 +5,116 @@ from glassesTools import eyetracker, importing, marker
 from src.gazeMapper import camera_recording, config, episode, session, plane
 from src.gazeMapper.process.code_episodes import process as do_coding
 from src.gazeMapper.process.detect_markers import process as detect_markers
-from src.gazeMapper.process.sync_VOR import process as sync_VOR
+from src.gazeMapper.process.sync_et_to_cam import process as sync_et_to_cam
 from src.gazeMapper.process.sync_to_ref import process as sync_to_ref
 from src.gazeMapper.process.gaze_to_plane import process as gaze_to_plane
 from src.gazeMapper.process.export_mapped import process as export_mapped
+from src.gazeMapper.process.run_validation import process as run_validation
 
 
-# base = pathlib.Path(r'C:\dat\projects\Roy Japanese Lego\pilot 3\data\J13')
-# base = pathlib.Path(r'C:\dat\projects\Roy Japanese Lego\pilot 3\data\N24')
-proj = pathlib.Path(r'C:\dat\projects\gazeMapper\projs\roy japan')
+which = 3
+match which:
+    case 1:
+        base1 = pathlib.Path(r'C:\dat\projects\Roy Japanese Lego\pilot 3\data\J13')
+        base2 = pathlib.Path(r'C:\dat\projects\Roy Japanese Lego\pilot 3\data\N24')
+        proj = pathlib.Path(r'C:\dat\projects\gazeMapper\projs\roy japan')
+        et_recs = ['et1','et2']
+        cam_recs= ['cam']
+
+    case 2:
+        base = pathlib.Path(r'C:\dat\projects\a_finished\2023 roy lego\analysis\data\pair12\Markers')
+        proj = pathlib.Path(r'C:\dat\projects\gazeMapper\projs\roy_markers')
+        et_recs = ['et1','et2']
+        cam_recs= ['cam']
+
+    case 3:
+        base = pathlib.Path(r'C:\dat\projects\Margot gazeMapper\pilot 4\data')
+        proj = pathlib.Path(r'C:\dat\projects\gazeMapper\projs\margot_2_et')
+        et_recs = ['et_teacher','et_student']
+        cam_recs= []
 
 
-# create session
+# # create session
 # sess_def = session.SessionDefinition.load_from_json(proj/'config'/'session_def.json')
-# sess = session.Session(sess_def,'N24')
-# sess.create_working_directory(proj)
-# # import recordings
-# rec_info = importing.get_recording_info(base/'J13A'/'20231019T081115Z', eyetracker.EyeTracker.Tobii_Glasses_3)
-# rec_info = importing.get_recording_info(base/'N24A'/'2023-11-30_10-10-47-d1aa2982', eyetracker.EyeTracker.Pupil_Invisible)
-# rec = sess.import_and_add_recording('et1',rec_info[0],False)
 
-# rec_info = importing.get_recording_info(base/'J13D'/'20231019T081031Z', eyetracker.EyeTracker.Tobii_Glasses_3)
-# rec_info = importing.get_recording_info(base/'N24D'/'2023-11-30_10-10-31-cc2e58e9', eyetracker.EyeTracker.Pupil_Invisible)
-# rec = sess.import_and_add_recording('et2',rec_info[0],False)
+# # import
+# match which:
+#     case 1:
+#         sess1 = session.Session(sess_def,'J13')
+#         sess1.create_working_directory(proj)
+#         rec_info = importing.get_recording_info(base1/'J13A'/'20231019T081115Z', eyetracker.EyeTracker.Tobii_Glasses_3)
+#         rec = sess1.import_and_add_recording('et1',rec_info[0],False)
+#         rec_info = importing.get_recording_info(base1/'J13D'/'20231019T081031Z', eyetracker.EyeTracker.Tobii_Glasses_3)
+#         rec = sess1.import_and_add_recording('et2',rec_info[0],False)
+#         rec_info = camera_recording.Recording('topview','2023-10-19_17-14-59.mp4', base1)
+#         rec = sess1.import_and_add_recording('cam',rec_info,False, cam_cal_file=r"C:\dat\projects\Roy Japanese Lego\pilot 3\analysis\data\brio_calibration_J.xml")
+#         sess1.store_as_json()
 
-# #rec_info = camera_recording.Recording('topview','2023-10-19_17-14-59.mp4', base)
-# rec_info = camera_recording.Recording('topview','2023-11-30_10-13-09.mov', base)
-# rec = sess.import_and_add_recording('cam',rec_info,False)
+#         sess2 = session.Session(sess_def,'N24')
+#         sess2.create_working_directory(proj)
+#         rec_info = importing.get_recording_info(base2/'N24A'/'2023-11-30_10-10-47-d1aa2982', eyetracker.EyeTracker.Pupil_Invisible)
+#         rec = sess2.import_and_add_recording('et1',rec_info[0],False)
+#         rec_info = importing.get_recording_info(base2/'N24D'/'2023-11-30_10-10-31-cc2e58e9', eyetracker.EyeTracker.Pupil_Invisible)
+#         rec = sess2.import_and_add_recording('et2',rec_info[0],False)
+#         rec_info = camera_recording.Recording('topview','2023-11-30_10-13-09.mov', base2)
+#         rec = sess2.import_and_add_recording('cam',rec_info,False, cam_cal_file=r"C:\dat\projects\Roy Japanese Lego\pilot 3\analysis\data\brio_calibration_N.xml")
+#         sess2.store_as_json()
 
-# sess.store_as_json()
+#     case 2:
+#         sess = session.Session(sess_def,'pair12')
+#         sess.create_working_directory(proj)
+#         # import recordings
+#         rec_info = importing.get_recording_info(base/'PI1_scherm'/'2022-07-01_14-04-15-0bdecc9e', eyetracker.EyeTracker.Pupil_Invisible)
+#         rec = sess.import_and_add_recording('et1',rec_info[0],False)
+
+#         rec_info = importing.get_recording_info(base/'PI2_deur'/'2022-07-01_14-04-01-a251b241', eyetracker.EyeTracker.Pupil_Invisible)
+#         rec = sess.import_and_add_recording('et2',rec_info[0],False)
+
+#         rec_info = camera_recording.Recording('topview','topview_2022-07-01_14-05-10.mov', base)
+#         rec = sess.import_and_add_recording('cam',rec_info,False, cam_cal_file=r"C:\dat\projects\a_finished\2023 roy lego\analysis\data\brio_calibration.xml")
+#         sess.store_as_json()
+
+#     case 3:
+#         recs = {'N01A':'2024-04-17_11-29-00-c263c366',
+#                 'N01D':'2024-04-17_11-29-39-f7e2e6f0',
+#                 'N02A':'2024-04-17_13-36-23-a1cf026b',
+#                 'N02D':'2024-04-17_13-37-02-6b4e4eec'}
+#         for r in ['N01','N02']:
+#             sess = session.Session(sess_def,r)
+#             sess.create_working_directory(proj)
+
+#             rec_info = importing.get_recording_info(base/r/(r+'A')/recs[r+'A'], eyetracker.EyeTracker.Pupil_Neon)
+#             rec = sess.import_and_add_recording('et_teacher',rec_info[0],False)
+
+#             rec_info = importing.get_recording_info(base/r/(r+'D')/recs[r+'D'], eyetracker.EyeTracker.Pupil_Neon)
+#             rec = sess.import_and_add_recording('et_student',rec_info[0],False)
+#             sess.store_as_json()
 
 
-# sd = session.SessionDefinition.load_from_json(proj/'config'/'session_def.json')
-# st = config.Study.load_from_json(proj/'config')
 
-# sess = session.Session.from_definition(st.session_def,proj/'test1')
-# sess.has_all_recordings()
-
-# sess2 = session.Session.load_from_json(proj/'test1')
-
-# pl1 = plane.get_plane_from_definition(st.planes[0], proj/'config'/st.planes[0].name)
-# pl2 = plane.get_plane_from_path(proj/'config'/st.planes[1].name)
 
 sessions = session.get_sessions_from_directory(proj)
 
 # for s in sessions:
-#     do_coding(s.recordings['et1'].info.working_directory)
-#     do_coding(s.recordings['et2'].info.working_directory)
-#     do_coding(s.recordings['cam'].info.working_directory)
+#     for r in et_recs+cam_recs:
+#         do_coding(s.recordings[r].info.working_directory)
 
 # for s in sessions:
-#     detect_markers(s.recordings['cam'].info.working_directory)
-#     detect_markers(s.recordings['et1'].info.working_directory)
-#     detect_markers(s.recordings['et2'].info.working_directory)
+#     for r in et_recs+cam_recs:
+#         detect_markers(s.recordings[r].info.working_directory)
 
 # for s in sessions:
-#     sync_VOR(s.recordings['et1'].info.working_directory)
-#     sync_VOR(s.recordings['et2'].info.working_directory)
+#     for r in et_recs:
+#         sync_et_to_cam(s.recordings[r].info.working_directory)
 #     sync_to_ref(s.working_directory)
 
 # for s in sessions:
-#     gaze_to_plane(s.recordings['et1'].info.working_directory)
-#     gaze_to_plane(s.recordings['et2'].info.working_directory)
+#     for r in et_recs:
+#         gaze_to_plane(s.recordings[r].info.working_directory)
+
+# for s in sessions:
+#     export_mapped(s.working_directory)
 
 for s in sessions:
-    gaze_to_plane(s.recordings['et1'].info.working_directory)
-    gaze_to_plane(s.recordings['et2'].info.working_directory)
+    for r in et_recs:
+        run_validation(s.recordings[r].info.working_directory)
