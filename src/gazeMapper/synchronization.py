@@ -46,6 +46,7 @@ def get_sync_for_recs(working_dir: str|pathlib.Path, ref_rec: str, recs: str|lis
     return sync
 
 def get_coding_file(working_dir: str|pathlib.Path):
+    working_dir  = pathlib.Path(working_dir)
     coding_file = working_dir / naming.coding_file
     assert coding_file.is_file(), f'A coding file must be available for the recording ({working_dir.name}) to run sync_to_ref, but it is not. Run code_episodes and code at least one {episode.Event.Sync_Camera.value} episode. Not found: {coding_file}'
     episodes = episode.list_to_marker_dict(episode.read_list_from_file(coding_file))[episode.Event.Sync_Camera]
