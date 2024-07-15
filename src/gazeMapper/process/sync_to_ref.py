@@ -7,7 +7,7 @@ from glassesTools import gaze_headref, timestamps, video_utils
 
 
 from . import naming, _utils
-from .. import config, episode, session
+from .. import config, episode, session, synchronization
 
 
 def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):
@@ -40,7 +40,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):
     session_info = session.Session.load_from_json(working_dir)
 
     # get info from reference recording
-    ref_episodes = _get_coding_file(working_dir / study_config.sync_ref_recording)
+    ref_episodes = synchronization.get_coding_file(working_dir / study_config.sync_ref_recording)
     ref_vid_ts_file = working_dir / study_config.sync_ref_recording / 'frameTimestamps.tsv'
     video_ts_ref = timestamps.VideoTimestamps(ref_vid_ts_file)
 
@@ -53,34 +53,8 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):
                 assert r!=study_config.sync_ref_recording, f'Recording {r} is the reference recording for sync, should not be specified in study_config.sync_average_recordings'
 
     # prep for sync info
-    cols    = ['t_ref','t_this','offset']
-    if study_config.do_time_stretch:
-        cols += ['t_ref_elapsed','diff_offset','stretch_fac']
-    else:
-        cols += ['mean_off']
-    recs    = [r for r in session_info.recordings if r!=study_config.sync_ref_recording]
-    index   = pd.MultiIndex.from_product([recs, range(len(ref_episodes))], names=['recording','interval'])
-    sync    = pd.DataFrame(columns=cols, dtype=float, index=index)
-
-    # collect timestamps for the recordings
-    for r in recs:
-        # get interval coding for this recording
-        episodes = _get_coding_file(working_dir / r)
-
-        # check intervals
-        assert len(episodes)==len(ref_episodes), f"The number of sync points for this recording ({len(episodes)}, {r}) is not equal to that for the reference recording ({len(episodes)}, {study_config.sync_ref_recording}). Cannot continue, fix your coding"
-
-        # get time information
-        video_ts = timestamps.VideoTimestamps(working_dir / r / 'frameTimestamps.tsv')
-
-        # get timestamps corresponding to sync frames
-        for ival in range(len(episodes)):
-            sync.loc[(r,ival),'t_ref']  = video_ts_ref.get_timestamp(ref_episodes[ival])/1000.  # ms -> s
-            sync.loc[(r,ival),'t_this'] =   video_ts  .get_timestamp(    episodes[ival])/1000.  # ms -> s
-            sync.loc[(r,ival),'offset'] = sync.loc[(r,ival),'t_ref']-sync.loc[(r,ival),'t_this']
-        if not study_config.do_time_stretch:
-            # no time stretching, get average offset. Applies to whole file, store only for first interval
-            sync.loc[(r,0),'mean_off'] = sync.loc[(r,slice(None)),'offset'].mean()
+    recs = [r for r in session_info.recordings if r!=study_config.sync_ref_recording]
+    sync = synchronization.get_sync_for_recs(working_dir, study_config.sync_ref_recording, recs, study_config.do_time_stretch)
 
     if study_config.do_time_stretch:
         # get stretch factor for each interval between two sync points
@@ -88,7 +62,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):
             recs_gr = [r for r in recs if r not in study_config.sync_average_recordings]
             recs_gr.append(study_config.sync_average_recordings)
         for r in recs_gr:
-            for ival in range(len(episodes)-1):
+            for ival in range(len(ref_episodes)-1):
                 sync.loc[(r,ival),'t_ref_elapsed'] = sync.loc[(r,ival+1),'t_ref' ].droplevel('interval')-sync.loc[(r,ival),'t_ref' ]
                 sync.loc[(r,ival),'diff_offset']   = sync.loc[(r,ival+1),'offset'].droplevel('interval')-sync.loc[(r,ival),'offset']
                 sync.loc[(r,ival),'stretch_fac']   = sync.loc[(r,ival),'diff_offset'].mean()/sync.loc[(r,ival),'t_ref_elapsed'].mean()
@@ -105,7 +79,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):
         ref_vid_ts = np.array(video_ts_ref.timestamps)
         ts_ref     = df[ts_col].to_numpy().copy()
         if study_config.do_time_stretch:
-            for ival in range(len(episodes)-1):
+            for ival in range(len(ref_episodes)-1):
                 # set up the problem - piecewise linear scale
                 # 1. get known good location for this interval, and the stretch factor
                 pivot       = sync.loc[(r,ival),'t_ref']
@@ -116,7 +90,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):
                     start = df[ts_col].min()
                 else:
                     start = sync.loc[(r,ival),'t_ref']
-                if ival==len(episodes)-2:
+                if ival==len(ref_episodes)-2:
                     # last interval, apply all the way to end of data
                     end = df[ts_col].max()
                 else:
@@ -153,10 +127,3 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):
         df = pl.from_pandas(df)
         df.write_csv(working_dir / r / 'gazeData.tsv', separator='\t', null_value='nan', float_precision=8)
 
-def _get_coding_file(working_dir: str|pathlib.Path):
-    coding_file = working_dir / naming.coding_file
-    assert coding_file.is_file(), f'A coding file must be available for the recording ({working_dir.name}) to run sync_to_ref, but it is not. Run code_episodes and code at least one {episode.Event.Sync_Camera.value} episode. Not found: {coding_file}'
-    episodes = episode.list_to_marker_dict(episode.read_list_from_file(coding_file))[episode.Event.Sync_Camera]
-    episodes = [x[0] for x in episodes] # remove inner wrapping list, there are only single values in it anyway
-    assert episodes, f'No {episode.Event.Sync_Camera.value} points found for this recording ({working_dir.name}). Run code_episodes and code at least one {episode.Event.Sync_Camera.value} point.'
-    return episodes
