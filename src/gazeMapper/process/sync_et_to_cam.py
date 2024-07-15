@@ -73,7 +73,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, a
     video_ts = timestamps.VideoTimestamps(working_dir / 'frameTimestamps.tsv')
 
     # get previous sync settings, if any
-    VOR_sync_file = working_dir / 'VOR_sync.tsv'
+    VOR_sync_file = working_dir / naming.VOR_sync_file
     if VOR_sync_file.is_file():
         VOR_sync = pd.read_csv(VOR_sync_file, index_col=0, delimiter='\t')
         # make sure we have the expected number of intervals
