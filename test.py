@@ -8,7 +8,7 @@ from src.gazeMapper.process.detect_markers import process as detect_markers
 from src.gazeMapper.process.sync_et_to_cam import process as sync_et_to_cam
 from src.gazeMapper.process.sync_to_ref import process as sync_to_ref
 from src.gazeMapper.process.gaze_to_plane import process as gaze_to_plane
-from src.gazeMapper.process.export_mapped import process as export_mapped
+from src.gazeMapper.process.export_trials import process as export_trials
 from src.gazeMapper.process.run_validation import process as run_validation
 
 
@@ -113,7 +113,7 @@ sessions = session.get_sessions_from_directory(proj)
 #         gaze_to_plane(s.recordings[r].info.working_directory)
 
 # for s in sessions:
-#     export_mapped(s.working_directory)
+#     export_trials(s.working_directory)
 
 for s in sessions:
     for r in et_recs:
