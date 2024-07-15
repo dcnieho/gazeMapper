@@ -1,8 +1,5 @@
 import pathlib
-import threading
 
-from glassesTools import aruco, marker, plane as gt_plane
-from glassesTools.video_gui import GUI, generic_tooltip_drawer, qns_tooltip
 from glassesValidator import process as gv_process, utils as gv_utils
 
 
