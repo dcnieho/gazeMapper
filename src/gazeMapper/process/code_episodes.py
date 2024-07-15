@@ -114,6 +114,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
             episodes = {e: episodes[e] for e in episodes if e in study_config.episodes_to_code}
     else:
         episodes = episode.get_empty_marker_dict(study_config.episodes_to_code)
+    # trial episodes are gotten from the reference recording if there is one. Check there is one and that this is not the reference recording
+    if study_config.sync_ref_recording and rec_def.name!=study_config.sync_ref_recording:
+        episodes.pop(episode.Event.Trial)
     key_tooltip = get_key_tooltip(episodes)
     gui.set_interesting_keys(list(key_tooltip.keys()))
     gui.register_draw_callback('status',lambda: my_tooltip(episodes, key_tooltip))
