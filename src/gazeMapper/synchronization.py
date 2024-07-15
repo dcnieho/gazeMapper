@@ -52,3 +52,16 @@ def get_coding_file(working_dir: str|pathlib.Path):
     episodes = [x[0] for x in episodes] # remove inner wrapping list, there are only single values in it anyway
     assert episodes, f'No {episode.Event.Sync_Camera.value} points found for this recording ({working_dir.name}). Run code_episodes and code at least one {episode.Event.Sync_Camera.value} point.'
     return episodes
+
+def get_episode_frame_indices_from_ref(working_dir: str|pathlib.Path, event: episode.Event, ref_rec: str, rec: str, extra_fr=10):
+    working_dir  = pathlib.Path(working_dir)
+    ref_episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir.parent / ref_rec / naming.coding_file))
+    assert event in ref_episodes, f'Trial episodes are gotten from the reference recording ({ref_rec}), but the coding file for this reference recording doesn\'t contain any ({event.value}) episodes'
+    # get sync and timestamp info we need to transform reference frames indices to frame indices of this recording
+    sync = get_sync_for_recs(working_dir.parent, ref_rec, rec)
+    video_ts_ref = timestamps.VideoTimestamps(working_dir.parent / ref_rec / 'frameTimestamps.tsv')
+    video_ts     = timestamps.VideoTimestamps(working_dir / 'frameTimestamps.tsv')
+    off = -sync.loc[(rec,0),'mean_off']*1000.   # s -> ms, negate because value is sync this_rec->ref, we need the opposite
+    frame_ts_ref = [[video_ts_ref.get_timestamp(i) for i in ifs] for ifs in ref_episodes[event]]
+    frame_idx    = [[video_ts.find_frame(i+off) for i in ts] for ts in frame_ts_ref]
+    return [[ifs[0]-extra_fr, ifs[1]+extra_fr] for ifs in frame_idx]   # arbitrarily expand by x frames on each edge, so we've likely got the frame we need
