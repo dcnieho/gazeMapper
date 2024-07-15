@@ -45,17 +45,17 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, a
 
     # check this is an eye tracker recording
     rec_def = study_config.session_def.get_recording_def(working_dir.name)
-    assert rec_def.type==session.RecordingType.EyeTracker, f'You can only run sync_VOR on eye tracker recordings, not on a {str(rec_def.type).split(".")[1]} recording'
+    assert rec_def.type==session.RecordingType.EyeTracker, f'You can only run sync_et_to_cam on eye tracker recordings, not on a {str(rec_def.type).split(".")[1]} recording'
 
-    planes = study_config.planes_per_episode[episode.Event.Sync_VOR]
-    assert len(planes)==1, "sync_VOR only supports a single plane being used for VOR sync, contact developer if this is an issue"
+    planes = study_config.planes_per_episode[episode.Event.Sync_ET_Data]
+    assert len(planes)==1, "sync_et_to_cam only supports a single plane being used for synchronizing eye tracking data to the scene camera, contact developer if this is an issue"
     pln = planes[0]
 
     # get interval coding
     coding_file = working_dir / naming.coding_file
-    assert coding_file.is_file(), f'A coding file must be available to run sync_VOR, but it is not. Run code_episodes and code at least one {episode.Event.Sync_VOR.value} episode. Not found: {coding_file}'
-    episodes = episode.list_to_marker_dict(episode.read_list_from_file(coding_file))[episode.Event.Sync_VOR]
-    assert episodes, f'No {episode.Event.Sync_VOR.value} episodes found for this recording. Run code_episodes and code at least one {episode.Event.Sync_VOR.value} episode.'
+    assert coding_file.is_file(), f'A coding file must be available to run sync_et_to_cam, but it is not. Run code_episodes and code at least one {episode.Event.Sync_ET_Data.value} episode. Not found: {coding_file}'
+    episodes = episode.list_to_marker_dict(episode.read_list_from_file(coding_file))[episode.Event.Sync_ET_Data]
+    assert episodes, f'No {episode.Event.Sync_ET_Data.value} episodes found for this recording. Run code_episodes and code at least one {episode.Event.Sync_ET_Data.value} episode.'
 
     # Read gaze data
     gazes = gaze_headref.read_dict_from_file(working_dir / 'gazeData.tsv', episodes)[0]

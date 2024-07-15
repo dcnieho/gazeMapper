@@ -32,8 +32,8 @@ from .. import config, episode, session
 _key_to_event_type_map = {
     'v': episode.Event.Validate,
     'c': episode.Event.Sync_Camera,
-    'e': episode.Event.Sync_VOR,
-    'm': episode.Event.Map,
+    'e': episode.Event.Sync_ET_Data,
+    't': episode.Event.Trial,
 }
 _event_type_to_key_map = {v: k for k, v in _key_to_event_type_map.items()}
 
@@ -251,11 +251,11 @@ def get_key_tooltip(episodes: dict[episode.Event]):
     event_type_tooltips = {
         episode.Event.Validate: "Mark frame as start or end of validation episode",
         episode.Event.Sync_Camera: "Mark frame as camera sync point",
-        episode.Event.Sync_VOR: "Mark frame as start or end of VOR synchronization episode",
-        episode.Event.Map: "Mark frame as start or end of analysis (gaze-to-world mapping) episode"
+        episode.Event.Sync_ET_Data: "Mark frame as start or end of eye tracker synchronization episode",
+        episode.Event.Trial: "Mark frame as start or end of trial"
     }
 
-    for e in [episode.Event.Validate, episode.Event.Sync_Camera, episode.Event.Sync_VOR, episode.Event.Map]:
+    for e in [episode.Event.Validate, episode.Event.Sync_Camera, episode.Event.Sync_ET_Data, episode.Event.Trial]:
         if e in episodes:
             key_tooltip[_event_type_to_key_map[e]] = event_type_tooltips[e]
 
