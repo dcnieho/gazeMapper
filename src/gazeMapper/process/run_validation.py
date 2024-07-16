@@ -18,7 +18,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None,
 
     # get info about the study the recording is a part of
     study_config = config.Study.load_from_json(config_dir)
-    assert episode.Event.Validate in study_config.planes_per_episode, 'No planes to use for validation are specified for the study, nothing to export'
+    assert episode.Event.Validate in study_config.planes_per_episode, 'No planes to use for validation are specified for the study, nothing to process'
     planes = study_config.planes_per_episode[episode.Event.Validate]
 
     # get info about recording
