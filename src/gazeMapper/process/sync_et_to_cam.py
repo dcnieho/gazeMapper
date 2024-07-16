@@ -47,6 +47,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, a
     rec_def = study_config.session_def.get_recording_def(working_dir.name)
     assert rec_def.type==session.RecordingType.EyeTracker, f'You can only run sync_et_to_cam on eye tracker recordings, not on a {str(rec_def.type).split(".")[1]} recording'
 
+    assert episode.Event.Sync_ET_Data in study_config.planes_per_episode, f'No plane specified for syncing eye tracker data to the scene cam, cannot continue'
     planes = study_config.planes_per_episode[episode.Event.Sync_ET_Data]
     assert len(planes)==1, "sync_et_to_cam only supports a single plane being used for synchronizing eye tracking data to the scene camera, contact developer if this is an issue"
     pln = planes[0]
