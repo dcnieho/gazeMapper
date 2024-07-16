@@ -71,6 +71,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
     in_video = session.read_recording_info(working_dir, rec_type)[1]
     if rec_type==session.RecordingType.Camera:
         hasGaze, hasPosterGaze, hasPosterPose = False, False, False
+        # no episode.Event.Sync_ET_Data for camera recordings, remove
+        if episode.Event.Sync_ET_Data in study_config.episodes_to_code:
+            study_config.episodes_to_code.remove(episode.Event.Sync_ET_Data)
     elif rec_type==session.RecordingType.EyeTracker:
         # Read gaze data
         hasGaze = True
