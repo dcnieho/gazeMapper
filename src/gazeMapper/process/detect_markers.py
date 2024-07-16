@@ -47,7 +47,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, s
     in_video = session.read_recording_info(working_dir, rec_def.type)[1]
 
     # get interval(s) coded to be analyzed, if any
-    episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / naming.coding_file))
+    episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / naming.coding_file), study_config.episodes_to_code)
 
     # trial episodes are gotten from the reference recording if there is one and this is not the reference recording
     if study_config.sync_ref_recording and rec_def.name!=study_config.sync_ref_recording:

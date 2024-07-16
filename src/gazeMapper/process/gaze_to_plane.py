@@ -48,7 +48,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, f
     assert rec_def.type==session.RecordingType.EyeTracker, f'You can only run gaze_to_plane on eye tracker recordings, not on a {str(rec_def.type).split(".")[1]} recording'
 
     # get episodes for which to transform gaze
-    episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / naming.coding_file))
+    episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / naming.coding_file), study_config.episodes_to_code)
     # trial episodes are gotten from the reference recording if there is one and this is not the reference recording
     if study_config.sync_ref_recording and rec_def.name!=study_config.sync_ref_recording:
         assert episode.Event.Trial not in episodes or not episodes[episode.Event.Trial], f'Trial episodes are gotten from the reference recording ({study_config.sync_ref_recording}) and should not be coded for this recording ({rec_def.name})'
