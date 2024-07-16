@@ -108,6 +108,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, a
             start, end = episodes[ival]
             plot_gaze  = {fr:gazes           [fr] for fr in      gazes       if fr>=start and fr<=end}
             plot_t_pos = {fr:target_positions[fr] for fr in target_positions if fr>=start and fr<=end}
+            assert plot_gaze, f'No gaze data found between frames {start} and {end}'
+            assert plot_t_pos, f'No target/scene camera data found between frames {start} and {end}'
             # determine initial offset
             toff = VOR_sync.loc[ival, 'offset_t']
             if np.isnan(toff):
