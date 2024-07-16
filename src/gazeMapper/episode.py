@@ -62,22 +62,23 @@ def write_list_to_file(episodes: list[Episode],
     df.to_csv(str(fileName), index=False, sep='\t', na_rep='nan')
 
 
-def get_empty_marker_dict(episodes: list[Event]=None) -> dict[Event,list[int]]:
+def get_empty_marker_dict(episodes: list[Event]=None) -> dict[Event,list[int]|list[list[int]]]:
     if not episodes:
         return {e:[] for e in Event}
     else:
         return {e:[] for e in episodes}
 
-def list_to_marker_dict(episodes: list[Episode]) -> dict[Event,list[list[int]]]:
-    e_dict = get_empty_marker_dict()
+def list_to_marker_dict(episodes: list[Episode], expected_types: list[Event]=None) -> dict[Event,list[int]|list[list[int]]]:
+    e_dict = get_empty_marker_dict(expected_types)
     for e in episodes:
+        assert e.event in e_dict, f'episode of type {e.event.value} found, but not expected (e.g. should not be coded for this study according to the study setup)'
         if e.end_frame is not None:
             e_dict[e.event].append([e.start_frame, e.end_frame])
         else:
             e_dict[e.event].append([e.start_frame])
     return e_dict
 
-def marker_dict_to_list(episodes: dict[Event,list[int]]|dict[Event,list[list[int]]]) -> list[Episode]:
+def marker_dict_to_list(episodes: dict[Event,list[int]|list[list[int]]]) -> list[Episode]:
     e_list: list[Episode] = []
     for e in episodes:
         if not episodes[e]:
