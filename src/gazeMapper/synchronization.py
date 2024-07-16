@@ -62,7 +62,7 @@ def get_episode_frame_indices_from_ref(working_dir: str|pathlib.Path, event: epi
     sync = get_sync_for_recs(working_dir.parent, ref_rec, rec)
     video_ts_ref = timestamps.VideoTimestamps(working_dir.parent / ref_rec / 'frameTimestamps.tsv')
     video_ts     = timestamps.VideoTimestamps(working_dir / 'frameTimestamps.tsv')
-    off = -sync.loc[(rec,0),'mean_off']*1000.   # s -> ms, negate because value is sync this_rec->ref, we need the opposite
+    off          = -sync.loc[(rec,0),'mean_off']*1000.   # s -> ms, negate because value is sync this_rec->ref, we need the opposite
     frame_ts_ref = [[video_ts_ref.get_timestamp(i) for i in ifs] for ifs in ref_episodes[event]]
     frame_idx    = [[video_ts.find_frame(i+off) for i in ts] for ts in frame_ts_ref]
     return [[ifs[0]-extra_fr, ifs[1]+extra_fr] for ifs in frame_idx]   # arbitrarily expand by x frames on each edge, so we've likely got the frame we need
