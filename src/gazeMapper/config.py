@@ -22,12 +22,29 @@ def get_marker_dict_from_list(markers: list[Marker]) -> dict[int,dict[str,Any]]:
 class Study:
     default_json_file_name = 'study_def.json'
 
-    def __init__(self, session_def: session.SessionDefinition, planes: list[plane.Definition], planes_per_episode: dict[episode.Event,list[str]], episodes_to_code: list[episode.Event], individual_markers: list[Marker], sync_ref_recording: str, do_time_stretch: bool, stretch_which: str, sync_average_recordings: list[str], working_directory: str|pathlib.Path):
+    def __init__(self,
+                 session_def: session.SessionDefinition,
+                 planes: list[plane.Definition],
+                 planes_per_episode: dict[episode.Event,list[str]],
+                 episodes_to_code: list[episode.Event],
+                 individual_markers: list[Marker],
+                 get_cam_movement_for_et_sync_method: str,
+                 sync_ref_recording: str,
+                 do_time_stretch: bool,
+                 stretch_which: str,
+                 sync_average_recordings: list[str],
+                 working_directory: str|pathlib.Path,
+                 # optional arguments
+                 get_cam_movement_for_et_sync_function: dict[str,str|dict[str]]=None):
         self.session_def            = session_def
         self.planes                 = planes
         self.planes_per_episode     = planes_per_episode
         self.episodes_to_code       = episodes_to_code
         self.working_directory      = working_directory
+
+        self.get_cam_movement_for_et_sync_method    = get_cam_movement_for_et_sync_method
+        self.get_cam_movement_for_et_sync_function  = get_cam_movement_for_et_sync_function
+
         self.sync_ref_recording     = sync_ref_recording
         self.do_time_stretch        = do_time_stretch
         self.stretch_which          = stretch_which
@@ -38,6 +55,9 @@ class Study:
         self._check_recordings([self.sync_ref_recording], 'sync_ref_recording')
         self._check_recordings(self.sync_average_recordings, 'sync_average_recordings')
         assert self.sync_ref_recording not in self.sync_average_recordings, f'Recording {self.sync_ref_recording} is the reference recording for sync, should not be specified sync_average_recordings'
+        assert self.get_cam_movement_for_et_sync_method in ['','plane','function'], 'get_cam_movement_for_et_sync_method parameter should be an empty string, "plane", or "function"'
+        if self.get_cam_movement_for_et_sync_method=='function':
+            assert all([x in self.get_cam_movement_for_et_sync_function for x in ["module_or_file","function","parameters"]]), 'if get_cam_movement_for_et_sync_method is set to "function", get_cam_movement_for_et_sync_function should specify "module_or_file", "function", and "parameters"'
 
     def _check_planes_per_episode(self):
         for e in self.planes_per_episode:
@@ -56,8 +76,11 @@ class Study:
         # instead to remain flexible and make it easy for users to rename, etc
         d_path = path / self.default_json_file_name
         with open(d_path, 'w') as f:
-            to_dump = {k:getattr(self,k) for k in ['planes_per_episode','episodes_to_code','individual_markers','sync_ref_recording','do_time_stretch','stretch_which','sync_average_recordings']}    # only these fields. session_def and planes will be populated from contents in the provided folder, and working_directory as the provided path
+            to_dump = {k:getattr(self,k) for k in ['planes_per_episode','episodes_to_code','get_cam_movement_for_et_sync_method','individual_markers','sync_ref_recording','do_time_stretch','stretch_which','sync_average_recordings']}    # only these fields. session_def and planes will be populated from contents in the provided folder, and working_directory as the provided path
             to_dump['planes_per_episode'] = [(k, to_dump['planes_per_episode'][k]) for k in to_dump['planes_per_episode']]   # pack as list of tuples for storage
+            # optional arguments
+            if self.get_cam_movement_for_et_sync_method=='function':
+                to_dump['get_cam_movement_for_et_sync_function'] = self.get_cam_movement_for_et_sync_function
             # dump to file
             json.dump(to_dump, f, cls=utils.CustomTypeEncoder, indent=2)
         # this doesn't story any files itself, but triggers the contained info to be stored
