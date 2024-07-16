@@ -1,4 +1,5 @@
 import pathlib
+import numpy as np
 import pandas as pd
 import polars as pl
 from collections import defaultdict
@@ -27,6 +28,17 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
 
     # per recording, read the relevant files and put them all together
     for r in recs:
+        # get trial coding
+        # trial episodes are gotten from the reference recording if there is one and this is not the reference recording
+        if study_config.sync_ref_recording and r!=study_config.sync_ref_recording:
+            episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / study_config.sync_ref_recording / naming.coding_file), study_config.episodes_to_code)
+            subset_var = 'frame_idx_ref'
+        else:
+            episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / r / naming.coding_file), study_config.episodes_to_code)
+            subset_var = 'frame_idx'
+        assert episode.Event.Trial in episodes and episodes[episode.Event.Trial], f'No {episode.Event.Trial.value} episodes found in the coding file, nothing to export'
+        episodes = episodes[episode.Event.Trial]
+
         # get all gaze data
         plane_gazes = {p:pd.read_csv(working_dir / r / f'{naming.world_gaze_prefix}{p}.tsv',sep='\t', dtype=defaultdict(lambda: float, **gaze_worldref.Gaze._non_float)) for p in planes}
 
@@ -77,7 +89,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
             for i in markers:
                 plane_gazes[f'marker_{i}_presence'] = plane_gazes[f'marker_{i}_presence'].notnull()
 
-        # finally, add scene and reference camera timestamp info, if present
+        # add scene and reference camera timestamp info, if present
         ts = pd.read_csv(working_dir / r / 'frameTimestamps.tsv',sep='\t').rename(columns={'timestamp':'frame_ts'})
         plane_gazes = plane_gazes.merge(ts, how="left", on='frame_idx')
         to_move = 1
@@ -94,6 +106,13 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
         idx = max([cols.index(c) for c in cols if c.startswith('frame_idx')])+1
         cols= cols[:idx] + cols[-to_move:] + cols[idx:-to_move]
         plane_gazes = plane_gazes[cols]
+
+        # add trial numbers
+        idx = max([cols.index(c) for c in cols if c.startswith('frame_ts')])+1
+        plane_gazes.insert(idx,'trial',np.int32(-1))
+        for i,e in enumerate(episodes):
+            sel = (plane_gazes[subset_var] >= e[0]) & (plane_gazes[subset_var] <= e[1])
+            plane_gazes.loc[sel,'trial'] = i+1
 
         # store
         # write into df (use polars as that library saves to file waaay faster)
