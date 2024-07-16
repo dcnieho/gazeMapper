@@ -18,22 +18,35 @@ utils.register_type(utils.CustomTypeEntry(Type,'__enum.plane.Type__',str, lambda
 class Definition:
     default_json_file_name = 'plane_def.json'
 
-    def __init__(self, type:Type, name:str=None, use_default:bool=False, marker_file: str|pathlib.Path=None, marker_size: float=None, marker_border_bits: int=1, min_num_markers: int=3, center: np.ndarray=None, unit: str=None, aruco_dict: int=cv2.aruco.DICT_4X4_250, ref_image_width: int=1920):
-        self.type                                       = type
-        self.name                                       = name
-        self.use_default            : bool              = use_default           # applies only to glassesValidator planes. If False, denotes this is the default/built-in glassesValidator plane, if True, denotes custom settings are expected
+    def __init__(self,
+                 type               : Type,
+                 use_default        : bool                  = False,
+                 name               : str                   = None,
+                 marker_file        : str|pathlib.Path      = None,
+                 marker_size        : float                 = None,
+                 marker_border_bits : int                   = 1,
+                 min_num_markers    : int                   = 3,
+                 plane_size         : tuple[float, float]   = None,
+                 origin             : np.ndarray            = None,
+                 unit               : str                   = None,
+                 aruco_dict         : int                   = cv2.aruco.DICT_4X4_250,
+                 ref_image_size     : int                   = 1920):
+        self.type                                           = type
+        self.name                                           = name
+        self.use_default            : bool                  = use_default           # applies only to glassesValidator planes. If False, denotes this is the default/built-in glassesValidator plane, if True, denotes custom settings are expected
         # the below are only for non-glassesValidator planes
-        self.marker_file            : str|pathlib.Path  = marker_file           # if str or Path: file from which to read markers. Else direction N_markerx4 array. Should contain centers of markers
-        self.marker_size            : float             = marker_size           # in "unit" units
-        self.marker_border_bits     : int               = marker_border_bits
-        self.min_num_markers        : int               = min_num_markers       # minimum number of markers that should be to run pose estimation w.r.t. the plane
-        self.center                 : np.ndarray        = center                # center of plane, in coordinates of the input file
-        self.unit                   : str               = unit
-        self.aruco_dict             : int               = aruco_dict
-        self.ref_image_width        : int               = ref_image_width
+        self.marker_file            : str|pathlib.Path      = marker_file           # if str or Path: file from which to read markers. Else direction N_markerx4 array. Should contain centers of markers
+        self.marker_size            : float                 = marker_size           # in "unit" units
+        self.plane_size             : tuple[float, float]   = plane_size            # in "unit" units
+        self.marker_border_bits     : int                   = marker_border_bits
+        self.min_num_markers        : int                   = min_num_markers       # minimum number of markers that should be to run pose estimation w.r.t. the plane
+        self.origin                 : np.ndarray            = origin                # center of plane, in coordinates of the input file
+        self.unit                   : str                   = unit
+        self.aruco_dict             : int                   = aruco_dict
+        self.ref_image_size         : int                   = ref_image_size        # largest dimension
 
-        if isinstance(self.center,list):
-            self.center = np.array(self.center)
+        if isinstance(self.origin,list):
+            self.origin = np.array(self.origin)
 
         # check provided info
         if self.type==Type.GlassesValidator:
@@ -70,12 +83,13 @@ class Definition:
             'use_default': self.use_default,
             'marker_file': self.marker_file,
             'marker_size': self.marker_size,
+            'plane_size': self.plane_size,
             'marker_border_bits': self.marker_border_bits,
             'min_num_markers': self.min_num_markers,
-            'center': self.center,
+            'origin': self.origin,
             'unit': self.unit,
             'aruco_dict': self.aruco_dict,
-            'ref_image_width': self.ref_image_width
+            'ref_image_width': self.ref_image_size
         }
 utils.register_type(utils.CustomTypeEntry(Definition,'__plane.Definition',lambda x: x._to_dict(), lambda x: Definition(**x)))
 
@@ -98,12 +112,13 @@ def get_plane_from_definition(plane_def: Definition, path: str | pathlib.Path) -
         pl = plane.Plane(
             markers             = path / plane_def.marker_file,
             marker_size         = plane_def.marker_size,
+            plane_size          = plane_def.plane_size,
             aruco_dict          = plane_def.aruco_dict,
             marker_border_bits  = plane_def.marker_border_bits,
             unit                = plane_def.unit,
             ref_image_store_path= path / plane.Plane.default_ref_image_name,
-            ref_image_width     = plane_def.ref_image_width
+            ref_image_size      = plane_def.ref_image_size
         )
-        if plane_def.center is not None:
-            pl.set_center(plane_def.center)
+        if plane_def.origin is not None:
+            pl.set_origin(plane_def.origin)
         return pl
