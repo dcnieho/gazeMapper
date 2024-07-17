@@ -2,12 +2,12 @@ import pathlib
 import threading
 import pandas as pd
 
-from glassesTools import aruco, marker, plane as gt_plane, timestamps
+from glassesTools import aruco, marker as gt_marker, plane as gt_plane
 from glassesTools.video_gui import GUI, generic_tooltip_drawer, qns_tooltip
 
 
 from . import naming
-from .. import config, episode, plane, session, synchronization
+from .. import config, episode, marker, plane, session, synchronization
 
 
 stopAllProcessing = False
@@ -104,7 +104,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, s
                                   # intervals to process
                                   analyze_frames,
                                   # detector and pose estimator setup
-                                  planes_setup, config.get_marker_dict_from_list(study_config.individual_markers),
+                                  planes_setup, marker.get_marker_dict_from_list(study_config.individual_markers),
                                   # other functions to run
                                   extra_processing,
                                   # visualization setup
@@ -113,7 +113,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, s
     for p in poses:
         gt_plane.write_list_to_file(poses[p], working_dir/f'{naming.plane_pose_prefix}{p}.tsv', skip_failed=True)
     for i in individual_markers:
-        marker.write_list_to_file(individual_markers[i], working_dir/f'{naming.marker_pose_prefix}{i}.tsv', skip_failed=True)
+        gt_marker.write_list_to_file(individual_markers[i], working_dir/f'{naming.marker_pose_prefix}{i}.tsv', skip_failed=True)
     if extra_processing:
         df = pd.DataFrame(extra_processing_output['sync_func'],columns=['frame_idx','target_x','target_y'])
         df.to_csv(working_dir/naming.target_sync_file, sep='\t', index=False, na_rep='nan', float_format="%.8f")
