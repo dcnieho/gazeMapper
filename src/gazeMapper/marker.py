@@ -1,6 +1,6 @@
 import pathlib
 import pandas as pd
-from typing import overload
+from typing import overload, Any
 from collections import defaultdict
 
 from glassesTools import marker as gt_marker, utils
@@ -27,8 +27,8 @@ def load_file(marker: Marker, folder: str|pathlib.Path) -> pd.DataFrame:
 
 @overload
 def code_marker_for_presence(markers: pd.DataFrame) -> pd.DataFrame: ...
-def code_marker_for_presence(markers: dict[int, pd.DataFrame]) -> dict[int, pd.DataFrame]: ...
-def code_marker_for_presence(markers: pd.DataFrame|dict[int, pd.DataFrame]) -> pd.DataFrame|dict[int, pd.DataFrame]:
+def code_marker_for_presence(markers: dict[Any, pd.DataFrame]) -> dict[Any, pd.DataFrame]: ...
+def code_marker_for_presence(markers: pd.DataFrame|dict[Any, pd.DataFrame]) -> pd.DataFrame|dict[Any, pd.DataFrame]:
     if isinstance(markers,dict):
         for i in markers:
             markers[i] = _code_marker_for_presence_impl(markers[i], f'{i}_')
