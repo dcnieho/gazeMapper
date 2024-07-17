@@ -1,7 +1,11 @@
+import pathlib
 import pandas as pd
 from typing import overload
+from collections import defaultdict
 
-from glassesTools import utils
+from glassesTools import marker as gt_marker, utils
+
+from . import naming
 
 
 class Marker:
@@ -15,6 +19,11 @@ def get_marker_dict_from_list(markers: list[Marker]) -> dict[int,dict[str]]:
     for m in markers:
         out[m.id] = {'marker_size': m.size}
     return out
+
+def load_file(marker: Marker, folder: str|pathlib.Path) -> pd.DataFrame:
+    folder = pathlib.Path(folder)
+    file = folder / f'{naming.marker_pose_prefix}{marker.id}.tsv'
+    return pd.read_csv(file,sep='\t', dtype=defaultdict(lambda: float, **gt_marker.Pose._non_float))
 
 @overload
 def code_marker_for_presence(markers: pd.DataFrame) -> pd.DataFrame: ...

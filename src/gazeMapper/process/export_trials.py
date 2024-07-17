@@ -4,7 +4,7 @@ import pandas as pd
 import polars as pl
 from collections import defaultdict
 
-from glassesTools import gaze_worldref, marker as gt_marker
+from glassesTools import gaze_worldref
 
 from .. import config, episode, marker, naming, session
 
@@ -63,8 +63,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
 
         # if there are individual markers, add them
         # load
-        m_files = {m.id: working_dir / r / f'{naming.marker_pose_prefix}{m.id}.tsv' for m in study_config.individual_markers}
-        markers = {m: pd.read_csv(m_files[m],sep='\t', dtype=defaultdict(lambda: float, **gt_marker.Pose._non_float)) for m in m_files if m_files[m].is_file()}
+        markers = {m.id: marker.load_file(m, working_dir / r) for m in study_config.individual_markers}
         # recode to presence/absence if wanted
         if only_code_marker_presence:
             markers = marker.code_marker_for_presence(markers)
