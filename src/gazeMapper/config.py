@@ -12,17 +12,24 @@ class Study:
     def __init__(self,
                  session_def: session.SessionDefinition,
                  planes: list[plane.Definition],
+                 individual_markers: list[marker.Marker],
+                 working_directory: str|pathlib.Path,
                  planes_per_episode: dict[episode.Event,list[str]],
+
                  episodes_to_code: list[episode.Event],
-                 individual_markers: list[Marker],
+
                  get_cam_movement_for_et_sync_method: str,
+
                  sync_ref_recording: str,
                  do_time_stretch: bool,
                  stretch_which: str,
                  sync_average_recordings: list[str],
-                 working_directory: str|pathlib.Path,
+
                  # optional arguments
-                 get_cam_movement_for_et_sync_function: dict[str,str|dict[str]]=None):
+                 get_cam_movement_for_et_sync_function: dict[str,str|dict[str]]=None,
+
+                 auto_sync_markers: list[int]=None,
+                 auto_code_trials_setup: dict[str]=None):
         self.session_def            = session_def
         self.planes                 = planes
         self.planes_per_episode     = planes_per_episode
@@ -38,19 +45,30 @@ class Study:
         self.sync_average_recordings= sync_average_recordings
         self.individual_markers     = individual_markers
 
+        self.auto_sync_markers      = auto_sync_markers
+
+        self.auto_code_trials_setup = auto_code_trials_setup
+
         self._check_planes_per_episode()
+        self._check_auto_markers()
         self._check_recordings([self.sync_ref_recording], 'sync_ref_recording')
         self._check_recordings(self.sync_average_recordings, 'sync_average_recordings')
-        assert self.sync_ref_recording not in self.sync_average_recordings, f'Recording {self.sync_ref_recording} is the reference recording for sync, should not be specified sync_average_recordings'
+        assert self.sync_ref_recording not in self.sync_average_recordings, f'Recording {self.sync_ref_recording} is the reference recording for sync, should not be specified in sync_average_recordings'
         assert self.get_cam_movement_for_et_sync_method in ['','plane','function'], 'get_cam_movement_for_et_sync_method parameter should be an empty string, "plane", or "function"'
         if self.get_cam_movement_for_et_sync_method=='function':
-            assert all([x in self.get_cam_movement_for_et_sync_function for x in ["module_or_file","function","parameters"]]), 'if get_cam_movement_for_et_sync_method is set to "function", get_cam_movement_for_et_sync_function should specify "module_or_file", "function", and "parameters"'
+            assert all([x in self.get_cam_movement_for_et_sync_function for x in ["module_or_file","function","parameters"]]), 'if get_cam_movement_for_et_sync_method is set to "function", get_cam_movement_for_et_sync_function should be a dict specifying "module_or_file", "function", and "parameters"'
 
     def _check_planes_per_episode(self):
         for e in self.planes_per_episode:
             for p in self.planes_per_episode[e]:
                 if not any([p==pl.name for pl in self.planes]):
                     raise ValueError(f'Plane {p} not known')
+
+    def _check_auto_markers(self):
+        if self.auto_sync_markers:
+            for i in self.auto_sync_markers:
+                if not any([m.id==i for m in self.individual_markers]):
+                    raise ValueError(f'Marker "{i}" specified in auto_sync_markers, but unknown because not present in individual_markers')
 
     def _check_recordings(self, which, field):
         for w in which:
