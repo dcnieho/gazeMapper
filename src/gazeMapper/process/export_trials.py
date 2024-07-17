@@ -4,10 +4,10 @@ import pandas as pd
 import polars as pl
 from collections import defaultdict
 
-from glassesTools import gaze_worldref, marker
+from glassesTools import gaze_worldref, marker as gt_marker
 
 from . import naming
-from .. import config, episode, session
+from .. import config, episode, marker, session
 
 
 def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, output3D = False, output2D = True, only_code_marker_presence = True):
@@ -65,16 +65,10 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
         # if there are individual markers, add them
         # load
         m_files = {m.id: working_dir / r / f'{naming.marker_pose_prefix}{m.id}.tsv' for m in study_config.individual_markers}
-        markers = {m: pd.read_csv(m_files[m],sep='\t', dtype=defaultdict(lambda: float, **marker.Pose._non_float)) for m in m_files if m_files[m].is_file()}
+        markers = {m: pd.read_csv(m_files[m],sep='\t', dtype=defaultdict(lambda: float, **gt_marker.Pose._non_float)) for m in m_files if m_files[m].is_file()}
         # recode to presence/absence if wanted
         if only_code_marker_presence:
-            for i in markers:
-                markers[i].insert(len(markers[i].columns),
-                                  f'marker_{i}_presence',
-                                  markers[i][[c for c in markers[i].columns if c not in ['frame_idx']]].notnull().all(axis='columns')
-                    )
-                markers[i] = markers[i][['frame_idx',f'marker_{i}_presence']]
-                markers[i][f'marker_{i}_presence'] = markers[i][f'marker_{i}_presence'].astype('bool')
+            markers = marker.code_marker_for_presence(markers)
         else:
             # rename columns to unique names
             for i in markers:

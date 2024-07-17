@@ -1,3 +1,6 @@
+import pandas as pd
+from typing import overload
+
 from glassesTools import utils
 
 
@@ -12,3 +15,24 @@ def get_marker_dict_from_list(markers: list[Marker]) -> dict[int,dict[str]]:
     for m in markers:
         out[m.id] = {'marker_size': m.size}
     return out
+
+@overload
+def code_marker_for_presence(markers: pd.DataFrame) -> pd.DataFrame: ...
+def code_marker_for_presence(markers: dict[int, pd.DataFrame]) -> dict[int, pd.DataFrame]: ...
+def code_marker_for_presence(markers: pd.DataFrame|dict[int, pd.DataFrame]) -> pd.DataFrame|dict[int, pd.DataFrame]:
+    if isinstance(markers,dict):
+        for i in markers:
+            markers[i] = _code_marker_for_presence_impl(markers[i], f'{i}_')
+    else:
+        markers = _code_marker_for_presence_impl(markers,'')
+    return markers
+
+def _code_marker_for_presence_impl(markers: pd.DataFrame, lbl_extra:str) -> pd.DataFrame:
+    new_col_lbl = f'marker_{lbl_extra}presence'
+    markers.insert(len(markers.columns),
+        new_col_lbl,
+        markers[[c for c in markers.columns if c not in ['frame_idx']]].notnull().all(axis='columns')
+    )
+    markers = markers[['frame_idx',new_col_lbl]]
+    markers = markers.astype({new_col_lbl: bool}) # ensure the new column is bool
+    return markers
