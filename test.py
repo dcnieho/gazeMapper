@@ -10,9 +10,10 @@ from src.gazeMapper.process.sync_to_ref import process as sync_to_ref
 from src.gazeMapper.process.gaze_to_plane import process as gaze_to_plane
 from src.gazeMapper.process.export_trials import process as export_trials
 from src.gazeMapper.process.run_validation import process as run_validation
+from src.gazeMapper.process.auto_code_sync_and_trials import process as auto_code_sync_and_trials
 
 
-which = 3
+which = 2
 match which:
     case 1:
         base1 = pathlib.Path(r'C:\dat\projects\Roy Japanese Lego\pilot 3\data\J13')
@@ -94,6 +95,7 @@ match which:
 
 
 sessions = session.get_sessions_from_directory(proj)
+study_config = config.Study.load_from_json(config.guess_config_dir(proj))
 
 # for s in sessions:
 #     for r in et_recs+cam_recs:
@@ -115,6 +117,14 @@ sessions = session.get_sessions_from_directory(proj)
 # for s in sessions:
 #     export_trials(s.working_directory)
 
+# for s in sessions:
+#     for r in et_recs:
+#         run_validation(s.recordings[r].info.working_directory)
+
 for s in sessions:
-    for r in et_recs:
-        run_validation(s.recordings[r].info.working_directory)
+    if study_config.sync_ref_recording and not study_config.auto_code_sync_points:
+        recs = [study_config.sync_ref_recording]
+    else:
+        recs = et_recs+cam_recs
+    for r in recs:
+        auto_code_sync_and_trials(s.recordings[r].info.working_directory)
