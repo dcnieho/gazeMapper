@@ -45,3 +45,9 @@ def _code_marker_for_presence_impl(markers: pd.DataFrame, lbl_extra:str) -> pd.D
     markers = markers[['frame_idx',new_col_lbl]]
     markers = markers.astype({new_col_lbl: bool}) # ensure the new column is bool
     return markers
+
+def fill_gaps_in_marker_detection(markers: pd.DataFrame, fill_value):
+    min_fr_idx = markers['frame_idx'].min()
+    max_fr_idx = markers['frame_idx'].max()
+    new_index = pd.Index(range(min_fr_idx,max_fr_idx+1), name='frame_idx')
+    return markers.set_index('frame_idx').reindex(new_index, fill_value=fill_value).reset_index()

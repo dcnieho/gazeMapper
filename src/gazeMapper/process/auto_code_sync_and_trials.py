@@ -34,28 +34,12 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):
         markers = [marker.code_marker_for_presence(m) for m in markers]
         # fill gaps in marker detection
         for i in range(len(markers)):
-            min_fr_idx, max_fr_idx = markers[i]['frame_idx'].min(), markers[i]['frame_idx'].max()
-            new_index = pd.Index(range(min_fr_idx,max_fr_idx+1), name='frame_idx')
-            markers[i] = markers[i].set_index('frame_idx').reindex(new_index, fill_value=False).reset_index()
+            markers[i] = marker.fill_gaps_in_marker_detection(markers[i], fill_value=False)
         # see where stretches of True (marker presence) start
         marker_starts = []
         for i in range(len(markers)):
-            vals = np.pad(markers[i]['marker_presence'].values.astype(int), (1, 1), 'constant', constant_values=(0, 0))
-            d    = np.diff(vals)
-            starts = np.where(d == 1)[0]
-            ends   = np.where(d == -1)[0]
-            gaps   = starts[1:]-ends[:-1]
-            # fill gaps in marker detection
-            gapi   = np.where(gaps<=study_config.auto_code_sync_points['max_gap_duration'])[0]
-            starts = np.delete(starts,gapi+1)
-            ends   = np.delete(ends,gapi)
-            # remove too short
-            lengths= ends-starts
-            shorti = np.where(lengths<=study_config.auto_code_sync_points['min_duration'])[0]
-            starts = np.delete(starts,shorti)
-            ends   = np.delete(ends,shorti)
-            # first frame is turn into frame_idx value
-            marker_starts.extend(markers[i].loc[starts,'frame_idx'])
+            start_frames,_ = get_marker_starts_ends(markers[i], study_config.auto_code_sync_points['max_gap_duration'], study_config.auto_code_sync_points['min_duration'])
+            marker_starts.extend(start_frames)
         # insert in episodes
         [episodes[episode.Event.Sync_Camera].append(i) for i in marker_starts if i not in episodes[episode.Event.Sync_Camera]]
 
@@ -65,3 +49,22 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):
 
     # store coded intervals to file
     episode.write_list_to_file(episode.marker_dict_to_list(episodes), coding_file)
+
+
+def get_marker_starts_ends(m: pd.DataFrame, max_gap_duration: int, min_duration: int):
+    vals = np.pad(m['marker_presence'].values.astype(int), (1, 1), 'constant', constant_values=(0, 0))
+    d    = np.diff(vals)
+    starts = np.where(d == 1)[0]
+    ends   = np.where(d == -1)[0]
+    gaps   = starts[1:]-ends[:-1]
+    # fill gaps in marker detection
+    gapi   = np.where(gaps<=max_gap_duration)[0]
+    starts = np.delete(starts,gapi+1)
+    ends   = np.delete(ends,gapi)
+    # remove too short
+    lengths= ends-starts
+    shorti = np.where(lengths<=min_duration)[0]
+    starts = np.delete(starts,shorti)
+    ends   = np.delete(ends,shorti)
+    # turn first and last frames into frame_idx values
+    return m.loc[starts,'frame_idx'].values, m.loc[ends-1,'frame_idx'].values # NB: -1 so that ends point to last frame during which marker was last seen (and to not index out of the array)
