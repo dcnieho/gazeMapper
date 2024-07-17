@@ -97,7 +97,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, s
         analyze_frames[p] = sorted(all_episodes, key = lambda x: x[1])
 
     # if there is some form of automatic coding configured, then we'll need to process the whole video
-    if study_config.auto_sync_markers or (study_config.auto_code_trials_setup and (not study_config.sync_ref_recording or rec_def.name==study_config.sync_ref_recording)):
+    if study_config.auto_code_sync_points or (study_config.auto_code_trials_episodes and (not study_config.sync_ref_recording or rec_def.name==study_config.sync_ref_recording)):
         analyze_frames = {p:None for p in analyze_frames}
 
     stopAllProcessing, poses, individual_markers, extra_processing_output = \

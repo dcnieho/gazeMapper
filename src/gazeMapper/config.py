@@ -28,8 +28,8 @@ class Study:
                  # optional arguments
                  get_cam_movement_for_et_sync_function: dict[str,str|dict[str]]=None,
 
-                 auto_sync_markers: list[int]=None,
-                 auto_code_trials_setup: dict[str]=None):
+                 auto_code_sync_points: list[int]=None,
+                 auto_code_trials_episodes: dict[str]=None):
         self.session_def            = session_def
         self.planes                 = planes
         self.planes_per_episode     = planes_per_episode
@@ -45,9 +45,8 @@ class Study:
         self.sync_average_recordings= sync_average_recordings
         self.individual_markers     = individual_markers
 
-        self.auto_sync_markers      = auto_sync_markers
-
-        self.auto_code_trials_setup = auto_code_trials_setup
+        self.auto_code_sync_points      = auto_code_sync_points
+        self.auto_code_trials_episodes  = auto_code_trials_episodes
 
         self._check_planes_per_episode()
         self._check_auto_markers()
@@ -57,6 +56,12 @@ class Study:
         assert self.get_cam_movement_for_et_sync_method in ['','plane','function'], 'get_cam_movement_for_et_sync_method parameter should be an empty string, "plane", or "function"'
         if self.get_cam_movement_for_et_sync_method=='function':
             assert all([x in self.get_cam_movement_for_et_sync_function for x in ["module_or_file","function","parameters"]]), 'if get_cam_movement_for_et_sync_method is set to "function", get_cam_movement_for_et_sync_function should be a dict specifying "module_or_file", "function", and "parameters"'
+        for e in self.planes_per_episode:
+            assert e in self.episodes_to_code, f'Plane(s) are defined in planes_per_episode for {e.name} events, but {e.name} events are not set up to be coded in episodes_to_code. Fix episodes_to_code.'
+        if self.auto_code_sync_points:
+            assert episode.Event.Sync_Camera in self.episodes_to_code, f'The auto_code_sync_points option is configured, but {episode.Event.Sync_Camera} points are not set to be coded in episodes_to_code. Fix episodes_to_code.'
+        if self.auto_code_trials_episodes:
+            assert episode.Event.Trial in self.episodes_to_code, f'The auto_code_trials_episodes option is configured, but {episode.Event.Trial} episodes are not set to be coded in episodes_to_code. Fix episodes_to_code.'
 
     def _check_planes_per_episode(self):
         for e in self.planes_per_episode:
@@ -65,10 +70,11 @@ class Study:
                     raise ValueError(f'Plane {p} not known')
 
     def _check_auto_markers(self):
-        if self.auto_sync_markers:
-            for i in self.auto_sync_markers:
+        if self.auto_code_sync_points:
+            for i in self.auto_code_sync_points:
                 if not any([m.id==i for m in self.individual_markers]):
-                    raise ValueError(f'Marker "{i}" specified in auto_sync_markers, but unknown because not present in individual_markers')
+                    raise ValueError(f'Marker "{i}" specified in auto_code_sync_points, but unknown because not present in individual_markers')
+        # TODO check auto_code_trials_episodes
 
     def _check_recordings(self, which, field):
         for w in which:
