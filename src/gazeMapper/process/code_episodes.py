@@ -16,8 +16,7 @@ from glassesTools import drawing, gaze_headref, gaze_worldref, ocv, plane, times
 from glassesTools.video_gui import GUI, generic_tooltip_drawer
 
 
-from . import naming
-from .. import config, episode, session
+from .. import config, episode, naming, session
 
 # This script shows a video player that is used to indicate the interval(s)
 # during which the poster should be found in the video and in later

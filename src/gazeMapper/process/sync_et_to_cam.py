@@ -14,8 +14,8 @@ from glassesTools import gaze_headref, ocv, plane, timestamps, video_utils
 from glassesTools.signal_gui import GUI, TargetPos
 
 
-from . import naming, _utils
-from .. import config, episode, session
+from . import _utils
+from .. import config, episode, naming, session
 
 
 

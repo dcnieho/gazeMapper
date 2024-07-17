@@ -6,8 +6,7 @@ from glassesTools import aruco, marker as gt_marker, plane as gt_plane
 from glassesTools.video_gui import GUI, generic_tooltip_drawer, qns_tooltip
 
 
-from . import naming
-from .. import config, episode, marker, plane, session, synchronization
+from .. import config, episode, marker, naming, plane, session, synchronization
 
 
 stopAllProcessing = False

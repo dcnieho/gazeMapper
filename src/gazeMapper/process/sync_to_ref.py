@@ -6,8 +6,8 @@ import polars as pl
 from glassesTools import gaze_headref, timestamps, video_utils
 
 
-from . import naming, _utils
-from .. import config, episode, session, synchronization
+from . import _utils
+from .. import config, session, synchronization
 
 
 def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):

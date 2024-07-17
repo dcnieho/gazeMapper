@@ -3,8 +3,7 @@ import pathlib
 from glassesValidator import process as gv_process, utils as gv_utils
 
 
-from . import naming
-from .. import config, episode, plane, session
+from .. import config, episode, naming, plane, session
 
 
 stopAllProcessing = False

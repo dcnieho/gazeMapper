@@ -5,8 +5,7 @@ from glassesTools import gaze_headref, gaze_worldref, ocv, plane as gt_plane, wo
 from glassesTools.video_gui import GUI, generic_tooltip_drawer, qns_tooltip
 
 
-from . import naming
-from .. import config, episode, plane, session, synchronization
+from .. import config, episode, naming, plane, session, synchronization
 
 
 stopAllProcessing = False

@@ -3,8 +3,7 @@ import pathlib
 
 from glassesTools import timestamps
 
-from .process import naming
-from . import episode
+from . import episode, naming
 
 def get_cols(do_time_stretch: bool):
     cols    = ['t_ref','t_this','offset']

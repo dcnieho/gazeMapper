@@ -6,8 +6,7 @@ from collections import defaultdict
 
 from glassesTools import gaze_worldref, marker as gt_marker
 
-from . import naming
-from .. import config, episode, marker, session
+from .. import config, episode, marker, naming, session
 
 
 def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, output3D = False, output2D = True, only_code_marker_presence = True):
