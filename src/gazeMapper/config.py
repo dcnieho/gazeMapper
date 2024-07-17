@@ -6,6 +6,11 @@ from glassesTools import utils
 from . import episode, marker, plane, session
 
 
+defaults = {
+    'auto_code_sync_points.max_gap_duration': 4,
+    'auto_code_sync_points.min_duration': 6,
+}
+
 class Study:
     default_json_file_name = 'study_def.json'
 
@@ -63,6 +68,12 @@ class Study:
         if self.auto_code_trials_episodes:
             assert episode.Event.Trial in self.episodes_to_code, f'The auto_code_trials_episodes option is configured, but {episode.Event.Trial} episodes are not set to be coded in episodes_to_code. Fix episodes_to_code.'
 
+        if self.auto_code_sync_points:
+            if 'max_gap_duration' not in self.auto_code_sync_points:
+                self.auto_code_sync_points['max_gap_duration'] = defaults['auto_code_sync_points.max_gap_duration']
+            if 'min_duration' not in self.auto_code_sync_points:
+                self.auto_code_sync_points['min_duration'] = defaults['auto_code_sync_points.min_duration']
+
     def _check_planes_per_episode(self):
         for e in self.planes_per_episode:
             for p in self.planes_per_episode[e]:
@@ -71,10 +82,13 @@ class Study:
 
     def _check_auto_markers(self):
         if self.auto_code_sync_points:
-            for i in self.auto_code_sync_points:
+            for i in self.auto_code_sync_points['markers']:
                 if not any([m.id==i for m in self.individual_markers]):
-                    raise ValueError(f'Marker "{i}" specified in auto_code_sync_points, but unknown because not present in individual_markers')
-        # TODO check auto_code_trials_episodes
+                    raise ValueError(f'Marker "{i}" specified in auto_code_sync_points.markers, but unknown because not present in individual_markers')
+        if self.auto_code_trials_episodes:
+            for i in self.auto_code_trials_episodes['markers']:
+                if not any([m.id==i for m in self.individual_markers]):
+                    raise ValueError(f'Marker "{i}" specified in auto_code_trials_episodes.markers, but unknown because not present in individual_markers')
 
     def _check_recordings(self, which, field):
         for w in which:
