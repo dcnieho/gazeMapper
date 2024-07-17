@@ -16,6 +16,13 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):
     assert study_config.auto_code_sync_points or study_config.auto_code_trials_episodes, f'No automatic sync point detection or trial episode coding is defined for this study, nothing to do'
     rec_def = study_config.session_def.get_recording_def(working_dir.name)
 
+    if not study_config.auto_code_sync_points:
+        if not (study_config.auto_code_trials_episodes and (not study_config.sync_ref_recording or rec_def.name==study_config.sync_ref_recording)):
+            if not study_config.auto_code_trials_episodes:
+                raise RuntimeError('Nothing to do, neither auto_code_sync_points nor auto_code_trials_episodes are defined')
+            else:
+                raise RuntimeError(f'Nothing to do, auto_code_trials_episodes is defined, but you have a sync_ref_recording ({study_config.sync_ref_recording}) and this ({rec_def.name}) isn\'t it')
+
     # get already coded interval(s), if any
     coding_file = working_dir / naming.coding_file
     if coding_file.is_file():
