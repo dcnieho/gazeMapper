@@ -9,6 +9,10 @@ from . import episode, marker, plane, session
 defaults = {
     'auto_code_sync_points.max_gap_duration': 4,
     'auto_code_sync_points.min_duration': 6,
+
+    'auto_code_trials_episodes.max_gap_duration': 4,
+    'auto_code_trials_episodes.max_intermarker_gap_duration': 15,
+    'auto_code_trials_episodes.min_duration': 6,
 }
 
 class Study:
@@ -33,7 +37,7 @@ class Study:
                  # optional arguments
                  get_cam_movement_for_et_sync_function: dict[str,str|dict[str]]=None,
 
-                 auto_code_sync_points: list[int]=None,
+                 auto_code_sync_points: dict[str]=None,
                  auto_code_trials_episodes: dict[str]=None):
         self.session_def            = session_def
         self.planes                 = planes
@@ -73,6 +77,13 @@ class Study:
                 self.auto_code_sync_points['max_gap_duration'] = defaults['auto_code_sync_points.max_gap_duration']
             if 'min_duration' not in self.auto_code_sync_points:
                 self.auto_code_sync_points['min_duration'] = defaults['auto_code_sync_points.min_duration']
+        if self.auto_code_trials_episodes:
+            if 'max_gap_duration' not in self.auto_code_trials_episodes:
+                self.auto_code_trials_episodes['max_gap_duration'] = defaults['auto_code_trials_episodes.max_gap_duration']
+            if 'max_intermarker_gap_duration' not in self.auto_code_trials_episodes:
+                self.auto_code_trials_episodes['max_intermarker_gap_duration'] = defaults['auto_code_trials_episodes.max_intermarker_gap_duration']
+            if 'min_duration' not in self.auto_code_trials_episodes:
+                self.auto_code_trials_episodes['min_duration'] = defaults['auto_code_trials_episodes.min_duration']
 
     def _check_planes_per_episode(self):
         for e in self.planes_per_episode:
@@ -86,9 +97,10 @@ class Study:
                 if not any([m.id==i for m in self.individual_markers]):
                     raise ValueError(f'Marker "{i}" specified in auto_code_sync_points.markers, but unknown because not present in individual_markers')
         if self.auto_code_trials_episodes:
-            for i in self.auto_code_trials_episodes['markers']:
-                if not any([m.id==i for m in self.individual_markers]):
-                    raise ValueError(f'Marker "{i}" specified in auto_code_trials_episodes.markers, but unknown because not present in individual_markers')
+            for f in ['start_markers','end_markers']:
+                for i in self.auto_code_trials_episodes[f]:
+                    if not any([m.id==i for m in self.individual_markers]):
+                        raise ValueError(f'Marker "{i}" specified in auto_code_trials_episodes.{f}, but unknown because not present in individual_markers')
 
     def _check_recordings(self, which, field):
         for w in which:
