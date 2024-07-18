@@ -1,8 +1,9 @@
 import pathlib
 import numpy as np
 import pandas as pd
+import shutil
 
-from .. import config, episode, marker, naming, session
+from .. import config, episode, marker, naming
 
 
 def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):
@@ -54,6 +55,9 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):
     if study_config.auto_code_trials_episodes and (not study_config.sync_ref_recording or rec_def.name==study_config.sync_ref_recording):
         pass
 
+    # back up coding file if it exists
+    if coding_file.is_file():
+        shutil.move(coding_file, coding_file.with_stem(f'{naming.coding_file.split(".")[0]}_backup'))
     # store coded intervals to file
     episode.write_list_to_file(episode.marker_dict_to_list(episodes), coding_file)
 
