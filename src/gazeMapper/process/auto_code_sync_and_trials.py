@@ -63,18 +63,18 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):
 
 
 def get_marker_starts_ends(m: pd.DataFrame, max_gap_duration: int, min_duration: int):
-    vals = np.pad(m['marker_presence'].values.astype(int), (1, 1), 'constant', constant_values=(0, 0))
-    d    = np.diff(vals)
-    starts = np.where(d == 1)[0]
-    ends   = np.where(d == -1)[0]
+    vals   = np.pad(m['marker_presence'].values.astype(int), (1, 1), 'constant', constant_values=(0, 0))
+    d      = np.diff(vals)
+    starts = np.nonzero(d == 1)[0]
+    ends   = np.nonzero(d == -1)[0]
     gaps   = starts[1:]-ends[:-1]
     # fill gaps in marker detection
-    gapi   = np.where(gaps<=max_gap_duration)[0]
+    gapi   = np.nonzero(gaps<=max_gap_duration)[0]
     starts = np.delete(starts,gapi+1)
     ends   = np.delete(ends,gapi)
     # remove too short
     lengths= ends-starts
-    shorti = np.where(lengths<=min_duration)[0]
+    shorti = np.nonzero(lengths<=min_duration)[0]
     starts = np.delete(starts,shorti)
     ends   = np.delete(ends,shorti)
     # turn first and last frames into frame_idx values
