@@ -12,8 +12,8 @@ isMacOS = sys.platform.startswith("darwin")
 if isMacOS:
     import AppKit
 
-from glassesTools import drawing, gaze_headref, gaze_worldref, ocv, plane, timestamps
-from glassesTools.video_gui import GUI, generic_tooltip_drawer
+from glassesTools import annotation, drawing, gaze_headref, gaze_worldref, ocv, plane, timestamps
+from glassesTools.video_gui import GUI
 
 
 from .. import config, episode, naming, session
@@ -28,16 +28,13 @@ from .. import config, episode, naming, session
 # (which can be run before this script, they will just process the whole video)
 # will also be shown if available.
 
-_key_to_event_type_map = {
-    'v': episode.Event.Validate,
-    'c': episode.Event.Sync_Camera,
-    'e': episode.Event.Sync_ET_Data,
-    't': episode.Event.Trial,
+_event_type_to_key_map = {
+    annotation.Event.Validate: imgui.Key.v,
+    annotation.Event.Sync_Camera: imgui.Key.c,
+    annotation.Event.Sync_ET_Data: imgui.Key.e,
+    annotation.Event.Trial: imgui.Key.t,
 }
-_event_type_to_key_map = {v: k for k, v in _key_to_event_type_map.items()}
 
-
-stopAllProcessing = False
 def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):
     # if show_poster, also draw poster with gaze overlaid on it (if available)
     working_dir = pathlib.Path(working_dir)
@@ -55,12 +52,9 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):
     proc_thread.start()
     gui.start()
     proc_thread.join()
-    return stopAllProcessing
 
 
 def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, main_win_id: int):
-    global stopAllProcessing
-
     # get info about the study the recording is a part of
     study_config = config.Study.load_from_json(config_dir)
 
@@ -71,8 +65,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
     if rec_type==session.RecordingType.Camera:
         hasGaze, hasPosterGaze, hasPosterPose = False, False, False
         # no episode.Event.Sync_ET_Data for camera recordings, remove
-        if episode.Event.Sync_ET_Data in study_config.episodes_to_code:
-            study_config.episodes_to_code.remove(episode.Event.Sync_ET_Data)
+        if annotation.Event.Sync_ET_Data in study_config.episodes_to_code:
+            study_config.episodes_to_code.remove(annotation.Event.Sync_ET_Data)
     elif rec_type==session.RecordingType.EyeTracker:
         # Read gaze data
         hasGaze = True
@@ -115,22 +109,29 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
         episodes = episode.get_empty_marker_dict(study_config.episodes_to_code)
     # trial episodes are gotten from the reference recording if there is one. Check there is one and that this is not the reference recording
     if study_config.sync_ref_recording and rec_def.name!=study_config.sync_ref_recording:
-        episodes.pop(episode.Event.Trial)
-    key_tooltip = get_key_tooltip(episodes)
-    gui.set_interesting_keys(list(key_tooltip.keys()))
-    gui.register_draw_callback('status',lambda: my_tooltip(episodes, key_tooltip))
+        episodes.pop(annotation.Event.Trial)
 
     # set up video playback
     # 1. timestamp info for relating audio to video frames
-    video_ts = timestamps.VideoTimestamps( working_dir / 'frameTimestamps.tsv' )
+    video_ts = timestamps.VideoTimestamps(working_dir / 'frameTimestamps.tsv')
     # 2. mediaplayer for the actual video playback, with sound if available
     ff_opts = {'volume': 1., 'sync': 'audio', 'framedrop': True}
     player = MediaPlayer(str(in_video), ff_opts=ff_opts)
+    gui.set_playing(True)
+
+    # set up annotation GUI
+    gui.set_allow_pause(True)
+    gui.set_allow_seek(True)
+    gui.set_allow_timeline_zoom(True)
+    gui.set_show_controls(True)
+    gui.set_allow_annotate(True, {e:_event_type_to_key_map[e] for e in episodes})
+    gui.set_show_timeline(True, video_ts, episodes, main_win_id)
+    gui.set_show_annotation_label(True, main_win_id)
 
     # show
     subPixelFac = 8   # for sub-pixel positioning
     armLength = 20    # mm
-    stopAllProcessing = False
+    should_exit = False
     hasRequestedFocus = not isMacOS # False only if on Mac OS, else True since its a no-op
     while True:
         frame, val = player.get_frame(force_refresh=True)
@@ -168,52 +169,36 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
             AppKit.NSApplication.sharedApplication().activateIgnoringOtherApps_(1)
             hasRequestedFocus = True
 
-        keys = gui.get_key_presses()
-        # seek: don't ask me why, but relative seeking works best for backward,
-        # and seeking to absolute pts best for forward seeking.
-        if 'j' in keys:
-            step = (video_ts.get_timestamp(frame_idx)-video_ts.get_timestamp(max(0,frame_idx-1)))/1000
-            player.seek(-step)                              # back one frame
-        if 'k' in keys:
-            nextTs = video_ts.get_timestamp(frame_idx+1)
-            if nextTs != -1.:
-                step = (nextTs-video_ts.get_timestamp(max(0,frame_idx)))/1000
-                player.seek(pts+step, relative=False)       # forward one frame
-        if 'h' in keys or 'H' in keys:
-            step = 1 if 'h' in keys else 10
-            player.seek(-step)                              # back one or ten seconds
-        if 'l' in keys or 'L' in keys:
-            step = 1 if 'l' in keys else 10
-            player.seek(pts+step, relative=False)           # forward one or ten seconds
-
-        if 'p' in keys:
-            player.toggle_pause()
-            if not player.get_pause():
-                player.seek(0)  # needed to get frames rolling in again, apparently, after seeking occurred while paused
-
-        code_keys = [x for x in keys if x in _key_to_event_type_map.keys()]
-        for code in code_keys:
-            # determine which event
-            event = _key_to_event_type_map[code]
-            if not frame_idx in episodes[event]:
-                episodes[event].append(frame_idx)
-                episodes[event].sort()
-        if 'd' in keys:
-            for e in episodes:
-                if frame_idx in episodes[e]:
-                    episodes[e].remove(frame_idx)
-
-        if 'q' in keys:
-            # quit fully
-            stopAllProcessing = True
-            break
-        if 'n' in keys:
-            # goto next
-            break
-
-        closed, = gui.get_state()
-        if closed:
-            stopAllProcessing = True
+        requests = gui.get_requests()
+        for r,p in requests:
+            match r:
+                case 'toggle_pause':
+                    player.toggle_pause()
+                    if not player.get_pause():
+                        player.seek(0)  # needed to get frames rolling in again, apparently, after seeking occurred while paused
+                    gui.set_playing(not player.get_pause())
+                case 'seek':
+                    player.seek(p, relative=False)
+                case 'delta_frame':
+                    new_ts = video_ts.get_timestamp(frame_idx+p)
+                    if new_ts != -1.:
+                        step = (new_ts-video_ts.get_timestamp(max(0,frame_idx)))/1000
+                        player.seek(pts+step, relative=False)
+                case 'delta_time':
+                    player.seek(pts+p, relative=False)
+                case 'add_coding':
+                    event,frame_idxs = p
+                    episodes[event].extend(frame_idxs)
+                    episodes[event].sort()
+                    gui.notify_annotations_changed()
+                case 'delete_coding':
+                    event,frame_idxs = p
+                    episodes[event] = [i for i in episodes[event] if i not in frame_idxs]
+                    gui.notify_annotations_changed()
+                case 'exit':
+                    should_exit = True
+                    break
+        if should_exit:
             break
 
     player.close_player()
@@ -221,54 +206,3 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
 
     # store coded intervals to file
     episode.write_list_to_file(episode.marker_dict_to_list(episodes), coding_file)
-
-    return stopAllProcessing
-
-def markers_to_string(episodes: dict[episode.Event,list[int]]):
-    descs: list[str] = []
-    for e in episodes:
-        parts: list[str] = []
-        if episode.type_map[e]==episode.Type.Point:
-            parts = [str(x) for x in episodes[e]]
-        else:
-            for m in range(0,len(episodes[e])-1,2):     # -1 to make sure we don't try incomplete intervals
-                parts.append('{} -- {}'.format(*episodes[e][m:m+2]))
-            if len(episodes[e])%2:                      # open interval
-                parts.append('{} -- xx'.format(episodes[e][-1]))
-        marks = ', '.join(parts)
-        if marks:
-            descs.append(f'{e.value}: {marks}')
-
-    return ', '.join(descs)
-
-def get_key_tooltip(episodes: dict[episode.Event]):
-    key_tooltip = {
-        "h": "Back 1 s, shift+H: back 10 s",
-        "l": "Forward 1 s, shift+L: forward 10 s",
-        "j": "Back 1 frame",
-        "k": "Forward 1 frame",
-        "p": "Pause or resume playback"
-    }
-
-    event_type_tooltips = {
-        episode.Event.Validate: "Mark frame as start or end of validation episode",
-        episode.Event.Sync_Camera: "Mark frame as camera sync point",
-        episode.Event.Sync_ET_Data: "Mark frame as start or end of eye tracker synchronization episode",
-        episode.Event.Trial: "Mark frame as start or end of trial"
-    }
-
-    for e in [episode.Event.Validate, episode.Event.Sync_Camera, episode.Event.Sync_ET_Data, episode.Event.Trial]:
-        if e in episodes:
-            key_tooltip[_event_type_to_key_map[e]] = event_type_tooltips[e]
-
-    key_tooltip |= {
-        "d": "Delete frame marking(s)",
-        "q": "Quit",
-        'n': 'Next'
-    }
-    return key_tooltip
-
-def my_tooltip(episodes: dict[episode.Event,list[int]], key_info_dict: dict[str,str]):
-    imgui.same_line()
-    imgui.text(markers_to_string(episodes))
-    generic_tooltip_drawer(key_info_dict)
