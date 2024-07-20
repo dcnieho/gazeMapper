@@ -28,7 +28,7 @@ def get_sync_for_recs(working_dir: str|pathlib.Path, ref_rec: str, recs: str|lis
         episodes = get_coding_file(working_dir / r)
 
         # check intervals
-        assert len(episodes)==len(ref_episodes), f"The number of sync points for this recording ({len(episodes)}, {r}) is not equal to that for the reference recording ({len(episodes)}, {ref_rec}). Cannot continue, fix your coding"
+        assert len(episodes)==len(ref_episodes), f"The number of sync points for this recording ({len(episodes)}, {r}) is not equal to that for the reference recording ({len(ref_episodes)}, {ref_rec}). Cannot continue, fix your coding"
 
         # get time information
         video_ts = timestamps.VideoTimestamps(working_dir / r / 'frameTimestamps.tsv')
