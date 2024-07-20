@@ -29,10 +29,10 @@ from .. import config, episode, naming, session
 # will also be shown if available.
 
 _event_type_to_key_map = {
-    annotation.Event.Validate: imgui.Key.v,
-    annotation.Event.Sync_Camera: imgui.Key.c,
-    annotation.Event.Sync_ET_Data: imgui.Key.e,
-    annotation.Event.Trial: imgui.Key.t,
+    annotation.Event.Validate       : imgui.Key.v,
+    annotation.Event.Sync_Camera    : imgui.Key.c,
+    annotation.Event.Sync_ET_Data   : imgui.Key.e,
+    annotation.Event.Trial          : imgui.Key.t,
 }
 
 def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):
