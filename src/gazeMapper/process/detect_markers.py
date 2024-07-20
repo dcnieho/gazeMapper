@@ -2,7 +2,7 @@ import pathlib
 import threading
 import pandas as pd
 
-from glassesTools import aruco, marker as gt_marker, plane as gt_plane
+from glassesTools import annotation, aruco, marker as gt_marker, plane as gt_plane
 from glassesTools.video_gui import GUI, generic_tooltip_drawer, qns_tooltip
 
 
@@ -51,20 +51,20 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, s
 
     # trial episodes are gotten from the reference recording if there is one and this is not the reference recording
     if study_config.sync_ref_recording and rec_def.name!=study_config.sync_ref_recording:
-        assert episode.Event.Trial not in episodes or not episodes[episode.Event.Trial], f'Trial episodes are gotten from the reference recording ({study_config.sync_ref_recording}) and should not be coded for this recording ({rec_def.name})'
-        episodes[episode.Event.Trial] = synchronization.get_episode_frame_indices_from_ref(working_dir, episode.Event.Trial, study_config.sync_ref_recording, rec_def.name)
+        assert annotation.Event.Trial not in episodes or not episodes[annotation.Event.Trial], f'Trial episodes are gotten from the reference recording ({study_config.sync_ref_recording}) and should not be coded for this recording ({rec_def.name})'
+        episodes[annotation.Event.Trial] = synchronization.get_episode_frame_indices_from_ref(working_dir, annotation.Event.Trial, study_config.sync_ref_recording, rec_def.name)
 
     extra_processing = None
     if rec_def.type==session.RecordingType.Camera:
-        # no episode.Event.Sync_ET_Data for camera recordings, remove
-        if episode.Event.Sync_ET_Data in study_config.planes_per_episode:
-            study_config.planes_per_episode.pop(episode.Event.Sync_ET_Data)
+        # no annotation.Event.Sync_ET_Data for camera recordings, remove
+        if annotation.Event.Sync_ET_Data in study_config.planes_per_episode:
+            study_config.planes_per_episode.pop(annotation.Event.Sync_ET_Data)
     elif rec_def.type==session.RecordingType.EyeTracker:
         match study_config.get_cam_movement_for_et_sync_method:
             case '':
                 pass # nothing to do
             case 'plane':
-                assert episode.Event.Sync_ET_Data in study_config.planes_per_episode, f'The method for synchronizing eye tracker data to the scene camera (get_cam_movement_for_et_sync_method) is set to "plane" but no plane is configured for {episode.Event.Sync_ET_Data.name} in the planes_per_episode config'
+                assert annotation.Event.Sync_ET_Data in study_config.planes_per_episode, f'The method for synchronizing eye tracker data to the scene camera (get_cam_movement_for_et_sync_method) is set to "plane" but no plane is configured for {annotation.Event.Sync_ET_Data.name} in the planes_per_episode config'
                 # NB: no extra_funcs to run
             case 'function':
                 import importlib
@@ -79,7 +79,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, s
                 else:
                     module = importlib.import_module(study_config.get_cam_movement_for_et_sync_function['module_or_file'])
                 func = getattr(module,study_config.get_cam_movement_for_et_sync_function['function'])
-                extra_processing = {'sync_func': (func, episodes[episode.Event.Sync_ET_Data], study_config.get_cam_movement_for_et_sync_function['parameters'])}
+                extra_processing = {'sync_func': (func, episodes[annotation.Event.Sync_ET_Data], study_config.get_cam_movement_for_et_sync_function['parameters'])}
             case _:
                 raise ValueError(f'study config get_cam_movement_for_et_sync_method={study_config.get_cam_movement_for_et_sync_method} not understood')
 

@@ -1,7 +1,7 @@
 import pandas as pd
 import pathlib
 
-from glassesTools import timestamps
+from glassesTools import annotation, timestamps
 
 from . import episode, naming
 
@@ -47,13 +47,13 @@ def get_sync_for_recs(working_dir: str|pathlib.Path, ref_rec: str, recs: str|lis
 def get_coding_file(working_dir: str|pathlib.Path):
     working_dir  = pathlib.Path(working_dir)
     coding_file = working_dir / naming.coding_file
-    assert coding_file.is_file(), f'A coding file must be available for the recording ({working_dir.name}) to run sync_to_ref, but it is not. Run code_episodes and code at least one {episode.Event.Sync_Camera.value} episode. Not found: {coding_file}'
-    episodes = episode.list_to_marker_dict(episode.read_list_from_file(coding_file))[episode.Event.Sync_Camera]
+    assert coding_file.is_file(), f'A coding file must be available for the recording ({working_dir.name}) to run sync_to_ref, but it is not. Run code_episodes and code at least one {annotation.Event.Sync_Camera.value} episode. Not found: {coding_file}'
+    episodes = episode.list_to_marker_dict(episode.read_list_from_file(coding_file))[annotation.Event.Sync_Camera]
     episodes = [x[0] for x in episodes] # remove inner wrapping list, there are only single values in it anyway
-    assert episodes, f'No {episode.Event.Sync_Camera.value} points found for this recording ({working_dir.name}). Run code_episodes and code at least one {episode.Event.Sync_Camera.value} point.'
+    assert episodes, f'No {annotation.Event.Sync_Camera.value} points found for this recording ({working_dir.name}). Run code_episodes and code at least one {annotation.Event.Sync_Camera.value} point.'
     return episodes
 
-def get_episode_frame_indices_from_ref(working_dir: str|pathlib.Path, event: episode.Event, ref_rec: str, rec: str, extra_fr=10):
+def get_episode_frame_indices_from_ref(working_dir: str|pathlib.Path, event: annotation.Event, ref_rec: str, rec: str, extra_fr=10):
     working_dir  = pathlib.Path(working_dir)
     ref_episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir.parent / ref_rec / naming.coding_file))
     assert event in ref_episodes, f'Trial episodes are gotten from the reference recording ({ref_rec}), but the coding file for this reference recording doesn\'t contain any ({event.value}) episodes'

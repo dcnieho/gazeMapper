@@ -1,41 +1,18 @@
-from enum import Enum, auto
 import pathlib
 import pandas as pd
 from collections import defaultdict
 
-from glassesTools import utils
-
-
-
-class Type(Enum):
-    Point       = auto()
-    Interval    = auto()
-
-
-class Event(utils.AutoName):
-    Validate    = auto()    # interval to be used for running glassesValidator
-    Sync_Camera = auto()    # point to be used for synchronizing different cameras
-    Sync_ET_Data= auto()    # episode to be used for synchronization of eye tracker data to sceen camera (e.g. using VOR)
-    Trial       = auto()    # episode for which to map gaze to plane(s): output for files to be provided to user
-events = [x.value for x in Event]
-utils.register_type(utils.CustomTypeEntry(Event,'__enum.Event__',str, lambda x: getattr(Event, x.split('.')[1])))
-
-type_map = {
-    Event.Validate    : Type.Interval,
-    Event.Sync_Camera : Type.Point,
-    Event.Sync_ET_Data: Type.Interval,
-    Event.Trial       : Type.Interval,
-}
+from glassesTools import annotation
 
 
 class Episode:
-    def __init__(self, event:Event, start_frame:int, end_frame:int=None):
+    def __init__(self, event:annotation.Event, start_frame:int, end_frame:int=None):
         self.event          = event
         self.start_frame    = start_frame
 
-        if type_map[event]==Type.Interval:
+        if annotation.type_map[event]==annotation.Type.Interval:
             assert end_frame is not None, f"end frame expected for an interval-type episode ({event.value}), but not provided"
-        if type_map[event]==Type.Point:
+        if annotation.type_map[event]==annotation.Type.Point:
             assert end_frame is None, f"end frame provided but not expected for a point-type episode ({event.value})"
         self.end_frame      = end_frame
 
@@ -43,7 +20,7 @@ class Episode:
 # for dealing with lists of events
 def read_list_from_file(fileName: str|pathlib.Path) -> list[Episode]:
     df = pd.read_csv(str(fileName), delimiter='\t', index_col=False, dtype=defaultdict(lambda: int, event=str, end_frame=pd.Int64Dtype()))
-    df['event']     = [Event(x) for x in df['event'].values]
+    df['event']     = [annotation.Event(x) for x in df['event'].values]
     df['end_frame'] = df['end_frame'].astype('object')
     df.loc[pd.isnull(df['end_frame']),'end_frame'] = None   # set missing to None
     return [Episode(**kwargs) for kwargs in df.to_dict(orient='records')]
@@ -62,13 +39,13 @@ def write_list_to_file(episodes: list[Episode],
     df.to_csv(str(fileName), index=False, sep='\t', na_rep='nan')
 
 
-def get_empty_marker_dict(episodes: list[Event]=None) -> dict[Event,list[int]|list[list[int]]]:
+def get_empty_marker_dict(episodes: list[annotation.Event]=None) -> dict[annotation.Event,list[int]|list[list[int]]]:
     if not episodes:
-        return {e:[] for e in Event}
+        return {e:[] for e in annotation.Event}
     else:
         return {e:[] for e in episodes}
 
-def list_to_marker_dict(episodes: list[Episode], expected_types: list[Event]=None) -> dict[Event,list[int]|list[list[int]]]:
+def list_to_marker_dict(episodes: list[Episode], expected_types: list[annotation.Event]=None) -> dict[annotation.Event,list[int]|list[list[int]]]:
     e_dict = get_empty_marker_dict(expected_types)
     for e in episodes:
         assert e.event in e_dict, f'episode of type {e.event.value} found, but not expected (e.g. should not be coded for this study according to the study setup)'
@@ -78,7 +55,7 @@ def list_to_marker_dict(episodes: list[Episode], expected_types: list[Event]=Non
             e_dict[e.event].append([e.start_frame])
     return e_dict
 
-def marker_dict_to_list(episodes: dict[Event,list[int]|list[list[int]]]) -> list[Episode]:
+def marker_dict_to_list(episodes: dict[annotation.Event,list[int]|list[list[int]]]) -> list[Episode]:
     e_list: list[Episode] = []
     for e in episodes:
         if not episodes[e]:
@@ -86,7 +63,7 @@ def marker_dict_to_list(episodes: dict[Event,list[int]|list[list[int]]]) -> list
         if isinstance(episodes[e][0],list):
             e_list.extend([Episode(e, *v) for v in episodes[e]])
         else:
-            if type_map[e]==Type.Interval:
+            if annotation.type_map[e]==annotation.Type.Interval:
                 for m in range(0,len(episodes[e])-1,2): # read in batches of two, and run until -1 to make sure we don't pick up incomplete intervals
                     e_list.append(Episode(e, *episodes[e][m:m+2]))
             else:
@@ -95,13 +72,13 @@ def marker_dict_to_list(episodes: dict[Event,list[int]|list[list[int]]]) -> list
     return sorted(e_list, key=lambda x: x.start_frame)
 
 
-def is_in_interval(episodes: dict[Event,list[int]]|list[Episode], idx: int) -> dict[Event, bool]:
+def is_in_interval(episodes: dict[annotation.Event,list[int]]|list[Episode], idx: int) -> dict[annotation.Event, bool]:
     if isinstance(episodes,dict):
         episodes = marker_dict_to_list(episodes)
 
-    e_dict: dict[Event,bool] = {e:False for e in Event}
+    e_dict: dict[annotation.Event,bool] = {e:False for e in annotation.Event}
     for e in episodes:
-        if type_map[e.event]==Type.Interval:
+        if annotation.type_map[e.event]==annotation.Type.Interval:
             if idx>=e.start_frame and idx<=e.end_frame:
                 e_dict[e.event] = True
         else:

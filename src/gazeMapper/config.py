@@ -1,9 +1,9 @@
 import pathlib
 import json
 
-from glassesTools import utils
+from glassesTools import annotation, utils
 
-from . import episode, marker, plane, session
+from . import marker, plane, session
 
 
 defaults = {
@@ -23,9 +23,9 @@ class Study:
                  planes: list[plane.Definition],
                  individual_markers: list[marker.Marker],
                  working_directory: str|pathlib.Path,
-                 planes_per_episode: dict[episode.Event,list[str]],
+                 planes_per_episode: dict[annotation.Event,list[str]],
 
-                 episodes_to_code: list[episode.Event],
+                 episodes_to_code: list[annotation.Event],
 
                  get_cam_movement_for_et_sync_method: str,
 
@@ -68,9 +68,9 @@ class Study:
         for e in self.planes_per_episode:
             assert e in self.episodes_to_code, f'Plane(s) are defined in planes_per_episode for {e.name} events, but {e.name} events are not set up to be coded in episodes_to_code. Fix episodes_to_code.'
         if self.auto_code_sync_points:
-            assert episode.Event.Sync_Camera in self.episodes_to_code, f'The auto_code_sync_points option is configured, but {episode.Event.Sync_Camera} points are not set to be coded in episodes_to_code. Fix episodes_to_code.'
+            assert annotation.Event.Sync_Camera in self.episodes_to_code, f'The auto_code_sync_points option is configured, but {annotation.Event.Sync_Camera} points are not set to be coded in episodes_to_code. Fix episodes_to_code.'
         if self.auto_code_trials_episodes:
-            assert episode.Event.Trial in self.episodes_to_code, f'The auto_code_trials_episodes option is configured, but {episode.Event.Trial} episodes are not set to be coded in episodes_to_code. Fix episodes_to_code.'
+            assert annotation.Event.Trial in self.episodes_to_code, f'The auto_code_trials_episodes option is configured, but {annotation.Event.Trial} episodes are not set to be coded in episodes_to_code. Fix episodes_to_code.'
 
         if self.auto_code_sync_points:
             if 'max_gap_duration' not in self.auto_code_sync_points:

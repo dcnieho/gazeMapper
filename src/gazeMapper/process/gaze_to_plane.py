@@ -1,7 +1,7 @@
 import pathlib
 import threading
 
-from glassesTools import gaze_headref, gaze_worldref, ocv, plane as gt_plane, worldgaze_gui
+from glassesTools import annotation, gaze_headref, gaze_worldref, ocv, plane as gt_plane, worldgaze_gui
 from glassesTools.video_gui import GUI, generic_tooltip_drawer, qns_tooltip
 
 
@@ -50,12 +50,12 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, f
     episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / naming.coding_file), study_config.episodes_to_code)
     # trial episodes are gotten from the reference recording if there is one and this is not the reference recording
     if study_config.sync_ref_recording and rec_def.name!=study_config.sync_ref_recording:
-        assert episode.Event.Trial not in episodes or not episodes[episode.Event.Trial], f'Trial episodes are gotten from the reference recording ({study_config.sync_ref_recording}) and should not be coded for this recording ({rec_def.name})'
-        episodes[episode.Event.Trial] = synchronization.get_episode_frame_indices_from_ref(working_dir, episode.Event.Trial, study_config.sync_ref_recording, rec_def.name)
+        assert annotation.Event.Trial not in episodes or not episodes[annotation.Event.Trial], f'Trial episodes are gotten from the reference recording ({study_config.sync_ref_recording}) and should not be coded for this recording ({rec_def.name})'
+        episodes[annotation.Event.Trial] = synchronization.get_episode_frame_indices_from_ref(working_dir, annotation.Event.Trial, study_config.sync_ref_recording, rec_def.name)
 
     # we transform to map to plane for validate and trial episodes, set it up
     mapping_setup: dict[str, list[list[int]]] = {}
-    for e in [episode.Event.Validate, episode.Event.Trial]:
+    for e in [annotation.Event.Validate, annotation.Event.Trial]:
         if e in study_config.planes_per_episode:
             for p in study_config.planes_per_episode[e]:
                 if p not in mapping_setup:

@@ -4,7 +4,7 @@ import pandas as pd
 import polars as pl
 from collections import defaultdict
 
-from glassesTools import gaze_worldref
+from glassesTools import annotation, gaze_worldref
 
 from .. import config, episode, marker, naming, session
 
@@ -18,8 +18,8 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
 
     # get info about the study it is a part of
     study_config = config.Study.load_from_json(config_dir)
-    assert episode.Event.Trial in study_config.planes_per_episode, 'No planes are specified for mapping gaze to during trials, nothing to export'
-    planes = study_config.planes_per_episode[episode.Event.Trial]
+    assert annotation.Event.Trial in study_config.planes_per_episode, 'No planes are specified for mapping gaze to during trials, nothing to export'
+    planes = study_config.planes_per_episode[annotation.Event.Trial]
 
     # get session info
     session_info = session.Session.load_from_json(working_dir)
@@ -35,8 +35,8 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
         else:
             episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / r / naming.coding_file), study_config.episodes_to_code)
             subset_var = 'frame_idx'
-        assert episode.Event.Trial in episodes and episodes[episode.Event.Trial], f'No {episode.Event.Trial.value} episodes found in the coding file, nothing to export'
-        episodes = episodes[episode.Event.Trial]
+        assert annotation.Event.Trial in episodes and episodes[annotation.Event.Trial], f'No {annotation.Event.Trial.value} episodes found in the coding file, nothing to export'
+        episodes = episodes[annotation.Event.Trial]
 
         # get all gaze data
         plane_gazes = {p:pd.read_csv(working_dir / r / f'{naming.world_gaze_prefix}{p}.tsv',sep='\t', dtype=defaultdict(lambda: float, **gaze_worldref.Gaze._non_float)) for p in planes}

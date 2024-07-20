@@ -10,7 +10,7 @@ isMacOS = sys.platform.startswith("darwin")
 if isMacOS:
     import AppKit
 
-from glassesTools import gaze_headref, ocv, plane, timestamps, video_utils
+from glassesTools import annotation, gaze_headref, ocv, plane, timestamps, video_utils
 from glassesTools.signal_gui import GUI, TargetPos
 
 
@@ -50,9 +50,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, a
 
     # get interval coding
     coding_file = working_dir / naming.coding_file
-    assert coding_file.is_file(), f'A coding file must be available to run sync_et_to_cam, but it is not. Run code_episodes and code at least one {episode.Event.Sync_ET_Data.value} episode. Not found: {coding_file}'
-    episodes = episode.list_to_marker_dict(episode.read_list_from_file(coding_file))[episode.Event.Sync_ET_Data]
-    assert episodes, f'No {episode.Event.Sync_ET_Data.value} episodes found for this recording. Run code_episodes and code at least one {episode.Event.Sync_ET_Data.value} episode.'
+    assert coding_file.is_file(), f'A coding file must be available to run sync_et_to_cam, but it is not. Run code_episodes and code at least one {annotation.Event.Sync_ET_Data.value} episode. Not found: {coding_file}'
+    episodes = episode.list_to_marker_dict(episode.read_list_from_file(coding_file))[annotation.Event.Sync_ET_Data]
+    assert episodes, f'No {annotation.Event.Sync_ET_Data.value} episodes found for this recording. Run code_episodes and code at least one {annotation.Event.Sync_ET_Data.value} episode.'
 
     # Read gaze data
     gazes = gaze_headref.read_dict_from_file(working_dir / 'gazeData.tsv', episodes)[0]
@@ -63,8 +63,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, a
         case '':
             raise ValueError('There is no eye tracker data to scene camera synchronization defined, should not run this function')
         case 'plane':
-            assert episode.Event.Sync_ET_Data in study_config.planes_per_episode, f'No plane specified for syncing eye tracker data to the scene cam, cannot continue'
-            planes = study_config.planes_per_episode[episode.Event.Sync_ET_Data]
+            assert annotation.Event.Sync_ET_Data in study_config.planes_per_episode, f'No plane specified for syncing eye tracker data to the scene cam, cannot continue'
+            planes = study_config.planes_per_episode[annotation.Event.Sync_ET_Data]
             assert len(planes)==1, "sync_et_to_cam only supports a single plane being used for synchronizing eye tracking data to the scene camera, contact developer if this is an issue"
             pln = planes[0]
 

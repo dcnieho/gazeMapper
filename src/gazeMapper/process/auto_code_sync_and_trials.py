@@ -3,6 +3,8 @@ import numpy as np
 import pandas as pd
 import shutil
 
+from glassesTools import annotation
+
 from .. import config, episode, marker, naming
 
 
@@ -49,7 +51,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):
             start_frames,_ = get_marker_starts_ends(markers[i], study_config.auto_code_sync_points['max_gap_duration'], study_config.auto_code_sync_points['min_duration'])
             marker_starts.extend(start_frames)
         # insert in episodes
-        [episodes[episode.Event.Sync_Camera].append(i) for i in marker_starts if i not in episodes[episode.Event.Sync_Camera]]
+        [episodes[annotation.Event.Sync_Camera].append(i) for i in marker_starts if i not in episodes[annotation.Event.Sync_Camera]]
 
     # automatic trial episode coding
     if study_config.auto_code_trials_episodes and (not study_config.sync_ref_recording or rec_def.name==study_config.sync_ref_recording):
@@ -100,7 +102,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):
             s_idx+=mini+1
             e_idx+=1
         # now insert into coding file. This just overwrites whatever is there
-        episodes[episode.Event.Trial] = [y for x in trials for y in x]
+        episodes[annotation.Event.Trial] = [y for x in trials for y in x]
 
     # back up coding file if it exists
     if coding_file.is_file():

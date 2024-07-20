@@ -1,6 +1,7 @@
 import pathlib
 
 from glassesValidator import process as gv_process, utils as gv_utils
+from glassesTools import annotation
 
 
 from .. import config, episode, naming, plane, session
@@ -17,15 +18,15 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None,
 
     # get info about the study the recording is a part of
     study_config = config.Study.load_from_json(config_dir)
-    assert episode.Event.Validate in study_config.planes_per_episode, 'No planes to use for validation are specified for the study, nothing to process'
-    planes = study_config.planes_per_episode[episode.Event.Validate]
+    assert annotation.Event.Validate in study_config.planes_per_episode, 'No planes to use for validation are specified for the study, nothing to process'
+    planes = study_config.planes_per_episode[annotation.Event.Validate]
 
     # get info about recording
     rec_def = study_config.session_def.get_recording_def(working_dir.name)
     assert rec_def.type==session.RecordingType.EyeTracker, f'You can only run run_validation on eye tracker recordings, not on a {str(rec_def.type).split(".")[1]} recording'
 
     # get interval(s) coded to be analyzed, if any
-    episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / 'coding.tsv'))[episode.Event.Validate]
+    episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / 'coding.tsv'))[annotation.Event.Validate]
 
     # per plane, run the glassesValidator steps
     for p in planes:
