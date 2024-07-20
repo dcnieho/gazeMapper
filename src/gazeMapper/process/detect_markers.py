@@ -98,8 +98,6 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, s
 
     poses, individual_markers, extra_processing_output = \
         aruco.run_pose_estimation(in_video, working_dir / "frameTimestamps.tsv", working_dir / "calibration.xml",   # input video
-                                  # output
-                                  working_dir,
                                   # intervals to process
                                   analyze_frames,
                                   # detector and pose estimator setup

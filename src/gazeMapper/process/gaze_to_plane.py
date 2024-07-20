@@ -86,7 +86,6 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, f
 
     in_video = session.read_recording_info(working_dir, rec_def.type)[1]
     worldgaze_gui.show_visualization(
-        working_dir,
         in_video, working_dir / 'frameTimestamps.tsv', working_dir / "calibration.xml",
         planes, poses, head_gazes, plane_gazes,
         {e:episodes[e] for e in [annotation.Event.Validate, annotation.Event.Trial]},
