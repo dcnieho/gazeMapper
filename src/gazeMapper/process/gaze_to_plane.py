@@ -2,13 +2,12 @@ import pathlib
 import threading
 
 from glassesTools import annotation, gaze_headref, gaze_worldref, ocv, plane as gt_plane, worldgaze_gui
-from glassesTools.video_gui import GUI, generic_tooltip_drawer, qns_tooltip
+from glassesTools.video_gui import GUI
 
 
 from .. import config, episode, naming, plane, session, synchronization
 
 
-stopAllProcessing = False
 def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show_visualization=False, show_planes=True, show_only_intervals=True):
     # if show_visualization, each frame is shown in a viewer, overlaid with info about detected planes and projected gaze
     # if show_poster, gaze in space od each plane is also drawn in a separate windows
@@ -23,22 +22,19 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
     # if we need gui, we run processing in a separate thread (GUI needs to be on the main thread for OSX, see https://github.com/pthom/hello_imgui/issues/33)
     if show_visualization:
         gui = GUI(use_thread = False)
-        gui.set_interesting_keys('qns')
-        gui.register_draw_callback('status',lambda: generic_tooltip_drawer(qns_tooltip()))
         frame_win_id = gui.add_window(working_dir.name)
+        gui.set_show_controls(True)
+        gui.set_show_play_percentage(True)
 
         proc_thread = threading.Thread(target=do_the_work, args=(working_dir, config_dir, gui, frame_win_id, show_planes, show_only_intervals))
         proc_thread.start()
         gui.start()
         proc_thread.join()
-        return stopAllProcessing
     else:
-        return do_the_work(working_dir, config_dir, None, None, False, False)
+        do_the_work(working_dir, config_dir, None, None, False, False)
 
 
 def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, frame_win_id: int, show_planes: bool, show_only_intervals: bool):
-    global stopAllProcessing
-
     # get info about the study the recording is a part of
     study_config = config.Study.load_from_json(config_dir)
 
@@ -86,12 +82,13 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, f
 
     # done if no visualization wanted
     if gui is None:
-        return False
+        return
 
     in_video = session.read_recording_info(working_dir, rec_def.type)[1]
-    return worldgaze_gui.show_visualization(
+    worldgaze_gui.show_visualization(
         working_dir,
         in_video, working_dir / 'frameTimestamps.tsv', working_dir / "calibration.xml",
-        planes, poses, head_gazes, plane_gazes, mapping_setup,
+        planes, poses, head_gazes, plane_gazes,
+        {e:episodes[e] for e in [annotation.Event.Validate, annotation.Event.Trial]},
         gui, frame_win_id, show_planes, show_only_intervals, 8
     )

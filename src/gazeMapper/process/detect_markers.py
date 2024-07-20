@@ -3,13 +3,12 @@ import threading
 import pandas as pd
 
 from glassesTools import annotation, aruco, marker as gt_marker, plane as gt_plane
-from glassesTools.video_gui import GUI, generic_tooltip_drawer, qns_tooltip
+from glassesTools.video_gui import GUI
 
 
 from .. import config, episode, marker, naming, plane, session, synchronization
 
 
-stopAllProcessing = False
 def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show_visualization=False, show_rejected_markers=False):
     # if show_visualization, each frame is shown in a viewer, overlaid with info about detected markers and planes
     # if show_rejected_markers, rejected ArUco marker candidates are also shown in the viewer. Possibly useful for debug
@@ -23,22 +22,19 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
     # if we need gui, we run processing in a separate thread (GUI needs to be on the main thread for OSX, see https://github.com/pthom/hello_imgui/issues/33)
     if show_visualization:
         gui = GUI(use_thread = False)
-        gui.set_interesting_keys('qns')
-        gui.register_draw_callback('status',lambda: generic_tooltip_drawer(qns_tooltip()))
         gui.add_window(working_dir.name)
+        gui.set_show_controls(True)
+        gui.set_show_play_percentage(True)
 
         proc_thread = threading.Thread(target=do_the_work, args=(working_dir, config_dir, gui, show_rejected_markers))
         proc_thread.start()
         gui.start()
         proc_thread.join()
-        return stopAllProcessing
     else:
-        return do_the_work(working_dir, config_dir, None, False)
+        do_the_work(working_dir, config_dir, None, False)
 
 
 def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, show_rejected_markers: bool):
-    global stopAllProcessing
-
     # get info about the study the recording is a part of
     study_config = config.Study.load_from_json(config_dir)
 
@@ -100,7 +96,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, s
     if study_config.auto_code_sync_points or study_config.auto_code_trials_episodes:
         analyze_frames = {p:None for p in analyze_frames}
 
-    stopAllProcessing, poses, individual_markers, extra_processing_output = \
+    poses, individual_markers, extra_processing_output = \
         aruco.run_pose_estimation(in_video, working_dir / "frameTimestamps.tsv", working_dir / "calibration.xml",   # input video
                                   # output
                                   working_dir,
@@ -120,5 +116,3 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, s
     if extra_processing:
         df = pd.DataFrame(extra_processing_output['sync_func'],columns=['frame_idx','target_x','target_y'])
         df.to_csv(working_dir/naming.target_sync_file, sep='\t', index=False, na_rep='nan', float_format="%.8f")
-
-    return stopAllProcessing
