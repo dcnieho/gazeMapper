@@ -63,40 +63,35 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
     rec_type = rec_def.type
     in_video = session.read_recording_info(working_dir, rec_type)[1]
     if rec_type==session.RecordingType.Camera:
-        hasGaze, hasPosterGaze, hasPosterPose = False, False, False
+        has_gaze, has_plane_gaze, has_plane_pose = False, False, False
         # no episode.Event.Sync_ET_Data for camera recordings, remove
         if annotation.Event.Sync_ET_Data in study_config.episodes_to_code:
             study_config.episodes_to_code.remove(annotation.Event.Sync_ET_Data)
     elif rec_type==session.RecordingType.EyeTracker:
         # Read gaze data
-        hasGaze = True
+        has_gaze = True
         gazes = gaze_headref.read_dict_from_file(working_dir / 'gazeData.tsv', ts_column_suffixes=['VOR',''])[0]
 
-        # Read gaze on poster data, if available
-        hasPosterGaze = False
-        if (working_dir / 'gazePosterPos.tsv').is_file():
-            try:
-                gazesPoster = gaze_worldref.read_dict_from_file(working_dir / 'gazePosterPos.tsv', ts_column_suffixes=['VOR',''])
-                hasPosterGaze = True
-            except:
-                # ignore when file can't be read or is empty
-                pass
+        planes: set[str] = set()
+        for e in [annotation.Event.Validate, annotation.Event.Trial]:
+            if e in study_config.planes_per_episode:
+                for p in study_config.planes_per_episode[e]:
+                    planes.add(p)
 
-        # Read pose of poster, if available
-        hasPosterPose = False
-        if (working_dir / 'posterPose.tsv').is_file():
-            try:
-                poses = plane.read_dict_from_file(working_dir / 'posterPose.tsv')
-                hasPosterPose = True
-            except:
-                # ignore when file can't be read or is empty
-                pass
+        # Read gaze on poster data, if available
+        plane_files = [working_dir/f'{naming.world_gaze_prefix}{p}.tsv' for p in planes]
+        plane_gazes = {p:gaze_worldref.read_dict_from_file(f) for p,f in zip(planes,plane_files) if f.is_file()}
+        has_plane_gaze = not not plane_gazes
+
+        # Read plane poses, if available
+        plane_files = [working_dir/f'{naming.plane_pose_prefix}{p}.tsv' for p in planes]
+        poses = {p:plane.read_dict_from_file(f) for p,f in zip(planes,plane_files) if f.is_file()}
+        has_plane_pose = not not poses
     else:
         raise ValueError(f'recording type "{rec_type}" is not understood')
 
     # get camera calibration info
-    cameraParams= ocv.CameraParams.readFromFile(working_dir / "calibration.xml")
-    hasCamCal   = cameraParams.has_intrinsics()
+    cam_params= ocv.CameraParams.readFromFile(working_dir / "calibration.xml")
 
     # get previous interval coding, if available
     coding_file = working_dir / naming.coding_file
@@ -129,10 +124,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
     gui.set_show_annotation_label(True, main_win_id)
 
     # show
-    subPixelFac = 8   # for sub-pixel positioning
-    armLength = 20    # mm
+    sub_pixel_fac = 8   # for sub-pixel positioning
     should_exit = False
-    hasRequestedFocus = not isMacOS # False only if on Mac OS, else True since its a no-op
+    has_requested_focus = not isMacOS # False only if on Mac OS, else True since its a no-op
     while True:
         frame, val = player.get_frame(force_refresh=True)
         if val == 'eof':
@@ -147,27 +141,33 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
             # the audio is my shepherd and nothing shall I lack :-)
             frame_idx = video_ts.find_frame(pts*1000)  # pts is in seconds, our frame timestamps are in ms
 
-            # if we have poster pose, draw poster origin on video
-            if hasPosterPose and frame_idx in poses and hasCamCal:
-                drawing.openCVFrameAxis(frame, cameraParams.camera_mtx, cameraParams.distort_coeffs, poses[frame_idx].pose_R_vec, poses[frame_idx].pose_T_vec, armLength, 3, subPixelFac)
+            # if we have plane pose, draw plane origin on video
+            if has_plane_pose:
+                for p in planes:
+                    if p in poses and frame_idx in poses[p]:
+                        a = poses[p][frame_idx].getOriginOnImage(cam_params)
+                        drawing.openCVCircle(frame, a, 3, (0,255,0), -1, sub_pixel_fac)
+                        drawing.openCVLine(frame, (a[0],a[1]-10), (a[0],a[1]+10), (0,255,0), 1, sub_pixel_fac)
+                        drawing.openCVLine(frame, (a[0]-10,a[1]), (a[0]+10,a[1]), (0,255,0), 1, sub_pixel_fac)
 
             # if have gaze for this frame, draw it
             # NB: usually have multiple gaze samples for a video frame, draw one
-            if hasGaze:
+            if has_gaze:
                 if frame_idx in gazes:
-                    gazes[frame_idx][0].draw(frame, cameraParams, subPixelFac)
+                    gazes[frame_idx][0].draw(frame, cam_params, sub_pixel_fac)
 
-            # if have gaze in world info, draw it too (also only first)
-            if hasPosterGaze and frame_idx in gazesPoster:
-                if hasCamCal:
-                    gazesPoster[frame_idx][0].drawOnWorldVideo(frame, cameraParams, subPixelFac)
+            # if have gaze in world info, draw it too (also only first sample)
+            if has_plane_gaze:
+                for p in planes:
+                    if p in plane_gazes and frame_idx in plane_gazes[p]:
+                        plane_gazes[p][frame_idx][0].drawOnWorldVideo(frame, cam_params, sub_pixel_fac)
 
             if frame is not None:
                 gui.update_image(frame, pts, frame_idx, window_id = main_win_id)
 
-        if not hasRequestedFocus:
+        if not has_requested_focus:
             AppKit.NSApplication.sharedApplication().activateIgnoringOtherApps_(1)
-            hasRequestedFocus = True
+            has_requested_focus = True
 
         requests = gui.get_requests()
         for r,p in requests:
