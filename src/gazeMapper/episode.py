@@ -39,13 +39,13 @@ def write_list_to_file(episodes: list[Episode],
     df.to_csv(str(fileName), index=False, sep='\t', na_rep='nan')
 
 
-def get_empty_marker_dict(episodes: list[annotation.Event]=None) -> dict[annotation.Event,list[int]|list[list[int]]]:
+def get_empty_marker_dict(episodes: list[annotation.Event]=None) -> dict[annotation.Event,list[list[int]]]:
     if not episodes:
         return {e:[] for e in annotation.Event}
     else:
         return {e:[] for e in episodes}
 
-def list_to_marker_dict(episodes: list[Episode], expected_types: list[annotation.Event]=None) -> dict[annotation.Event,list[int]|list[list[int]]]:
+def list_to_marker_dict(episodes: list[Episode], expected_types: list[annotation.Event]=None) -> dict[annotation.Event,list[list[int]]]:
     e_dict = get_empty_marker_dict(expected_types)
     for e in episodes:
         assert e.event in e_dict, f'episode of type {e.event.value} found, but not expected (e.g. should not be coded for this study according to the study setup)'
