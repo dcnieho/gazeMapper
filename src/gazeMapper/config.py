@@ -103,6 +103,8 @@ class Study:
                         raise ValueError(f'Marker "{i}" specified in auto_code_trials_episodes.{f}, but unknown because not present in individual_markers')
 
     def _check_recordings(self, which, field):
+        if not which:
+            return
         for w in which:
             if not any([r.name==w for r in self.session_def.recordings]):
                 raise ValueError(f'Recording "{w}" not known, check {field}')
