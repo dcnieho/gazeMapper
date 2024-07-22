@@ -91,7 +91,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
         raise ValueError(f'recording type "{rec_type}" is not understood')
 
     # get camera calibration info
-    cam_params= ocv.CameraParams.readFromFile(working_dir / "calibration.xml")
+    cam_params = ocv.CameraParams.read_from_file(working_dir / "calibration.xml")
 
     # get previous interval coding, if available
     coding_file = working_dir / naming.coding_file
@@ -145,7 +145,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
             if has_plane_pose:
                 for p in planes:
                     if p in poses and frame_idx in poses[p]:
-                        a = poses[p][frame_idx].getOriginOnImage(cam_params)
+                        a = poses[p][frame_idx].get_origin_on_image(cam_params)
                         drawing.openCVCircle(frame, a, 3, (0,255,0), -1, sub_pixel_fac)
                         drawing.openCVLine(frame, (a[0],a[1]-10), (a[0],a[1]+10), (0,255,0), 1, sub_pixel_fac)
                         drawing.openCVLine(frame, (a[0]-10,a[1]), (a[0]+10,a[1]), (0,255,0), 1, sub_pixel_fac)
@@ -160,7 +160,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
             if has_plane_gaze:
                 for p in planes:
                     if p in plane_gazes and frame_idx in plane_gazes[p]:
-                        plane_gazes[p][frame_idx][0].drawOnWorldVideo(frame, cam_params, sub_pixel_fac)
+                        plane_gazes[p][frame_idx][0].draw_on_world_video(frame, cam_params, sub_pixel_fac)
 
             if frame is not None:
                 gui.update_image(frame, pts, frame_idx, window_id = main_win_id)

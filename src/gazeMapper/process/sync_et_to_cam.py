@@ -74,16 +74,16 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, a
             poses = plane.read_dict_from_file(pln_file, episodes)
 
             # get camera calibration info
-            cameraParams= ocv.CameraParams.readFromFile(working_dir / "calibration.xml")
-            cameraParams.has_intrinsics()
+            camera_params= ocv.CameraParams.read_from_file(working_dir / "calibration.xml")
+            camera_params.has_intrinsics()
 
             # compute target positions
             target_positions: dict[int, TargetPos] = {}
             for frame_idx in poses:
                 if poses[frame_idx].pose_N_markers>0:
-                    t_pos = poses[frame_idx].planeToCamPose(np.zeros((3,)), cameraParams)
+                    t_pos = poses[frame_idx].plane_to_cam_pose(np.zeros((3,)), camera_params)
                 elif poses[frame_idx].homography_N_markers>0:
-                    t_pos = poses[frame_idx].planeToCamHomography(np.zeros((3,)), cameraParams)
+                    t_pos = poses[frame_idx].plane_to_cam_homography(np.zeros((3,)), camera_params)
                 target_positions[frame_idx] = TargetPos(video_ts.get_timestamp(frame_idx), frame_idx, t_pos)
         case 'function':
             df = pd.read_csv(working_dir/naming.target_sync_file, delimiter='\t', index_col=False, dtype=defaultdict(lambda: float, frame_idx=int))
@@ -102,14 +102,14 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, a
         VOR_sync = pd.DataFrame(columns=['offset_t'], dtype=float, index=pd.Index(list(range(len(episodes))),name='interval'))
 
     # show
-    hasRequestedFocus = not isMacOS # False only if on Mac OS, else True since its a no-op
+    has_requested_focus = not isMacOS # False only if on Mac OS, else True since its a no-op
     ival = 0
     need_to_load = True
     stopAllProcessing = False
     while True:
-        if not hasRequestedFocus:
+        if not has_requested_focus:
             AppKit.NSApplication.sharedApplication().activateIgnoringOtherApps_(1)
-            hasRequestedFocus = True
+            has_requested_focus = True
 
         if need_to_load:
             # select data
@@ -156,7 +156,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, a
     df = pd.read_csv(working_dir / 'gazeData.tsv', delimiter='\t', index_col=False)
     # resync gaze timestamps using VOR, and get correct scene camera frame numbers
     ts_VOR = df['timestamp'].to_numpy() + toff*1000.   # s -> ms
-    fr_VOR = video_utils.tssToFrameNumber(ts_VOR,video_ts.timestamps,trim=True)['frame_idx'].to_numpy()
+    fr_VOR = video_utils.timestamps_to_frame_number(ts_VOR,video_ts.timestamps,trim=True)['frame_idx'].to_numpy()
     # write into df (use polars as that library saves to file waaay faster)
     df = _utils.insert_ts_fridx_in_df(df, gaze_headref.Gaze, 'VOR', ts_VOR, fr_VOR)
     df = pl.from_pandas(df)

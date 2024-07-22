@@ -121,7 +121,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):
                     vid_ts_df.to_csv(ref_vid_ts_file, sep='\t', float_format="%.8f")
         else:
             ts_ref += sync.loc[(r,0),'mean_off']*1000.   # s -> ms
-        fr_ref = video_utils.tssToFrameNumber(ts_ref,ref_vid_ts,trim=True)['frame_idx'].to_numpy()
+        fr_ref = video_utils.timestamps_to_frame_number(ts_ref,ref_vid_ts,trim=True)['frame_idx'].to_numpy()
         # write into df (use polars as that library saves to file waaay faster)
         df = _utils.insert_ts_fridx_in_df(df, gaze_headref.Gaze, 'ref', ts_ref, fr_ref)
         df = pl.from_pandas(df)

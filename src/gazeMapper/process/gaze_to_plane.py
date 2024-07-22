@@ -71,13 +71,13 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, f
     poses = {p:gt_plane.read_dict_from_file(working_dir/f'{naming.plane_pose_prefix}{p}.tsv', mapping_setup[p] if should_load_part else None) for p in mapping_setup}
 
     # get camera calibration info
-    cameraParams = ocv.CameraParams.readFromFile(working_dir / "calibration.xml")
-    cameraParams.has_intrinsics()
+    camera_params = ocv.CameraParams.read_from_file(working_dir / "calibration.xml")
+    camera_params.has_intrinsics()
 
     # transform gaze to plane(s)
     plane_gazes: dict[str, dict[int,list[gaze_worldref.Gaze]]] = {}
     for p in planes:
-        plane_gazes[p] = gaze_worldref.gazes_head_to_world(poses[p], head_gazes, cameraParams)
+        plane_gazes[p] = gaze_worldref.from_head(poses[p], head_gazes, camera_params)
         gaze_worldref.write_dict_to_file(plane_gazes[p], working_dir/f'{naming.world_gaze_prefix}{p}.tsv', skip_missing=True)
 
     # done if no visualization wanted
