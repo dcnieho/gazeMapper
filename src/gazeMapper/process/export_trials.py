@@ -90,9 +90,9 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
             plane_gazes = plane_gazes.merge(ts, how="left", on='frame_idx_VOR')
             to_move += 1
         if 'frame_idx_ref' in plane_gazes.columns:
-            ts = pd.read_csv(working_dir / study_config.sync_ref_recording / 'frameTimestamps.tsv',sep='\t').rename(columns={'frame_idx':'frame_idx_ref','timestamp':'frame_ts_ref'}).drop(columns=['timestamp_stretched'],errors='ignore')
+            ts = pd.read_csv(working_dir / study_config.sync_ref_recording / 'frameTimestamps.tsv',sep='\t').rename(columns={'frame_idx':'frame_idx_ref','timestamp':'frame_ts_ref','timestamp_stretched':'frame_ts_ref_stretched'})
             plane_gazes = plane_gazes.merge(ts, how="left", on='frame_idx_ref')
-            to_move += 1
+            to_move += len([c for c in ts.columns if c.startswith('frame_ts_')])
         # reorder to get ts columns in the right place
         cols= plane_gazes.columns.to_list()
         idx = max([cols.index(c) for c in cols if c.startswith('frame_idx')])+1
