@@ -19,7 +19,6 @@ from .. import config, episode, naming, session
 
 
 
-stopAllProcessing = False
 def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, apply_average=True):
     # apply_average: if True: the average offset for all VOR sync episodes will be applied to the timestamps
     # if False, the VOR offset for the first episode will be applied, the rest are taken as checks
@@ -37,7 +36,6 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
     proc_thread.start()
     gui.start()
     proc_thread.join()
-    return stopAllProcessing
 
 
 def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, apply_average: bool):
@@ -105,7 +103,6 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, a
     has_requested_focus = not isMacOS # False only if on Mac OS, else True since its a no-op
     ival = 0
     need_to_load = True
-    stopAllProcessing = False
     while True:
         if not has_requested_focus:
             AppKit.NSApplication.sharedApplication().activateIgnoringOtherApps_(1)
@@ -129,7 +126,6 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, a
 
         closed,is_done = gui.get_state()
         if closed:
-            stopAllProcessing = True
             break
         if is_done:
             # store offset
@@ -161,5 +157,3 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, a
     df = _utils.insert_ts_fridx_in_df(df, gaze_headref.Gaze, 'VOR', ts_VOR, fr_VOR)
     df = pl.from_pandas(df)
     df.write_csv(working_dir / 'gazeData.tsv', separator='\t', null_value='nan', float_precision=8)
-
-    return stopAllProcessing
