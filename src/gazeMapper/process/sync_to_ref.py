@@ -54,7 +54,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):
 
     # prep for sync info
     recs = [r for r in session_info.recordings if r!=study_config.sync_ref_recording]
-    sync = synchronization.get_sync_for_recs(working_dir, study_config.sync_ref_recording, recs, study_config.do_time_stretch, study_config.sync_average_recordings)
+    sync = synchronization.get_sync_for_recs(working_dir, recs, study_config.sync_ref_recording, study_config.do_time_stretch, study_config.sync_average_recordings)
 
     # store sync info
     sync.to_csv(working_dir / 'ref_sync.tsv', sep='\t', na_rep='nan', float_format="%.16f")
