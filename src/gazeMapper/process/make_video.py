@@ -74,10 +74,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
         planes_setup, _         = _get_plane_setup(study_config, config_dir)
 
         # Read gaze data
-        ts_column_suffixes = []
-        if study_config.sync_ref_recording and rec==study_config.sync_ref_recording:
-            ts_column_suffixes = ['ref', 'VOR', ''] # we want to use synced gaze data for these videos, if available
-        gazes_head[rec]         = gaze_headref.read_dict_from_file(rec_working_dir / 'gazeData.tsv', ts_column_suffixes=ts_column_suffixes)[0]
+        if rec_def.type==session.RecordingType.EyeTracker:
+            # NB: we want to use synced gaze data for these videos, if available
+            gazes_head[rec]     = gaze_headref.read_dict_from_file(rec_working_dir / 'gazeData.tsv', ts_column_suffixes=['ref', 'VOR', ''])[0]
 
         # get camera calibration info
         camera_params[rec]      = ocv.CameraParams.read_from_file(rec_working_dir / "calibration.xml")
