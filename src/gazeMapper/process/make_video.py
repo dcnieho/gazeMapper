@@ -95,8 +95,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
             pose_estimators[rec].set_do_report_frames(False)
 
         if rec in study_config.make_video_which:
-            pose_estimators[rec].set_visualize_on_frame(True, show_rejected_markers)
-
+            pose_estimators[rec].set_visualize_on_frame(True, sub_pixel_fac, show_rejected_markers)
             # get video file info
             vid_info[rec] = pose_estimators[rec].get_video_info()
 
