@@ -65,52 +65,24 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):
         df = pd.read_csv(working_dir / r / 'gazeData.tsv', delimiter='\t', index_col=False)
         ts_col = 'timestamp_VOR' if 'timestamp_VOR' in df else 'timestamp'
         # get gaze timestamps and camera frame numbers _in reference video timeline_
-        ref_vid_ts = np.array(video_ts_ref.timestamps)
-        ts_ref     = df[ts_col].to_numpy().copy()
-        if study_config.do_time_stretch:
-            for ival in range(len(ref_episodes)-1):
-                # set up the problem - piecewise linear scale
-                # 1. get known good location for this interval, and the stretch factor
-                pivot       = sync.loc[(r,ival),'t_ref']
-                stretch_fac = sync.loc[(r,ival),'stretch_fac']
-                # 2. determine data range to apply stretch for this interval to
-                if ival==0:
-                    # first interval, apply all the way from start of data
-                    start = df[ts_col].min()
-                else:
-                    start = sync.loc[(r,ival),'t_ref']
-                if ival==len(ref_episodes)-2:
-                    # last interval, apply all the way to end of data
-                    end = df[ts_col].max()
-                else:
-                    end = sync.loc[(r,ival+1),'t_ref']
-                data_sel = (ts_ref >= start) & (ts_ref <= end)
-                # calculate new timestamps
-                # 1. first translate gaze ts to reference timestamps
-                ts_ref[data_sel] += sync.loc[(r,ival),'offset']*1000.   # s -> ms
-                # 2. apply scaling
-                if study_config.stretch_which=='ref':
-                    data_sel = (ref_vid_ts >= start) & (ref_vid_ts <= end)
-                    ref_vid_ts[data_sel] = (ref_vid_ts[data_sel]-pivot)*(1-stretch_fac)+pivot
-                elif study_config.stretch_which=='other':
-                    raise NotImplementedError()
-            # store new time signal if one was made
-            if study_config.stretch_which=='ref':
-                vid_ts_df = pd.read_csv(ref_vid_ts_file, delimiter='\t', index_col='frame_idx')
-                should_store = False
-                if 'timestamp_stretched' not in vid_ts_df.columns:
-                    # doesn't exist, insert
-                    vid_ts_df.insert(1,'timestamp_stretched', ref_vid_ts)
-                    should_store = True
-                elif max(vid_ts_df['timestamp_stretched'].to_numpy()-ref_vid_ts)<10e-5:
-                    # exists but what we just computed is different, update
-                    vid_ts_df['timestamp_stretched'] = ref_vid_ts
-                    should_store = True
-                if should_store:
-                    vid_ts_df.to_csv(ref_vid_ts_file, sep='\t', float_format="%.8f")
-        else:
-            ts_ref += sync.loc[(r,0),'mean_off']*1000.   # s -> ms
-        fr_ref = video_utils.timestamps_to_frame_number(ts_ref,ref_vid_ts,trim=True)['frame_idx'].to_numpy()
+        ts_ref, ref_vid_ts, fr_ref = synchronization.apply_sync(r, sync, df[ts_col].to_numpy(), video_ts_ref.timestamps,
+                                                                len(ref_episodes), study_config.do_time_stretch, study_config.stretch_which)
+
+        # store new video time signal if one was made
+        if study_config.do_time_stretch and study_config.stretch_which=='ref':
+            vid_ts_df = pd.read_csv(ref_vid_ts_file, delimiter='\t', index_col='frame_idx')
+            should_store = False
+            if 'timestamp_stretched' not in vid_ts_df.columns:
+                # doesn't exist, insert
+                vid_ts_df.insert(1,'timestamp_stretched', ref_vid_ts)
+                should_store = True
+            elif max(vid_ts_df['timestamp_stretched'].to_numpy()-ref_vid_ts)<10e-5:
+                # exists but what we just computed is different, update
+                vid_ts_df['timestamp_stretched'] = ref_vid_ts
+                should_store = True
+            if should_store:
+                vid_ts_df.to_csv(ref_vid_ts_file, sep='\t', float_format="%.8f")
+
         # write into df (use polars as that library saves to file waaay faster)
         df = _utils.insert_ts_fridx_in_df(df, gaze_headref.Gaze, 'ref', ts_ref, fr_ref)
         df = pl.from_pandas(df)

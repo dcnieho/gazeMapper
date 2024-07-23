@@ -1,7 +1,8 @@
+import numpy as np
 import pandas as pd
 import pathlib
 
-from glassesTools import annotation, timestamps
+from glassesTools import annotation, timestamps, video_utils
 
 from . import episode, naming
 
@@ -60,6 +61,48 @@ def get_sync_for_recs(working_dir: str|pathlib.Path, ref_rec: str, recs: str|lis
                 sync.loc[(r,ival),'diff_offset']   = offset-sync.loc[(r,ival),'offset']
                 sync.loc[(r,ival),'stretch_fac']   = sync.loc[(r,ival),'diff_offset'].mean()/sync.loc[(r,ival),'t_ref_elapsed'].mean()
     return sync
+
+def apply_sync(rec: str,
+               sync: pd.DataFrame,
+               data_timestamps: np.ndarray,
+               reference_video_timestamps: np.ndarray,
+               num_reference_episodes: int,
+               do_time_stretch = False,
+               stretch_which: str = None):
+    reference_video_timestamps  = np.array(reference_video_timestamps).copy()
+    data_timestamps             = data_timestamps.copy()
+    t_start, t_end = data_timestamps.min(), data_timestamps.max()
+    if do_time_stretch:
+        for ival in range(num_reference_episodes-1):
+            # set up the problem - piecewise linear scale
+            # 1. get known good location for this interval, and the stretch factor
+            pivot       = sync.loc[(rec,ival),'t_ref']
+            stretch_fac = sync.loc[(rec,ival),'stretch_fac']
+            # 2. determine data range to apply stretch for this interval to
+            if ival==0:
+                # first interval, apply all the way from start of data
+                start = t_start
+            else:
+                start = sync.loc[(rec,ival),'t_ref']
+            if ival==num_reference_episodes-2:  # NB: zero-based indexing
+                # last interval, apply all the way to end of data
+                end = t_end
+            else:
+                end = sync.loc[(rec,ival+1),'t_ref']
+            data_sel = (data_timestamps >= start) & (data_timestamps <= end)
+            # calculate new timestamps
+            # 1. first translate gaze ts to reference timestamps
+            data_timestamps[data_sel] += sync.loc[(rec,ival),'offset']*1000.   # s -> ms
+            # 2. apply scaling
+            if stretch_which=='ref':
+                data_sel = (reference_video_timestamps >= start) & (reference_video_timestamps <= end)
+                reference_video_timestamps[data_sel] = (reference_video_timestamps[data_sel]-pivot)*(1-stretch_fac)+pivot
+            elif stretch_which=='other':
+                raise NotImplementedError()
+    else:
+        data_timestamps += sync.loc[(rec,0),'mean_off']*1000.   # s -> ms
+    fr_ref = video_utils.timestamps_to_frame_number(data_timestamps,reference_video_timestamps,trim=True)['frame_idx'].to_numpy()
+    return data_timestamps, reference_video_timestamps, fr_ref
 
 def get_coding_file(working_dir: str|pathlib.Path):
     working_dir  = pathlib.Path(working_dir)
