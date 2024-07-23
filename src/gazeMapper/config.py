@@ -113,8 +113,9 @@ class Study:
         path = pathlib.Path(path)
         # this stores only the planes_per_episode variable to json, rest is read from other files
         # instead to remain flexible and make it easy for users to rename, etc
-        d_path = path / self.default_json_file_name
-        with open(d_path, 'w') as f:
+        if path.is_dir():
+            path = path / self.default_json_file_name
+        with open(path, 'w') as f:
             to_dump = {k:getattr(self,k) for k in vars(self) if not k.startswith('_') and k not in ['session_def','planes','working_directory']}    # session_def and planes will be populated from contents in the provided folder, and working_directory as the provided path
             to_dump['planes_per_episode'] = [(k, to_dump['planes_per_episode'][k]) for k in to_dump['planes_per_episode']]   # pack as list of tuples for storage
             # optional arguments
@@ -134,7 +135,10 @@ class Study:
     def load_from_json(path: str | pathlib.Path) -> 'Study':
         path = pathlib.Path(path)
         # get kwds
-        d_path = path / Study.default_json_file_name
+        if path.is_dir():
+            d_path = path / Study.default_json_file_name
+        else:
+            d_path = path
         with open(d_path, 'r') as f:
             kwds = json.load(f, object_hook=utils.json_reconstitute)
         kwds['planes_per_episode'] = {k:v for k,v in kwds['planes_per_episode']}  # stored as list of tuples, unpack
