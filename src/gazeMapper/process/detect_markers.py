@@ -11,7 +11,7 @@ from glassesTools.video_gui import GUI
 from .. import config, episode, marker, naming, plane, session, synchronization
 
 
-def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show_visualization=True, show_rejected_markers=False):
+def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show_visualization=False, show_rejected_markers=False):
     # if show_visualization, each frame is shown in a viewer, overlaid with info about detected markers and planes
     # if show_rejected_markers, rejected ArUco marker candidates are also shown in the viewer. Possibly useful for debug
     working_dir = pathlib.Path(working_dir)
