@@ -7,7 +7,7 @@ import numpy as np
 import threading
 from typing import Any, Callable
 
-from glassesTools import annotation, aruco, gaze_headref, ocv, plane, timestamps, transforms
+from glassesTools import annotation, aruco, intervals, gaze_headref, ocv, plane, timestamps, utils
 from glassesTools.video_gui import GUI
 
 from .. import config, episode, marker, naming, session, synchronization
@@ -19,7 +19,7 @@ import ffpyplayer.tools
 from fractions import Fraction
 
 
-def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show_rejected_markers=False, show_visualization=False):
+def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show_rejected_markers=False, show_visualization=True):
     # if show_visualization, the generated video is shown as it is created in a viewer
     working_dir  = pathlib.Path(working_dir) # working directory of a session, not of a recording
     if config_dir is None:
@@ -51,13 +51,14 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
     session_info = session.Session.load_from_json(working_dir)
 
     # load info for all recordings in the recording session and setup wanted output videos
-    episodes        : dict[str, dict[annotation.Event, list[list[int]]]]    = {}
-    gazes_head      : dict[str, dict[int, list[gaze_headref.Gaze]]]         = {}
-    in_videos       : dict[str, pathlib.Path]                               = {}
-    camera_params   : dict[str, ocv.CameraParams]                           = {}
-    videos_ts       : dict[str, timestamps.VideoTimestamps]                 = {}
-    pose_estimators : dict[str, aruco.PoseEstimator]                        = {}
-    vid_info        : dict[str, tuple[int, int, float]]                     = {}
+    episodes        : dict[str, dict[annotation.Event, list[list[int]]]]            = {}
+    episode_colors  : dict[str, dict[annotation.Event, tuple[float, float, float]]] = {}
+    gazes_head      : dict[str, dict[int, list[gaze_headref.Gaze]]]                 = {}
+    in_videos       : dict[str, pathlib.Path]                                       = {}
+    camera_params   : dict[str, ocv.CameraParams]                                   = {}
+    videos_ts       : dict[str, timestamps.VideoTimestamps]                         = {}
+    pose_estimators : dict[str, aruco.PoseEstimator]                                = {}
+    vid_info        : dict[str, tuple[int, int, float]]                             = {}
     recs = [r for r in session_info.recordings]
     for rec in recs:
         rec_def = session_info.recordings[rec].defition
@@ -65,6 +66,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
 
         # get interval(s) coded to be analyzed, if any
         episodes[rec] = episode.list_to_marker_dict(episode.read_list_from_file(rec_working_dir / naming.coding_file), study_config.episodes_to_code)
+        colors = [tuple(round(cc*255) for cc in c) for c in utils.get_colors(len(episodes[rec]), 0.45, 0.65)]
+        episode_colors[rec] = {k:c for k,c in zip(episodes[rec], colors)}
 
         # get other setup
         sync_target_function    = _get_sync_function(study_config, rec_def, None if annotation.Event.Sync_ET_Data not in episodes[rec] else episodes[rec][annotation.Event.Sync_ET_Data])
@@ -205,6 +208,34 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                 if frame[v] is None:
                     # we don't have a valid frame, use a fully black frame
                     frame[v] = np.zeros((vid_info[v][1],vid_info[v][0],3), np.uint8)   # black image
+
+            # print info on frame
+            for v in all_vids:
+                # timecode and frame number
+                texts = ['%8.3f [%6d]' % (frame_ts[lead_vid]/1000.,frame_idx[lead_vid])]
+                frame_colors = [(0,0,0)]
+                # events, if any
+                event, _ = intervals.which_interval(frame_idx[lead_vid], episodes[v])
+                for e in event:
+                    texts.append(e.value)
+                    frame_colors.append(episode_colors[v][e][::-1])
+                # now print them all
+                text_sizes: list[tuple[int,int]]= []
+                baselines : list[int]           = []
+                for t in texts:
+                    t, b = cv2.getTextSize(t,cv2.FONT_HERSHEY_PLAIN,2,2)
+                    text_sizes.append(t)
+                    baselines.append(b)
+                max_height = max(text_sizes, key=lambda x: x[1])[1]
+                x_end = 0
+                margin = 5
+                for t,f,ts,b in zip(texts,frame_colors,text_sizes,baselines):
+                    x_advance = ts[0]+margin
+                    cv2.rectangle(frame[v],(x_end,frame[v].shape[0]),(x_end+x_advance,frame[v].shape[0]-max_height-b-margin), f, -1)
+                    cv2.putText(frame[v], (t), (x_end+margin, frame[v].shape[0]-margin), cv2.FONT_HERSHEY_PLAIN, 2, (0,255,255), 2)
+                    x_end += x_advance
+
+
 
             for v in all_vids:
                 img = Image(plane_buffers=[frame[v].flatten().tobytes()], pix_fmt='bgr24', size=(frame[v].shape[1], frame[v].shape[0]))
