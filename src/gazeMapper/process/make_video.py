@@ -59,7 +59,6 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
     camera_params   : dict[str, ocv.CameraParams]                           = {}
     videos_ts       : dict[str, timestamps.VideoTimestamps]                 = {}
     pose_estimators : dict[str, aruco.PoseEstimator]                        = {}
-    gui_window_ids  : dict[str, int]                                        = {}
     vid_info        : dict[str, tuple[int, int, float]]                     = {}
     recs = [r for r in session_info.recordings]
     for rec in recs:
@@ -99,23 +98,41 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
             # get video file info
             vid_info[rec] = pose_estimators[rec].get_video_info()
 
-            # if we have a gui, set it up
-            if has_gui:
-                if (study_config.sync_ref_recording and rec==study_config.sync_ref_recording) or (not study_config.sync_ref_recording and len(vid_writer)==1):
-                    gui_window_ids[rec] = main_win_id
-                    gui.set_show_timeline(True, videos_ts[rec], episodes[rec], main_win_id)
-                else:
-                    gui_window_ids[rec] = gui.add_window(rec)
-                gui.set_frame_size(vid_info[rec], gui_window_ids[rec])
-
-    # get frame sync info
+    # get frame sync info, and recording's episodes expressed in the reference video's frame indices
     if study_config.sync_ref_recording:
         sync = synchronization.get_sync_for_recs(working_dir, recs, study_config.sync_ref_recording, study_config.do_time_stretch, study_config.sync_average_recordings)
         ref_frame_idxs: dict[str, list[int]] = {}
         for r in sync.index.get_level_values('recording').unique():
-            ref_frame_idxs[r] = synchronization.get_frame_idxs_from_reference(r, sync, videos_ts[study_config.sync_ref_recording].indices,
+            # for each frame in the reference video, get the corresponding frame in this recording
+            ref_frame_idxs[r] = synchronization.reference_frames_to_video(r, sync, videos_ts[study_config.sync_ref_recording].indices,
                                                                               videos_ts[r].timestamps, videos_ts[study_config.sync_ref_recording].timestamps,
                                                                               study_config.do_time_stretch, study_config.stretch_which)
+            # make sure episodes has a trial annotation, which comes from the reference recording
+            episodes[r][annotation.Event.Trial] = synchronization.reference_frames_to_video(r, sync, episodes[study_config.sync_ref_recording][annotation.Event.Trial],
+                                                                                            videos_ts[r].timestamps, videos_ts[study_config.sync_ref_recording].timestamps,
+                                                                                            study_config.do_time_stretch, study_config.stretch_which)
+            # also get this recording's coded events in the reference's frames idxs
+            episodes[r] = {e: synchronization.video_frames_to_reference(r, sync, episodes[r][e],
+                                                                        videos_ts[r].timestamps, videos_ts[study_config.sync_ref_recording].timestamps,
+                                                                        study_config.do_time_stretch, study_config.stretch_which)
+                           for e in episodes[r]}
+            # fix episodes with start or end points outside the reference video
+            # also, flatten them in the process, that's what the GUI and movie annotator want
+            for e in episodes[r]:
+                new_iv = []
+                for iv in episodes[r][e]:
+                    if iv[0]==-1 and (len(iv)==1 or iv[1]==-1):
+                        continue
+                    if iv[0]==-1:
+                        iv[0] = 0
+                    if len(iv)>1 and iv[1]==-1:
+                        iv[1] = videos_ts[study_config.sync_ref_recording].indices[-1]
+                    new_iv.extend(iv)
+                episodes[rec][e] = new_iv
+
+        # also flatten the episodes for the reference recording
+        for e in episodes[study_config.sync_ref_recording]:
+            episodes[study_config.sync_ref_recording][e] = [i for iv in episodes[study_config.sync_ref_recording][e] for i in iv]
 
     video_sets: list[tuple[str, list[str]]] = []
     if study_config.sync_ref_recording:
@@ -135,8 +152,25 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
         frame_ts            : dict[str, float]                      = {}
         pose                : dict[str, dict[str, plane.Pose]]      = {}
         sync_target_signal  : dict[str, dict[str, list[int, Any]]]  = {}
+        gui_window_ids      : dict[str, int]                        = {}
 
         all_vids = [lead_vid] + other_vids
+
+        if has_gui:
+            # clean up any previous windows (except main window, this will have to be renamed only)
+            for v in gui_window_ids:
+                if gui_window_ids[v]!=0:    # main window is id 0
+                    gui.delete_window(v)
+            gui_window_ids.clear()
+            for v in all_vids:
+                # if we have a gui, set it up for this recording
+                if v==lead_vid:
+                    gui_window_ids[v] = main_win_id
+                    gui.set_window_title(f'{working_dir.name}: {v}', main_win_id)
+                else:
+                    gui_window_ids[v] = gui.add_window(f'{working_dir.name}: {v}')
+                gui.set_show_timeline(True, videos_ts[lead_vid], episodes[v], gui_window_ids[v])
+                gui.set_frame_size(vid_info[v], gui_window_ids[v])
 
         # open output video files
         for v in all_vids:
@@ -154,7 +188,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                 pose_estimators[lead_vid].process_one_frame()
             # TODO: if there is a discontinuity, fill in the missing frames so audio stays in sync
             # check if we're done
-            if status==aruco.Status.Finished or frame_idx[lead_vid]>1600:
+            if status==aruco.Status.Finished or frame_idx[lead_vid]>2000:
                 break
             # NB: no need to handle aruco.Status.Skip, since we didn't provide the pose estimator with any analysis intervals (we want to process the whole video)
 
@@ -177,6 +211,16 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
             for v in all_vids:
                 img = Image(plane_buffers=[frame[v].flatten().tobytes()], pix_fmt='bgr24', size=(frame[v].shape[1], frame[v].shape[0]))
                 vid_writer[v].write_frame(img=img, pts=frame_idx[lead_vid]/vid_info[lead_vid][2])
+
+            if has_gui:
+                for v in all_vids:
+                    gui.update_image(frame[v], frame_ts[lead_vid]/1000., frame_idx[lead_vid], window_id = gui_window_ids[v])
+
+                requests = gui.get_requests()
+                for r,_ in requests:
+                    if r=='exit':   # only request we need to handle
+                        should_exit = True
+                        break
 
         # done
         for v in all_vids:
@@ -206,3 +250,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                 else:
                     # something failed. Put file without audio back under output name
                     shutil.move(tempName, file)
+
+    # done with all videos, clean up
+    if has_gui:
+        gui.stop()
