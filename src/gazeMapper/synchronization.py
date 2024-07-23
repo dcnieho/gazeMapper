@@ -113,15 +113,18 @@ def get_coding_file(working_dir: str|pathlib.Path):
     assert episodes, f'No {annotation.Event.Sync_Camera.value} points found for this recording ({working_dir.name}). Run code_episodes and code at least one {annotation.Event.Sync_Camera.value} point.'
     return episodes
 
-def get_episode_frame_indices_from_ref(working_dir: str|pathlib.Path, event: annotation.Event, ref_rec: str, rec: str, extra_fr=10):
+def get_episode_frame_indices_from_ref(working_dir: str|pathlib.Path, event: annotation.Event, rec: str, ref_rec:str, do_time_stretch, sync_average_recordings: list[str], stretch_which: str, extra_fr=0):
     working_dir  = pathlib.Path(working_dir)
     ref_episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir.parent / ref_rec / naming.coding_file))
-    assert event in ref_episodes, f'Trial episodes are gotten from the reference recording ({ref_rec}), but the coding file for this reference recording doesn\'t contain any ({event.value}) episodes'
+    assert event in ref_episodes, f'Trying to get {event.value} episodes from the reference recording ({ref_rec}), but the coding file for this reference recording doesn\'t contain any ({event.value}) episodes'
     # get sync and timestamp info we need to transform reference frames indices to frame indices of this recording
-    sync = get_sync_for_recs(working_dir.parent, ref_rec, rec)
+    sync = get_sync_for_recs(working_dir.parent, ref_rec, rec, do_time_stretch, sync_average_recordings)
     video_ts_ref = timestamps.VideoTimestamps(working_dir.parent / ref_rec / 'frameTimestamps.tsv')
     video_ts     = timestamps.VideoTimestamps(working_dir / 'frameTimestamps.tsv')
-    off          = -sync.loc[(rec,0),'mean_off']*1000.   # s -> ms, negate because value is sync this_rec->ref, we need the opposite
-    frame_ts_ref = [[video_ts_ref.get_timestamp(i) for i in ifs] for ifs in ref_episodes[event]]
-    frame_idx    = [[video_ts.find_frame(i+off) for i in ts] for ts in frame_ts_ref]
-    return [[ifs[0]-extra_fr, ifs[1]+extra_fr] for ifs in frame_idx]   # arbitrarily expand by x frames on each edge, so we've likely got the frame we need
+
+    # get sync of this recording's video to ref (fr_idx_ref contains the reference frame_idxs corresponding to this recording's frames)
+    _, _, fr_idx_ref = apply_sync(rec, sync, video_ts.timestamps, video_ts_ref.timestamps, do_time_stretch, stretch_which)
+
+    # find where ref's episodes are in this video
+    frame_idx = [[np.nonzero(fr_idx_ref==x)[0][i] for x,i in zip(y,[0,-1])]for y in ref_episodes[event]]
+    return [[i+e for i,e in zip(ifs, [-extra_fr, extra_fr])] for ifs in frame_idx]   # expand by extra_fr frames on each edge
