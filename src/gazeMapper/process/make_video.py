@@ -115,7 +115,6 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                                                                         study_config.do_time_stretch, study_config.stretch_which)
                            for e in episodes[r]}
             # fix episodes with start or end points outside the reference video
-            # also, flatten them in the process, that's what the GUI and movie annotator want
             for e in episodes[r]:
                 new_iv = []
                 for iv in episodes[r][e]:
@@ -125,12 +124,11 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                         iv[0] = 0
                     if len(iv)>1 and iv[1]==-1:
                         iv[1] = videos_ts[study_config.sync_ref_recording].indices[-1]
-                    new_iv.extend(iv)
+                    new_iv.append(iv)
                 episodes[rec][e] = new_iv
 
-        # also flatten the episodes for the reference recording
-        for e in episodes[study_config.sync_ref_recording]:
-            episodes[study_config.sync_ref_recording][e] = [i for iv in episodes[study_config.sync_ref_recording][e] for i in iv]
+    # flatten the episodes for each recording, that's what the GUI and movie annotator want
+    episodes_flat = {r:{e:[i for iv in episodes[r][e] for i in iv] for e in episodes[r]} for r in episodes}
 
     video_sets: list[tuple[str, list[str]]] = []
     if study_config.sync_ref_recording:
@@ -167,7 +165,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                     gui.set_window_title(f'{working_dir.name}: {v}', main_win_id)
                 else:
                     gui_window_ids[v] = gui.add_window(f'{working_dir.name}: {v}')
-                gui.set_show_timeline(True, videos_ts[lead_vid], episodes[v], gui_window_ids[v])
+                gui.set_show_timeline(True, videos_ts[lead_vid], episodes_flat[v], gui_window_ids[v])
                 gui.set_frame_size(vid_info[v], gui_window_ids[v])
                 gui.set_show_controls(True, gui_window_ids[v])
                 gui.set_show_play_percentage(True, gui_window_ids[v])
