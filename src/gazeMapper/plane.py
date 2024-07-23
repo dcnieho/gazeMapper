@@ -27,7 +27,7 @@ class Definition:
                  marker_border_bits : int                   = 1,
                  min_num_markers    : int                   = 3,
                  plane_size         : tuple[float, float]   = None,
-                 origin             : np.ndarray            = None,
+                 origin             : tuple[float, float]   = None,
                  unit               : str                   = None,
                  aruco_dict         : int                   = cv2.aruco.DICT_4X4_250,
                  ref_image_size     : int                   = 1920):
@@ -40,13 +40,10 @@ class Definition:
         self.plane_size             : tuple[float, float]   = plane_size            # in "unit" units
         self.marker_border_bits     : int                   = marker_border_bits
         self.min_num_markers        : int                   = min_num_markers       # minimum number of markers that should be to run pose estimation w.r.t. the plane
-        self.origin                 : np.ndarray            = origin                # center of plane, in coordinates of the input file
+        self.origin                 : tuple[float, float]   = origin                # center of plane, in coordinates of the input file
         self.unit                   : str                   = unit
         self.aruco_dict             : int                   = aruco_dict
         self.ref_image_size         : int                   = ref_image_size        # largest dimension
-
-        if isinstance(self.origin,list):
-            self.origin = np.array(self.origin)
 
         # check provided info
         if self.type==Type.GlassesValidator:
