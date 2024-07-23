@@ -124,23 +124,41 @@ def get_episode_frame_indices_from_ref(working_dir: str|pathlib.Path, event: ann
     video_ts_ref = timestamps.VideoTimestamps(working_dir.parent / ref_rec / 'frameTimestamps.tsv')
     video_ts     = timestamps.VideoTimestamps(working_dir / 'frameTimestamps.tsv')
     # get frame indices in this recording's video corresponding to each of the reference frames
-    frame_idx = get_frame_idxs_from_reference(rec, sync, ref_episodes[event], video_ts.timestamps, video_ts_ref.timestamps, do_time_stretch, stretch_which)
+    frame_idx = reference_frames_to_video(rec, sync, ref_episodes[event], video_ts.timestamps, video_ts_ref.timestamps, do_time_stretch, stretch_which)
     return [[i+e for i,e in zip(ifs, [-extra_fr, extra_fr])] for ifs in frame_idx]   # expand by extra_fr frames on each edge
 
 @overload
-def get_frame_idxs_from_reference(rec: str, sync: pd.DataFrame, fr_idxs: list[int], video_ts: list[float]|np.ndarray, video_ts_ref: list[float]|np.ndarray, do_time_stretch: bool, stretch_which: str) -> list[int]: ...
+def reference_frames_to_video(rec: str, sync: pd.DataFrame, fr_idxs: list[int], video_ts: list[float]|np.ndarray, video_ts_ref: list[float]|np.ndarray, do_time_stretch: bool, stretch_which: str) -> list[int]: ...
 @overload
-def get_frame_idxs_from_reference(rec: str, sync: pd.DataFrame, fr_idxs: list[list[int]], video_ts: list[float]|np.ndarray, video_ts_ref: list[float]|np.ndarray, do_time_stretch: bool, stretch_which: str) -> list[list[int]]: ...
-def get_frame_idxs_from_reference(rec: str, sync: pd.DataFrame, fr_idxs: list[int]|list[list[int]], video_ts: list[float]|np.ndarray, video_ts_ref: list[float]|np.ndarray, do_time_stretch: bool, stretch_which: str) -> list[int]|list[list[int]]:
+def reference_frames_to_video(rec: str, sync: pd.DataFrame, fr_idxs: list[list[int]], video_ts: list[float]|np.ndarray, video_ts_ref: list[float]|np.ndarray, do_time_stretch: bool, stretch_which: str) -> list[list[int]]: ...
+def reference_frames_to_video(rec: str, sync: pd.DataFrame, fr_idxs: list[int]|list[list[int]], this_video_ts: list[float]|np.ndarray, video_ts_ref: list[float]|np.ndarray, do_time_stretch: bool, stretch_which: str) -> list[int]|list[list[int]]:
     if not fr_idxs:
         return []
 
-    # get where (which frame) each of the video's timestamps occur in the reference video, given the sync info
-    # (fr_idx_ref contains the reference frame_idxs corresponding to this video's frames, video_ts)
-    _, _, fr_idx_ref = apply_sync(rec, sync, video_ts, video_ts_ref, do_time_stretch, stretch_which)
+    # get the video's timestamps in time of the reference video
+    this_video_ts_ref, video_ts_ref, _ = apply_sync(rec, sync, this_video_ts, video_ts_ref, do_time_stretch, stretch_which)
 
-    # find frame idxs in this video for each reference frame specified in fr_idxs
-    if isinstance(fr_idxs[0],list):
-        return [[idx[i] if (idx:=np.nonzero(fr_idx_ref==x)[0]).size else -1 for x,i in zip(y,[0,-1])] for y in fr_idxs]
-    else:
-        return [ idx[0] if (idx:=np.nonzero(fr_idx_ref==x)[0]).size else -1 for x in fr_idxs]
+    # get where (which frame) each of this video's timestamps occur in the reference video, given the sync info
+    # (fr_idx_ref contains the reference frame_idxs corresponding to this video's frames, video_ts)
+    fr_idx_ref = video_utils.timestamps_to_frame_number(video_ts_ref, this_video_ts_ref, trim=True)['frame_idx'].to_numpy()
+    fr_idx_ref[video_ts_ref<this_video_ts_ref[0]] = -1
+
+    return fr_idx_ref[fr_idxs].tolist()
+
+@overload
+def video_frames_to_reference(rec: str, sync: pd.DataFrame, fr_idxs: list[int], video_ts: list[float]|np.ndarray, video_ts_ref: list[float]|np.ndarray, do_time_stretch: bool, stretch_which: str) -> list[int]: ...
+@overload
+def video_frames_to_reference(rec: str, sync: pd.DataFrame, fr_idxs: list[list[int]], video_ts: list[float]|np.ndarray, video_ts_ref: list[float]|np.ndarray, do_time_stretch: bool, stretch_which: str) -> list[list[int]]: ...
+def video_frames_to_reference(rec: str, sync: pd.DataFrame, fr_idxs: list[int]|list[list[int]], this_video_ts: list[float]|np.ndarray, video_ts_ref: list[float]|np.ndarray, do_time_stretch: bool, stretch_which: str) -> list[int]|list[list[int]]:
+    if not fr_idxs:
+        return []
+
+    # get the video's timestamps in time of the reference video
+    this_video_ts_ref, video_ts_ref, _ = apply_sync(rec, sync, this_video_ts, video_ts_ref, do_time_stretch, stretch_which)
+
+    # get where (which frame) each of the reference video frames occur in this video, given the sync info
+    # (fr_idx contains this video's frame_idxs corresponding to this reference's frames, video_ts)
+    fr_idx = video_utils.timestamps_to_frame_number(this_video_ts_ref, video_ts_ref, trim=True)['frame_idx'].to_numpy()
+    fr_idx[this_video_ts_ref<video_ts_ref[0]] = -1
+
+    return fr_idx[fr_idxs].tolist()
