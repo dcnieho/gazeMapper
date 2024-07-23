@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import pathlib
+from typing import overload
 
 from glassesTools import annotation, timestamps, video_utils
 
@@ -13,10 +14,11 @@ def get_cols(do_time_stretch: bool):
     else:
         cols += ['mean_off']
 
-def get_sync_for_recs(working_dir: str|pathlib.Path, ref_rec: str, recs: str|list[str], do_time_stretch, sync_average_recordings: list[str]):
+def get_sync_for_recs(working_dir: str|pathlib.Path, recs: str|list[str], ref_rec: str, do_time_stretch: bool, sync_average_recordings: list[str]):
     working_dir  = pathlib.Path(working_dir)
     if isinstance(recs,str):
         recs = [recs]
+    recs = [r for r in recs if r!=ref_rec]
     ref_episodes = get_coding_file(working_dir / ref_rec)
     video_ts_ref = timestamps.VideoTimestamps(working_dir / ref_rec / 'frameTimestamps.tsv')
 
@@ -113,18 +115,32 @@ def get_coding_file(working_dir: str|pathlib.Path):
     assert episodes, f'No {annotation.Event.Sync_Camera.value} points found for this recording ({working_dir.name}). Run code_episodes and code at least one {annotation.Event.Sync_Camera.value} point.'
     return episodes
 
-def get_episode_frame_indices_from_ref(working_dir: str|pathlib.Path, event: annotation.Event, rec: str, ref_rec:str, do_time_stretch, sync_average_recordings: list[str], stretch_which: str, extra_fr=0):
+def get_episode_frame_indices_from_ref(working_dir: str|pathlib.Path, event: annotation.Event, rec: str, ref_rec:str, do_time_stretch: bool, sync_average_recordings: list[str], stretch_which: str, extra_fr=0):
     working_dir  = pathlib.Path(working_dir)
     ref_episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir.parent / ref_rec / naming.coding_file))
     assert event in ref_episodes, f'Trying to get {event.value} episodes from the reference recording ({ref_rec}), but the coding file for this reference recording doesn\'t contain any ({event.value}) episodes'
     # get sync and timestamp info we need to transform reference frames indices to frame indices of this recording
-    sync = get_sync_for_recs(working_dir.parent, ref_rec, rec, do_time_stretch, sync_average_recordings)
+    sync = get_sync_for_recs(working_dir.parent, rec, ref_rec, do_time_stretch, sync_average_recordings)
     video_ts_ref = timestamps.VideoTimestamps(working_dir.parent / ref_rec / 'frameTimestamps.tsv')
     video_ts     = timestamps.VideoTimestamps(working_dir / 'frameTimestamps.tsv')
-
-    # get sync of this recording's video to ref (fr_idx_ref contains the reference frame_idxs corresponding to this recording's frames)
-    _, _, fr_idx_ref = apply_sync(rec, sync, video_ts.timestamps, video_ts_ref.timestamps, do_time_stretch, stretch_which)
-
-    # find where ref's episodes are in this video
-    frame_idx = [[np.nonzero(fr_idx_ref==x)[0][i] for x,i in zip(y,[0,-1])]for y in ref_episodes[event]]
+    # get frame indices in this recording's video corresponding to each of the reference frames
+    frame_idx = get_frame_idxs_from_reference(rec, sync, ref_episodes[event], video_ts.timestamps, video_ts_ref.timestamps, do_time_stretch, stretch_which)
     return [[i+e for i,e in zip(ifs, [-extra_fr, extra_fr])] for ifs in frame_idx]   # expand by extra_fr frames on each edge
+
+@overload
+def get_frame_idxs_from_reference(rec: str, sync: pd.DataFrame, fr_idxs: list[int], video_ts: list[float]|np.ndarray, video_ts_ref: list[float]|np.ndarray, do_time_stretch: bool, stretch_which: str) -> list[int]: ...
+@overload
+def get_frame_idxs_from_reference(rec: str, sync: pd.DataFrame, fr_idxs: list[list[int]], video_ts: list[float]|np.ndarray, video_ts_ref: list[float]|np.ndarray, do_time_stretch: bool, stretch_which: str) -> list[list[int]]: ...
+def get_frame_idxs_from_reference(rec: str, sync: pd.DataFrame, fr_idxs: list[int]|list[list[int]], video_ts: list[float]|np.ndarray, video_ts_ref: list[float]|np.ndarray, do_time_stretch: bool, stretch_which: str) -> list[int]|list[list[int]]:
+    if not fr_idxs:
+        return []
+
+    # get where (which frame) each of the video's timestamps occur in the reference video, given the sync info
+    # (fr_idx_ref contains the reference frame_idxs corresponding to this video's frames, video_ts)
+    _, _, fr_idx_ref = apply_sync(rec, sync, video_ts, video_ts_ref, do_time_stretch, stretch_which)
+
+    # find frame idxs in this video for each reference frame specified in fr_idxs
+    if isinstance(fr_idxs[0],list):
+        return [[idx[i] if (idx:=np.nonzero(fr_idx_ref==x)[0]).size else -1 for x,i in zip(y,[0,-1])] for y in fr_idxs]
+    else:
+        return [ idx[0] if (idx:=np.nonzero(fr_idx_ref==x)[0]).size else -1 for x in fr_idxs]
