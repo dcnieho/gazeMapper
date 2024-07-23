@@ -65,14 +65,14 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, s
         estimator.register_extra_processing_fun('sync', *sync_target_function)
     estimator.attach_gui(gui, 8, show_rejected_markers)
 
-    poses, individual_markers, extra_processing_output = estimator.process_video()
+    poses, individual_markers, sync_target_signal = estimator.process_video()
 
     for p in poses:
         gt_plane.write_list_to_file(poses[p], working_dir/f'{naming.plane_pose_prefix}{p}.tsv', skip_failed=True)
     for i in individual_markers:
         gt_marker.write_list_to_file(individual_markers[i], working_dir/f'{naming.marker_pose_prefix}{i}.tsv', skip_failed=True)
-    if extra_processing_output:
-        df = pd.DataFrame(extra_processing_output['sync'],columns=['frame_idx','target_x','target_y'])
+    if sync_target_signal:
+        df = pd.DataFrame(sync_target_signal['sync'],columns=['frame_idx','target_x','target_y'])
         df.to_csv(working_dir/naming.target_sync_file, sep='\t', index=False, na_rep='nan', float_format="%.8f")
 
 
