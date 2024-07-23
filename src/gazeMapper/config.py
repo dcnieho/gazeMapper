@@ -115,7 +115,7 @@ class Study:
         # instead to remain flexible and make it easy for users to rename, etc
         d_path = path / self.default_json_file_name
         with open(d_path, 'w') as f:
-            to_dump = {k:getattr(self,k) for k in ['planes_per_episode','episodes_to_code','get_cam_movement_for_et_sync_method','individual_markers','sync_ref_recording','do_time_stretch','stretch_which','sync_average_recordings']}    # only these fields. session_def and planes will be populated from contents in the provided folder, and working_directory as the provided path
+            to_dump = {k:getattr(self,k) for k in vars(self) if not k.startswith('_') and k not in ['session_def','planes','working_directory']}    # session_def and planes will be populated from contents in the provided folder, and working_directory as the provided path
             to_dump['planes_per_episode'] = [(k, to_dump['planes_per_episode'][k]) for k in to_dump['planes_per_episode']]   # pack as list of tuples for storage
             # optional arguments
             if self.get_cam_movement_for_et_sync_method=='function':

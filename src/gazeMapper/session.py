@@ -140,7 +140,7 @@ class Session:
         if path.is_dir():
             path /= self.default_json_file_name
         with open(path, 'w') as f:
-            to_dump = {k:getattr(self,k) for k in ['definition']}    # only this field. Name will be populated from name of session/provided folder, recordings from each subfolder in the session/provided folder, and working_directory as the provided path
+            to_dump = {k:getattr(self,k) for k in vars(self) if not k.startswith('_') and k not in ['name','working_directory','recordings']}   # Name will be populated from name of session/provided folder, recordings from each subfolder in the session/provided folder, and working_directory as the provided path
             # dump to file
             json.dump(to_dump, f, cls=utils.CustomTypeEncoder, indent=2)
 
