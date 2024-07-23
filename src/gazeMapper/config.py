@@ -107,7 +107,7 @@ class Study:
             return
         for w in which:
             if not any([r.name==w for r in self.session_def.recordings]):
-                raise ValueError(f'Recording "{w}" not known, check {field}')
+                raise ValueError(f'Recording "{w}" not known, check {field} in the study configuration')
 
     def store_as_json(self, path: str | pathlib.Path):
         path = pathlib.Path(path)
