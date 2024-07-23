@@ -112,22 +112,23 @@ def _get_sync_function(study_config: config.Study,
 
 def _get_plane_setup(study_config: config.Study,
                      config_dir: pathlib.Path,
-                     episodes: dict[annotation.Event,list[list[int]]]) -> tuple[dict[str, dict[str,Any]], dict[str, list[list[int]]]]:
+                     episodes: dict[annotation.Event,list[list[int]]] = None) -> tuple[dict[str, dict[str,Any]], dict[str, list[list[int]]]]:
     # process the above into a dict of plane definitions and a dict with frame number intervals for which to use each
     planes = {v for k in study_config.planes_per_episode for v in study_config.planes_per_episode[k]}
     planes_setup: dict[str, dict[str]] = {}
-    analyze_frames: dict[str, list[list[int]]] = {}
+    analyze_frames: dict[str, list[list[int]]] = {} if episodes else None
     for p in planes:
         p_def = [pl for pl in study_config.planes if pl.name==p][0]
         pl = plane.get_plane_from_definition(p_def, config_dir/p)
         planes_setup[p] = {'plane': pl, 'aruco_dict': p_def.aruco_dict, 'aruco_params': {'markerBorderBits': p_def.marker_border_bits}, 'min_num_markers': p_def.min_num_markers}
-        # determine for which frames this plane should be used
-        anal_episodes = [k for k in study_config.planes_per_episode if p in study_config.planes_per_episode[k]]
-        all_episodes = [ep for k in anal_episodes for ep in episodes[k]]
-        analyze_frames[p] = sorted(all_episodes, key = lambda x: x[1])
+        if episodes:
+            # determine for which frames this plane should be used
+            anal_episodes = [k for k in study_config.planes_per_episode if p in study_config.planes_per_episode[k]]
+            all_episodes = [ep for k in anal_episodes for ep in episodes[k]]
+            analyze_frames[p] = sorted(all_episodes, key = lambda x: x[1])
 
     # if there is some form of automatic coding configured, then we'll need to process the whole video for each recording in a session
-    if study_config.auto_code_sync_points or study_config.auto_code_trials_episodes:
+    if episodes and (study_config.auto_code_sync_points or study_config.auto_code_trials_episodes):
         analyze_frames = {p:None for p in analyze_frames}
 
     return planes_setup, analyze_frames

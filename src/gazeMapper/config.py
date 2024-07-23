@@ -38,7 +38,9 @@ class Study:
                  get_cam_movement_for_et_sync_function: dict[str,str|dict[str]]=None,
 
                  auto_code_sync_points: dict[str]=None,
-                 auto_code_trials_episodes: dict[str]=None):
+                 auto_code_trials_episodes: dict[str]=None
+
+                 make_video_which: list[str]=None):
         self.session_def            = session_def
         self.planes                 = planes
         self.planes_per_episode     = planes_per_episode
@@ -57,10 +59,13 @@ class Study:
         self.auto_code_sync_points      = auto_code_sync_points
         self.auto_code_trials_episodes  = auto_code_trials_episodes
 
+        self.make_video_which                   = make_video_which
+
         self._check_planes_per_episode()
         self._check_auto_markers()
         self._check_recordings([self.sync_ref_recording], 'sync_ref_recording')
         self._check_recordings(self.sync_average_recordings, 'sync_average_recordings')
+        self._check_recordings(self.make_video_which, 'make_video_which')
         assert self.sync_ref_recording not in self.sync_average_recordings, f'Recording {self.sync_ref_recording} is the reference recording for sync, should not be specified in sync_average_recordings'
         assert self.get_cam_movement_for_et_sync_method in ['','plane','function'], 'get_cam_movement_for_et_sync_method parameter should be an empty string, "plane", or "function"'
         if self.get_cam_movement_for_et_sync_method=='function':
