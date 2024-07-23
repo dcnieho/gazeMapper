@@ -66,7 +66,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):
         ts_col = 'timestamp_VOR' if 'timestamp_VOR' in df else 'timestamp'
         # get gaze timestamps and camera frame numbers _in reference video timeline_
         ts_ref, ref_vid_ts, fr_ref = synchronization.apply_sync(r, sync, df[ts_col].to_numpy(), video_ts_ref.timestamps,
-                                                                len(ref_episodes), study_config.do_time_stretch, study_config.stretch_which)
+                                                                study_config.do_time_stretch, study_config.stretch_which)
 
         # store new video time signal if one was made
         if study_config.do_time_stretch and study_config.stretch_which=='ref':

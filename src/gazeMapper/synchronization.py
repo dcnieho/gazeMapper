@@ -13,7 +13,7 @@ def get_cols(do_time_stretch: bool):
     else:
         cols += ['mean_off']
 
-def get_sync_for_recs(working_dir: str|pathlib.Path, ref_rec: str, recs: str|list[str], do_time_stretch=False, sync_average_recordings: list[str]=None):
+def get_sync_for_recs(working_dir: str|pathlib.Path, ref_rec: str, recs: str|list[str], do_time_stretch, sync_average_recordings: list[str]):
     working_dir  = pathlib.Path(working_dir)
     if isinstance(recs,str):
         recs = [recs]
@@ -66,12 +66,12 @@ def apply_sync(rec: str,
                sync: pd.DataFrame,
                data_timestamps: np.ndarray,
                reference_video_timestamps: np.ndarray,
-               num_reference_episodes: int,
-               do_time_stretch = False,
-               stretch_which: str = None):
+               do_time_stretch,
+               stretch_which: str):
     reference_video_timestamps  = np.array(reference_video_timestamps).copy()
-    data_timestamps             = data_timestamps.copy()
-    t_start, t_end = data_timestamps.min(), data_timestamps.max()
+    data_timestamps             = np.array(data_timestamps).copy()
+    t_start, t_end              = data_timestamps.min(), data_timestamps.max()
+    num_reference_episodes      = sync.loc[rec].shape[0]
     if do_time_stretch:
         for ival in range(num_reference_episodes-1):
             # set up the problem - piecewise linear scale
