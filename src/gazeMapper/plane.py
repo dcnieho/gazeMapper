@@ -78,19 +78,7 @@ class Definition:
         return dfntn
 
     def _to_dict(self):
-        return {
-            'type': self.type,
-            'use_default': self.use_default,
-            'marker_file': self.marker_file,
-            'marker_size': self.marker_size,
-            'plane_size': self.plane_size,
-            'marker_border_bits': self.marker_border_bits,
-            'min_num_markers': self.min_num_markers,
-            'origin': self.origin,
-            'unit': self.unit,
-            'aruco_dict': self.aruco_dict,
-            'ref_image_width': self.ref_image_size
-        }
+        return {k:getattr(self,k) for k in vars(self) if not k.startswith('_') and k not in ['name']}    # name will be populated from the provided path
 utils.register_type(utils.CustomTypeEntry(Definition,'__plane.Definition',lambda x: x._to_dict(), lambda x: Definition(**x)))
 
 
