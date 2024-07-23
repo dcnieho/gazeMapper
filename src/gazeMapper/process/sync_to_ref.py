@@ -54,18 +54,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):
 
     # prep for sync info
     recs = [r for r in session_info.recordings if r!=study_config.sync_ref_recording]
-    sync = synchronization.get_sync_for_recs(working_dir, study_config.sync_ref_recording, recs, study_config.do_time_stretch)
-
-    if study_config.do_time_stretch:
-        # get stretch factor for each interval between two sync points
-        if study_config.sync_average_recordings:
-            recs_gr = [r for r in recs if r not in study_config.sync_average_recordings]
-            recs_gr.append(study_config.sync_average_recordings)
-        for r in recs_gr:
-            for ival in range(len(ref_episodes)-1):
-                sync.loc[(r,ival),'t_ref_elapsed'] = sync.loc[(r,ival+1),'t_ref' ].droplevel('interval')-sync.loc[(r,ival),'t_ref' ]
-                sync.loc[(r,ival),'diff_offset']   = sync.loc[(r,ival+1),'offset'].droplevel('interval')-sync.loc[(r,ival),'offset']
-                sync.loc[(r,ival),'stretch_fac']   = sync.loc[(r,ival),'diff_offset'].mean()/sync.loc[(r,ival),'t_ref_elapsed'].mean()
+    sync = synchronization.get_sync_for_recs(working_dir, study_config.sync_ref_recording, recs, study_config.do_time_stretch, study_config.sync_average_recordings)
 
     # store sync info
     sync.to_csv(working_dir / 'ref_sync.tsv', sep='\t', na_rep='nan', float_format="%.16f")

@@ -12,7 +12,7 @@ def get_cols(do_time_stretch: bool):
     else:
         cols += ['mean_off']
 
-def get_sync_for_recs(working_dir: str|pathlib.Path, ref_rec: str, recs: str|list[str], do_time_stretch=False):
+def get_sync_for_recs(working_dir: str|pathlib.Path, ref_rec: str, recs: str|list[str], do_time_stretch=False, sync_average_recordings: list[str]=None):
     working_dir  = pathlib.Path(working_dir)
     if isinstance(recs,str):
         recs = [recs]
@@ -42,6 +42,23 @@ def get_sync_for_recs(working_dir: str|pathlib.Path, ref_rec: str, recs: str|lis
             # no time stretching, get average offset. Applies to whole file, store only for first interval
             sync.loc[(r,0),'mean_off'] = sync.loc[(r,slice(None)),'offset'].mean()
 
+    if do_time_stretch:
+        # get stretch factor for each interval between two sync points
+        if sync_average_recordings:
+            recs_gr = [r for r in recs if r not in sync_average_recordings]
+            recs_gr.append(sync_average_recordings)
+        else:
+            recs_gr = recs
+        for r in recs_gr:
+            for ival in range(len(ref_episodes)-1):
+                t_ref = sync.loc[(r,ival+1),'t_ref' ]
+                offset= sync.loc[(r,ival+1),'offset']
+                if not isinstance(t_ref,float) and 'interval' in t_ref.index.names:
+                    t_ref = t_ref .droplevel('interval')
+                    offset= offset.droplevel('interval')
+                sync.loc[(r,ival),'t_ref_elapsed'] = t_ref-sync.loc[(r,ival),'t_ref' ]
+                sync.loc[(r,ival),'diff_offset']   = offset-sync.loc[(r,ival),'offset']
+                sync.loc[(r,ival),'stretch_fac']   = sync.loc[(r,ival),'diff_offset'].mean()/sync.loc[(r,ival),'t_ref_elapsed'].mean()
     return sync
 
 def get_coding_file(working_dir: str|pathlib.Path):
