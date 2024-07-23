@@ -31,8 +31,6 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
         # We run processing in a separate thread (GUI needs to be on the main thread for OSX, see https://github.com/pthom/hello_imgui/issues/33)
         gui = GUI(use_thread = False)
         main_win_id = gui.add_window(working_dir.name)
-        gui.set_show_controls(True)
-        gui.set_show_play_percentage(True)
 
         proc_thread = threading.Thread(target=do_the_work, args=(working_dir, config_dir, gui, main_win_id, show_rejected_markers))
         proc_thread.start()
@@ -171,6 +169,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                     gui_window_ids[v] = gui.add_window(f'{working_dir.name}: {v}')
                 gui.set_show_timeline(True, videos_ts[lead_vid], episodes[v], gui_window_ids[v])
                 gui.set_frame_size(vid_info[v], gui_window_ids[v])
+                gui.set_show_controls(True, gui_window_ids[v])
+                gui.set_show_play_percentage(True, gui_window_ids[v])
 
         # open output video files
         for v in all_vids:
