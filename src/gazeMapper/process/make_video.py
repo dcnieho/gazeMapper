@@ -70,7 +70,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
         episodes[rec] = episode.list_to_marker_dict(episode.read_list_from_file(rec_working_dir / naming.coding_file), study_config.episodes_to_code)
 
         # get other setup
-        sync_target_function    = _get_sync_function(study_config, rec_def, episodes)
+        sync_target_function    = _get_sync_function(study_config, rec_def, None if annotation.Event.Sync_ET_Data not in episodes[rec] else episodes[rec][annotation.Event.Sync_ET_Data])
         planes_setup, _         = _get_plane_setup(study_config, config_dir)
 
         # Read gaze data

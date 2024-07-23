@@ -52,7 +52,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, s
         assert annotation.Event.Trial not in episodes or not episodes[annotation.Event.Trial], f'Trial episodes are gotten from the reference recording ({study_config.sync_ref_recording}) and should not be coded for this recording ({rec_def.name})'
         episodes[annotation.Event.Trial] = synchronization.get_episode_frame_indices_from_ref(working_dir, annotation.Event.Trial, rec_def.name, study_config.sync_ref_recording, study_config.do_time_stretch, study_config.sync_average_recordings, study_config.stretch_which)
 
-    sync_target_function         = _get_sync_function(study_config, rec_def, episodes)
+    sync_target_function         = _get_sync_function(study_config, rec_def, episodes[annotation.Event.Sync_ET_Data])
     planes_setup, analyze_frames = _get_plane_setup(study_config, config_dir, episodes)
 
     # set up pose estimator and run it
@@ -78,7 +78,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, s
 
 def _get_sync_function(study_config: config.Study,
                        rec_def: session.RecordingDefinition,
-                       episodes: dict[annotation.Event,list[list[int]]]) -> None | list[Callable[[np.ndarray,Any], tuple[float,float]], list[list[int]], dict[str]]:
+                       episodes: list[list[int]]) -> None | list[Callable[[np.ndarray,Any], tuple[float,float]], list[list[int]], dict[str]]:
     sync_target_function: list[Callable[[np.ndarray,Any], tuple[float,float]], list[int]|list[list[int]], dict[str]] = None
     if rec_def.type==session.RecordingType.Camera:
         # no annotation.Event.Sync_ET_Data for camera recordings, remove
@@ -104,7 +104,7 @@ def _get_sync_function(study_config: config.Study,
                 else:
                     module = importlib.import_module(study_config.get_cam_movement_for_et_sync_function['module_or_file'])
                 func = getattr(module,study_config.get_cam_movement_for_et_sync_function['function'])
-                sync_target_function = [func, episodes[annotation.Event.Sync_ET_Data], study_config.get_cam_movement_for_et_sync_function['parameters']]
+                sync_target_function = [func, episodes, study_config.get_cam_movement_for_et_sync_function['parameters']]
             case _:
                 raise ValueError(f'study config get_cam_movement_for_et_sync_method={study_config.get_cam_movement_for_et_sync_method} not understood')
 
