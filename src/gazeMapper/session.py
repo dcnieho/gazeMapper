@@ -31,11 +31,15 @@ utils.register_type(utils.CustomTypeEntry(Recording,'__session.Recording__',lamb
 def read_recording_info(working_dir: pathlib.Path, rec_type: RecordingType) -> tuple[EyeTrackerRecording|camera_recording.Recording, pathlib.Path]:
     if rec_type==RecordingType.Camera:
         rec_info = camera_recording.Recording.load_from_json(working_dir)
-        in_video = rec_info.get_video_path()
     elif rec_type==RecordingType.EyeTracker:
         rec_info = EyeTrackerRecording.load_from_json(working_dir)
-        in_video = rec_info.get_scene_video_path()
-    return rec_info, in_video
+    return rec_info, get_video_path(rec_info)
+
+def get_video_path(rec_info: EyeTrackerRecording|camera_recording.Recording) -> pathlib.Path:
+    if isinstance(rec_info, camera_recording.Recording):
+        return rec_info.get_video_path()
+    elif isinstance(rec_info, EyeTrackerRecording):
+        return rec_info.get_scene_video_path()
 
 class SessionDefinition:
     def __init__(self, recordings: list[RecordingDefinition]=None):
