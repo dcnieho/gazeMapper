@@ -1,7 +1,7 @@
 import shutil
 import os
 import pathlib
-
+import math
 import cv2
 import numpy as np
 import threading
@@ -100,6 +100,11 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
             pose_estimators[rec].set_visualize_on_frame(True, sub_pixel_fac, show_rejected_markers)
             # get video file info
             vid_info[rec] = pose_estimators[rec].get_video_info()
+            # override fps with frame timestamp info
+            if videos_ts[rec].has_stretched:
+                vid_info[rec] = (*vid_info[rec][:2], 1000/videos_ts[rec].get_IFI(timestamps.Type.Stretched))
+            else:
+                vid_info[rec] = (*vid_info[rec][:2], 1000/videos_ts[rec].get_IFI(timestamps.Type.Normal))
 
     # get frame sync info, and recording's episodes expressed in the reference video's frame indices
     if study_config.sync_ref_recording:
@@ -196,12 +201,20 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
             vid_writer[v] = MediaWriter(str(working_dir / v / naming.process_video), [out_opts], overwrite=True)
 
         # now make the video
+        def n_digit(value):
+            return int(math.log10(value))+1
+        def n_digit_timestamp(value_ms: float):
+            return n_digit(value_ms/1000)+4    # ms->s, add decimal point and three decimals
+        timestamp_width = {lead_vid: n_digit_timestamp(videos_ts[lead_vid].get_last()[1])}
+        timestamp_width |= {v: n_digit_timestamp(videos_ts[v].get_timestamp(max(ref_frame_idxs[v]))) for v in other_vids}
+        frame_idx_width = {lead_vid: n_digit(videos_ts[lead_vid].get_last()[0])}
+        frame_idx_width |= {v: n_digit(max(ref_frame_idxs[v])) for v in other_vids}
         while True:
             status, pose[lead_vid], _, sync_target_signal[lead_vid], (frame[lead_vid], frame_idx[lead_vid], frame_ts[lead_vid]) = \
                 pose_estimators[lead_vid].process_one_frame()
             # TODO: if there is a discontinuity, fill in the missing frames so audio stays in sync
             # check if we're done
-            if status==aruco.Status.Finished or frame_idx[lead_vid]>2000:
+            if status==aruco.Status.Finished or frame_idx[lead_vid]>1400:
                 break
             # NB: no need to handle aruco.Status.Skip, since we didn't provide the pose estimator with any analysis intervals (we want to process the whole video)
 
@@ -224,13 +237,18 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
             # print info on frame
             for v in all_vids:
                 # timecode and frame number
-                texts = [f'{frame_ts[lead_vid]/1000.:8.3f} [{frame_idx[lead_vid]:6d}]']
+                if v==lead_vid and videos_ts[lead_vid].has_stretched:
+                    # for reference video, if we have stretched timestamps, print those too
+                    texts = [f'{frame_ts[lead_vid]/1000.:{timestamp_width[lead_vid]}.3f} ({videos_ts[lead_vid].get_timestamp(frame_idx[lead_vid], timestamps.Type.Stretched)/1000.:{timestamp_width[lead_vid]}.3f})']
+                else:
+                    texts = [f'{frame_ts[lead_vid]/1000.:{timestamp_width[lead_vid]}.3f}']
+                texts[0] += f' [{frame_idx[lead_vid]:{frame_idx_width[lead_vid]}d}]'
                 frame_colors = [(0,0,0)]
                 if v in other_vids:
                     if frame_ts[v] is None:
                         texts.append('no frame')
                     else:
-                        texts.append(f'{frame_ts[v]/1000.:8.3f} [{frame_idx[v]:6d}]')
+                        texts.append(f'{frame_ts[v]/1000.:{timestamp_width[v]}.3f} [{frame_idx[v]:{frame_idx_width[v]}d}]')
                     frame_colors.append((128,128,128))
                 # events, if any
                 event, ivals = intervals.which_interval(frame_idx[lead_vid], episodes[v])
