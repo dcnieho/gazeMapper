@@ -212,8 +212,14 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
             # print info on frame
             for v in all_vids:
                 # timecode and frame number
-                texts = ['%8.3f [%6d]' % (frame_ts[lead_vid]/1000.,frame_idx[lead_vid])]
+                texts = [f'{frame_ts[lead_vid]/1000.:8.3f} [{frame_idx[lead_vid]:6d}]']
                 frame_colors = [(0,0,0)]
+                if v in other_vids:
+                    if frame_ts[v] is None:
+                        texts.append('no frame')
+                    else:
+                        texts.append(f'{frame_ts[v]/1000.:8.3f} [{frame_idx[v]:6d}]')
+                    frame_colors.append((128,128,128))
                 # events, if any
                 event, _ = intervals.which_interval(frame_idx[lead_vid], episodes[v])
                 for e in event:
