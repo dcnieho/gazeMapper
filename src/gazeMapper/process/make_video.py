@@ -133,6 +133,12 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
     # flatten the episodes for each recording, that's what the GUI and movie annotator want
     episodes_flat = {r:{e:[i for iv in episodes[r][e] for i in iv] for e in episodes[r]} for r in episodes}
 
+    if study_config.sync_ref_recording:
+        # check that all camera sync point frames of a recording are in the reference recordings sync frames (a recording may miss some, but the ones it has must be equal)
+        for r in sync.index.get_level_values('recording').unique():
+            assert all([i in episodes_flat[study_config.sync_ref_recording][annotation.Event.Sync_Camera] for i in episodes_flat[r][annotation.Event.Sync_Camera]]), \
+                f'Camera sync points found for recording {r} ({episodes_flat[r][annotation.Event.Sync_Camera]}) that do not occur among the reference recordings sync points ({study_config.sync_ref_recording}, {episodes_flat[study_config.sync_ref_recording][annotation.Event.Sync_Camera]}). That means the sync logic must have failed'
+
     video_sets: list[tuple[str, list[str]]] = []
     if study_config.sync_ref_recording:
         video_sets.append((study_config.sync_ref_recording,[r for r in study_config.make_video_which if r!=study_config.sync_ref_recording]))
