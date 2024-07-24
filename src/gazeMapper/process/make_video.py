@@ -19,7 +19,7 @@ import ffpyplayer.tools
 from fractions import Fraction
 
 
-def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show_rejected_markers=False, show_visualization=True):
+def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show_rejected_markers=False, show_visualization=False):
     # if show_visualization, the generated video is shown as it is created in a viewer
     working_dir  = pathlib.Path(working_dir) # working directory of a session, not of a recording
     if config_dir is None:

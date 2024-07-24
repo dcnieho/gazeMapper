@@ -132,4 +132,4 @@ study_config = config.Study.load_from_json(config.guess_config_dir(proj))
 #         auto_code_sync_and_trials(s.recordings[r].info.working_directory)
 
 for s in sessions:
-    make_video(s.working_directory)
+    make_video(s.working_directory, show_visualization=True)
