@@ -133,7 +133,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                     if len(iv)>1 and iv[1]==-1:
                         iv[1] = videos_ts[study_config.sync_ref_recording].indices[-1]
                     new_iv.append(iv)
-                episodes[rec][e] = new_iv[::-1]
+                episodes[r][e] = new_iv[::-1]
 
     # flatten the episodes for each recording, that's what the GUI and movie annotator want
     episodes_flat = {r:{e:[i for iv in episodes[r][e] for i in iv] for e in episodes[r]} for r in episodes}
