@@ -11,9 +11,10 @@ from src.gazeMapper.process.gaze_to_plane import process as gaze_to_plane
 from src.gazeMapper.process.export_trials import process as export_trials
 from src.gazeMapper.process.run_validation import process as run_validation
 from src.gazeMapper.process.auto_code_sync_and_trials import process as auto_code_sync_and_trials
+from src.gazeMapper.process.make_video import process as make_video
 
 
-which = 2
+which = 3
 match which:
     case 1:
         base1 = pathlib.Path(r'C:\dat\projects\Roy Japanese Lego\pilot 3\data\J13')
@@ -31,7 +32,7 @@ match which:
     case 3:
         base = pathlib.Path(r'C:\dat\projects\Margot gazeMapper\pilot 4\data')
         proj = pathlib.Path(r'C:\dat\projects\gazeMapper\projs\margot_2_et')
-        et_recs = ['et_teacher','et_student']
+        et_recs = ['et_student','et_teacher']
         cam_recs= []
 
 
@@ -95,6 +96,7 @@ match which:
 
 
 sessions = session.get_sessions_from_directory(proj)
+sessions = [sessions[0]]
 study_config = config.Study.load_from_json(config.guess_config_dir(proj))
 
 # for s in sessions:
@@ -121,10 +123,13 @@ study_config = config.Study.load_from_json(config.guess_config_dir(proj))
 #     for r in et_recs:
 #         run_validation(s.recordings[r].info.working_directory)
 
+# for s in sessions:
+#     if study_config.sync_ref_recording and not study_config.auto_code_sync_points:
+#         recs = [study_config.sync_ref_recording]
+#     else:
+#         recs = et_recs+cam_recs
+#     for r in recs:
+#         auto_code_sync_and_trials(s.recordings[r].info.working_directory)
+
 for s in sessions:
-    if study_config.sync_ref_recording and not study_config.auto_code_sync_points:
-        recs = [study_config.sync_ref_recording]
-    else:
-        recs = et_recs+cam_recs
-    for r in recs:
-        auto_code_sync_and_trials(s.recordings[r].info.working_directory)
+    make_video(s.working_directory)
