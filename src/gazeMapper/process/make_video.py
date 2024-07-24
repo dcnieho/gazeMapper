@@ -202,7 +202,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                 else:
                     # read it
                     _, pose[v], _, sync_target_signal[v], (frame[v], frame_idx[v], frame_ts[v]) = \
-                        pose_estimators[v].process_one_frame()
+                        pose_estimators[v].process_one_frame(fr_idx_this)
 
             for v in all_vids:
                 if frame[v] is None:
