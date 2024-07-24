@@ -52,6 +52,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
 
     # load info for all recordings in the recording session and setup wanted output videos
     episodes        : dict[str, dict[annotation.Event, list[list[int]]]]            = {}
+    episodes_seq_nrs: dict[str, dict[annotation.Event, list[int]]]                  = {}
     episode_colors  : dict[str, dict[annotation.Event, tuple[float, float, float]]] = {}
     gazes_head      : dict[str, dict[int, list[gaze_headref.Gaze]]]                 = {}
     in_videos       : dict[str, pathlib.Path]                                       = {}
@@ -68,6 +69,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
         episodes[rec] = episode.list_to_marker_dict(episode.read_list_from_file(rec_working_dir / naming.coding_file), study_config.episodes_to_code)
         colors = [tuple(round(cc*255) for cc in c) for c in utils.get_colors(len(episodes[rec]), 0.45, 0.65)]
         episode_colors[rec] = {k:c for k,c in zip(episodes[rec], colors)}
+        episodes_seq_nrs[rec] = {e: list(range(1,len(episodes[rec][e])+1)) for e in episodes[rec]}
 
         # get other setup
         sync_target_function    = _get_sync_function(study_config, rec_def, None if annotation.Event.Sync_ET_Data not in episodes[rec] else episodes[rec][annotation.Event.Sync_ET_Data])
@@ -112,6 +114,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
             episodes[r][annotation.Event.Trial] = synchronization.reference_frames_to_video(r, sync, episodes[study_config.sync_ref_recording][annotation.Event.Trial],
                                                                                             videos_ts[r].timestamps, videos_ts[study_config.sync_ref_recording].timestamps,
                                                                                             study_config.do_time_stretch, study_config.stretch_which)
+            episodes_seq_nrs[r][annotation.Event.Trial] = episodes_seq_nrs[study_config.sync_ref_recording][annotation.Event.Trial]
             # also get this recording's coded events in the reference's frames idxs
             episodes[r] = {e: synchronization.video_frames_to_reference(r, sync, episodes[r][e],
                                                                         videos_ts[r].timestamps, videos_ts[study_config.sync_ref_recording].timestamps,
@@ -120,15 +123,16 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
             # fix episodes with start or end points outside the reference video
             for e in episodes[r]:
                 new_iv = []
-                for iv in episodes[r][e]:
+                for i,iv in reversed(list(enumerate(episodes[r][e]))):
                     if iv[0]==-1 and (len(iv)==1 or iv[1]==-1):
+                        del episodes_seq_nrs[r][e][i]
                         continue
                     if iv[0]==-1:
                         iv[0] = 0
                     if len(iv)>1 and iv[1]==-1:
                         iv[1] = videos_ts[study_config.sync_ref_recording].indices[-1]
                     new_iv.append(iv)
-                episodes[rec][e] = new_iv
+                episodes[rec][e] = new_iv[::-1]
 
     # flatten the episodes for each recording, that's what the GUI and movie annotator want
     episodes_flat = {r:{e:[i for iv in episodes[r][e] for i in iv] for e in episodes[r]} for r in episodes}
@@ -227,9 +231,10 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                         texts.append(f'{frame_ts[v]/1000.:8.3f} [{frame_idx[v]:6d}]')
                     frame_colors.append((128,128,128))
                 # events, if any
-                event, _ = intervals.which_interval(frame_idx[lead_vid], episodes[v])
-                for e in event:
-                    texts.append(e.value)
+                event, ivals = intervals.which_interval(frame_idx[lead_vid], episodes[v])
+                for e,iv in zip(event,ivals):
+                    idx = episodes[v][e].index(iv)
+                    texts.append(f'{e.value} {episodes_seq_nrs[v][e][idx]}')
                     frame_colors.append(episode_colors[v][e][::-1])
                 # now print them all
                 text_sizes: list[tuple[int,int]]= []
