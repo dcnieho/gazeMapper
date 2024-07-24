@@ -110,6 +110,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
             ref_frame_idxs[r] = synchronization.reference_frames_to_video(r, sync, videos_ts[study_config.sync_ref_recording].indices,
                                                                               videos_ts[r].timestamps, videos_ts[study_config.sync_ref_recording].timestamps,
                                                                               study_config.do_time_stretch, study_config.stretch_which)
+            ref_frame_idxs[r] = synchronization.smooth_video_frames_indices(ref_frame_idxs[r])
             # make sure episodes has a trial annotation, which comes from the reference recording
             episodes[r][annotation.Event.Trial] = synchronization.reference_frames_to_video(r, sync, episodes[study_config.sync_ref_recording][annotation.Event.Trial],
                                                                                             videos_ts[r].timestamps, videos_ts[study_config.sync_ref_recording].timestamps,

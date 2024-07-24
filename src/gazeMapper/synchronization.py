@@ -162,3 +162,39 @@ def video_frames_to_reference(rec: str, sync: pd.DataFrame, fr_idxs: list[int]|l
     fr_idx[this_video_ts_ref<video_ts_ref[0]] = -1
 
     return fr_idx[fr_idxs].tolist()
+
+def smooth_video_frames_indices(fr_idxs: list[int]):
+    # detect plateaus of N samples followed by a step of N samples
+    # that may occur if sampling rates of two videos are unmatched when syncing them.
+    # while the plateaus are correct for "nearest" frame logic, for display purposes
+    # a smoothed version of the higher framerate video may be wanted
+    fr_idxs = np.array(fr_idxs)
+
+    # get steps in frame_signal
+    d       = np.diff(fr_idxs)
+    if np.any(d<0):
+        # below logic assumes a increasing frame index array
+        return fr_idxs.tolist()
+
+    # find where the plateaus are (consecutive steps of 0)
+    vals    = np.pad((d==0).astype(int), (1, 1), 'constant', constant_values=(0, 0))
+    d2      = np.diff(vals)
+    starts  = np.nonzero(d2 == 1)[0]
+    ends    = np.nonzero(d2 == -1)[0]
+
+    # for each plateau, see how long it is, and what the step to the next value after it is
+    plateau_len = ends-starts+1
+    step_at_end = d[ends]
+
+    # select those plateaus whose step after is the same size as the plateau length (e.g. frame indices [235 236 236 238], a plateau of length 2, and a step of two frames thereafter)
+    # those we can fix up
+    to_fix = np.nonzero(np.logical_and(plateau_len==step_at_end, starts!=-1))[0]
+
+    # fix em
+    for i in to_fix:
+        fr_start = fr_idxs[starts[i]]
+        fr_end   = fr_idxs[ends[i]+1]
+        new_vals = list(range(fr_start,fr_end))
+        fr_idxs[starts[i]:ends[i]+1] = new_vals
+
+    return fr_idxs.tolist()
