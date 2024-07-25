@@ -73,7 +73,6 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, f
 
     # get camera calibration info
     camera_params = ocv.CameraParams.read_from_file(working_dir / "calibration.xml")
-    camera_params.has_intrinsics()
 
     # transform gaze to plane(s)
     plane_gazes: dict[str, dict[int,list[gaze_worldref.Gaze]]] = {}
