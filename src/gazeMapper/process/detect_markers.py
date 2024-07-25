@@ -64,7 +64,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, s
         estimator.add_individual_marker(i, markers[i])
     if sync_target_function is not None:
         estimator.register_extra_processing_fun('sync', *sync_target_function)
-    estimator.attach_gui(gui, 8, show_rejected_markers)
+    estimator.attach_gui(gui)
+    estimator.show_rejected_markers = show_rejected_markers
 
     poses, individual_markers, sync_target_signal = estimator.process_video()
 

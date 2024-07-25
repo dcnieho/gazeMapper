@@ -19,7 +19,7 @@ import ffpyplayer.tools
 from fractions import Fraction
 
 
-def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show_rejected_markers=False, show_visualization=False):
+def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show_visualization=False):
     # if show_visualization, the generated video is shown as it is created in a viewer
     working_dir  = pathlib.Path(working_dir) # working directory of a session, not of a recording
     if config_dir is None:
@@ -32,14 +32,14 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
         gui = GUI(use_thread = False)
         main_win_id = gui.add_window(working_dir.name)
 
-        proc_thread = threading.Thread(target=do_the_work, args=(working_dir, config_dir, gui, main_win_id, show_rejected_markers))
+        proc_thread = threading.Thread(target=do_the_work, args=(working_dir, config_dir, gui, main_win_id))
         proc_thread.start()
         gui.start()
         proc_thread.join()
     else:
-        do_the_work(working_dir, config_dir, None, None, show_rejected_markers)
+        do_the_work(working_dir, config_dir, None, None)
 
-def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, main_win_id: int, show_rejected_markers: bool):
+def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, main_win_id: int):
     has_gui = gui is not None
     sub_pixel_fac = 8   # for anti-aliased drawing
 
@@ -148,8 +148,13 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
             pose_estimators[rec].set_do_report_frames(False)
 
         if rec in study_config.make_video_which:
-            pose_estimators[rec].set_visualize_on_frame(True, sub_pixel_fac, show_rejected_markers)
+            pose_estimators[rec].set_visualize_on_frame(True)
+            pose_estimators[rec].sub_pixel_fac                      = sub_pixel_fac
+            pose_estimators[rec].show_detected_markers              = study_config.video_show_detected_markers
+            pose_estimators[rec].show_board_axes                    = study_config.video_show_board_axes
             pose_estimators[rec].proc_individial_markers_all_frames = study_config.video_process_individual_marker_for_all_frames
+            pose_estimators[rec].show_individual_marker_axes        = study_config.video_show_individual_marker_axes
+            pose_estimators[rec].show_rejected_markers              = study_config.video_show_rejected_markers
             # get video file info
             vid_info[rec] = pose_estimators[rec].get_video_info()
             # override fps with frame timestamp info

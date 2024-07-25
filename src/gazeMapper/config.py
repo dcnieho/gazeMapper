@@ -42,7 +42,11 @@ class Study:
 
                  make_video_which: list[str]=None,
                  video_process_planes_for_all_frames=False,
-                 video_process_individual_marker_for_all_frames=True):
+                 video_show_detected_markers=True,
+                 video_show_board_axes=True,
+                 video_process_individual_marker_for_all_frames=True,
+                 video_show_individual_marker_axes=True,
+                 video_show_rejected_markers=False):
         self.session_def            = session_def
         self.planes                 = planes
         self.planes_per_episode     = planes_per_episode
@@ -61,9 +65,13 @@ class Study:
         self.auto_code_sync_points      = auto_code_sync_points
         self.auto_code_trials_episodes  = auto_code_trials_episodes
 
-        self.make_video_which                   = make_video_which
-        self.video_process_planes_for_all_frames= video_process_planes_for_all_frames   # if True, all planes are processed for all frames, if False, only according to the planes_per_episode setup and the coding
+        self.make_video_which                               = make_video_which
+        self.video_process_planes_for_all_frames            = video_process_planes_for_all_frames   # if True, all planes are processed for all frames, if False, only according to the planes_per_episode setup and the coding
+        self.video_show_detected_markers                    = video_show_detected_markers
+        self.video_show_board_axes                          = video_show_board_axes
         self.video_process_individual_marker_for_all_frames = video_process_individual_marker_for_all_frames   # if True, all frames are processed in search of individual markers, if False, individual markers are only searched for when in a coded episode of any of the planes specified in planes_per_episode setup
+        self.video_show_individual_marker_axes              = video_show_individual_marker_axes
+        self.video_show_rejected_markers                    = video_show_rejected_markers
 
         self._check_planes_per_episode()
         self._check_auto_markers()
