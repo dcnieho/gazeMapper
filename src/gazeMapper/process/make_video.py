@@ -181,7 +181,6 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
         frame_idx           : dict[str, int]                        = {}
         frame_ts            : dict[str, float]                      = {}
         pose                : dict[str, dict[str, plane.Pose]]      = {}
-        sync_target_signal  : dict[str, dict[str, list[int, Any]]]  = {}
         gui_window_ids      : dict[str, int]                        = {}
 
         all_vids = [lead_vid] + other_vids
@@ -225,7 +224,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
         frame_idx_width = {lead_vid: n_digit(videos_ts[lead_vid].get_last()[0])}
         frame_idx_width |= {v: n_digit(max(ref_frame_idxs[v])) for v in other_vids}
         while True:
-            status, pose[lead_vid], _, sync_target_signal[lead_vid], (frame[lead_vid], frame_idx[lead_vid], frame_ts[lead_vid]) = \
+            status, pose[lead_vid], _, _, (frame[lead_vid], frame_idx[lead_vid], frame_ts[lead_vid]) = \
                 pose_estimators[lead_vid].process_one_frame()
             # TODO: if there is a discontinuity, fill in the missing frames so audio stays in sync
             # check if we're done
@@ -237,11 +236,11 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                 # find corresponding frame
                 fr_idx_this = ref_frame_idxs[v][frame_idx[lead_vid]]
                 if fr_idx_this==-1:
-                    _, pose[v], _, sync_target_signal[v], (frame[v], frame_idx[v], frame_ts[v]) = \
+                    _, pose[v], _, _, (frame[v], frame_idx[v], frame_ts[v]) = \
                         None, None, None, None, (None, None, None)
                 else:
                     # read it
-                    _, pose[v], _, sync_target_signal[v], (frame[v], frame_idx[v], frame_ts[v]) = \
+                    _, pose[v], _, _, (frame[v], frame_idx[v], frame_ts[v]) = \
                         pose_estimators[v].process_one_frame(fr_idx_this)
 
             for v in all_vids:
