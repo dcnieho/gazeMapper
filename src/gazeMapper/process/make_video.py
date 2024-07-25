@@ -61,6 +61,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
     videos_ts       : dict[str, timestamps.VideoTimestamps]                         = {}
     pose_estimators : dict[str, aruco.PoseEstimator]                                = {}
     vid_info        : dict[str, tuple[int, int, float]]                             = {}
+    planes          : dict[str, plane.Plane]                                        = {}
     recs = [r for r in session_info.recordings]
     for rec in recs:
         rec_def = session_info.recordings[rec].defition
@@ -138,6 +139,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
         pose_estimators[rec].set_allow_early_exit(False)    # make sure we run through the whole video
         planes_setup, analyze_frames = _get_plane_setup(study_config, config_dir, episodes[rec], want_analyze_frames=True)
         for p in planes_setup:
+            planes[p] = planes_setup[p]['plane']
             pose_estimators[rec].add_plane(p, planes_setup[p], None if study_config.video_process_planes_for_all_frames else analyze_frames[p])
         for i in (markers:=marker.get_marker_dict_from_list(study_config.individual_markers)):
             pose_estimators[rec].add_individual_marker(i, markers[i])
