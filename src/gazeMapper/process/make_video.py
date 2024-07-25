@@ -154,6 +154,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
             pose_estimators[rec].show_board_axes                    = study_config.video_show_board_axes
             pose_estimators[rec].proc_individial_markers_all_frames = study_config.video_process_individual_marker_for_all_frames
             pose_estimators[rec].show_individual_marker_axes        = study_config.video_show_individual_marker_axes
+            pose_estimators[rec].show_sync_func_output              = study_config.video_show_sync_func_output
             pose_estimators[rec].show_rejected_markers              = study_config.video_show_rejected_markers
             # get video file info
             vid_info[rec] = pose_estimators[rec].get_video_info()

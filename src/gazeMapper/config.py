@@ -46,6 +46,7 @@ class Study:
                  video_show_board_axes=True,
                  video_process_individual_marker_for_all_frames=True,
                  video_show_individual_marker_axes=True,
+                 video_show_sync_func_output=True,
                  video_show_rejected_markers=False):
         self.session_def            = session_def
         self.planes                 = planes
@@ -71,6 +72,7 @@ class Study:
         self.video_show_board_axes                          = video_show_board_axes
         self.video_process_individual_marker_for_all_frames = video_process_individual_marker_for_all_frames   # if True, all frames are processed in search of individual markers, if False, individual markers are only searched for when in a coded episode of any of the planes specified in planes_per_episode setup
         self.video_show_individual_marker_axes              = video_show_individual_marker_axes
+        self.video_show_sync_func_output                    = video_show_sync_func_output
         self.video_show_rejected_markers                    = video_show_rejected_markers
 
         self._check_planes_per_episode()
