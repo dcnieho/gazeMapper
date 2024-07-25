@@ -40,7 +40,8 @@ class Study:
                  auto_code_sync_points: dict[str]=None,
                  auto_code_trials_episodes: dict[str]=None
 
-                 make_video_which: list[str]=None):
+                 make_video_which: list[str]=None
+                 video_process_planes_for_all_frames=False,):
         self.session_def            = session_def
         self.planes                 = planes
         self.planes_per_episode     = planes_per_episode
@@ -60,6 +61,7 @@ class Study:
         self.auto_code_trials_episodes  = auto_code_trials_episodes
 
         self.make_video_which                   = make_video_which
+        self.video_process_planes_for_all_frames= video_process_planes_for_all_frames   # if True, all planes are processed for all frames, if False, only according to the planes_per_episode setup and the coding
 
         self._check_planes_per_episode()
         self._check_auto_markers()

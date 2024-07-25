@@ -113,7 +113,8 @@ def _get_sync_function(study_config: config.Study,
 
 def _get_plane_setup(study_config: config.Study,
                      config_dir: pathlib.Path,
-                     episodes: dict[annotation.Event,list[list[int]]] = None) -> tuple[dict[str, dict[str,Any]], dict[str, list[list[int]]]]:
+                     episodes: dict[annotation.Event,list[list[int]]] = None,
+                     want_analyze_frames = False) -> tuple[dict[str, dict[str,Any]], dict[str, list[list[int]]]]:
     # process the above into a dict of plane definitions and a dict with frame number intervals for which to use each
     planes = {v for k in study_config.planes_per_episode for v in study_config.planes_per_episode[k]}
     planes_setup: dict[str, dict[str]] = {}
@@ -129,7 +130,7 @@ def _get_plane_setup(study_config: config.Study,
             analyze_frames[p] = sorted(all_episodes, key = lambda x: x[1])
 
     # if there is some form of automatic coding configured, then we'll need to process the whole video for each recording in a session
-    if episodes and (study_config.auto_code_sync_points or study_config.auto_code_trials_episodes):
+    if not want_analyze_frames and episodes and (study_config.auto_code_sync_points or study_config.auto_code_trials_episodes):
         analyze_frames = {p:None for p in analyze_frames}
 
     return planes_setup, analyze_frames

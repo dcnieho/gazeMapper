@@ -52,6 +52,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
 
     # load info for all recordings in the recording session and setup wanted output videos
     episodes        : dict[str, dict[annotation.Event, list[list[int]]]]            = {}
+    episodes_as_ref : dict[str, dict[annotation.Event, list[list[int]]]]            = {}
     episodes_seq_nrs: dict[str, dict[annotation.Event, list[int]]]                  = {}
     episode_colors  : dict[str, dict[annotation.Event, tuple[float, float, float]]] = {}
     gazes_head      : dict[str, dict[int, list[gaze_headref.Gaze]]]                 = {}
@@ -71,10 +72,6 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
         episode_colors[rec] = {k:c for k,c in zip(episodes[rec], colors)}
         episodes_seq_nrs[rec] = {e: list(range(1,len(episodes[rec][e])+1)) for e in episodes[rec]}
 
-        # get other setup
-        sync_target_function    = _get_sync_function(study_config, rec_def, None if annotation.Event.Sync_ET_Data not in episodes[rec] else episodes[rec][annotation.Event.Sync_ET_Data])
-        planes_setup, _         = _get_plane_setup(study_config, config_dir)
-
         # Read gaze data
         if rec_def.type==session.RecordingType.EyeTracker:
             # NB: we want to use synced gaze data for these videos, if available
@@ -83,14 +80,67 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
         # get camera calibration info
         camera_params[rec]      = ocv.CameraParams.read_from_file(rec_working_dir / "calibration.xml")
 
-        # build pose estimator
-        in_videos[rec] = session.get_video_path(session_info.recordings[rec].info)     # get video file to process
+        # get frame timestamps
         videos_ts[rec] = timestamps.VideoTimestamps(rec_working_dir / "frameTimestamps.tsv")
+
+    # get frame sync info, and recording's episodes expressed in the reference video's frame indices
+    if study_config.sync_ref_recording:
+        sync = synchronization.get_sync_for_recs(working_dir, recs, study_config.sync_ref_recording, study_config.do_time_stretch, study_config.sync_average_recordings)
+        ref_frame_idxs: dict[str, list[int]] = {}
+        episodes_as_ref[study_config.sync_ref_recording] = episodes[study_config.sync_ref_recording]
+        for r in sync.index.get_level_values('recording').unique():
+            # for each frame in the reference video, get the corresponding frame in this recording
+            ref_frame_idxs[r] = synchronization.reference_frames_to_video(r, sync, videos_ts[study_config.sync_ref_recording].indices,
+                                                                              videos_ts[r].timestamps, videos_ts[study_config.sync_ref_recording].timestamps,
+                                                                              study_config.do_time_stretch, study_config.stretch_which)
+            ref_frame_idxs[r] = synchronization.smooth_video_frames_indices(ref_frame_idxs[r])
+            # make sure episodes has a trial annotation, which comes from the reference recording
+            episodes[r][annotation.Event.Trial] = synchronization.reference_frames_to_video(r, sync, episodes[study_config.sync_ref_recording][annotation.Event.Trial],
+                                                                                            videos_ts[r].timestamps, videos_ts[study_config.sync_ref_recording].timestamps,
+                                                                                            study_config.do_time_stretch, study_config.stretch_which)
+            episodes_seq_nrs[r][annotation.Event.Trial] = episodes_seq_nrs[study_config.sync_ref_recording][annotation.Event.Trial]
+            episode_colors[r] = {k:c for k,c in zip(episodes[r], colors)}
+            # also get this recording's coded events in the reference's frames idxs
+            episodes_as_ref[r] = {e: synchronization.video_frames_to_reference(r, sync, episodes[r][e],
+                                                                        videos_ts[r].timestamps, videos_ts[study_config.sync_ref_recording].timestamps,
+                                                                        study_config.do_time_stretch, study_config.stretch_which)
+                           for e in episodes[r]}
+            # fix episodes with start or end points outside the reference video
+            for e in episodes_as_ref[r]:
+                new_iv = []
+                for i,iv in reversed(list(enumerate(episodes_as_ref[r][e]))):
+                    if iv[0]==-1 and (len(iv)==1 or iv[1]==-1):
+                        del episodes_seq_nrs[r][e][i]
+                        continue
+                    if iv[0]==-1:
+                        iv[0] = 0
+                    if len(iv)>1 and iv[1]==-1:
+                        iv[1] = videos_ts[study_config.sync_ref_recording].indices[-1]
+                    new_iv.append(iv)
+                episodes_as_ref[r][e] = new_iv[::-1]
+    else:
+        # just an alias
+        episodes_as_ref = episodes
+
+    # flatten the episodes for each recording, that's what the GUI and movie annotator want
+    episodes_as_ref_flat = {r:{e:[i for iv in episodes_as_ref[r][e] for i in iv] for e in episodes_as_ref[r]} for r in episodes_as_ref}
+
+    if study_config.sync_ref_recording:
+        # check that all camera sync point frames of a recording are in the reference recordings sync frames (a recording may miss some, but the ones it has must be equal)
+        for r in sync.index.get_level_values('recording').unique():
+            assert all([i in episodes_as_ref_flat[study_config.sync_ref_recording][annotation.Event.Sync_Camera] for i in episodes_as_ref_flat[r][annotation.Event.Sync_Camera]]), \
+                f'Camera sync points found for recording {r} ({episodes_as_ref_flat[r][annotation.Event.Sync_Camera]}) that do not occur among the reference recordings sync points ({study_config.sync_ref_recording}, {episodes_as_ref_flat[study_config.sync_ref_recording][annotation.Event.Sync_Camera]}). That means the sync logic must have failed'
+
+    # build pose estimator
+    for rec in recs:
+        in_videos[rec] = session.get_video_path(session_info.recordings[rec].info)     # get video file to process
         pose_estimators[rec] = aruco.PoseEstimator(in_videos[rec], videos_ts[rec], camera_params[rec])
+        planes_setup, analyze_frames = _get_plane_setup(study_config, config_dir, episodes[rec], want_analyze_frames=True)
         for p in planes_setup:
-            pose_estimators[rec].add_plane(p, planes_setup[p])
+            pose_estimators[rec].add_plane(p, planes_setup[p], None if study_config.video_process_planes_for_all_frames else analyze_frames[p])
         for i in (markers:=marker.get_marker_dict_from_list(study_config.individual_markers)):
             pose_estimators[rec].add_individual_marker(i, markers[i])
+        sync_target_function = _get_sync_function(study_config, rec_def, None if annotation.Event.Sync_ET_Data not in episodes[rec] else episodes[rec][annotation.Event.Sync_ET_Data])
         if sync_target_function is not None:
             pose_estimators[rec].register_extra_processing_fun('sync', *sync_target_function)
         if study_config.sync_ref_recording and rec!=study_config.sync_ref_recording:
@@ -105,49 +155,6 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                 vid_info[rec] = (*vid_info[rec][:2], 1000/videos_ts[rec].get_IFI(timestamps.Type.Stretched))
             else:
                 vid_info[rec] = (*vid_info[rec][:2], 1000/videos_ts[rec].get_IFI(timestamps.Type.Normal))
-
-    # get frame sync info, and recording's episodes expressed in the reference video's frame indices
-    if study_config.sync_ref_recording:
-        sync = synchronization.get_sync_for_recs(working_dir, recs, study_config.sync_ref_recording, study_config.do_time_stretch, study_config.sync_average_recordings)
-        ref_frame_idxs: dict[str, list[int]] = {}
-        for r in sync.index.get_level_values('recording').unique():
-            # for each frame in the reference video, get the corresponding frame in this recording
-            ref_frame_idxs[r] = synchronization.reference_frames_to_video(r, sync, videos_ts[study_config.sync_ref_recording].indices,
-                                                                              videos_ts[r].timestamps, videos_ts[study_config.sync_ref_recording].timestamps,
-                                                                              study_config.do_time_stretch, study_config.stretch_which)
-            ref_frame_idxs[r] = synchronization.smooth_video_frames_indices(ref_frame_idxs[r])
-            # make sure episodes has a trial annotation, which comes from the reference recording
-            episodes[r][annotation.Event.Trial] = synchronization.reference_frames_to_video(r, sync, episodes[study_config.sync_ref_recording][annotation.Event.Trial],
-                                                                                            videos_ts[r].timestamps, videos_ts[study_config.sync_ref_recording].timestamps,
-                                                                                            study_config.do_time_stretch, study_config.stretch_which)
-            episodes_seq_nrs[r][annotation.Event.Trial] = episodes_seq_nrs[study_config.sync_ref_recording][annotation.Event.Trial]
-            # also get this recording's coded events in the reference's frames idxs
-            episodes[r] = {e: synchronization.video_frames_to_reference(r, sync, episodes[r][e],
-                                                                        videos_ts[r].timestamps, videos_ts[study_config.sync_ref_recording].timestamps,
-                                                                        study_config.do_time_stretch, study_config.stretch_which)
-                           for e in episodes[r]}
-            # fix episodes with start or end points outside the reference video
-            for e in episodes[r]:
-                new_iv = []
-                for i,iv in reversed(list(enumerate(episodes[r][e]))):
-                    if iv[0]==-1 and (len(iv)==1 or iv[1]==-1):
-                        del episodes_seq_nrs[r][e][i]
-                        continue
-                    if iv[0]==-1:
-                        iv[0] = 0
-                    if len(iv)>1 and iv[1]==-1:
-                        iv[1] = videos_ts[study_config.sync_ref_recording].indices[-1]
-                    new_iv.append(iv)
-                episodes[r][e] = new_iv[::-1]
-
-    # flatten the episodes for each recording, that's what the GUI and movie annotator want
-    episodes_flat = {r:{e:[i for iv in episodes[r][e] for i in iv] for e in episodes[r]} for r in episodes}
-
-    if study_config.sync_ref_recording:
-        # check that all camera sync point frames of a recording are in the reference recordings sync frames (a recording may miss some, but the ones it has must be equal)
-        for r in sync.index.get_level_values('recording').unique():
-            assert all([i in episodes_flat[study_config.sync_ref_recording][annotation.Event.Sync_Camera] for i in episodes_flat[r][annotation.Event.Sync_Camera]]), \
-                f'Camera sync points found for recording {r} ({episodes_flat[r][annotation.Event.Sync_Camera]}) that do not occur among the reference recordings sync points ({study_config.sync_ref_recording}, {episodes_flat[study_config.sync_ref_recording][annotation.Event.Sync_Camera]}). That means the sync logic must have failed'
 
     video_sets: list[tuple[str, list[str]]] = []
     if study_config.sync_ref_recording:
@@ -184,7 +191,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                     gui.set_window_title(f'{working_dir.name}: {v}', main_win_id)
                 else:
                     gui_window_ids[v] = gui.add_window(f'{working_dir.name}: {v}')
-                gui.set_show_timeline(True, videos_ts[lead_vid], episodes_flat[v], gui_window_ids[v])
+                gui.set_show_timeline(True, videos_ts[lead_vid], episodes_as_ref_flat[v], gui_window_ids[v])
                 gui.set_frame_size(vid_info[v], gui_window_ids[v])
                 gui.set_show_controls(True, gui_window_ids[v])
                 gui.set_timecode_position('r', gui_window_ids[v])
@@ -214,7 +221,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                 pose_estimators[lead_vid].process_one_frame()
             # TODO: if there is a discontinuity, fill in the missing frames so audio stays in sync
             # check if we're done
-            if status==aruco.Status.Finished or frame_idx[lead_vid]>1400:
+            if status==aruco.Status.Finished or frame_idx[lead_vid]>1500:
                 break
             # NB: no need to handle aruco.Status.Skip, since we didn't provide the pose estimator with any analysis intervals (we want to process the whole video)
 
@@ -251,9 +258,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                         texts.append(f'{frame_ts[v]/1000.:{timestamp_width[v]}.3f} [{frame_idx[v]:{frame_idx_width[v]}d}]')
                     frame_colors.append((128,128,128))
                 # events, if any
-                event, ivals = intervals.which_interval(frame_idx[lead_vid], episodes[v])
+                event, ivals = intervals.which_interval(frame_idx[lead_vid], episodes_as_ref[v])
                 for e,iv in zip(event,ivals):
-                    idx = episodes[v][e].index(iv)
+                    idx = episodes_as_ref[v][e].index(iv)
                     texts.append(f'{e.value} {episodes_seq_nrs[v][e][idx]}')
                     frame_colors.append(episode_colors[v][e][::-1])
                 # now print them all
