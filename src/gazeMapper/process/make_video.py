@@ -135,6 +135,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
     for rec in recs:
         in_videos[rec] = session.get_video_path(session_info.recordings[rec].info)     # get video file to process
         pose_estimators[rec] = aruco.PoseEstimator(in_videos[rec], videos_ts[rec], camera_params[rec])
+        pose_estimators[rec].set_allow_early_exit(False)    # make sure we run through the whole video
         planes_setup, analyze_frames = _get_plane_setup(study_config, config_dir, episodes[rec], want_analyze_frames=True)
         for p in planes_setup:
             pose_estimators[rec].add_plane(p, planes_setup[p], None if study_config.video_process_planes_for_all_frames else analyze_frames[p])
@@ -148,6 +149,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
 
         if rec in study_config.make_video_which:
             pose_estimators[rec].set_visualize_on_frame(True, sub_pixel_fac, show_rejected_markers)
+            pose_estimators[rec].proc_individial_markers_all_frames = study_config.video_process_individual_marker_for_all_frames
             # get video file info
             vid_info[rec] = pose_estimators[rec].get_video_info()
             # override fps with frame timestamp info

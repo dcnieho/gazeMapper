@@ -38,10 +38,11 @@ class Study:
                  get_cam_movement_for_et_sync_function: dict[str,str|dict[str]]=None,
 
                  auto_code_sync_points: dict[str]=None,
-                 auto_code_trials_episodes: dict[str]=None
+                 auto_code_trials_episodes: dict[str]=None,
 
-                 make_video_which: list[str]=None
-                 video_process_planes_for_all_frames=False,):
+                 make_video_which: list[str]=None,
+                 video_process_planes_for_all_frames=False,
+                 video_process_individual_marker_for_all_frames=True):
         self.session_def            = session_def
         self.planes                 = planes
         self.planes_per_episode     = planes_per_episode
@@ -62,6 +63,7 @@ class Study:
 
         self.make_video_which                   = make_video_which
         self.video_process_planes_for_all_frames= video_process_planes_for_all_frames   # if True, all planes are processed for all frames, if False, only according to the planes_per_episode setup and the coding
+        self.video_process_individual_marker_for_all_frames = video_process_individual_marker_for_all_frames   # if True, all frames are processed in search of individual markers, if False, individual markers are only searched for when in a coded episode of any of the planes specified in planes_per_episode setup
 
         self._check_planes_per_episode()
         self._check_auto_markers()
