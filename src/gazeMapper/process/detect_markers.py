@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from typing import Any, Callable
 
-from glassesTools import annotation, aruco, marker as gt_marker, plane as gt_plane
+from glassesTools import annotation, aruco, drawing, marker as gt_marker, plane as gt_plane
 from glassesTools.video_gui import GUI
 
 
@@ -80,8 +80,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, s
 
 def _get_sync_function(study_config: config.Study,
                        rec_def: session.RecordingDefinition,
-                       episodes: list[list[int]]) -> None | list[Callable[[np.ndarray,Any], tuple[float,float]], list[list[int]], dict[str]]:
-    sync_target_function: list[Callable[[np.ndarray,Any], tuple[float,float]], list[int]|list[list[int]], dict[str]] = None
+                       episodes: list[list[int]]) -> None | list[Callable[[np.ndarray,Any], tuple[float,float]], list[list[int]], dict[str], Callable[[np.ndarray,int,float,float], None]]:
+    sync_target_function: list[Callable[[np.ndarray,Any], tuple[float,float]], list[int]|list[list[int]], dict[str], Callable[[np.ndarray,int,float,float], None]] = None
     if rec_def.type==session.RecordingType.Camera:
         # no annotation.Event.Sync_ET_Data for camera recordings, remove
         if annotation.Event.Sync_ET_Data in study_config.planes_per_episode:
@@ -106,11 +106,18 @@ def _get_sync_function(study_config: config.Study,
                 else:
                     module = importlib.import_module(study_config.get_cam_movement_for_et_sync_function['module_or_file'])
                 func = getattr(module,study_config.get_cam_movement_for_et_sync_function['function'])
-                sync_target_function = [func, episodes, study_config.get_cam_movement_for_et_sync_function['parameters']]
+                sync_target_function = [func, episodes, study_config.get_cam_movement_for_et_sync_function['parameters'], _sync_function_output_drawer]
             case _:
                 raise ValueError(f'study config get_cam_movement_for_et_sync_method={study_config.get_cam_movement_for_et_sync_method} not understood')
 
     return sync_target_function
+
+def _sync_function_output_drawer(frame: np.ndarray, frame_idx: int, tx: float, ty: float, sub_pixel_fac=8):
+    # input is tx, ty pixel positions on the camera image
+    ll = 20
+    drawing.openCVLine(frame, (tx,ty-ll), (tx,ty+ll), (0,255,0), 1, sub_pixel_fac)
+    drawing.openCVLine(frame, (tx-ll,ty), (tx+ll,ty), (0,255,0), 1, sub_pixel_fac)
+    drawing.openCVCircle(frame, (tx,ty), 3, (0,0,255), -1, sub_pixel_fac)
 
 def _get_plane_setup(study_config: config.Study,
                      config_dir: pathlib.Path,
