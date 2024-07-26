@@ -61,7 +61,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
     videos_ts       : dict[str, timestamps.VideoTimestamps]                         = {}
     pose_estimators : dict[str, aruco.PoseEstimator]                                = {}
     vid_info        : dict[str, tuple[int, int, float]]                             = {}
+    plane_names     = {p for k in study_config.planes_per_episode for p in study_config.planes_per_episode[k]}
     planes          : dict[str, plane.Plane]                                        = {}
+    all_poses       : dict[str, dict[str, dict[int, plane.Pose]]]                   = {}
     recs = [r for r in session_info.recordings]
     for rec in recs:
         rec_def = session_info.recordings[rec].defition
@@ -134,9 +136,18 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
         for r in sync.index.get_level_values('recording').unique():
             assert all([i in episodes_as_ref_flat[study_config.sync_ref_recording][annotation.Event.Sync_Camera] for i in episodes_as_ref_flat[r][annotation.Event.Sync_Camera]]), \
                 f'Camera sync points found for recording {r} ({episodes_as_ref_flat[r][annotation.Event.Sync_Camera]}) that do not occur among the reference recordings sync points ({study_config.sync_ref_recording}, {episodes_as_ref_flat[study_config.sync_ref_recording][annotation.Event.Sync_Camera]}). That means the sync logic must have failed'
+        # load plane gazes
+        if not (study_config.video_process_planes_for_all_frames or study_config.video_process_individual_markers_for_all_frames):
+            to_load = [r for r in recs if r not in study_config.make_video_which]
+            for r in to_load:
+                all_poses[r] = {}
+                for p in plane_names:
+                    all_poses[r][p] = plane.read_dict_from_file(working_dir/r/f'{naming.plane_pose_prefix}{p}.tsv')
 
     # build pose estimator
     for rec in recs:
+        if rec not in study_config.make_video_which and not (study_config.video_process_planes_for_all_frames or study_config.video_process_individual_markers_for_all_frames):
+            continue
         in_videos[rec] = session.get_video_path(session_info.recordings[rec].info)     # get video file to process
         pose_estimators[rec] = aruco.PoseEstimator(in_videos[rec], videos_ts[rec], camera_params[rec])
         pose_estimators[rec].set_allow_early_exit(False)    # make sure we run through the whole video
@@ -161,6 +172,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
             pose_estimators[rec].show_individual_marker_axes        = study_config.video_show_individual_marker_axes
             pose_estimators[rec].show_sync_func_output              = study_config.video_show_sync_func_output
             pose_estimators[rec].show_rejected_markers              = study_config.video_show_rejected_markers
+
+        if rec in study_config.make_video_which or rec==study_config.sync_ref_recording:
             # get video file info
             vid_info[rec] = pose_estimators[rec].get_video_info()
             # override fps with frame timestamp info
@@ -169,15 +182,15 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
             else:
                 vid_info[rec] = (*vid_info[rec][:2], 1000/videos_ts[rec].get_IFI(timestamps.Type.Normal))
 
-    video_sets: list[tuple[str, list[str]]] = []
+    video_sets: list[tuple[str, list[str], list[str]]] = []
     if study_config.sync_ref_recording:
-        video_sets.append((study_config.sync_ref_recording,[r for r in study_config.make_video_which if r!=study_config.sync_ref_recording]))
+        video_sets.append((study_config.sync_ref_recording,[r for r in study_config.make_video_which if r!=study_config.sync_ref_recording], recs))
     else:
-        video_sets.extend([(r,[]) for r in study_config.make_video_which])
+        video_sets.extend([(r,[],[]) for r in study_config.make_video_which])
 
     # per set of videos
     should_exit = False
-    for lead_vid, other_vids in video_sets:
+    for lead_vid, other_vids, proc_vids in video_sets:
         if should_exit:
             break
 
@@ -188,7 +201,10 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
         pose                : dict[str, dict[str, plane.Pose]]      = {}
         gui_window_ids      : dict[str, int]                        = {}
 
-        all_vids = [lead_vid] + other_vids
+        all_vids    = [lead_vid] + other_vids
+        # videos to be written out may not be equal to all_vids. This can occur if we
+        # have a study_config.sync_ref_recording, but config is not to make a video for it
+        write_vids  = [v for v in all_vids if v in study_config.make_video_which]
 
         if has_gui:
             # clean up any previous windows (except main window, this will have to be renamed only)
@@ -210,7 +226,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                 gui.set_show_play_percentage(True, gui_window_ids[v])
 
         # open output video files
-        for v in all_vids:
+        for v in write_vids:
             # get which pixel format
             codec    = ffpyplayer.tools.get_format_codec(fmt=pathlib.Path(naming.process_video).suffix[1:])
             pix_fmt  = ffpyplayer.tools.get_best_pix_fmt('bgr24',ffpyplayer.tools.get_supported_pixfmts(codec))
@@ -237,9 +253,15 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                 break
             # NB: no need to handle aruco.Status.Skip, since we didn't provide the pose estimator with any analysis intervals (we want to process the whole video)
 
-            for v in other_vids:
+            for v in proc_vids:
+                if v==lead_vid:
+                    continue
                 # find corresponding frame
                 fr_idx_this = ref_frame_idxs[v][frame_idx[lead_vid]]
+
+                if v in all_poses:
+                    pose[v] = {p: ps for p in plane_names if (ps:=all_poses[v][p].get(fr_idx_this, None)) is not None}
+                    continue
                 if fr_idx_this==-1:
                     _, pose[v], _, _, (frame[v], frame_idx[v], frame_ts[v]) = \
                         None, None, None, None, (None, None, None)
@@ -248,19 +270,20 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                     _, pose[v], _, _, (frame[v], frame_idx[v], frame_ts[v]) = \
                         pose_estimators[v].process_one_frame(fr_idx_this)
 
-            for v in all_vids:
+            for v in write_vids:
                 if frame[v] is None:
                     # we don't have a valid frame, use a fully black frame
                     frame[v] = np.zeros((vid_info[v][1],vid_info[v][0],3), np.uint8)   # black image
 
             # draw gaze on the video
-            for v in all_vids:
+            for v in proc_vids:
                 if v in gazes_head and frame_idx[lead_vid] in gazes_head[v]:
                     clr = study_config.video_recording_colors[v][::-1]  # RGB -> BGR
                     for g in gazes_head[v][frame_idx[lead_vid]]:
-                        g.draw(frame[v], sub_pixel_fac=sub_pixel_fac, clr=clr, draw_3d_gaze_point=False)
+                        if v in all_vids:
+                            g.draw(frame[v], sub_pixel_fac=sub_pixel_fac, clr=clr, draw_3d_gaze_point=False)
 
-                        # if we have a reference recording and camera pose for both, we can also draw the gaze in the reference recording
+                        # if we have a reference recording and camera pose for both, we can also draw the gaze in the reference recording, and possible on other recordings
                         if study_config.sync_ref_recording and pose[lead_vid] is not None:
                             # collect gaze on all planes for which pose is available
                             plane_gazes: dict[str, tuple[float,gaze_worldref.Gaze]] = {}
@@ -279,19 +302,19 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                             else:
                                 continue
                             # draw gaze point, camera and gaze vector between the two on the reference video
-                            if study_config.sync_ref_recording!=v:  # if this is the reference video, its own gaze is already drawn
+                            if study_config.sync_ref_recording!=v and lead_vid in write_vids:  # if this is the reference video, its own gaze is already drawn
                                 draw_gaze_on_other_video(frame[lead_vid], pose[v][pl], pose[lead_vid][pl], plane_gaze, camera_params[lead_vid], clr, True, True, sub_pixel_fac)
 
                             # also draw on other videos
-                            for vo in all_vids:
-                                if vo==v or pose[vo] is None or pl not in pose[vo] or not pose[vo][pl].pose_successful():
+                            for vo in write_vids:
+                                if vo in [v, study_config.sync_ref_recording] or pose[vo] is None or pl not in pose[vo] or not pose[vo][pl].pose_successful():
                                     continue
                                 # draw gaze point and camera on the other video, and possibly gaze vector between them
                                 draw_gaze_on_other_video(frame[vo], pose[v][pl], pose[vo][pl], plane_gaze, camera_params[vo], clr, True, study_config.sync_ref_recording==v, sub_pixel_fac)
 
 
             # print info on frame
-            for v in all_vids:
+            for v in write_vids:
                 # timecode and frame number
                 if v==lead_vid and videos_ts[lead_vid].has_stretched:
                     # for reference video, if we have stretched timestamps, print those too
@@ -329,13 +352,13 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                     x_end += x_advance
 
             # submit frame to be encoded
-            for v in all_vids:
+            for v in write_vids:
                 img = Image(plane_buffers=[frame[v].flatten().tobytes()], pix_fmt='bgr24', size=(frame[v].shape[1], frame[v].shape[0]))
                 vid_writer[v].write_frame(img=img, pts=frame_idx[lead_vid]/vid_info[lead_vid][2])
 
             # update gui, if any
             if has_gui:
-                for v in all_vids:
+                for v in write_vids:
                     gui.update_image(frame[v], frame_ts[lead_vid]/1000., frame_idx[lead_vid], window_id = gui_window_ids[v])
 
                 requests = gui.get_requests()
@@ -345,12 +368,12 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                         break
 
         # done with this set of videos
-        for v in all_vids:
+        for v in write_vids:
             vid_writer[v].close()
 
         # if ffmpeg is on path, add audio to scene and optionally board video
         if shutil.which('ffmpeg') is not None:
-            for v in all_vids:
+            for v in write_vids:
                 rec_working_dir = working_dir / v
 
                 file = rec_working_dir / naming.process_video
@@ -363,7 +386,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                 if v==lead_vid:
                     cmd_str = ' '.join(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-i', f'"{tempName}"', '-i', f'"{in_videos[v]}"', '-vcodec', 'copy', '-acodec', 'copy', '-map', '0:v:0', '-map', '1:a:0?', f'"{file}"'])
                 else:
-                    pass # TODO
+                    continue # TODO
                 os.system(cmd_str)
 
                 # clean up
