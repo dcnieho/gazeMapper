@@ -278,18 +278,15 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                                 plane_gaze = plane_gazes[best][1]
                             else:
                                 continue
-                            # draw on the reference video
-                            gaze_cam_ref = pose[lead_vid][pl].plane_to_cam_pose(np.append(plane_gaze.gazePosPlane2D_vidPos_ray,0.).reshape(1,3), camera_params[lead_vid])
-                            drawing.openCVCircle(frame[lead_vid], gaze_cam_ref, 12, clr, 2, sub_pixel_fac)
+                            # draw gaze point, camera and gaze vector between the two on the reference video
+                            draw_gaze_on_other_video(frame[lead_vid], pose[v][pl], pose[lead_vid][pl], plane_gaze, camera_params[lead_vid], clr, True, True, sub_pixel_fac)
 
-                            # also draw position of this video's camera on the reference video
-                            # take point 0,0,0 in this camera's space (i.e. camera position) and transform to the plane's world space
-                            cam_pos_plane = pose[v][pl].cam_frame_to_world((0.,0.,0.))
-                            # draw on the reference video
-                            cam_pos_ref = pose[lead_vid][pl].plane_to_cam_pose(cam_pos_plane, camera_params[lead_vid])
-                            drawing.openCVCircle(frame[lead_vid], cam_pos_ref, 3, clr, 1, sub_pixel_fac)
-                            # and draw line connecting the camera and the gaze point
-                            drawing.openCVLine(frame[lead_vid], gaze_cam_ref, cam_pos_ref, clr, 8, sub_pixel_fac)
+                            # also draw on other videos
+                            for vo in other_vids:
+                                if vo==v or pose[vo] is None or pl not in pose[vo] or not pose[vo][pl].pose_successful():
+                                    continue
+                                # draw gaze point and camera on the other video
+                                draw_gaze_on_other_video(frame[vo], pose[v][pl], pose[vo][pl], plane_gaze, camera_params[vo], clr, True, False, sub_pixel_fac)
 
 
             # print info on frame
@@ -378,3 +375,18 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
     # done with all videos, clean up
     if has_gui:
         gui.stop()
+
+def draw_gaze_on_other_video(frame_other, pose_this, pose_other, plane_gaze, camera_params_other, clr, do_draw_camera, do_draw_gaze_vec, sub_pixel_fac):
+    gaze_cam_ref = pose_other.plane_to_cam_pose(np.append(plane_gaze.gazePosPlane2D_vidPos_ray,0.).reshape(1,3), camera_params_other)
+    drawing.openCVCircle(frame_other, gaze_cam_ref, 12, clr, 2, sub_pixel_fac)
+
+    # also draw position of this video's camera on the reference video
+    if do_draw_camera:
+        # take point 0,0,0 in this camera's space (i.e. camera position) and transform to the plane's world space
+        cam_pos_plane = pose_this.cam_frame_to_world((0.,0.,0.))
+        # draw on the reference video
+        cam_pos_ref = pose_other.plane_to_cam_pose(cam_pos_plane, camera_params_other)
+        drawing.openCVCircle(frame_other, cam_pos_ref, 3, clr, 1, sub_pixel_fac)
+        # and draw line connecting the camera and the gaze point
+        if do_draw_gaze_vec:
+            drawing.openCVLine(frame_other, gaze_cam_ref, cam_pos_ref, clr, 8, sub_pixel_fac)
