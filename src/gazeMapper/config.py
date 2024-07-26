@@ -49,6 +49,10 @@ class Study:
                  video_show_individual_marker_axes=True,
                  video_show_sync_func_output=True,
                  video_show_rejected_markers=False,
+                 video_show_camera_in_ref=True,
+                 video_show_camera_in_other=True,
+                 video_show_gaze_vec_in_ref=True,
+                 video_show_gaze_vec_in_other=False,
                  video_gaze_to_plane_margin=0.25):
         self.session_def            = session_def
         self.planes                 = planes
@@ -77,6 +81,10 @@ class Study:
         self.video_show_individual_marker_axes              = video_show_individual_marker_axes
         self.video_show_sync_func_output                    = video_show_sync_func_output
         self.video_show_rejected_markers                    = video_show_rejected_markers
+        self.video_show_camera_in_ref                       = video_show_camera_in_ref
+        self.video_show_camera_in_other                     = video_show_camera_in_other
+        self.video_show_gaze_vec_in_ref                     = video_show_gaze_vec_in_ref
+        self.video_show_gaze_vec_in_other                   = video_show_gaze_vec_in_other
         self.video_gaze_to_plane_margin                     = video_gaze_to_plane_margin    # fraction of plane size, added to each side of the plane
 
         self._check_planes_per_episode()

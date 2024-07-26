@@ -303,14 +303,14 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                                 continue
                             # draw gaze point, camera and gaze vector between the two on the reference video
                             if study_config.sync_ref_recording!=v and lead_vid in write_vids:  # if this is the reference video, its own gaze is already drawn
-                                draw_gaze_on_other_video(frame[lead_vid], pose[v][pl], pose[lead_vid][pl], plane_gaze, camera_params[lead_vid], clr, True, True, sub_pixel_fac)
+                                draw_gaze_on_other_video(frame[lead_vid], pose[v][pl], pose[lead_vid][pl], plane_gaze, camera_params[lead_vid], clr, study_config.video_show_camera_in_ref, study_config.video_show_gaze_vec_in_ref, sub_pixel_fac)
 
                             # also draw on other videos
                             for vo in write_vids:
                                 if vo in [v, study_config.sync_ref_recording] or pose[vo] is None or pl not in pose[vo] or not pose[vo][pl].pose_successful():
                                     continue
                                 # draw gaze point and camera on the other video, and possibly gaze vector between them
-                                draw_gaze_on_other_video(frame[vo], pose[v][pl], pose[vo][pl], plane_gaze, camera_params[vo], clr, True, study_config.sync_ref_recording==v, sub_pixel_fac)
+                                draw_gaze_on_other_video(frame[vo], pose[v][pl], pose[vo][pl], plane_gaze, camera_params[vo], clr, study_config.video_show_camera_in_other, study_config.video_show_gaze_vec_in_other or (study_config.video_show_gaze_vec_in_ref and v==study_config.sync_ref_recording), sub_pixel_fac)
 
 
             # print info on frame
