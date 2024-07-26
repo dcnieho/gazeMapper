@@ -41,7 +41,7 @@ class Study:
                  auto_code_trials_episodes: dict[str]=None,
 
                  make_video_which: list[str]=None,
-                 video_recording_colors: dict[str,tuple[int,int,int]]={'et1':(255,127,0), 'et2':(0, 95, 191)},
+                 video_recording_colors: dict[str,tuple[int,int,int]]=None,
                  video_process_planes_for_all_frames=False,
                  video_show_detected_markers=True,
                  video_show_board_axes=True,
