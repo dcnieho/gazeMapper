@@ -386,6 +386,10 @@ def draw_gaze_on_other_video(frame_other, pose_this, pose_other, plane_gaze, cam
     if do_draw_camera:
         # take point 0,0,0 in this camera's space (i.e. camera position) and transform to the plane's world space
         cam_pos_world_this = pose_this.cam_frame_to_world((0.,0.,0.))
+        if pose_other.world_frame_to_cam(cam_pos_world_this)[2]<=0:
+            # other video's camera is behind this camera, won't be visible
+            # and projecting it anyway yields a nonsensical result
+            return
         # draw on the other video
         cam_pos_other = pose_other.plane_to_cam_pose(cam_pos_world_this, camera_params_other)
         drawing.openCVCircle(frame_other, cam_pos_other, 3, clr, 1, sub_pixel_fac)
