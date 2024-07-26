@@ -77,6 +77,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
         if rec_def.type==session.RecordingType.EyeTracker:
             # NB: we want to use synced gaze data for these videos, if available
             gazes_head[rec]     = gaze_headref.read_dict_from_file(rec_working_dir / 'gazeData.tsv', ts_column_suffixes=['ref', 'VOR', ''])[0]
+            # check we have timestamps synced to ref, if relevant
+            if study_config.sync_ref_recording and rec!=study_config.sync_ref_recording:
+                assert gazes_head[rec][next(iter(gazes_head[rec]))][0].timestamp_ref is not None, f'This study has a reference recording ({study_config.sync_ref_recording}) to synchronize the recordings to, but the gaze data for this recording ({rec}) has not been synchronized. Run sync_to_ref before running this.'
 
         # get camera calibration info
         camera_params[rec]      = ocv.CameraParams.read_from_file(rec_working_dir / "calibration.xml")
