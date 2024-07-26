@@ -259,27 +259,34 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
 
                         # if we have a reference recording and camera pose for both, we can also draw the gaze in the reference recording
                         if study_config.sync_ref_recording and study_config.sync_ref_recording!=v and pose[lead_vid] is not None:
-                            drawnCam = {v:False for v in all_vids}
+                            # collect gaze on all planes for which pose is available
+                            plane_gazes: dict[str, tuple[float,gaze_worldref.Gaze]] = {}
                             for pl in pose[lead_vid]:
                                 if pose[lead_vid][pl].pose_successful() and pose[v] is not None and pl in pose[v] and pose[v][pl].pose_successful():
                                     # turn into position on board
-                                    gaze_plane = gaze_worldref.from_head(pose[v][pl], g, camera_params[v])
-                                    # check if gaze is not too far outside board
-                                    if transforms.in_bbox(*gaze_plane.gazePosPlane2D_vidPos_ray, planes[pl].bbox, study_config.video_gaze_to_plane_margin):
-                                        # draw on the reference video
-                                        gaze_cam_ref = pose[lead_vid][pl].plane_to_cam_pose(np.append(gaze_plane.gazePosPlane2D_vidPos_ray,0.).reshape(1,3), camera_params[lead_vid])
-                                        drawing.openCVCircle(frame[lead_vid], gaze_cam_ref, 12, clr, 2, sub_pixel_fac)
+                                    plane_gaze = gaze_worldref.from_head(pose[v][pl], g, camera_params[v])
+                                    plane_gazes[pl] = (transforms.dist_from_bbox(*plane_gaze.gazePosPlane2D_vidPos_ray, planes[pl].bbox), plane_gaze)
 
-                                        # also draw position of this video's camera on the reference video
-                                        if not drawnCam[v]:
-                                            # take point 0,0,0 in this camera's space (i.e. camera position) and transform to the plane's world space
-                                            cam_pos_plane = pose[v][pl].cam_frame_to_world((0.,0.,0.))
-                                            # draw on the reference video
-                                            cam_pos_ref = pose[lead_vid][pl].plane_to_cam_pose(cam_pos_plane, camera_params[lead_vid])
-                                            drawing.openCVCircle(frame[lead_vid], cam_pos_ref, 3, clr, 1, sub_pixel_fac)
-                                            # and draw line connecting the camera and the gaze point
-                                            drawing.openCVLine(frame[lead_vid], gaze_cam_ref, cam_pos_ref, clr, 8, sub_pixel_fac)
-                                            drawnCam[v] = True
+                            # find the plane to which gaze is closest
+                            best = None if not plane_gazes else min(plane_gazes, key=lambda d: plane_gazes[d][0])
+                            # check if gaze is not too far outside that plane
+                            if best is not None and plane_gazes[best][0]<=study_config.video_gaze_to_plane_margin:
+                                pl = best
+                                plane_gaze = plane_gazes[best][1]
+                            else:
+                                continue
+                            # draw on the reference video
+                            gaze_cam_ref = pose[lead_vid][pl].plane_to_cam_pose(np.append(plane_gaze.gazePosPlane2D_vidPos_ray,0.).reshape(1,3), camera_params[lead_vid])
+                            drawing.openCVCircle(frame[lead_vid], gaze_cam_ref, 12, clr, 2, sub_pixel_fac)
+
+                            # also draw position of this video's camera on the reference video
+                            # take point 0,0,0 in this camera's space (i.e. camera position) and transform to the plane's world space
+                            cam_pos_plane = pose[v][pl].cam_frame_to_world((0.,0.,0.))
+                            # draw on the reference video
+                            cam_pos_ref = pose[lead_vid][pl].plane_to_cam_pose(cam_pos_plane, camera_params[lead_vid])
+                            drawing.openCVCircle(frame[lead_vid], cam_pos_ref, 3, clr, 1, sub_pixel_fac)
+                            # and draw line connecting the camera and the gaze point
+                            drawing.openCVLine(frame[lead_vid], gaze_cam_ref, cam_pos_ref, clr, 8, sub_pixel_fac)
 
 
             # print info on frame
