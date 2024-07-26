@@ -377,16 +377,17 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
         gui.stop()
 
 def draw_gaze_on_other_video(frame_other, pose_this, pose_other, plane_gaze, camera_params_other, clr, do_draw_camera, do_draw_gaze_vec, sub_pixel_fac):
-    gaze_cam_ref = pose_other.plane_to_cam_pose(np.append(plane_gaze.gazePosPlane2D_vidPos_ray,0.).reshape(1,3), camera_params_other)
-    drawing.openCVCircle(frame_other, gaze_cam_ref, 12, clr, 2, sub_pixel_fac)
+    # draw on the other video
+    gaze_pos_other = pose_other.plane_to_cam_pose(np.append(plane_gaze.gazePosPlane2D_vidPos_ray,0.).reshape(1,3), camera_params_other)
+    drawing.openCVCircle(frame_other, gaze_pos_other, 12, clr, 2, sub_pixel_fac)
 
-    # also draw position of this video's camera on the reference video
+    # also draw position of this video's camera on the other video
     if do_draw_camera:
         # take point 0,0,0 in this camera's space (i.e. camera position) and transform to the plane's world space
-        cam_pos_plane = pose_this.cam_frame_to_world((0.,0.,0.))
-        # draw on the reference video
-        cam_pos_ref = pose_other.plane_to_cam_pose(cam_pos_plane, camera_params_other)
-        drawing.openCVCircle(frame_other, cam_pos_ref, 3, clr, 1, sub_pixel_fac)
+        cam_pos_world_this = pose_this.cam_frame_to_world((0.,0.,0.))
+        # draw on the other video
+        cam_pos_other = pose_other.plane_to_cam_pose(cam_pos_world_this, camera_params_other)
+        drawing.openCVCircle(frame_other, cam_pos_other, 3, clr, 1, sub_pixel_fac)
         # and draw line connecting the camera and the gaze point
         if do_draw_gaze_vec:
-            drawing.openCVLine(frame_other, gaze_cam_ref, cam_pos_ref, clr, 8, sub_pixel_fac)
+            drawing.openCVLine(frame_other, gaze_pos_other, cam_pos_other, clr, 8, sub_pixel_fac)
