@@ -261,7 +261,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                         g.draw(frame[v], sub_pixel_fac=sub_pixel_fac, clr=clr, draw_3d_gaze_point=False)
 
                         # if we have a reference recording and camera pose for both, we can also draw the gaze in the reference recording
-                        if study_config.sync_ref_recording and study_config.sync_ref_recording!=v and pose[lead_vid] is not None:
+                        if study_config.sync_ref_recording and pose[lead_vid] is not None:
                             # collect gaze on all planes for which pose is available
                             plane_gazes: dict[str, tuple[float,gaze_worldref.Gaze]] = {}
                             for pl in pose[lead_vid]:
@@ -279,14 +279,15 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                             else:
                                 continue
                             # draw gaze point, camera and gaze vector between the two on the reference video
-                            draw_gaze_on_other_video(frame[lead_vid], pose[v][pl], pose[lead_vid][pl], plane_gaze, camera_params[lead_vid], clr, True, True, sub_pixel_fac)
+                            if study_config.sync_ref_recording!=v:  # if this is the reference video, its own gaze is already drawn
+                                draw_gaze_on_other_video(frame[lead_vid], pose[v][pl], pose[lead_vid][pl], plane_gaze, camera_params[lead_vid], clr, True, True, sub_pixel_fac)
 
                             # also draw on other videos
-                            for vo in other_vids:
+                            for vo in all_vids:
                                 if vo==v or pose[vo] is None or pl not in pose[vo] or not pose[vo][pl].pose_successful():
                                     continue
-                                # draw gaze point and camera on the other video
-                                draw_gaze_on_other_video(frame[vo], pose[v][pl], pose[vo][pl], plane_gaze, camera_params[vo], clr, True, False, sub_pixel_fac)
+                                # draw gaze point and camera on the other video, and possibly gaze vector between them
+                                draw_gaze_on_other_video(frame[vo], pose[v][pl], pose[vo][pl], plane_gaze, camera_params[vo], clr, True, study_config.sync_ref_recording==v, sub_pixel_fac)
 
 
             # print info on frame
