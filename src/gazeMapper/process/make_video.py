@@ -5,9 +5,9 @@ import math
 import cv2
 import numpy as np
 import threading
-from typing import Any, Callable
+from typing import Any
 
-from glassesTools import annotation, aruco, intervals, gaze_headref, ocv, plane, timestamps, utils
+from glassesTools import annotation, aruco, drawing, intervals, gaze_headref, gaze_worldref, ocv, plane, timestamps, transforms, utils
 from glassesTools.video_gui import GUI
 
 from .. import config, episode, marker, naming, session, synchronization
@@ -250,6 +250,38 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                     # we don't have a valid frame, use a fully black frame
                     frame[v] = np.zeros((vid_info[v][1],vid_info[v][0],3), np.uint8)   # black image
 
+            # draw gaze on the video
+            for v in all_vids:
+                if v in gazes_head and frame_idx[lead_vid] in gazes_head[v]:
+                    clr = study_config.video_recording_colors[v][::-1]  # RGB -> BGR
+                    for g in gazes_head[v][frame_idx[lead_vid]]:
+                        g.draw(frame[v], sub_pixel_fac=sub_pixel_fac, clr=clr, draw_3d_gaze_point=False)
+
+                        # if we have a reference recording and camera pose for both, we can also draw the gaze in the reference recording
+                        if study_config.sync_ref_recording and study_config.sync_ref_recording!=v and pose[lead_vid] is not None:
+                            drawnCam = {v:False for v in all_vids}
+                            for pl in pose[lead_vid]:
+                                if pose[lead_vid][pl].pose_successful() and pose[v] is not None and pl in pose[v] and pose[v][pl].pose_successful():
+                                    # turn into position on board
+                                    gaze_plane = gaze_worldref.from_head(pose[v][pl], g, camera_params[v])
+                                    # check if gaze is not too far outside board
+                                    if transforms.in_bbox(*gaze_plane.gazePosPlane2D_vidPos_ray, planes[pl].bbox, study_config.video_gaze_to_plane_margin):
+                                        # draw on the reference video
+                                        gaze_cam_ref = pose[lead_vid][pl].plane_to_cam_pose(np.append(gaze_plane.gazePosPlane2D_vidPos_ray,0.).reshape(1,3), camera_params[lead_vid])
+                                        drawing.openCVCircle(frame[lead_vid], gaze_cam_ref, 12, clr, 2, sub_pixel_fac)
+
+                                        # also draw position of this video's camera on the reference video
+                                        if not drawnCam[v]:
+                                            # take point 0,0,0 in this camera's space (i.e. camera position) and transform to the plane's world space
+                                            cam_pos_plane = pose[v][pl].cam_frame_to_world((0.,0.,0.))
+                                            # draw on the reference video
+                                            cam_pos_ref = pose[lead_vid][pl].plane_to_cam_pose(cam_pos_plane, camera_params[lead_vid])
+                                            drawing.openCVCircle(frame[lead_vid], cam_pos_ref, 3, clr, 1, sub_pixel_fac)
+                                            # and draw line connecting the camera and the gaze point
+                                            drawing.openCVLine(frame[lead_vid], gaze_cam_ref, cam_pos_ref, clr, 8, sub_pixel_fac)
+                                            drawnCam[v] = True
+
+
             # print info on frame
             for v in all_vids:
                 # timecode and frame number
@@ -288,12 +320,12 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                     cv2.putText(frame[v], (t), (x_end+margin, frame[v].shape[0]-margin), cv2.FONT_HERSHEY_PLAIN, 2, (0,255,255), 2)
                     x_end += x_advance
 
-
-
+            # submit frame to be encoded
             for v in all_vids:
                 img = Image(plane_buffers=[frame[v].flatten().tobytes()], pix_fmt='bgr24', size=(frame[v].shape[1], frame[v].shape[0]))
                 vid_writer[v].write_frame(img=img, pts=frame_idx[lead_vid]/vid_info[lead_vid][2])
 
+            # update gui, if any
             if has_gui:
                 for v in all_vids:
                     gui.update_image(frame[v], frame_ts[lead_vid]/1000., frame_idx[lead_vid], window_id = gui_window_ids[v])
@@ -304,7 +336,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                         should_exit = True
                         break
 
-        # done
+        # done with this set of videos
         for v in all_vids:
             vid_writer[v].close()
 

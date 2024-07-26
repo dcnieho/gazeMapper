@@ -41,13 +41,15 @@ class Study:
                  auto_code_trials_episodes: dict[str]=None,
 
                  make_video_which: list[str]=None,
+                 video_recording_colors: dict[str,tuple[int,int,int]]={'et1':(255,127,0), 'et2':(0, 95, 191)},
                  video_process_planes_for_all_frames=False,
                  video_show_detected_markers=True,
                  video_show_board_axes=True,
                  video_process_individual_marker_for_all_frames=True,
                  video_show_individual_marker_axes=True,
                  video_show_sync_func_output=True,
-                 video_show_rejected_markers=False):
+                 video_show_rejected_markers=False,
+                 video_gaze_to_plane_margin=0.25):
         self.session_def            = session_def
         self.planes                 = planes
         self.planes_per_episode     = planes_per_episode
@@ -67,6 +69,7 @@ class Study:
         self.auto_code_trials_episodes  = auto_code_trials_episodes
 
         self.make_video_which                               = make_video_which
+        self.video_recording_colors                         = video_recording_colors
         self.video_process_planes_for_all_frames            = video_process_planes_for_all_frames   # if True, all planes are processed for all frames, if False, only according to the planes_per_episode setup and the coding
         self.video_show_detected_markers                    = video_show_detected_markers
         self.video_show_board_axes                          = video_show_board_axes
@@ -74,12 +77,14 @@ class Study:
         self.video_show_individual_marker_axes              = video_show_individual_marker_axes
         self.video_show_sync_func_output                    = video_show_sync_func_output
         self.video_show_rejected_markers                    = video_show_rejected_markers
+        self.video_gaze_to_plane_margin                     = video_gaze_to_plane_margin    # fraction of plane size, added to each side of the plane
 
         self._check_planes_per_episode()
         self._check_auto_markers()
         self._check_recordings([self.sync_ref_recording], 'sync_ref_recording')
         self._check_recordings(self.sync_average_recordings, 'sync_average_recordings')
         self._check_recordings(self.make_video_which, 'make_video_which')
+        self._check_recordings(self.video_recording_colors, 'video_recording_colors')
         assert self.sync_ref_recording not in self.sync_average_recordings, f'Recording {self.sync_ref_recording} is the reference recording for sync, should not be specified in sync_average_recordings'
         assert self.get_cam_movement_for_et_sync_method in ['','plane','function'], 'get_cam_movement_for_et_sync_method parameter should be an empty string, "plane", or "function"'
         if self.get_cam_movement_for_et_sync_method=='function':
