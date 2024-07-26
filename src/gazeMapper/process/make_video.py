@@ -401,8 +401,13 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
         gui.stop()
 
 def draw_gaze_on_other_video(frame_other, pose_this, pose_other, plane_gaze, camera_params_other, clr, do_draw_camera, do_draw_gaze_vec, sub_pixel_fac):
+    gaze_point = np.append(plane_gaze.gazePosPlane2D_vidPos_ray,0.).reshape(1,3)
     # draw on the other video
-    gaze_pos_other = pose_other.plane_to_cam_pose(np.append(plane_gaze.gazePosPlane2D_vidPos_ray,0.).reshape(1,3), camera_params_other)
+    if pose_other.world_frame_to_cam(gaze_point)[2]<=0:
+        # other recording's gaze point is behind this camera, won't be visible
+        # and projecting it anyway yields a nonsensical result
+        return
+    gaze_pos_other = pose_other.plane_to_cam_pose(gaze_point, camera_params_other)
     drawing.openCVCircle(frame_other, gaze_pos_other, 12, clr, 2, sub_pixel_fac)
 
     # also draw position of this video's camera on the other video
