@@ -142,6 +142,12 @@ def reference_frames_to_video(rec: str, sync: pd.DataFrame, fr_idxs: list[int]|l
     # (fr_idx_ref contains the reference frame_idxs corresponding to this video's frames, video_ts)
     fr_idx_ref = video_utils.timestamps_to_frame_number(video_ts_ref, this_video_ts_ref, trim=True)['frame_idx'].to_numpy()
     fr_idx_ref[video_ts_ref<this_video_ts_ref[0]] = -1
+    # in case only the first fr_idx is trimmed, a little bit of leeway is ok
+    if fr_idx_ref.size>=2 and fr_idx_ref[0]==-1 and fr_idx_ref[1]>0:
+        ifi = np.mean(np.diff(video_ts_ref))
+        # that means, do assign a frame to the first frame if its a usual frame (judged by ifi)
+        if video_ts_ref[1]-video_ts_ref[0] < ifi*1.2:
+            fr_idx_ref[0] = fr_idx_ref[1]-1
 
     return fr_idx_ref[fr_idxs].tolist()
 
