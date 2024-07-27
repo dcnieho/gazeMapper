@@ -287,19 +287,19 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                         # if we have a reference recording and camera pose for both, we can also draw the gaze in the reference recording, and possible on other recordings
                         if study_config.sync_ref_recording and pose[lead_vid] is not None:
                             # collect gaze on all planes for which pose is available
-                            plane_gazes: dict[str, tuple[float,gaze_worldref.Gaze]] = {}
+                            plane_gazes: dict[str, tuple[float,float,float,gaze_worldref.Gaze]] = {}
                             for pl in pose[lead_vid]:
                                 if pose[lead_vid][pl].pose_successful() and pose[v] is not None and pl in pose[v] and pose[v][pl].pose_successful():
                                     # turn into position on board
                                     plane_gaze = gaze_worldref.from_head(pose[v][pl], g, camera_params[v])
-                                    plane_gazes[pl] = (transforms.dist_from_bbox(*plane_gaze.gazePosPlane2D_vidPos_ray, planes[pl].bbox), plane_gaze)
+                                    plane_gazes[pl] = (transforms.dist_from_bbox(*plane_gaze.gazePosPlane2D_vidPos_ray, planes[pl].bbox), pose[lead_vid][pl].pose_reprojection_error, pose[v][pl].pose_reprojection_error, plane_gaze)
 
                             # find the plane to which gaze is closest
-                            best = None if not plane_gazes else min(plane_gazes, key=lambda d: plane_gazes[d][0])
+                            best = None if not plane_gazes else min(plane_gazes, key=lambda d: sum(plane_gazes[d][1:3])/2 if plane_gazes[d][0]<=study_config.video_gaze_to_plane_margin else math.inf)
                             # check if gaze is not too far outside that plane
                             if best is not None and plane_gazes[best][0]<=study_config.video_gaze_to_plane_margin:
                                 pl = best
-                                plane_gaze = plane_gazes[best][1]
+                                plane_gaze = plane_gazes[best][3]
                             else:
                                 continue
                             # draw gaze point, camera and gaze vector between the two on the reference video
