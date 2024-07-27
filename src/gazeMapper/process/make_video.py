@@ -53,7 +53,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
     # load info for all recordings in the recording session and setup wanted output videos
     episodes        : dict[str, dict[annotation.Event, list[list[int]]]]            = {}
     episodes_as_ref : dict[str, dict[annotation.Event, list[list[int]]]]            = {}
-    episodes_seq_nrs: dict[str, dict[annotation.Event, list[int]]]                  = {}
+    episodes_seq_nrs: dict[str, dict[annotation.Event, list[str]]]                  = {}
     episode_colors  : dict[str, dict[annotation.Event, tuple[float, float, float]]] = {}
     gazes_head      : dict[str, dict[int, list[gaze_headref.Gaze]]]                 = {}
     in_videos       : dict[str, pathlib.Path]                                       = {}
@@ -73,7 +73,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
         episodes[rec] = episode.list_to_marker_dict(episode.read_list_from_file(rec_working_dir / naming.coding_file), study_config.episodes_to_code)
         colors = [tuple(round(cc*255) for cc in c) for c in utils.get_colors(len(episodes[rec]), 0.45, 0.65)]
         episode_colors[rec] = {k:c for k,c in zip(episodes[rec], colors)}
-        episodes_seq_nrs[rec] = {e: list(range(1,len(episodes[rec][e])+1)) for e in episodes[rec]}
+        episodes_seq_nrs[rec] = {e: [str(x) for x in range(1,len(episodes[rec][e])+1)] for e in episodes[rec]}
 
         # Read gaze data
         if rec_def.type==session.RecordingType.EyeTracker:
@@ -93,7 +93,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
     if study_config.sync_ref_recording:
         sync = synchronization.get_sync_for_recs(working_dir, list(recs), study_config.sync_ref_recording, study_config.do_time_stretch, study_config.sync_average_recordings)
         ref_frame_idxs: dict[str, list[int]] = {}
-        episodes_as_ref[study_config.sync_ref_recording] = episodes[study_config.sync_ref_recording]
+        episodes_as_ref[study_config.sync_ref_recording] = episodes[study_config.sync_ref_recording].copy()
         for r in sync.index.get_level_values('recording').unique():
             # for each frame in the reference video, get the corresponding frame in this recording
             ref_frame_idxs[r] = synchronization.reference_frames_to_video(r, sync, videos_ts[study_config.sync_ref_recording].indices,
@@ -111,7 +111,39 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                                                                         videos_ts[r].timestamps, videos_ts[study_config.sync_ref_recording].timestamps,
                                                                         study_config.do_time_stretch, study_config.stretch_which)
                            for e in episodes[r]}
-            # fix episodes with start or end points outside the reference video
+
+        if study_config.video_process_annotations_for_all_recordings:
+            # go through all planes for all episodes and apply them to all recordings
+            # not annotation.Event.Trial as that already comes from only the reference recording
+            for rec in recs:
+                for e in [annotation.Event.Sync_ET_Data, annotation.Event.Validate]:
+                    if e in episodes[rec]:
+                        for r in recs-set([rec]):
+                            if r==study_config.sync_ref_recording:
+                                eps = episodes_as_ref[rec][e]
+                            else:
+                                eps = synchronization.reference_frames_to_video(r, sync, episodes_as_ref[rec][e],
+                                                                                videos_ts[r].timestamps, videos_ts[study_config.sync_ref_recording].timestamps,
+                                                                                study_config.do_time_stretch, study_config.stretch_which)
+                            # find out where to insert (skip if [-1 -1] or already present)
+                            for i,ep in reversed(list(enumerate(eps))):
+                                if all([x==-1 for x in ep]) or \
+                                   any([all([abs(y-z)<=1 for y,z in zip(x,ep)]) for x in episodes[r][e]]):  # episode already in the set (one frame leeway for round trip errors)
+                                    continue
+                                if ep[0]==-1:
+                                    ep[0] = 0
+                                for j,ep_o in reversed(list(enumerate(episodes[r][e]))):
+                                    if ep_o[0]<ep[0]:
+                                        continue
+                                    # insert here
+                                    episodes[r][e] = episodes[r][e][:j] + [ep] + episodes[r][e][j:]
+                                    episodes_as_ref[r][e] = episodes_as_ref[r][e][:j] + [episodes_as_ref[rec][e][i]] + episodes_as_ref[r][e][j:]
+                                    episodes_seq_nrs[r][e] = episodes_seq_nrs[r][e][:j] + [f'{episodes_seq_nrs[rec][e][i]} ({rec})'] + episodes_seq_nrs[r][e][j:]
+                                    break
+
+
+        # fix episodes with start or end points outside the reference video
+        for r in sync.index.get_level_values('recording').unique():
             for e in episodes_as_ref[r]:
                 new_iv = []
                 for i,iv in reversed(list(enumerate(episodes_as_ref[r][e]))):

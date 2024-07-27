@@ -43,6 +43,7 @@ class Study:
                  make_video_which: list[str]=None,
                  video_recording_colors: dict[str,tuple[int,int,int]]=None,
                  video_process_planes_for_all_frames=False,
+                 video_process_annotations_for_all_recordings=True,
                  video_show_detected_markers=True,
                  video_show_board_axes=True,
                  video_process_individual_markers_for_all_frames=True,
@@ -76,6 +77,7 @@ class Study:
         self.make_video_which                               = make_video_which
         self.video_recording_colors                         = video_recording_colors
         self.video_process_planes_for_all_frames            = video_process_planes_for_all_frames   # if True, all planes are processed for all frames, if False, only according to the planes_per_episode setup and the coding
+        self.video_process_annotations_for_all_recordings   = video_process_annotations_for_all_recordings   # if True, all coded episodes for all planes of all recordings are processed (so e.g. if validation coded for one recording in the session, that plane is processed for all)
         self.video_show_detected_markers                    = video_show_detected_markers
         self.video_show_board_axes                          = video_show_board_axes
         self.video_process_individual_markers_for_all_frames= video_process_individual_markers_for_all_frames   # if True, all frames are processed in search of individual markers, if False, individual markers are only searched for when in a coded episode of any of the planes specified in planes_per_episode setup
