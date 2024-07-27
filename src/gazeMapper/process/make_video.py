@@ -64,7 +64,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
     plane_names     = {p for k in study_config.planes_per_episode for p in study_config.planes_per_episode[k]}
     planes          : dict[str, plane.Plane]                                        = {}
     all_poses       : dict[str, dict[str, dict[int, plane.Pose]]]                   = {}
-    recs = [r for r in session_info.recordings]
+    recs = {r for r in session_info.recordings}
     for rec in recs:
         rec_def = session_info.recordings[rec].defition
         rec_working_dir = working_dir / rec
@@ -91,7 +91,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
 
     # get frame sync info, and recording's episodes expressed in the reference video's frame indices
     if study_config.sync_ref_recording:
-        sync = synchronization.get_sync_for_recs(working_dir, recs, study_config.sync_ref_recording, study_config.do_time_stretch, study_config.sync_average_recordings)
+        sync = synchronization.get_sync_for_recs(working_dir, list(recs), study_config.sync_ref_recording, study_config.do_time_stretch, study_config.sync_average_recordings)
         ref_frame_idxs: dict[str, list[int]] = {}
         episodes_as_ref[study_config.sync_ref_recording] = episodes[study_config.sync_ref_recording]
         for r in sync.index.get_level_values('recording').unique():
@@ -183,11 +183,11 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
             else:
                 vid_info[rec] = (*vid_info[rec][:2], 1000/videos_ts[rec].get_IFI(timestamps.Type.Normal))
 
-    video_sets: list[tuple[str, list[str], list[str]]] = []
+    video_sets: list[tuple[str, set[str], set[str]]] = []
     if study_config.sync_ref_recording:
-        video_sets.append((study_config.sync_ref_recording,[r for r in study_config.make_video_which if r!=study_config.sync_ref_recording], recs))
+        video_sets.append((study_config.sync_ref_recording,{r for r in study_config.make_video_which if r!=study_config.sync_ref_recording}, recs))
     else:
-        video_sets.extend([(r,[],[]) for r in study_config.make_video_which])
+        video_sets.extend([(r,set(),set()) for r in study_config.make_video_which])
 
     # per set of videos
     should_exit = False
@@ -202,10 +202,10 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
         pose                : dict[str, dict[str, plane.Pose]]      = {}
         gui_window_ids      : dict[str, int]                        = {}
 
-        all_vids    = [lead_vid] + other_vids
+        all_vids    = set([lead_vid]) | other_vids
         # videos to be written out may not be equal to all_vids. This can occur if we
         # have a study_config.sync_ref_recording, but config is not to make a video for it
-        write_vids  = [v for v in all_vids if v in study_config.make_video_which]
+        write_vids  = {v for v in all_vids if v in study_config.make_video_which}
 
         if has_gui:
             # clean up any previous windows (except main window, this will have to be renamed only)
@@ -254,9 +254,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                 break
             # NB: no need to handle aruco.Status.Skip, since we didn't provide the pose estimator with any analysis intervals (we want to process the whole video)
 
-            for v in proc_vids:
-                if v==lead_vid:
-                    continue
+            for v in proc_vids-set([lead_vid]):
                 # find corresponding frame
                 fr_idx_this = ref_frame_idxs[v][frame_idx[lead_vid]]
 
@@ -307,8 +305,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                                 draw_gaze_on_other_video(frame[lead_vid], pose[v][pl], pose[lead_vid][pl], plane_gaze, camera_params[lead_vid], clr, study_config.video_show_camera_in_ref, study_config.video_show_gaze_vec_in_ref, sub_pixel_fac)
 
                             # also draw on other videos
-                            for vo in write_vids:
-                                if vo in [v, study_config.sync_ref_recording] or pose[vo] is None or pl not in pose[vo] or not pose[vo][pl].pose_successful():
+                            for vo in write_vids-set([v, study_config.sync_ref_recording]):
+                                if pose[vo] is None or pl not in pose[vo] or not pose[vo][pl].pose_successful():
                                     continue
                                 # draw gaze point and camera on the other video, and possibly gaze vector between them
                                 draw_gaze_on_other_video(frame[vo], pose[v][pl], pose[vo][pl], plane_gaze, camera_params[vo], clr, study_config.video_show_camera_in_other, study_config.video_show_gaze_vec_in_other or (study_config.video_show_gaze_vec_in_ref and v==study_config.sync_ref_recording), sub_pixel_fac)
