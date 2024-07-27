@@ -409,7 +409,7 @@ def draw_gaze_on_other_video(frame_other, pose_this, pose_other, plane_gaze, cam
         # and projecting it anyway yields a nonsensical result
         return
     gaze_pos_other = pose_other.plane_to_cam_pose(gaze_point, camera_params_other)
-    drawing.openCVCircle(frame_other, gaze_pos_other, 12, clr, 2, sub_pixel_fac)
+    drawing.openCVCircle(frame_other, gaze_pos_other, 8, clr, 2, sub_pixel_fac)
 
     # also draw position of this video's camera on the other video, and possibly gaze vector
     if do_draw_camera or do_draw_gaze_vec:
@@ -425,4 +425,4 @@ def draw_gaze_on_other_video(frame_other, pose_this, pose_other, plane_gaze, cam
             drawing.openCVCircle(frame_other, cam_pos_other, 3, clr, 1, sub_pixel_fac)
         # and draw line connecting the camera and the gaze point
         if do_draw_gaze_vec:
-            drawing.openCVLine(frame_other, gaze_pos_other, cam_pos_other, clr, 8, sub_pixel_fac)
+            drawing.openCVLine(frame_other, gaze_pos_other, cam_pos_other, clr, 5, sub_pixel_fac)
