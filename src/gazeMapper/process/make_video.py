@@ -415,9 +415,20 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
 
                 # add audio
                 if v==lead_vid:
-                    cmd_str = ' '.join(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-i', f'"{tempName}"', '-i', f'"{in_videos[v]}"', '-vcodec', 'copy', '-acodec', 'copy', '-map', '0:v:0', '-map', '1:a:0?', f'"{file}"'])
+                    cmd_str = ' '.join(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-i', f'"{tempName}"', '-i', f'"{in_videos[v]}"', '-vcodec', 'copy', '-acodec', 'copy', '-map', '0:v:0', '-map', '1:a:0?', '-shortest', f'"{file}"'])
                 else:
-                    continue # TODO
+                    inputs = ['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-i', f'"{tempName}"', '-i', f'"{in_videos[v]}"']
+
+                    first_frame = ref_frame_idxs[v][0]
+                    if first_frame==-1:
+                        # video starts later, we need to delay audio when copying
+                        frame_off = np.argmax(np.array(ref_frame_idxs[v])>-1)
+                        t_off = videos_ts[lead_vid].get_timestamp(frame_off, timestamps.Type.Stretched if videos_ts[lead_vid].has_stretched else timestamps.Type.Normal)
+                        filt = f'[1:a]adelay=delays={t_off:.9f}:all=1[a];[a]apad[audio];'
+                    else:
+                        t_off = videos_ts[v].get_timestamp(first_frame)
+                        filt = f'[1:a]atrim=start={t_off/1000},asetpts=PTS-STARTPTS[a];[a]apad[audio];'
+                    cmd_str = ' '.join(inputs + ['-filter_complex', f'"{filt}"', '-map', '0:v', '-map', '[audio]', '-c:v', 'copy', '-shortest', f'"{file}"'])
                 os.system(cmd_str)
 
                 # clean up
