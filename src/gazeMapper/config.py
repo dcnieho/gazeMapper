@@ -49,7 +49,7 @@ class Study:
                  video_process_individual_markers_for_all_frames=True,
                  video_show_individual_marker_axes=True,
                  video_show_sync_func_output=True,
-                 video_show_unknown_markers=False,
+                 video_show_unexpected_markers=False,
                  video_show_rejected_markers=False,
                  video_show_camera_in_ref=True,
                  video_show_camera_in_other=True,
@@ -83,7 +83,7 @@ class Study:
         self.video_process_individual_markers_for_all_frames= video_process_individual_markers_for_all_frames   # if True, all frames are processed in search of individual markers, if False, individual markers are only searched for when in a coded episode of any of the planes specified in planes_per_episode setup
         self.video_show_individual_marker_axes              = video_show_individual_marker_axes
         self.video_show_sync_func_output                    = video_show_sync_func_output
-        self.video_show_unknown_markers                     = video_show_unknown_markers
+        self.video_show_unexpected_markers                  = video_show_unexpected_markers
         self.video_show_rejected_markers                    = video_show_rejected_markers
         self.video_show_camera_in_ref                       = video_show_camera_in_ref
         self.video_show_camera_in_other                     = video_show_camera_in_other
