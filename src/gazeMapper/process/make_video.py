@@ -5,6 +5,7 @@ import math
 import cv2
 import numpy as np
 import threading
+import copy
 from typing import Any
 
 from glassesTools import annotation, aruco, drawing, intervals, gaze_headref, gaze_worldref, ocv, plane, timestamps, transforms, utils
@@ -93,7 +94,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
     if study_config.sync_ref_recording:
         sync = synchronization.get_sync_for_recs(working_dir, list(recs), study_config.sync_ref_recording, study_config.do_time_stretch, study_config.sync_average_recordings)
         ref_frame_idxs: dict[str, list[int]] = {}
-        episodes_as_ref[study_config.sync_ref_recording] = episodes[study_config.sync_ref_recording].copy()
+        episodes_as_ref[study_config.sync_ref_recording] = copy.deepcopy(episodes[study_config.sync_ref_recording])
         for r in sync.index.get_level_values('recording').unique():
             # for each frame in the reference video, get the corresponding frame in this recording
             ref_frame_idxs[r] = synchronization.reference_frames_to_video(r, sync, videos_ts[study_config.sync_ref_recording].indices,
@@ -115,31 +116,42 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
         if study_config.video_process_annotations_for_all_recordings:
             # go through all planes for all episodes and apply them to all recordings
             # not annotation.Event.Trial as that already comes from only the reference recording
+            inserted = False
+            evts = [annotation.Event.Sync_ET_Data, annotation.Event.Validate]
             for rec in recs:
-                for e in [annotation.Event.Sync_ET_Data, annotation.Event.Validate]:
+                for e in evts:
                     if e in episodes[rec]:
                         for r in recs-set([rec]):
                             if r==study_config.sync_ref_recording:
-                                eps = episodes_as_ref[rec][e]
+                                inp = episodes_as_ref[rec][e].copy()
+                                eps = inp
                             else:
-                                eps = synchronization.reference_frames_to_video(r, sync, episodes_as_ref[rec][e],
+                                inp = [[max(0,ep[0]), min(ep[1],videos_ts[study_config.sync_ref_recording].indices[-1])] if not all([x==-1 for x in ep]) else ep for ep in episodes_as_ref[rec][e]]
+                                eps = synchronization.reference_frames_to_video(r, sync, inp,
                                                                                 videos_ts[r].timestamps, videos_ts[study_config.sync_ref_recording].timestamps,
                                                                                 study_config.do_time_stretch, study_config.stretch_which)
-                            # find out where to insert (skip if [-1 -1] or already present)
+                            # insert, but skip if:
+                            # 1. ref episode or resulting are equal to [-1 -1]
+                            # 2. episode is already in the set (one frame leeway for round trip errors)
+                            # 3. episode comes from another recording (has lbl with a name in brackets), we don't want those to propagate
                             for i,ep in reversed(list(enumerate(eps))):
-                                if all([x==-1 for x in ep]) or \
-                                   any([all([abs(y-z)<=1 for y,z in zip(x,ep)]) for x in episodes[r][e]]):  # episode already in the set (one frame leeway for round trip errors)
+                                if all([x==-1 for x in inp[i]]) or \
+                                   all([x==-1 for x in ep]) or \
+                                   any([all([abs(y-z)<=1 for y,z in zip(x,ep)]) for x in episodes[r][e]]) or \
+                                   '(' in episodes_seq_nrs[rec][e][i]:
                                     continue
-                                if ep[0]==-1:
-                                    ep[0] = 0
-                                for j,ep_o in reversed(list(enumerate(episodes[r][e]))):
-                                    if ep_o[0]<ep[0]:
-                                        continue
-                                    # insert here
-                                    episodes[r][e] = episodes[r][e][:j] + [ep] + episodes[r][e][j:]
-                                    episodes_as_ref[r][e] = episodes_as_ref[r][e][:j] + [episodes_as_ref[rec][e][i]] + episodes_as_ref[r][e][j:]
-                                    episodes_seq_nrs[r][e] = episodes_seq_nrs[r][e][:j] + [f'{episodes_seq_nrs[rec][e][i]} ({rec})'] + episodes_seq_nrs[r][e][j:]
-                                    break
+                                episodes[r][e].append(ep)
+                                episodes_as_ref[r][e].append(inp[i])
+                                episodes_seq_nrs[r][e].append(f'{episodes_seq_nrs[rec][e][i]} ({rec})')
+                                inserted = True
+            if inserted:
+                # if any new items added, have to resort the list (though actually it turns out all the below logic doesn't require the lists to be sorted, lets do it anyway as thats not a guarantee)
+                for rec in recs:
+                    for e in evts:
+                        if e not in episodes[rec] or not episodes[rec][e]:
+                            continue
+                        episodes[rec][e], episodes_as_ref[rec][e], episodes_seq_nrs[rec][e] = \
+                            [list(ivs) for ivs in zip(*[(x,y,z) for x,y,z in sorted(zip(episodes[rec][e], episodes_as_ref[rec][e], episodes_seq_nrs[rec][e]), key=lambda x: x[0])])]
 
 
         # fix episodes with start or end points outside the reference video
@@ -148,6 +160,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                 new_iv = []
                 for i,iv in reversed(list(enumerate(episodes_as_ref[r][e]))):
                     if iv[0]==-1 and (len(iv)==1 or iv[1]==-1):
+                        # not during reference video, so its irrelevant. Just remove
+                        del episodes[r][e][i]
                         del episodes_seq_nrs[r][e][i]
                         continue
                     if iv[0]==-1:
