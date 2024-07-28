@@ -282,7 +282,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                 pose_estimators[lead_vid].process_one_frame()
             # TODO: if there is a discontinuity, fill in the missing frames so audio stays in sync
             # check if we're done
-            if status==aruco.Status.Finished or frame_idx[lead_vid]>1500:
+            if status==aruco.Status.Finished:
                 break
             # NB: no need to handle aruco.Status.Skip, since we didn't provide the pose estimator with any analysis intervals (we want to process the whole video)
 
