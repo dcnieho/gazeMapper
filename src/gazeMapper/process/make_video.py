@@ -133,7 +133,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                             # insert, but skip if:
                             # 1. ref episode or resulting are equal to [-1 -1]
                             # 2. episode is already in the set (one frame leeway for round trip errors)
-                            # 3. episode comes from another recording (has lbl with a name in brackets), we don't want those to propagate
+                            # 3. episode comes from another recording (has lbl with a name in brackets), we don't want those to propagate (test this with one frame leeway to allow for round trip errors)
                             for i,ep in reversed(list(enumerate(eps))):
                                 if all([x==-1 for x in inp[i]]) or \
                                    all([x==-1 for x in ep]) or \
@@ -180,7 +180,10 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
     if study_config.sync_ref_recording:
         # check that all camera sync point frames of a recording are in the reference recordings sync frames (a recording may miss some, but the ones it has must be equal)
         for r in sync.index.get_level_values('recording').unique():
-            assert all([i in episodes_as_ref_flat[study_config.sync_ref_recording][annotation.Event.Sync_Camera] for i in episodes_as_ref_flat[r][annotation.Event.Sync_Camera]]), \
+            ref_sync_points = episodes_as_ref_flat[study_config.sync_ref_recording][annotation.Event.Sync_Camera]
+            rec_sync_points = episodes_as_ref_flat[r][annotation.Event.Sync_Camera]
+            # NB: allow one frame leeway to allow for small offsets due to conversion, or cameras not running completely in sync
+            assert all([abs(i_ref-i_rec)<=1 for i_ref,i_rec in zip(ref_sync_points,rec_sync_points)]), \
                 f'Camera sync points found for recording {r} ({episodes_as_ref_flat[r][annotation.Event.Sync_Camera]}) that do not occur among the reference recordings sync points ({study_config.sync_ref_recording}, {episodes_as_ref_flat[study_config.sync_ref_recording][annotation.Event.Sync_Camera]}). That means the sync logic must have failed'
         # load plane gazes
         if not (study_config.video_process_planes_for_all_frames or study_config.video_process_individual_markers_for_all_frames):
