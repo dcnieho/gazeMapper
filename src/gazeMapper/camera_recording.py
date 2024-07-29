@@ -3,6 +3,7 @@ import pathlib
 import typing
 import shutil
 import json
+import os
 
 from glassesTools import utils, video_utils
 
@@ -40,12 +41,15 @@ class Recording:
     def get_video_path(self):
         vid = self.working_directory / self.video_file
         if not vid.is_file():
-            vid = self.source_directory / self.video_file
+            if not self.source_directory.is_absolute():
+                vid = (self.working_directory / self.source_directory / self.video_file).resolve()
+            else:
+                vid = self.source_directory / self.video_file
         return vid
 
 
 
-def do_import(rec_info: Recording, cam_cal_file: str|pathlib.Path=None, copy_video=True):
+def do_import(rec_info: Recording, cam_cal_file: str|pathlib.Path=None, copy_video=True, source_dir_as_relative_path = False):
     assert rec_info.working_directory
     rec_info.working_directory = pathlib.Path(rec_info.working_directory)
     ifile = (rec_info.source_directory / rec_info.video_file)
@@ -74,6 +78,8 @@ def do_import(rec_info: Recording, cam_cal_file: str|pathlib.Path=None, copy_vid
     rec_info.duration = (ts.timestamp.iat[-1]-ts.timestamp.iat[0])/1000.    # ms -> s
 
     # store recording info to folder
+    if source_dir_as_relative_path:
+        rec_info.source_directory = pathlib.Path(os.path.relpath(rec_info.source_directory,rec_info.working_directory))
     rec_info.store_as_json(rec_info.working_directory)
 
     return rec_info
