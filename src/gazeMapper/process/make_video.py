@@ -44,8 +44,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
     has_gui = gui is not None
     sub_pixel_fac = 8   # for anti-aliased drawing
 
-    # get info about the study the recording is a part of
-    study_config = config.Study.load_from_json(config_dir)
+    # get settings for the study
+    study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent})
     assert not not study_config.make_video_which, f'There are no videos to be made (make_video_which is not defined or null in the study setup)'
 
     # get session info

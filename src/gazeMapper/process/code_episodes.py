@@ -55,8 +55,8 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):
 
 
 def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, main_win_id: int):
-    # get info about the study the recording is a part of
-    study_config = config.Study.load_from_json(config_dir)
+    # get settings for the study
+    study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent, config.OverrideLevel.Recording: working_dir})
 
     # get info about recording
     rec_def  = study_config.session_def.get_recording_def(working_dir.name)

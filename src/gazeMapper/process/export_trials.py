@@ -16,8 +16,8 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
     config_dir  = pathlib.Path(config_dir)
     print(f'processing: {working_dir.name}')
 
-    # get info about the study it is a part of
-    study_config = config.Study.load_from_json(config_dir)
+    # get settings for the study
+    study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent})
     assert annotation.Event.Trial in study_config.planes_per_episode, 'No planes are specified for mapping gaze to during trials, nothing to export'
     planes = study_config.planes_per_episode[annotation.Event.Trial]
 

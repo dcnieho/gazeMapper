@@ -15,7 +15,8 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):
     config_dir  = pathlib.Path(config_dir)
     print(f'processing: {working_dir.name}')
 
-    study_config = config.Study.load_from_json(config_dir)
+    # get settings for the study
+    study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent, config.OverrideLevel.Recording: working_dir})
     assert study_config.auto_code_sync_points or study_config.auto_code_trials_episodes, f'No automatic sync point detection or trial episode coding is defined for this study, nothing to do'
     rec_def = study_config.session_def.get_recording_def(working_dir.name)
 

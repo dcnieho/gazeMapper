@@ -16,8 +16,8 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None,
         config_dir = config.guess_config_dir(working_dir)
     config_dir  = pathlib.Path(config_dir)
 
-    # get info about the study the recording is a part of
-    study_config = config.Study.load_from_json(config_dir)
+    # get settings for the study
+    study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent, config.OverrideLevel.Recording: working_dir})
     assert annotation.Event.Validate in study_config.planes_per_episode, 'No planes to use for validation are specified for the study, nothing to process'
     planes = study_config.planes_per_episode[annotation.Event.Validate]
 

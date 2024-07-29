@@ -1,5 +1,8 @@
 import pathlib
 import json
+import inspect
+import copy
+import enum
 
 from glassesTools import annotation, utils
 
@@ -91,6 +94,9 @@ class Study:
         self.video_show_gaze_vec_in_other                   = video_show_gaze_vec_in_other
         self.video_gaze_to_plane_margin                     = video_gaze_to_plane_margin    # fraction of plane size, added to each side of the plane
 
+        self._check_all()
+
+    def _check_all(self):
         self._check_planes_per_episode()
         self._check_auto_markers()
         self._check_recordings([self.sync_ref_recording], 'sync_ref_recording')
@@ -159,7 +165,7 @@ class Study:
                 to_dump['get_cam_movement_for_et_sync_function'] = self.get_cam_movement_for_et_sync_function
             # dump to file
             json.dump(to_dump, f, cls=utils.CustomTypeEncoder, indent=2)
-        # this doesn't story any files itself, but triggers the contained info to be stored
+        # this doesn't store any files itself, but triggers the contained info to be stored
         self.session_def.store_as_json(self.working_directory / 'session_def.json')
         for p in self.planes:
             p_dir = self.working_directory / p.name
@@ -170,11 +176,11 @@ class Study:
     @staticmethod
     def load_from_json(path: str | pathlib.Path) -> 'Study':
         path = pathlib.Path(path)
-        # get kwds
         if path.is_dir():
             d_path = path / Study.default_json_file_name
         else:
             d_path = path
+        # get kwds
         with open(d_path, 'r') as f:
             kwds = json.load(f, object_hook=utils.json_reconstitute)
         kwds['planes_per_episode'] = {k:v for k,v in kwds['planes_per_episode']}  # stored as list of tuples, unpack
@@ -195,6 +201,78 @@ class Study:
             planes.append(plane.Definition.load_from_json(p_file))
 
         return Study(sess_def, planes, working_directory=path, **kwds)
+
+class OverrideLevel(enum.Enum):
+    Session     = enum.auto()
+    Recording   = enum.auto()
+
+class StudyOverride:
+    default_json_file_name = 'study_def_override.json'
+
+    def __init__(self, level: OverrideLevel, **kwargs):
+        study_init = inspect.signature(Study.__init__)
+        exclude = {'self', 'session_def', 'planes', 'individual_markers', 'working_directory', 'planes_per_episode'}
+        # TODO: depending on level, disallow more
+        self._params = set(study_init.parameters)-exclude
+        for p in self._params:
+            setattr(self,p,None)
+        for p in kwargs:
+            if p in exclude:
+                raise TypeError(f"{StudyOverride.__name__}.__init__(): you are not allowed to override the '{p}' parameter of a {Study.__name__} class")
+            if p not in self._params:
+                raise TypeError(f"{StudyOverride.__name__}.__init__(): got an unknown parameter '{p}'")
+            setattr(self,p,kwargs[p])
+
+    def apply(self, study: Study) -> Study:
+        study = copy.copy(study)
+        for p in self._params:
+            if (val:=getattr(self,p)) is not None:
+                if isinstance(val,dict):
+                    # overwrite existing and add new dict keys
+                    setattr(study,p,getattr(study,p)|val)
+                else:
+                    setattr(study,p,val)
+        # check resulting study is valid
+        study._check_all()
+        return study
+
+    def store_as_json(self, path: str | pathlib.Path):
+        path = pathlib.Path(path)
+        # this stores only the planes_per_episode variable to json, rest is read from other files
+        # instead to remain flexible and make it easy for users to rename, etc
+        if path.is_dir():
+            path = path / self.default_json_file_name
+        with open(path, 'w') as f:
+            to_dump = {p:v for p in self._params if (v:=getattr(self,p)) is not None}
+            json.dump(to_dump, f, cls=utils.CustomTypeEncoder, indent=2)
+
+    @staticmethod
+    def load_from_json(level: OverrideLevel, path: str | pathlib.Path) -> 'StudyOverride':
+        path = pathlib.Path(path)
+        if path.is_dir():
+            path = path / StudyOverride.default_json_file_name
+        # get kwds
+        with open(path, 'r') as f:
+            kwds = json.load(f, object_hook=utils.json_reconstitute)
+        return StudyOverride(level, **kwds)
+
+def load_override_and_apply(study: Study, level: OverrideLevel, override_path: str|pathlib.Path) -> Study:
+    override_path = pathlib.Path(override_path)
+    if override_path.is_dir():
+        override_path = override_path / StudyOverride.default_json_file_name
+    if not override_path.is_file():
+        return study
+
+    study_override = StudyOverride.load_from_json(level, override_path)
+    return study_override.apply(study)
+
+def read_study_config_with_overrides(config_path: str|pathlib.Path, overrides: dict[OverrideLevel, str|pathlib.Path] = None) -> Study:
+    study = Study.load_from_json(config_path)
+    if overrides:
+        for l in [OverrideLevel.Session, OverrideLevel.Recording]:
+            if l in overrides:
+                study = load_override_and_apply(study, l, overrides[l])
+    return study
 
 def guess_config_dir(working_dir: str|pathlib.Path, config_dir_name: str = "config", json_file_name: str = Study.default_json_file_name) -> pathlib.Path:
     # can be invoked with either:
