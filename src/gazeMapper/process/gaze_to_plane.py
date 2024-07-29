@@ -8,7 +8,7 @@ from glassesTools.video_gui import GUI
 from .. import config, episode, naming, plane, session, synchronization
 
 
-def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show_visualization=False, show_planes=True, show_only_intervals=True):
+def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show_visualization=False, show_planes=True, show_only_intervals=True, **study_settings):
     # if show_visualization, each frame is shown in a viewer, overlaid with info about detected planes and projected gaze
     # if show_poster, gaze in space od each plane is also drawn in a separate windows
     # if show_only_intervals, only the coded mapping episodes (if available) are shown in the viewer while the rest of the scene video is skipped past
@@ -26,17 +26,17 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
         gui.set_show_controls(True)
         gui.set_show_play_percentage(True)
 
-        proc_thread = threading.Thread(target=do_the_work, args=(working_dir, config_dir, gui, frame_win_id, show_planes, show_only_intervals))
+        proc_thread = threading.Thread(target=do_the_work, args=(working_dir, config_dir, gui, frame_win_id, show_planes, show_only_intervals), kwargs=study_settings)
         proc_thread.start()
         gui.start()
         proc_thread.join()
     else:
-        do_the_work(working_dir, config_dir, None, None, False, False)
+        do_the_work(working_dir, config_dir, None, None, False, False, **study_settings)
 
 
-def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, frame_win_id: int, show_planes: bool, show_only_intervals: bool):
+def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, frame_win_id: int, show_planes: bool, show_only_intervals: bool, **study_settings):
     # get settings for the study
-    study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent, config.OverrideLevel.Recording: working_dir})
+    study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent, config.OverrideLevel.Recording: working_dir}, **study_settings)
 
     # get info about recording
     rec_def = study_config.session_def.get_recording_def(working_dir.name)

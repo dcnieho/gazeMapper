@@ -11,7 +11,7 @@ from glassesTools.video_gui import GUI
 from .. import config, episode, marker, naming, plane, session, synchronization
 
 
-def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show_visualization=False, show_rejected_markers=False):
+def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show_visualization=False, visualization_show_rejected_markers=False, **study_settings):
     # if show_visualization, each frame is shown in a viewer, overlaid with info about detected markers and planes
     # if show_rejected_markers, rejected ArUco marker candidates are also shown in the viewer. Possibly useful for debug
     working_dir = pathlib.Path(working_dir)
@@ -28,17 +28,17 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
         gui.set_show_controls(True)
         gui.set_show_play_percentage(True)
 
-        proc_thread = threading.Thread(target=do_the_work, args=(working_dir, config_dir, gui, show_rejected_markers))
+        proc_thread = threading.Thread(target=do_the_work, args=(working_dir, config_dir, gui, visualization_show_rejected_markers), kwargs=study_settings)
         proc_thread.start()
         gui.start()
         proc_thread.join()
     else:
-        do_the_work(working_dir, config_dir, None, False)
+        do_the_work(working_dir, config_dir, None, False, **study_settings)
 
 
-def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, show_rejected_markers: bool):
+def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, visualization_show_rejected_markers: bool, **study_settings):
     # get settings for the study
-    study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent, config.OverrideLevel.Recording: working_dir})
+    study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent, config.OverrideLevel.Recording: working_dir}, **study_settings)
 
     # get info about recording
     rec_def = study_config.session_def.get_recording_def(working_dir.name)
@@ -65,7 +65,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, s
     if sync_target_function is not None:
         estimator.register_extra_processing_fun('sync', *sync_target_function)
     estimator.attach_gui(gui)
-    estimator.show_rejected_markers = show_rejected_markers
+    estimator.show_rejected_markers = visualization_show_rejected_markers
 
     poses, individual_markers, sync_target_signal = estimator.process_video()
 

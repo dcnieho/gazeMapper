@@ -35,7 +35,7 @@ _event_type_to_key_map = {
     annotation.Event.Trial          : imgui.Key.t,
 }
 
-def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):
+def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **study_settings):
     # if show_poster, also draw poster with gaze overlaid on it (if available)
     working_dir = pathlib.Path(working_dir)
     if config_dir is None:
@@ -48,15 +48,15 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):
     gui = GUI(use_thread = False)
     main_win_id = gui.add_window(f'{working_dir.parent.name}, {working_dir.name}')
 
-    proc_thread = threading.Thread(target=do_the_work, args=(working_dir, config_dir, gui, main_win_id))
+    proc_thread = threading.Thread(target=do_the_work, args=(working_dir, config_dir, gui, main_win_id), kwargs=study_settings)
     proc_thread.start()
     gui.start()
     proc_thread.join()
 
 
-def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, main_win_id: int):
+def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, main_win_id: int, **study_settings):
     # get settings for the study
-    study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent, config.OverrideLevel.Recording: working_dir})
+    study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent, config.OverrideLevel.Recording: working_dir}, **study_settings)
 
     # get info about recording
     rec_def  = study_config.session_def.get_recording_def(working_dir.name)

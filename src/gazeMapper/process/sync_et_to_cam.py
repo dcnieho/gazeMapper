@@ -19,7 +19,7 @@ from .. import config, episode, naming, session
 
 
 
-def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, apply_average=True):
+def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, apply_average=True, **study_settings):
     # apply_average: if True: the average offset for all VOR sync episodes will be applied to the timestamps
     # if False, the VOR offset for the first episode will be applied, the rest are taken as checks
     working_dir = pathlib.Path(working_dir)
@@ -32,15 +32,15 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
     # We run processing in a separate thread (GUI needs to be on the main thread for OSX, see https://github.com/pthom/hello_imgui/issues/33)
     gui = GUI(use_thread = False)
 
-    proc_thread = threading.Thread(target=do_the_work, args=(working_dir, config_dir, gui, apply_average))
+    proc_thread = threading.Thread(target=do_the_work, args=(working_dir, config_dir, gui, apply_average), kwargs=study_settings)
     proc_thread.start()
     gui.start()
     proc_thread.join()
 
 
-def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, apply_average: bool):
+def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, apply_average: bool, **study_settings):
     # get settings for the study
-    study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent, config.OverrideLevel.Recording: working_dir})
+    study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent, config.OverrideLevel.Recording: working_dir}, **study_settings)
 
     # check this is an eye tracker recording
     rec_def = study_config.session_def.get_recording_def(working_dir.name)

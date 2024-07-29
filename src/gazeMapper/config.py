@@ -205,6 +205,7 @@ class Study:
 class OverrideLevel(enum.Enum):
     Session     = enum.auto()
     Recording   = enum.auto()
+    FunctionArgs= enum.auto()
 
 class StudyOverride:
     default_json_file_name = 'study_def_override.json'
@@ -266,12 +267,20 @@ def load_override_and_apply(study: Study, level: OverrideLevel, override_path: s
     study_override = StudyOverride.load_from_json(level, override_path)
     return study_override.apply(study)
 
-def read_study_config_with_overrides(config_path: str|pathlib.Path, overrides: dict[OverrideLevel, str|pathlib.Path] = None) -> Study:
+def apply_kwarg_overrides(study: Study, **kwargs) -> Study:
+    if not kwargs:
+        return study
+    overrides = StudyOverride(OverrideLevel.FunctionArgs, **kwargs)
+    return overrides.apply(study)
+
+def read_study_config_with_overrides(config_path: str|pathlib.Path, overrides: dict[OverrideLevel, str|pathlib.Path] = None, **kwargs) -> Study:
     study = Study.load_from_json(config_path)
     if overrides:
         for l in [OverrideLevel.Session, OverrideLevel.Recording]:
             if l in overrides:
                 study = load_override_and_apply(study, l, overrides[l])
+    if kwargs:
+        study = apply_kwarg_overrides(study, **kwargs)
     return study
 
 def guess_config_dir(working_dir: str|pathlib.Path, config_dir_name: str = "config", json_file_name: str = Study.default_json_file_name) -> pathlib.Path:

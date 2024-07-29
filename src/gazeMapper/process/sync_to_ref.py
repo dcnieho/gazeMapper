@@ -10,7 +10,7 @@ from . import _utils
 from .. import config, session, synchronization
 
 
-def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):
+def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **study_settings):
     working_dir = pathlib.Path(working_dir) # working directory of a session, not of a recording
     if config_dir is None:
         config_dir = config.guess_config_dir(working_dir)
@@ -18,7 +18,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):
     print(f'processing: {working_dir.name}')
 
     # get settings for the study
-    study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent})
+    study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent}, **study_settings)
     # documentation for some settings in the json file:
     # 1. sync_ref_recording. Name of one of the recordings that is part of the session, the one w.r.t. which
     #    the other recordings are synced.

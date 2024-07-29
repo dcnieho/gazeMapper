@@ -8,7 +8,7 @@ from glassesTools import annotation
 from .. import config, episode, marker, naming
 
 
-def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):
+def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **study_settings):
     working_dir = pathlib.Path(working_dir) # working directory of a session, not of a recording
     if config_dir is None:
         config_dir = config.guess_config_dir(working_dir)
@@ -16,7 +16,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None):
     print(f'processing: {working_dir.name}')
 
     # get settings for the study
-    study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent, config.OverrideLevel.Recording: working_dir})
+    study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent, config.OverrideLevel.Recording: working_dir}, **study_settings)
     assert study_config.auto_code_sync_points or study_config.auto_code_trials_episodes, f'No automatic sync point detection or trial episode coding is defined for this study, nothing to do'
     rec_def = study_config.session_def.get_recording_def(working_dir.name)
 

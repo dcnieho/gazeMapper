@@ -10,14 +10,14 @@ from .. import config, episode, naming, plane, session
 stopAllProcessing = False
 def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None,
             do_global_shift=True, max_dist_fac=.5,
-            dq_types: list[gv_process.DataQualityType]=None, allow_dq_fallback=False, include_data_loss=False):
+            dq_types: list[gv_process.DataQualityType]=None, allow_dq_fallback=False, include_data_loss=False, **study_settings):
     working_dir = pathlib.Path(working_dir)
     if config_dir is None:
         config_dir = config.guess_config_dir(working_dir)
     config_dir  = pathlib.Path(config_dir)
 
     # get settings for the study
-    study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent, config.OverrideLevel.Recording: working_dir})
+    study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent, config.OverrideLevel.Recording: working_dir}, **study_settings)
     assert annotation.Event.Validate in study_config.planes_per_episode, 'No planes to use for validation are specified for the study, nothing to process'
     planes = study_config.planes_per_episode[annotation.Event.Validate]
 

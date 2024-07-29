@@ -9,7 +9,7 @@ from glassesTools import annotation, gaze_worldref
 from .. import config, episode, marker, naming, session
 
 
-def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, output3D = False, output2D = True, only_code_marker_presence = True):
+def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, output3D = False, output2D = True, only_code_marker_presence = True, **study_settings):
     working_dir = pathlib.Path(working_dir) # working directory of a session, not of a recording
     if config_dir is None:
         config_dir = config.guess_config_dir(working_dir)
@@ -17,7 +17,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
     print(f'processing: {working_dir.name}')
 
     # get settings for the study
-    study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent})
+    study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent}, **study_settings)
     assert annotation.Event.Trial in study_config.planes_per_episode, 'No planes are specified for mapping gaze to during trials, nothing to export'
     planes = study_config.planes_per_episode[annotation.Event.Trial]
 

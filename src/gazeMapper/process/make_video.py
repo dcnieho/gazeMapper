@@ -20,7 +20,7 @@ import ffpyplayer.tools
 from fractions import Fraction
 
 
-def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show_visualization=False):
+def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show_visualization=False, **study_settings):
     # if show_visualization, the generated video is shown as it is created in a viewer
     working_dir  = pathlib.Path(working_dir) # working directory of a session, not of a recording
     if config_dir is None:
@@ -33,19 +33,19 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
         gui = GUI(use_thread = False)
         main_win_id = gui.add_window(working_dir.name)
 
-        proc_thread = threading.Thread(target=do_the_work, args=(working_dir, config_dir, gui, main_win_id))
+        proc_thread = threading.Thread(target=do_the_work, args=(working_dir, config_dir, gui, main_win_id), kwargs=study_settings)
         proc_thread.start()
         gui.start()
         proc_thread.join()
     else:
-        do_the_work(working_dir, config_dir, None, None)
+        do_the_work(working_dir, config_dir, None, None, **study_settings)
 
-def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, main_win_id: int):
+def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, main_win_id: int, **study_settings):
     has_gui = gui is not None
     sub_pixel_fac = 8   # for anti-aliased drawing
 
     # get settings for the study
-    study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent})
+    study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent}, **study_settings)
     assert not not study_config.make_video_which, f'There are no videos to be made (make_video_which is not defined or null in the study setup)'
 
     # get session info
