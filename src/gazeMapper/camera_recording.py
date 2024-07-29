@@ -73,7 +73,7 @@ def do_import(rec_info: Recording, cam_cal_file: str|pathlib.Path=None, copy_vid
 
     # and frame timestamps
     print('  Getting frame timestamps...')
-    ts = video_utils.getFrameTimestampsFromVideo(rec_info.get_video_path())
+    ts = video_utils.get_frame_timestamps_from_video(rec_info.get_video_path())
     ts.to_csv(str(rec_info.working_directory / 'frameTimestamps.tsv'), sep='\t')
     rec_info.duration = (ts.timestamp.iat[-1]-ts.timestamp.iat[0])/1000.    # ms -> s
 
