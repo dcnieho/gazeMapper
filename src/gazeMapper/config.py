@@ -202,6 +202,26 @@ class Study:
 
         return Study(sess_def, planes, working_directory=path, **kwds)
 
+def guess_config_dir(working_dir: str|pathlib.Path, config_dir_name: str = "config", json_file_name: str = Study.default_json_file_name) -> pathlib.Path:
+    # can be invoked with either:
+    # 1. the project folder;
+    # 2. a session's working directory; or
+    # 3. a recording's directory in a session's working directory.
+    # So try three levels
+    for i in range(3):
+        if i>0:
+            # try again in parent directory
+            working_dir = working_dir.parent
+        test_dir = working_dir / config_dir_name
+        if not test_dir.is_dir():
+            continue
+        test_file = test_dir / json_file_name
+        if test_file.is_file():
+            return test_dir
+
+    raise RuntimeError('config directory not found')
+
+
 class OverrideLevel(enum.Enum):
     Session     = enum.auto()
     Recording   = enum.auto()
@@ -219,7 +239,11 @@ class StudyOverride:
             setattr(self,p,None)
         for p in kwargs:
             if p in exclude:
-                raise TypeError(f"{StudyOverride.__name__}.__init__(): you are not allowed to override the '{p}' parameter of a {Study.__name__} class")
+                if level==OverrideLevel.FunctionArgs:
+                    err_text = 'when providing parameter overrides as extra arguments to the function'
+                else:
+                    err_text = f'when providing parameter overrides for a {level.name}'
+                raise TypeError(f"{StudyOverride.__name__}.__init__(): you are not allowed to override the '{p}' parameter of a {Study.__name__} class {err_text}")
             if p not in self._params:
                 raise TypeError(f"{StudyOverride.__name__}.__init__(): got an unknown parameter '{p}'")
             setattr(self,p,kwargs[p])
@@ -282,22 +306,3 @@ def read_study_config_with_overrides(config_path: str|pathlib.Path, overrides: d
     if kwargs:
         study = apply_kwarg_overrides(study, **kwargs)
     return study
-
-def guess_config_dir(working_dir: str|pathlib.Path, config_dir_name: str = "config", json_file_name: str = Study.default_json_file_name) -> pathlib.Path:
-    # can be invoked with either:
-    # 1. the project folder;
-    # 2. a session's working directory; or
-    # 3. a recording's directory in a session's working directory.
-    # So try three levels
-    for i in range(3):
-        if i>0:
-            # try again in parent directory
-            working_dir = working_dir.parent
-        test_dir = working_dir / config_dir_name
-        if not test_dir.is_dir():
-            continue
-        test_file = test_dir / json_file_name
-        if test_file.is_file():
-            return test_dir
-
-    raise RuntimeError('config directory not found')
