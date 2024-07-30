@@ -33,6 +33,29 @@ class AutoCodeTrialEpisodes(TypedDict, total=False):
     start_markers: list[int]
     end_markers: list[int]
 
+class I2MCSettings(TypedDict, total=False):
+    xres: int
+    yres: int
+    freq: float
+    missingx: float
+    missingy: float
+    scrSz: list[float, float]
+    disttoscreen: float
+    windowtimeInterp: float
+    edgeSampInterp: int
+    maxdisp: float
+    windowtime: float
+    steptime: float
+    downsamples: list[int]
+    downsampFilter: bool
+    chebyOrder: int
+    maxerrors: int
+    cutoffstd: float
+    onoffsetThresh: float
+    maxMergeDist: float
+    maxMergeTime: float
+    minFixDur: float
+
 class Study:
     default_json_file_name = 'study_def.json'
 
@@ -66,9 +89,10 @@ class Study:
 
                  validate_do_global_shift                       : bool                              = True,
                  validate_max_dist_fac                          : float                             = .5,
-                 validate_dq_types                              : list[gv_process.DataQualityType]  = None,
+                 validate_dq_types                              : list[gv_process.DataQualityType]|None = None,
                  validate_allow_dq_fallback                     : bool                              = False,
                  validate_include_data_loss                     : bool                              = False,
+                 validate_I2MC_settings                         : I2MCSettings|None                 = None,
 
                  make_video_which                               : list[str]|None                    = None,
                  video_recording_colors                         : dict[str,list[int]]|None          = None,
@@ -116,6 +140,7 @@ class Study:
         self.validate_dq_types                              = validate_dq_types
         self.validate_allow_dq_fallback                     = validate_allow_dq_fallback
         self.validate_include_data_loss                     = validate_include_data_loss
+        self.validate_I2MC_settings                         = validate_I2MC_settings
 
         self.make_video_which                               = make_video_which
         self.video_recording_colors                         = video_recording_colors
@@ -288,7 +313,9 @@ class StudyOverride:
             # arguments they may make sense depending on the processing function that
             # is being called, but we cannot differentiate, so reject to be conservative
             # use whitelist
-            include = {'get_cam_movement_for_et_sync_method','get_cam_movement_for_et_sync_function', 'auto_code_sync_points', 'auto_code_trial_episodes'}
+            include = {'get_cam_movement_for_et_sync_method','get_cam_movement_for_et_sync_function',
+                       'auto_code_sync_points', 'auto_code_trial_episodes',
+                       'validate_do_global_shift', 'validate_max_dist_fac', 'validate_dq_types', 'validate_allow_dq_fallback', 'validate_include_data_loss', 'validate_I2MC_settings'}
             exclude = all_params-include
         self._params = all_params-exclude
         for p in self._params:
