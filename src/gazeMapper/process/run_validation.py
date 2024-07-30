@@ -33,7 +33,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
         plane_def = [pl for pl in study_config.planes if pl.name==p][0]
         if plane_def.type!=plane.Type.GlassesValidator:
             raise ValueError(f'Plane {p} is not a glassesValidator plane, cannot be used for validation')
-        validator_config_dir = None # use glassesValidator built-in/default
+        validator_config_dir = None # None -> use glassesValidator built-in/default
         if not plane_def.use_default:
             validator_config_dir = config_dir/p
 
