@@ -231,6 +231,7 @@ class StudyOverride:
     default_json_file_name = 'study_def_override.json'
 
     def __init__(self, level: OverrideLevel, **kwargs):
+        self.level = level
         study_init = inspect.signature(Study.__init__)
         exclude = {'self', 'session_def', 'planes', 'individual_markers', 'working_directory', 'planes_per_episode'}
         # TODO: depending on level, disallow more
@@ -239,10 +240,10 @@ class StudyOverride:
             setattr(self,p,None)
         for p in kwargs:
             if p in exclude:
-                if level==OverrideLevel.FunctionArgs:
-                    err_text = 'when providing parameter overrides as extra arguments to the function'
+                if self.level==OverrideLevel.FunctionArgs:
+                    err_text = 'with parameter overrides provided as extra arguments to the processing function'
                 else:
-                    err_text = f'when providing parameter overrides for a {level.name}'
+                    err_text = f'with parameter overrides configured for a {self.level.name}'
                 raise TypeError(f"{StudyOverride.__name__}.__init__(): you are not allowed to override the '{p}' parameter of a {Study.__name__} class {err_text}")
             if p not in self._params:
                 raise TypeError(f"{StudyOverride.__name__}.__init__(): got an unknown parameter '{p}'")
@@ -258,7 +259,14 @@ class StudyOverride:
                 else:
                     setattr(study,p,val)
         # check resulting study is valid
-        study._check_all()
+        try:
+            study._check_all()
+        except Exception as oe:
+            if self.level==OverrideLevel.FunctionArgs:
+                err_text = 'when applying parameter overrides provided as extra arguments to the processing function'
+            else:
+                err_text = f'when applying {self.level.name}-level parameter overrides'
+            raise ValueError(f'Study setup became invalid {err_text}: {str(oe)}').with_traceback(oe.__traceback__) from None
         return study
 
     def store_as_json(self, path: str | pathlib.Path):
