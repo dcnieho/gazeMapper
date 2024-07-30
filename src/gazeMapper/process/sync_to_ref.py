@@ -46,11 +46,14 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
 
     # check input
     if study_config.do_time_stretch:
-        assert len(ref_episodes)>1, f"You requested to do time stretching when syncing the recordings, but there is only one camera sync point. At least two sync points are required for time stretching"
+        if len(ref_episodes)<2:
+            raise ValueError(f"You requested to do time stretching when syncing the recordings, but there is only one camera sync point. At least two sync points are required for time stretching")
         if study_config.sync_average_recordings:
             for r in study_config.sync_average_recordings:
-                assert r in session_info.recordings, f'Recording {r} not found for session {session_info.name}'
-                assert r!=study_config.sync_ref_recording, f'Recording {r} is the reference recording for sync, should not be specified in study_config.sync_average_recordings'
+                if r not in session_info.recordings:
+                    raise ValueError(f'Recording {r} not found for session {session_info.name}')
+                if r==study_config.sync_ref_recording:
+                    raise ValueError(f'Recording {r} is the reference recording for sync, should not be specified in study_config.sync_average_recordings')
 
     # prep for sync info
     recs = [r for r in session_info.recordings if r!=study_config.sync_ref_recording]

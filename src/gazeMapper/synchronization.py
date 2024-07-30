@@ -31,7 +31,8 @@ def get_sync_for_recs(working_dir: str|pathlib.Path, recs: str|list[str], ref_re
         episodes = get_coding_file(working_dir / r)
 
         # check intervals
-        assert len(episodes)==len(ref_episodes), f"The number of sync points for this recording ({len(episodes)}, {r}) is not equal to that for the reference recording ({len(ref_episodes)}, {ref_rec}). Cannot continue, fix your coding"
+        if len(episodes)!=len(ref_episodes):
+            raise ValueError(f"The number of sync points for this recording ({len(episodes)}, {r}) is not equal to that for the reference recording ({len(ref_episodes)}, {ref_rec}). Cannot continue, fix your coding")
 
         # get time information
         video_ts = timestamps.VideoTimestamps(working_dir / r / 'frameTimestamps.tsv')
@@ -109,16 +110,19 @@ def apply_sync(rec: str,
 def get_coding_file(working_dir: str|pathlib.Path):
     working_dir  = pathlib.Path(working_dir)
     coding_file = working_dir / naming.coding_file
-    assert coding_file.is_file(), f'A coding file must be available for the recording ({working_dir.name}) to run sync_to_ref, but it is not. Run code_episodes and code at least one {annotation.Event.Sync_Camera.value} episode. Not found: {coding_file}'
+    if not coding_file.is_file():
+        raise FileNotFoundError(f'A coding file must be available for the recording ({working_dir.name}) to run sync_to_ref, but it is not. Run code_episodes and code at least one {annotation.Event.Sync_Camera.value} episode. Not found: {coding_file}')
     episodes = episode.list_to_marker_dict(episode.read_list_from_file(coding_file))[annotation.Event.Sync_Camera]
     episodes = [x[0] for x in episodes] # remove inner wrapping list, there are only single values in it anyway
-    assert episodes, f'No {annotation.Event.Sync_Camera.value} points found for this recording ({working_dir.name}). Run code_episodes and code at least one {annotation.Event.Sync_Camera.value} point.'
+    if not episodes:
+        raise ValueError(f'No {annotation.Event.Sync_Camera.value} points found for this recording ({working_dir.name}). Run code_episodes and code at least one {annotation.Event.Sync_Camera.value} point.')
     return episodes
 
 def get_episode_frame_indices_from_ref(working_dir: str|pathlib.Path, event: annotation.Event, rec: str, ref_rec:str, all_recs: list[str], do_time_stretch: bool, sync_average_recordings: list[str], stretch_which: str, extra_fr=0):
     working_dir  = pathlib.Path(working_dir)
     ref_episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir.parent / ref_rec / naming.coding_file))
-    assert event in ref_episodes, f'Trying to get {event.value} episodes from the reference recording ({ref_rec}), but the coding file for this reference recording doesn\'t contain any ({event.value}) episodes'
+    if event not in ref_episodes:
+        raise KeyError(f'Trying to get {event.value} episodes from the reference recording ({ref_rec}), but the coding file for this reference recording doesn\'t contain any ({event.value}) episodes')
     # get sync and timestamp info we need to transform reference frames indices to frame indices of this recording
     sync = get_sync_for_recs(working_dir.parent, all_recs, ref_rec, do_time_stretch, sync_average_recordings)
     video_ts_ref = timestamps.VideoTimestamps(working_dir.parent / ref_rec / 'frameTimestamps.tsv')

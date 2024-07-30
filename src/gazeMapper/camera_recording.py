@@ -50,10 +50,12 @@ class Recording:
 
 
 def do_import(rec_info: Recording, cam_cal_file: str|pathlib.Path=None, copy_video=True, source_dir_as_relative_path = False):
-    assert rec_info.working_directory
+    if not rec_info.working_directory:
+        raise ValueError('working_directory must be set on the rec_info object')
     rec_info.working_directory = pathlib.Path(rec_info.working_directory)
     ifile = (rec_info.source_directory / rec_info.video_file)
-    assert ifile.is_file()
+    if not ifile.is_file():
+        raise FileNotFoundError(f'The camera recording file {ifile} was not found')
     print(f'processing: {rec_info.video_file} -> {rec_info.working_directory}')
 
     if not rec_info.working_directory.is_dir():

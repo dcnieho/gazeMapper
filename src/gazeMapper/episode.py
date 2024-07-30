@@ -11,9 +11,11 @@ class Episode:
         self.start_frame    = start_frame
 
         if annotation.type_map[event]==annotation.Type.Interval:
-            assert end_frame is not None, f"end frame expected for an interval-type episode ({event.value}), but not provided"
+            if end_frame is None:
+                raise ValueError(f"end frame expected for an interval-type episode ({event.value}), but not provided")
         if annotation.type_map[event]==annotation.Type.Point:
-            assert end_frame is None, f"end frame provided but not expected for a point-type episode ({event.value})"
+            if end_frame is not None:
+                raise ValueError(f"end frame provided but not expected for a point-type episode ({event.value})")
         self.end_frame      = end_frame
 
 
@@ -48,7 +50,8 @@ def get_empty_marker_dict(episodes: list[annotation.Event]=None) -> dict[annotat
 def list_to_marker_dict(episodes: list[Episode], expected_types: list[annotation.Event]=None) -> dict[annotation.Event,list[list[int]]]:
     e_dict = get_empty_marker_dict(expected_types)
     for e in episodes:
-        assert e.event in e_dict, f'episode of type {e.event.value} found, but not expected (e.g. should not be coded for this study according to the study setup)'
+        if e.event not in e_dict:
+            raise ValueError(f'episode of type {e.event.value} found, but not expected (e.g. should not be coded for this study according to the study setup)')
         if e.end_frame is not None:
             e_dict[e.event].append([e.start_frame, e.end_frame])
         else:

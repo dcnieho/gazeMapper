@@ -46,7 +46,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
 
     # get settings for the study
     study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent}, **study_settings)
-    assert not not study_config.make_video_which, f'There are no videos to be made (make_video_which is not defined or null in the study setup)'
+    if not study_config.make_video_which:
+        raise ValueError(f'There are no videos to be made (make_video_which is not defined or null in the study setup)')
 
     # get session info
     session_info = session.Session.load_from_json(working_dir)
@@ -82,7 +83,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
             gazes_head[rec]     = gaze_headref.read_dict_from_file(rec_working_dir / 'gazeData.tsv', ts_column_suffixes=['ref', 'VOR', ''])[0]
             # check we have timestamps synced to ref, if relevant
             if study_config.sync_ref_recording and rec!=study_config.sync_ref_recording:
-                assert gazes_head[rec][next(iter(gazes_head[rec]))][0].timestamp_ref is not None, f'This study has a reference recording ({study_config.sync_ref_recording}) to synchronize the recordings to, but the gaze data for this recording ({rec}) has not been synchronized. Run sync_to_ref before running this.'
+                if gazes_head[rec][next(iter(gazes_head[rec]))][0].timestamp_ref is None:
+                    raise ValueError(f'This study has a reference recording ({study_config.sync_ref_recording}) to synchronize the recordings to, but the gaze data for this recording ({rec}) has not been synchronized. Run sync_to_ref before running this.')
 
         # get camera calibration info
         camera_params[rec]      = ocv.CameraParams.read_from_file(rec_working_dir / "calibration.xml")
@@ -183,8 +185,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
             ref_sync_points = episodes_as_ref_flat[study_config.sync_ref_recording][annotation.Event.Sync_Camera]
             rec_sync_points = episodes_as_ref_flat[r][annotation.Event.Sync_Camera]
             # NB: allow one frame leeway to allow for small offsets due to conversion, or cameras not running completely in sync
-            assert all([abs(i_ref-i_rec)<=1 for i_ref,i_rec in zip(ref_sync_points,rec_sync_points)]), \
-                f'Camera sync points found for recording {r} ({episodes_as_ref_flat[r][annotation.Event.Sync_Camera]}) that do not occur among the reference recordings sync points ({study_config.sync_ref_recording}, {episodes_as_ref_flat[study_config.sync_ref_recording][annotation.Event.Sync_Camera]}). That means the sync logic must have failed'
+            if not all([abs(i_ref-i_rec)<=1 for i_ref,i_rec in zip(ref_sync_points,rec_sync_points)]):
+                raise RuntimeError(f'Camera sync points found for recording {r} ({episodes_as_ref_flat[r][annotation.Event.Sync_Camera]}) that do not occur among the reference recordings sync points ({study_config.sync_ref_recording}, {episodes_as_ref_flat[study_config.sync_ref_recording][annotation.Event.Sync_Camera]}). That means the sync logic must have failed')
         # load plane gazes
         if not (study_config.video_process_planes_for_all_frames or study_config.video_process_individual_markers_for_all_frames):
             to_load = [r for r in recs if r not in study_config.make_video_which]

@@ -18,7 +18,8 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
 
     # get settings for the study
     study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent}, **study_settings)
-    assert annotation.Event.Trial in study_config.planes_per_episode, 'No planes are specified for mapping gaze to during trials, nothing to export'
+    if annotation.Event.Trial not in study_config.planes_per_episode:
+        raise ValueError('No planes are specified for mapping gaze to during trials, nothing to export')
     planes = study_config.planes_per_episode[annotation.Event.Trial]
 
     # get session info
@@ -35,7 +36,8 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
         else:
             episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / r / naming.coding_file), study_config.episodes_to_code)
             subset_var = 'frame_idx'
-        assert annotation.Event.Trial in episodes and episodes[annotation.Event.Trial], f'No {annotation.Event.Trial.value} episodes found in the coding file, nothing to export'
+        if annotation.Event.Trial not in episodes or not episodes[annotation.Event.Trial]:
+            raise RuntimeError(f'No {annotation.Event.Trial.value} episodes found in the coding file, nothing to export')
         episodes = episodes[annotation.Event.Trial]
 
         # get all gaze data

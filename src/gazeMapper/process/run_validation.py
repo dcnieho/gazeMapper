@@ -18,12 +18,14 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None,
 
     # get settings for the study
     study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent, config.OverrideLevel.Recording: working_dir}, **study_settings)
-    assert annotation.Event.Validate in study_config.planes_per_episode, 'No planes to use for validation are specified for the study, nothing to process'
+    if annotation.Event.Validate not in study_config.planes_per_episode:
+        raise ValueError('No planes to use for validation are specified for the study, nothing to process')
     planes = study_config.planes_per_episode[annotation.Event.Validate]
 
     # get info about recording
     rec_def = study_config.session_def.get_recording_def(working_dir.name)
-    assert rec_def.type==session.RecordingType.EyeTracker, f'You can only run run_validation on eye tracker recordings, not on a {str(rec_def.type).split(".")[1]} recording'
+    if rec_def.type!=session.RecordingType.EyeTracker:
+        raise ValueError(f'You can only run run_validation on eye tracker recordings, not on a {str(rec_def.type).split(".")[1]} recording')
 
     # get interval(s) coded to be analyzed, if any
     episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / 'coding.tsv'))[annotation.Event.Validate]
@@ -31,7 +33,8 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None,
     # per plane, run the glassesValidator steps
     for p in planes:
         plane_def = [pl for pl in study_config.planes if pl.name==p][0]
-        assert plane_def.type==plane.Type.GlassesValidator, f'Plane {p} is not a glassesValidator plane, cannot be used for validation'
+        if plane_def.type!=plane.Type.GlassesValidator:
+            raise ValueError(f'Plane {p} is not a glassesValidator plane, cannot be used for validation')
         validator_config_dir = None # use glassesValidator built-in/default
         if not plane_def.use_default:
             validator_config_dir = config_dir/p

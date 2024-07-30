@@ -103,16 +103,22 @@ class Study:
         self._check_recordings(self.sync_average_recordings, 'sync_average_recordings')
         self._check_recordings(self.make_video_which, 'make_video_which')
         self._check_recordings(self.video_recording_colors, 'video_recording_colors')
-        assert self.sync_ref_recording not in self.sync_average_recordings, f'Recording {self.sync_ref_recording} is the reference recording for sync, should not be specified in sync_average_recordings'
-        assert self.get_cam_movement_for_et_sync_method in ['','plane','function'], 'get_cam_movement_for_et_sync_method parameter should be an empty string, "plane", or "function"'
+        if self.sync_ref_recording in self.sync_average_recordings:
+            raise ValueError(f'Recording {self.sync_ref_recording} is the reference recording for sync, should not be specified in sync_average_recordings')
+        if self.get_cam_movement_for_et_sync_method not in ['','plane','function']:
+            raise ValueError('get_cam_movement_for_et_sync_method parameter should be an empty string, "plane", or "function"')
         if self.get_cam_movement_for_et_sync_method=='function':
-            assert all([x in self.get_cam_movement_for_et_sync_function for x in ["module_or_file","function","parameters"]]), 'if get_cam_movement_for_et_sync_method is set to "function", get_cam_movement_for_et_sync_function should be a dict specifying "module_or_file", "function", and "parameters"'
+            if not all([x in self.get_cam_movement_for_et_sync_function for x in ["module_or_file","function","parameters"]]):
+                raise ValueError('if get_cam_movement_for_et_sync_method is set to "function", get_cam_movement_for_et_sync_function should be a dict specifying "module_or_file", "function", and "parameters"')
         for e in self.planes_per_episode:
-            assert e in self.episodes_to_code, f'Plane(s) are defined in planes_per_episode for {e.name} events, but {e.name} events are not set up to be coded in episodes_to_code. Fix episodes_to_code.'
+            if e not in self.episodes_to_code:
+                raise ValueError(f'Plane(s) are defined in planes_per_episode for {e.name} events, but {e.name} events are not set up to be coded in episodes_to_code. Fix episodes_to_code.')
         if self.auto_code_sync_points:
-            assert annotation.Event.Sync_Camera in self.episodes_to_code, f'The auto_code_sync_points option is configured, but {annotation.Event.Sync_Camera} points are not set to be coded in episodes_to_code. Fix episodes_to_code.'
+            if annotation.Event.Sync_Camera not in self.episodes_to_code:
+                raise ValueError(f'The auto_code_sync_points option is configured, but {annotation.Event.Sync_Camera} points are not set to be coded in episodes_to_code. Fix episodes_to_code.')
         if self.auto_code_trials_episodes:
-            assert annotation.Event.Trial in self.episodes_to_code, f'The auto_code_trials_episodes option is configured, but {annotation.Event.Trial} episodes are not set to be coded in episodes_to_code. Fix episodes_to_code.'
+            if annotation.Event.Trial not in self.episodes_to_code:
+                raise ValueError(f'The auto_code_trials_episodes option is configured, but {annotation.Event.Trial} episodes are not set to be coded in episodes_to_code. Fix episodes_to_code.')
 
         if self.auto_code_sync_points:
             if 'max_gap_duration' not in self.auto_code_sync_points:

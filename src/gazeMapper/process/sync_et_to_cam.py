@@ -44,13 +44,16 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, a
 
     # check this is an eye tracker recording
     rec_def = study_config.session_def.get_recording_def(working_dir.name)
-    assert rec_def.type==session.RecordingType.EyeTracker, f'You can only run sync_et_to_cam on eye tracker recordings, not on a {str(rec_def.type).split(".")[1]} recording'
+    if rec_def.type!=session.RecordingType.EyeTracker:
+        raise ValueError(f'You can only run sync_et_to_cam on eye tracker recordings, not on a {str(rec_def.type).split(".")[1]} recording')
 
     # get interval coding
     coding_file = working_dir / naming.coding_file
-    assert coding_file.is_file(), f'A coding file must be available to run sync_et_to_cam, but it is not. Run code_episodes and code at least one {annotation.Event.Sync_ET_Data.value} episode. Not found: {coding_file}'
+    if not coding_file.is_file():
+        raise FileNotFoundError(f'A coding file must be available to run sync_et_to_cam, but it is not. Run code_episodes and code at least one {annotation.Event.Sync_ET_Data.value} episode. Not found: {coding_file}')
     episodes = episode.list_to_marker_dict(episode.read_list_from_file(coding_file))[annotation.Event.Sync_ET_Data]
-    assert episodes, f'No {annotation.Event.Sync_ET_Data.value} episodes found for this recording. Run code_episodes and code at least one {annotation.Event.Sync_ET_Data.value} episode.'
+    if not episodes:
+        raise RuntimeError(f'No {annotation.Event.Sync_ET_Data.value} episodes found for this recording. Run code_episodes and code at least one {annotation.Event.Sync_ET_Data.value} episode.')
 
     # Read gaze data
     gazes = gaze_headref.read_dict_from_file(working_dir / 'gazeData.tsv', episodes)[0]
@@ -61,14 +64,17 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, a
         case '':
             raise ValueError('There is no eye tracker data to scene camera synchronization defined, should not run this function')
         case 'plane':
-            assert annotation.Event.Sync_ET_Data in study_config.planes_per_episode, f'No plane specified for syncing eye tracker data to the scene cam, cannot continue'
+            if annotation.Event.Sync_ET_Data not in study_config.planes_per_episode:
+                raise ValueError(f'No plane specified for syncing eye tracker data to the scene cam, cannot continue')
             planes = study_config.planes_per_episode[annotation.Event.Sync_ET_Data]
-            assert len(planes)==1, "sync_et_to_cam only supports a single plane being used for synchronizing eye tracking data to the scene camera, contact developer if this is an issue"
+            if len(planes)!=1:
+                raise NotImplementedError("sync_et_to_cam only supports a single plane being used for synchronizing eye tracking data to the scene camera, contact developer if this is an issue")
             pln = planes[0]
 
             # Read pose w.r.t plane
             pln_file = working_dir/f'{naming.plane_pose_prefix}{pln}.tsv'
-            assert pln_file.is_file(), f'A planePose file for the {pln} plane is not found, but is needed. Run detect_markers to create this file.'
+            if not pln_file.is_file():
+                raise FileNotFoundError(f'A planePose file for the {pln} plane is not found, but is needed. Run detect_markers to create this file.')
             poses = plane.read_dict_from_file(pln_file, episodes)
 
             # get camera calibration info
@@ -113,8 +119,10 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, a
             start, end = episodes[ival]
             plot_gaze  = {fr:gazes           [fr] for fr in      gazes       if fr>=start and fr<=end}
             plot_t_pos = {fr:target_positions[fr] for fr in target_positions if fr>=start and fr<=end}
-            assert plot_gaze, f'No gaze data found between frames {start} and {end}'
-            assert plot_t_pos, f'No target/scene camera data found between frames {start} and {end}'
+            if not plot_gaze:
+                raise RuntimeError(f'No gaze data found between frames {start} and {end}')
+            if not plot_t_pos:
+                raise RuntimeError(f'No target/scene camera data found between frames {start} and {end}')
             # determine initial offset
             toff = VOR_sync.loc[ival, 'offset_t']
             if np.isnan(toff):

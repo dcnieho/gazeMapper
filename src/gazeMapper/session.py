@@ -125,9 +125,11 @@ class Session:
     def check_recording_info(self, which: str, rec_info: EyeTrackerRecording|camera_recording.Recording):
         rec_def = self.definition.get_recording_def(which)
         if rec_def.type==RecordingType.EyeTracker:
-            assert isinstance(rec_info,EyeTrackerRecording), f"The provided rec_info is not for an eye tracker recording, but {which} is an eye tracker recording"
+            if not isinstance(rec_info,EyeTrackerRecording):
+                raise TypeError(f"The provided rec_info is not for an eye tracker recording, but {which} is an eye tracker recording")
         elif rec_def.type==RecordingType.Camera:
-            assert isinstance(rec_info,camera_recording.Recording), f"The provided rec_info is not for a camera recording, but {which} is a camera recording"
+            if not isinstance(rec_info,camera_recording.Recording):
+                raise TypeError(f"The provided rec_info is not for a camera recording, but {which} is a camera recording")
 
     def add_recording_from_info(self, which: str, rec_info: EyeTrackerRecording|camera_recording.Recording):
         rec_def = self.definition.get_recording_def(which)

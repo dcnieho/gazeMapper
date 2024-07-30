@@ -48,14 +48,19 @@ class Definition:
         # check provided info
         if self.type==Type.GlassesValidator:
             # prevent bugs
-            assert self.marker_file is None, "The marker_file input argument should not be set when the plane is a GlassesValidator plane (would be ignored)"
-            assert self.marker_size is None, "The marker_size input argument should not be set when the plane is a GlassesValidator plane (would be ignored)"
+            if self.marker_file is not None:
+                raise ValueError("The marker_file input argument should not be set when the plane is a GlassesValidator plane (would be ignored)")
+            if self.marker_size is not None:
+                raise ValueError("The marker_size input argument should not be set when the plane is a GlassesValidator plane (would be ignored)")
             # NB: all the other parameters are also ignored, but have meaningful defaults, so can't be checked
         else:
-            assert self.marker_file is not None, "The marker_file input argument should be provided"
-            assert self.marker_size is not None, "The marker_size input argument should be provided"
+            if self.marker_file is None:
+                raise ValueError("The marker_file input argument should be provided")
+            if self.marker_size is None:
+                raise ValueError("The marker_size input argument should be provided")
             # prevent bugs
-            assert self.use_default is False, "The use_default input argument is for GlassesValidator planes. It should be set to False (default) when the plane is not a GlassesValidator plane (would be ignored)"
+            if self.use_default:
+                raise ValueError("The use_default input argument is for GlassesValidator planes. It should be set to False (default) when the plane is not a GlassesValidator plane (would be ignored)")
 
     def store_as_json(self, path: str | pathlib.Path):
         path = pathlib.Path(path)
