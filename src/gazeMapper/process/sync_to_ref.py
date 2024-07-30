@@ -45,11 +45,11 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
     video_ts_ref = timestamps.VideoTimestamps(ref_vid_ts_file)
 
     # check input
-    if study_config.do_time_stretch:
+    if study_config.sync_ref_do_time_stretch:
         if len(ref_episodes)<2:
             raise ValueError(f"You requested to do time stretching when syncing the recordings, but there is only one camera sync point. At least two sync points are required for time stretching")
-        if study_config.sync_average_recordings:
-            for r in study_config.sync_average_recordings:
+        if study_config.sync_ref_average_recordings:
+            for r in study_config.sync_ref_average_recordings:
                 if r not in session_info.recordings:
                     raise ValueError(f'Recording {r} not found for session {session_info.name}')
                 if r==study_config.sync_ref_recording:
@@ -57,7 +57,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
 
     # prep for sync info
     recs = [r for r in session_info.recordings if r!=study_config.sync_ref_recording]
-    sync = synchronization.get_sync_for_recs(working_dir, recs, study_config.sync_ref_recording, study_config.do_time_stretch, study_config.sync_average_recordings)
+    sync = synchronization.get_sync_for_recs(working_dir, recs, study_config.sync_ref_recording, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings)
 
     # store sync info
     sync.to_csv(working_dir / 'ref_sync.tsv', sep='\t', na_rep='nan', float_format="%.16f")
@@ -69,10 +69,10 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
         ts_col = 'timestamp_VOR' if 'timestamp_VOR' in df else 'timestamp'
         # get gaze timestamps and camera frame numbers _in reference video timeline_
         ts_ref, ref_vid_ts, fr_ref = synchronization.apply_sync(r, sync, df[ts_col].to_numpy(), video_ts_ref.timestamps,
-                                                                study_config.do_time_stretch, study_config.stretch_which)
+                                                                study_config.sync_ref_do_time_stretch, study_config.sync_ref_stretch_which)
 
         # store new video time signal if one was made
-        if study_config.do_time_stretch and study_config.stretch_which=='ref':
+        if study_config.sync_ref_do_time_stretch and study_config.sync_ref_stretch_which=='ref':
             vid_ts_df = pd.read_csv(ref_vid_ts_file, delimiter='\t', index_col='frame_idx')
             should_store = False
             if 'timestamp_stretched' not in vid_ts_df.columns:

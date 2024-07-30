@@ -39,18 +39,17 @@ class Study:
     def __init__(self,
                  session_def: session.SessionDefinition,
                  planes: list[plane.Definition],
+                 planes_per_episode: dict[annotation.Event,list[str]],
+                 episodes_to_code: list[annotation.Event],
                  individual_markers: list[marker.Marker],
                  working_directory: str|pathlib.Path,
-                 planes_per_episode: dict[annotation.Event,list[str]],
-
-                 episodes_to_code: list[annotation.Event],
 
                  get_cam_movement_for_et_sync_method: str,
 
                  sync_ref_recording: str,
-                 do_time_stretch: bool,
-                 stretch_which: str,
-                 sync_average_recordings: list[str],
+                 sync_ref_do_time_stretch: bool,
+                 sync_ref_stretch_which: str,
+                 sync_ref_average_recordings: list[str],
 
                  # setup with defaults
                  get_cam_movement_for_et_sync_function: dict[str,str|dict[str,Any]]|None=None,
@@ -78,16 +77,16 @@ class Study:
         self.planes                 = planes
         self.planes_per_episode     = planes_per_episode
         self.episodes_to_code       = episodes_to_code
+        self.individual_markers     = individual_markers
         self.working_directory      = working_directory
 
         self.get_cam_movement_for_et_sync_method    = get_cam_movement_for_et_sync_method
         self.get_cam_movement_for_et_sync_function  = get_cam_movement_for_et_sync_function
 
-        self.sync_ref_recording     = sync_ref_recording
-        self.do_time_stretch        = do_time_stretch
-        self.stretch_which          = stretch_which
-        self.sync_average_recordings= sync_average_recordings
-        self.individual_markers     = individual_markers
+        self.sync_ref_recording         = sync_ref_recording
+        self.sync_ref_do_time_stretch   = sync_ref_do_time_stretch
+        self.sync_ref_stretch_which     = sync_ref_stretch_which
+        self.sync_ref_average_recordings= sync_ref_average_recordings
 
         self.auto_code_sync_points      = auto_code_sync_points
         self.auto_code_trial_episodes   = auto_code_trial_episodes
@@ -115,10 +114,10 @@ class Study:
         self._check_planes_per_episode()
         self._check_auto_markers()
         self._check_recordings([self.sync_ref_recording], 'sync_ref_recording')
-        self._check_recordings(self.sync_average_recordings, 'sync_average_recordings')
+        self._check_recordings(self.sync_ref_average_recordings, 'sync_average_recordings')
         self._check_recordings(self.make_video_which, 'make_video_which')
         self._check_recordings(self.video_recording_colors, 'video_recording_colors')
-        if self.sync_ref_recording in self.sync_average_recordings:
+        if self.sync_ref_recording in self.sync_ref_average_recordings:
             raise ValueError(f'Recording {self.sync_ref_recording} is the reference recording for sync, should not be specified in sync_average_recordings')
         if self.get_cam_movement_for_et_sync_method not in ['','plane','function']:
             raise ValueError('get_cam_movement_for_et_sync_method parameter should be an empty string, "plane", or "function"')

@@ -94,25 +94,25 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
 
     # get frame sync info, and recording's episodes expressed in the reference video's frame indices
     if study_config.sync_ref_recording:
-        sync = synchronization.get_sync_for_recs(working_dir, list(recs), study_config.sync_ref_recording, study_config.do_time_stretch, study_config.sync_average_recordings)
+        sync = synchronization.get_sync_for_recs(working_dir, list(recs), study_config.sync_ref_recording, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings)
         ref_frame_idxs: dict[str, list[int]] = {}
         episodes_as_ref[study_config.sync_ref_recording] = copy.deepcopy(episodes[study_config.sync_ref_recording])
         for r in sync.index.get_level_values('recording').unique():
             # for each frame in the reference video, get the corresponding frame in this recording
             ref_frame_idxs[r] = synchronization.reference_frames_to_video(r, sync, videos_ts[study_config.sync_ref_recording].indices,
                                                                               videos_ts[r].timestamps, videos_ts[study_config.sync_ref_recording].timestamps,
-                                                                              study_config.do_time_stretch, study_config.stretch_which)
+                                                                              study_config.sync_ref_do_time_stretch, study_config.sync_ref_stretch_which)
             ref_frame_idxs[r] = synchronization.smooth_video_frames_indices(ref_frame_idxs[r])
             # make sure episodes has a trial annotation, which comes from the reference recording
             episodes[r][annotation.Event.Trial] = synchronization.reference_frames_to_video(r, sync, episodes[study_config.sync_ref_recording][annotation.Event.Trial],
                                                                                             videos_ts[r].timestamps, videos_ts[study_config.sync_ref_recording].timestamps,
-                                                                                            study_config.do_time_stretch, study_config.stretch_which)
+                                                                                            study_config.sync_ref_do_time_stretch, study_config.sync_ref_stretch_which)
             episodes_seq_nrs[r][annotation.Event.Trial] = episodes_seq_nrs[study_config.sync_ref_recording][annotation.Event.Trial]
             episode_colors[r] = {k:c for k,c in zip(episodes[r], colors)}
             # also get this recording's coded events in the reference's frames idxs
             episodes_as_ref[r] = {e: synchronization.video_frames_to_reference(r, sync, episodes[r][e],
                                                                         videos_ts[r].timestamps, videos_ts[study_config.sync_ref_recording].timestamps,
-                                                                        study_config.do_time_stretch, study_config.stretch_which)
+                                                                        study_config.sync_ref_do_time_stretch, study_config.sync_ref_stretch_which)
                            for e in episodes[r]}
 
         if study_config.video_process_annotations_for_all_recordings:
@@ -131,7 +131,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                                 inp = [[max(0,ep[0]), min(ep[1],videos_ts[study_config.sync_ref_recording].indices[-1])] if not all([x==-1 for x in ep]) else ep for ep in episodes_as_ref[rec][e]]
                                 eps = synchronization.reference_frames_to_video(r, sync, inp,
                                                                                 videos_ts[r].timestamps, videos_ts[study_config.sync_ref_recording].timestamps,
-                                                                                study_config.do_time_stretch, study_config.stretch_which)
+                                                                                study_config.sync_ref_do_time_stretch, study_config.sync_ref_stretch_which)
                             # insert, but skip if:
                             # 1. ref episode or resulting are equal to [-1 -1]
                             # 2. episode is already in the set (one frame leeway for round trip errors)

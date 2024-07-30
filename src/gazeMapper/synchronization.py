@@ -14,7 +14,7 @@ def get_cols(do_time_stretch: bool):
     else:
         cols += ['mean_off']
 
-def get_sync_for_recs(working_dir: str|pathlib.Path, recs: str|list[str], ref_rec: str, do_time_stretch: bool, sync_average_recordings: list[str]):
+def get_sync_for_recs(working_dir: str|pathlib.Path, recs: str|list[str], ref_rec: str, do_time_stretch: bool, average_recordings: list[str]):
     working_dir  = pathlib.Path(working_dir)
     if isinstance(recs,str):
         recs = [recs]
@@ -48,9 +48,9 @@ def get_sync_for_recs(working_dir: str|pathlib.Path, recs: str|list[str], ref_re
 
     if do_time_stretch:
         # get stretch factor for each interval between two sync points
-        if sync_average_recordings:
-            recs_gr = [r for r in recs if r not in sync_average_recordings]
-            recs_gr.append(sync_average_recordings)
+        if average_recordings:
+            recs_gr = [r for r in recs if r not in average_recordings]
+            recs_gr.append(average_recordings)
         else:
             recs_gr = recs
         for r in recs_gr:
@@ -118,13 +118,13 @@ def get_coding_file(working_dir: str|pathlib.Path):
         raise ValueError(f'No {annotation.Event.Sync_Camera.value} points found for this recording ({working_dir.name}). Run code_episodes and code at least one {annotation.Event.Sync_Camera.value} point.')
     return episodes
 
-def get_episode_frame_indices_from_ref(working_dir: str|pathlib.Path, event: annotation.Event, rec: str, ref_rec:str, all_recs: list[str], do_time_stretch: bool, sync_average_recordings: list[str], stretch_which: str, extra_fr=0):
+def get_episode_frame_indices_from_ref(working_dir: str|pathlib.Path, event: annotation.Event, rec: str, ref_rec:str, all_recs: list[str], do_time_stretch: bool, average_recordings: list[str], stretch_which: str, extra_fr=0):
     working_dir  = pathlib.Path(working_dir)
     ref_episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir.parent / ref_rec / naming.coding_file))
     if event not in ref_episodes:
         raise KeyError(f'Trying to get {event.value} episodes from the reference recording ({ref_rec}), but the coding file for this reference recording doesn\'t contain any ({event.value}) episodes')
     # get sync and timestamp info we need to transform reference frames indices to frame indices of this recording
-    sync = get_sync_for_recs(working_dir.parent, all_recs, ref_rec, do_time_stretch, sync_average_recordings)
+    sync = get_sync_for_recs(working_dir.parent, all_recs, ref_rec, do_time_stretch, average_recordings)
     video_ts_ref = timestamps.VideoTimestamps(working_dir.parent / ref_rec / 'frameTimestamps.tsv')
     video_ts     = timestamps.VideoTimestamps(working_dir / 'frameTimestamps.tsv')
     # get frame indices in this recording's video corresponding to each of the reference frames
