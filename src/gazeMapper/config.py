@@ -319,7 +319,7 @@ class StudyOverride:
             if (val:=getattr(self,p)) is not None:
                 if isinstance(val,dict):
                     # overwrite existing and add new dict keys
-                    setattr(study,p,getattr(study,p)|val)
+                    setattr(study,p,current|val if (current:=getattr(study,p)) is not None else val)
                 else:
                     setattr(study,p,val)
         # check resulting study is valid
