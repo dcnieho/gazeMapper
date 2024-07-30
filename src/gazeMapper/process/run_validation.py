@@ -50,6 +50,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
 
         output_analysis_interval_file_name = f'{naming.validation_prefix}{p}_fixation_intervals.tsv'
         gv_process.determine_fixation_intervals(working_dir, validator_config_dir, study_config.validate_do_global_shift, study_config.validate_max_dist_fac,
+                                                study_config.validate_I2MC_settings,
                                                 marker_interval_file_name=marker_interval_file_name,
                                                 world_gaze_file_name=f'{naming.world_gaze_prefix}{p}.tsv',
                                                 fixation_detection_file_name_prefix=f'{naming.validation_prefix}{p}_targetSelection_I2MC_',
