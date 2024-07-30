@@ -9,7 +9,7 @@ from glassesTools import annotation, gaze_worldref
 from .. import config, episode, marker, naming, session
 
 
-def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, output3D = False, output2D = True, only_code_marker_presence = True, **study_settings):
+def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **study_settings):
     working_dir = pathlib.Path(working_dir) # working directory of a session, not of a recording
     if config_dir is None:
         config_dir = config.guess_config_dir(working_dir)
@@ -44,11 +44,11 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
         plane_gazes = {p:pd.read_csv(working_dir / r / f'{naming.world_gaze_prefix}{p}.tsv',sep='\t', dtype=defaultdict(lambda: float, **gaze_worldref.Gaze._non_float)) for p in planes}
 
         # throw away unwanted columns
-        if not output3D:
+        if not study_config.export_output3D:
             for p in plane_gazes:
                 # throw away all columns starting with gazePosCam or gazeOriCam
                 plane_gazes[p] = plane_gazes[p].drop(columns=[c for c in plane_gazes[p].columns if c.startswith('gazePosCam') or c.startswith('gazeOriCam')])
-        if not output2D:
+        if not study_config.export_output2D:
             for p in plane_gazes:
                 # throw away all columns starting with gazePosPlane2D
                 plane_gazes[p] = plane_gazes[p].drop(columns=[c for c in plane_gazes[p].columns if c.startswith('gazePosPlane2D')])
@@ -67,7 +67,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
         # load
         markers = {m.id: marker.load_file(m, working_dir / r) for m in study_config.individual_markers}
         # recode to presence/absence if wanted
-        if only_code_marker_presence:
+        if study_config.export_only_code_marker_presence:
             markers = marker.code_marker_for_presence(markers)
         else:
             # rename columns to unique names
@@ -79,7 +79,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
             # NB: by not providing on, merge is done on intersection of columns (so that is all timestamp and frame_idx columns, which is what we want)
             plane_gazes = plane_gazes.merge(markers[i], how='left', on='frame_idx')
         # correct missing values in presence column to false
-        if only_code_marker_presence:
+        if study_config.export_only_code_marker_presence:
             for i in markers:
                 plane_gazes[f'marker_{i}_presence'] = plane_gazes[f'marker_{i}_presence'].notnull()
 

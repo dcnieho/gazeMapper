@@ -59,6 +59,10 @@ class Study:
                  auto_code_sync_points                          : AutoCodeSyncPoints|None           = None,
                  auto_code_trial_episodes                       : AutoCodeTrialEpisodes|None        = None,
 
+                 export_output3D                                : bool                              = False,
+                 export_output2D                                : bool                              = True,
+                 export_only_code_marker_presence               : bool                              = True,
+
                  make_video_which                               : list[str]|None                    = None,
                  video_recording_colors                         : dict[str,list[int]]|None          = None,
                  video_process_planes_for_all_frames            : bool                              = False,
@@ -95,6 +99,10 @@ class Study:
 
         self.auto_code_sync_points                          = auto_code_sync_points
         self.auto_code_trial_episodes                       = auto_code_trial_episodes
+
+        self.export_output3D                                = export_output3D,
+        self.export_output2D                                = export_output2D,
+        self.export_only_code_marker_presence               = export_only_code_marker_presence,
 
         self.make_video_which                               = make_video_which
         self.video_recording_colors                         = video_recording_colors
