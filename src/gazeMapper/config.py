@@ -37,63 +37,64 @@ class Study:
 
     @typeguard.typechecked(collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
     def __init__(self,
-                 session_def: session.SessionDefinition,
-                 planes: list[plane.Definition],
-                 planes_per_episode: dict[annotation.Event,list[str]],
-                 episodes_to_code: list[annotation.Event],
-                 individual_markers: list[marker.Marker],
-                 working_directory: str|pathlib.Path,
+                 session_def                                    : session.SessionDefinition,
+                 planes                                         : list[plane.Definition],
+                 planes_per_episode                             : dict[annotation.Event,list[str]],
+                 episodes_to_code                               : list[annotation.Event],
+                 individual_markers                             : list[marker.Marker],
+                 working_directory                              : str|pathlib.Path,
 
-                 get_cam_movement_for_et_sync_method: str,
+                 get_cam_movement_for_et_sync_method            : str,
 
-                 sync_ref_recording: str,
-                 sync_ref_do_time_stretch: bool,
-                 sync_ref_stretch_which: str,
-                 sync_ref_average_recordings: list[str],
+                 sync_ref_recording                             : str,
+                 sync_ref_do_time_stretch                       : bool,
+                 sync_ref_stretch_which                         : str,
+                 sync_ref_average_recordings                    : list[str],
 
                  # setup with defaults
-                 sync_et_to_cam_use_average: bool=True,
+                 sync_et_to_cam_use_average                     : bool=True,
 
-                 get_cam_movement_for_et_sync_function: dict[str,str|dict[str,Any]]|None=None,
+                 get_cam_movement_for_et_sync_function          : dict[str,str|dict[str,Any]]|None  = None,
 
-                 auto_code_sync_points: AutoCodeSyncPoints|None=None,
-                 auto_code_trial_episodes: AutoCodeTrialEpisodes|None=None,
+                 auto_code_sync_points                          : AutoCodeSyncPoints|None           = None,
+                 auto_code_trial_episodes                       : AutoCodeTrialEpisodes|None        = None,
 
-                 make_video_which: list[str]|None=None,
-                 video_recording_colors: dict[str,list[int]]|None=None,
-                 video_process_planes_for_all_frames: bool=False,
-                 video_process_annotations_for_all_recordings: bool=True,
-                 video_show_detected_markers: bool=True,
-                 video_show_board_axes: bool=True,
-                 video_process_individual_markers_for_all_frames: bool=True,
-                 video_show_individual_marker_axes: bool=True,
-                 video_show_sync_func_output: bool=True,
-                 video_show_unexpected_markers: bool=False,
-                 video_show_rejected_markers: bool=False,
-                 video_show_camera_in_ref: bool=True,
-                 video_show_camera_in_other: bool=True,
-                 video_show_gaze_vec_in_ref: bool=True,
-                 video_show_gaze_vec_in_other: bool=False,
-                 video_gaze_to_plane_margin: float=0.25):
-        self.session_def            = session_def
-        self.planes                 = planes
-        self.planes_per_episode     = planes_per_episode
-        self.episodes_to_code       = episodes_to_code
-        self.individual_markers     = individual_markers
-        self.working_directory      = working_directory
+                 make_video_which                               : list[str]|None                    = None,
+                 video_recording_colors                         : dict[str,list[int]]|None          = None,
+                 video_process_planes_for_all_frames            : bool                              = False,
+                 video_process_annotations_for_all_recordings   : bool                              = True,
+                 video_show_detected_markers                    : bool                              = True,
+                 video_show_board_axes                          : bool                              = True,
+                 video_process_individual_markers_for_all_frames: bool                              = True,
+                 video_show_individual_marker_axes              : bool                              = True,
+                 video_show_sync_func_output                    : bool                              = True,
+                 video_show_unexpected_markers                  : bool                              = False,
+                 video_show_rejected_markers                    : bool                              = False,
+                 video_show_camera_in_ref                       : bool                              = True,
+                 video_show_camera_in_other                     : bool                              = True,
+                 video_show_gaze_vec_in_ref                     : bool                              = True,
+                 video_show_gaze_vec_in_other                   : bool                              = False,
+                 video_gaze_to_plane_margin                     : float                             = 0.25
+                 ):
+        self.session_def                                    = session_def
+        self.planes                                         = planes
+        self.planes_per_episode                             = planes_per_episode
+        self.episodes_to_code                               = episodes_to_code
+        self.individual_markers                             = individual_markers
+        self.working_directory                              = working_directory
 
-        self.get_cam_movement_for_et_sync_method    = get_cam_movement_for_et_sync_method
-        self.get_cam_movement_for_et_sync_function  = get_cam_movement_for_et_sync_function
+        self.get_cam_movement_for_et_sync_method            = get_cam_movement_for_et_sync_method
+        self.get_cam_movement_for_et_sync_function          = get_cam_movement_for_et_sync_function
 
-        self.sync_et_to_cam_use_average = sync_et_to_cam_use_average
+        self.sync_et_to_cam_use_average                     = sync_et_to_cam_use_average
 
-        self.sync_ref_recording         = sync_ref_recording
-        self.sync_ref_do_time_stretch   = sync_ref_do_time_stretch
-        self.sync_ref_stretch_which     = sync_ref_stretch_which
-        self.sync_ref_average_recordings= sync_ref_average_recordings
+        self.sync_ref_recording                             = sync_ref_recording
+        self.sync_ref_do_time_stretch                       = sync_ref_do_time_stretch
+        self.sync_ref_stretch_which                         = sync_ref_stretch_which
+        self.sync_ref_average_recordings                    = sync_ref_average_recordings
 
-        self.auto_code_sync_points      = auto_code_sync_points
-        self.auto_code_trial_episodes   = auto_code_trial_episodes
+        self.auto_code_sync_points                          = auto_code_sync_points
+        self.auto_code_trial_episodes                       = auto_code_trial_episodes
 
         self.make_video_which                               = make_video_which
         self.video_recording_colors                         = video_recording_colors
