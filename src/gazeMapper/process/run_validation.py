@@ -8,9 +8,7 @@ from .. import config, episode, naming, plane, session
 
 
 stopAllProcessing = False
-def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None,
-            do_global_shift=True, max_dist_fac=.5,
-            dq_types: list[gv_process.DataQualityType]=None, allow_dq_fallback=False, include_data_loss=False, **study_settings):
+def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **study_settings):
     working_dir = pathlib.Path(working_dir)
     if config_dir is None:
         config_dir = config.guess_config_dir(working_dir)
@@ -51,13 +49,13 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None,
                                               output_gaze_offset_file_name=output_gaze_offset_file_name)
 
         output_analysis_interval_file_name = f'{naming.validation_prefix}{p}_fixation_intervals.tsv'
-        gv_process.determine_fixation_intervals(working_dir, validator_config_dir, do_global_shift, max_dist_fac,
+        gv_process.determine_fixation_intervals(working_dir, validator_config_dir, study_config.validate_do_global_shift, study_config.validate_max_dist_fac,
                                                 marker_interval_file_name=marker_interval_file_name,
                                                 world_gaze_file_name=f'{naming.world_gaze_prefix}{p}.tsv',
                                                 fixation_detection_file_name_prefix=f'{naming.validation_prefix}{p}_targetSelection_I2MC_',
                                                 output_analysis_interval_file_name=output_analysis_interval_file_name)
 
-        gv_process.calculate_data_quality(working_dir, dq_types, allow_dq_fallback, include_data_loss,
+        gv_process.calculate_data_quality(working_dir, study_config.validate_dq_types, study_config.validate_allow_dq_fallback, study_config.validate_include_data_loss,
                                           analysis_interval_file_name=output_analysis_interval_file_name,
                                           gaze_offset_file_name=output_gaze_offset_file_name,
                                           output_data_quality_file_name=f'{naming.validation_prefix}{p}_data_quality.tsv')

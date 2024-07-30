@@ -7,6 +7,7 @@ import typeguard
 from typing import Any, TypedDict
 
 from glassesTools import annotation, utils
+from glassesValidator import process as gv_process
 
 from . import marker, plane, session
 
@@ -63,6 +64,12 @@ class Study:
                  export_output2D                                : bool                              = True,
                  export_only_code_marker_presence               : bool                              = True,
 
+                 validate_do_global_shift                       : bool                              = True,
+                 validate_max_dist_fac                          : float                             = .5,
+                 validate_dq_types                              : list[gv_process.DataQualityType]  = None,
+                 validate_allow_dq_fallback                     : bool                              = False,
+                 validate_include_data_loss                     : bool                              = False,
+
                  make_video_which                               : list[str]|None                    = None,
                  video_recording_colors                         : dict[str,list[int]]|None          = None,
                  video_process_planes_for_all_frames            : bool                              = False,
@@ -103,6 +110,12 @@ class Study:
         self.export_output3D                                = export_output3D,
         self.export_output2D                                = export_output2D,
         self.export_only_code_marker_presence               = export_only_code_marker_presence,
+
+        self.validate_do_global_shift                       = validate_do_global_shift
+        self.validate_max_dist_fac                          = validate_max_dist_fac
+        self.validate_dq_types                              = validate_dq_types
+        self.validate_allow_dq_fallback                     = validate_allow_dq_fallback
+        self.validate_include_data_loss                     = validate_include_data_loss
 
         self.make_video_which                               = make_video_which
         self.video_recording_colors                         = video_recording_colors
