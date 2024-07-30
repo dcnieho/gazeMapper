@@ -4,7 +4,7 @@ import typing
 import copy
 import enum
 import typeguard
-from typing import Any
+from typing import Any, TypedDict
 
 from glassesTools import annotation, utils
 
@@ -19,6 +19,18 @@ defaults = {
     'auto_code_trials_episodes.max_intermarker_gap_duration': 15,
     'auto_code_trials_episodes.min_duration': 6,
 }
+
+class AutoCodeSyncPoints(TypedDict, total=False):
+    max_gap_duration: int
+    min_duration: int
+    markers: list[int]
+
+class AutoCodeTrialEpisodes(TypedDict, total=False):
+    max_gap_duration: int
+    max_intermarker_gap_duration: int
+    min_duration: int
+    start_markers: list[int]
+    end_markers: list[int]
 
 class Study:
     default_json_file_name = 'study_def.json'
@@ -43,8 +55,8 @@ class Study:
                  # setup with defaults
                  get_cam_movement_for_et_sync_function: dict[str,str|dict[str,Any]]|None=None,
 
-                 auto_code_sync_points: dict[str,Any]|None=None,
-                 auto_code_trial_episodes: dict[str,Any]|None=None,
+                 auto_code_sync_points: AutoCodeSyncPoints|None=None,
+                 auto_code_trial_episodes: AutoCodeTrialEpisodes|None=None,
 
                  make_video_which: list[str]|None=None,
                  video_recording_colors: dict[str,list[int]]|None=None,
