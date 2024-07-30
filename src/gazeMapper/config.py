@@ -3,6 +3,8 @@ import json
 import inspect
 import copy
 import enum
+import typeguard
+from typing import Any
 
 from glassesTools import annotation, utils
 
@@ -21,6 +23,7 @@ defaults = {
 class Study:
     default_json_file_name = 'study_def.json'
 
+    @typeguard.typechecked(collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
     def __init__(self,
                  session_def: session.SessionDefinition,
                  planes: list[plane.Definition],
@@ -38,27 +41,27 @@ class Study:
                  sync_average_recordings: list[str],
 
                  # setup with defaults
-                 get_cam_movement_for_et_sync_function: dict[str,str|dict[str]]=None,
+                 get_cam_movement_for_et_sync_function: dict[str,str|dict[str,Any]]|None=None,
 
-                 auto_code_sync_points: dict[str]=None,
-                 auto_code_trials_episodes: dict[str]=None,
+                 auto_code_sync_points: dict[str,Any]|None=None,
+                 auto_code_trials_episodes: dict[str,Any]|None=None,
 
-                 make_video_which: list[str]=None,
-                 video_recording_colors: dict[str,tuple[int,int,int]]=None,
-                 video_process_planes_for_all_frames=False,
-                 video_process_annotations_for_all_recordings=True,
-                 video_show_detected_markers=True,
-                 video_show_board_axes=True,
-                 video_process_individual_markers_for_all_frames=True,
-                 video_show_individual_marker_axes=True,
-                 video_show_sync_func_output=True,
-                 video_show_unexpected_markers=False,
-                 video_show_rejected_markers=False,
-                 video_show_camera_in_ref=True,
-                 video_show_camera_in_other=True,
-                 video_show_gaze_vec_in_ref=True,
-                 video_show_gaze_vec_in_other=False,
-                 video_gaze_to_plane_margin=0.25):
+                 make_video_which: list[str]|None=None,
+                 video_recording_colors: dict[str,list[int]]|None=None,
+                 video_process_planes_for_all_frames: bool=False,
+                 video_process_annotations_for_all_recordings: bool=True,
+                 video_show_detected_markers: bool=True,
+                 video_show_board_axes: bool=True,
+                 video_process_individual_markers_for_all_frames: bool=True,
+                 video_show_individual_marker_axes: bool=True,
+                 video_show_sync_func_output: bool=True,
+                 video_show_unexpected_markers: bool=False,
+                 video_show_rejected_markers: bool=False,
+                 video_show_camera_in_ref: bool=True,
+                 video_show_camera_in_other: bool=True,
+                 video_show_gaze_vec_in_ref: bool=True,
+                 video_show_gaze_vec_in_other: bool=False,
+                 video_gaze_to_plane_margin: float=0.25):
         self.session_def            = session_def
         self.planes                 = planes
         self.planes_per_episode     = planes_per_episode
