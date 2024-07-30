@@ -140,7 +140,7 @@ def _get_plane_setup(study_config: config.Study,
             analyze_frames[p] = sorted(all_episodes, key = lambda x: x[1])
 
     # if there is some form of automatic coding configured, then we'll need to process the whole video for each recording in a session
-    if not want_analyze_frames and episodes and (study_config.auto_code_sync_points or study_config.auto_code_trials_episodes):
+    if not want_analyze_frames and episodes and (study_config.auto_code_sync_points or study_config.auto_code_trial_episodes):
         analyze_frames = {p:None for p in analyze_frames}
 
     return planes_setup, analyze_frames

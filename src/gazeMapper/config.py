@@ -44,7 +44,7 @@ class Study:
                  get_cam_movement_for_et_sync_function: dict[str,str|dict[str,Any]]|None=None,
 
                  auto_code_sync_points: dict[str,Any]|None=None,
-                 auto_code_trials_episodes: dict[str,Any]|None=None,
+                 auto_code_trial_episodes: dict[str,Any]|None=None,
 
                  make_video_which: list[str]|None=None,
                  video_recording_colors: dict[str,list[int]]|None=None,
@@ -78,7 +78,7 @@ class Study:
         self.individual_markers     = individual_markers
 
         self.auto_code_sync_points      = auto_code_sync_points
-        self.auto_code_trials_episodes  = auto_code_trials_episodes
+        self.auto_code_trial_episodes   = auto_code_trial_episodes
 
         self.make_video_which                               = make_video_which
         self.video_recording_colors                         = video_recording_colors
@@ -119,7 +119,7 @@ class Study:
         if self.auto_code_sync_points:
             if annotation.Event.Sync_Camera not in self.episodes_to_code:
                 raise ValueError(f'The auto_code_sync_points option is configured, but {annotation.Event.Sync_Camera} points are not set to be coded in episodes_to_code. Fix episodes_to_code.')
-        if self.auto_code_trials_episodes:
+        if self.auto_code_trial_episodes:
             if annotation.Event.Trial not in self.episodes_to_code:
                 raise ValueError(f'The auto_code_trials_episodes option is configured, but {annotation.Event.Trial} episodes are not set to be coded in episodes_to_code. Fix episodes_to_code.')
 
@@ -128,13 +128,13 @@ class Study:
                 self.auto_code_sync_points['max_gap_duration'] = defaults['auto_code_sync_points.max_gap_duration']
             if 'min_duration' not in self.auto_code_sync_points:
                 self.auto_code_sync_points['min_duration'] = defaults['auto_code_sync_points.min_duration']
-        if self.auto_code_trials_episodes:
-            if 'max_gap_duration' not in self.auto_code_trials_episodes:
-                self.auto_code_trials_episodes['max_gap_duration'] = defaults['auto_code_trials_episodes.max_gap_duration']
-            if 'max_intermarker_gap_duration' not in self.auto_code_trials_episodes:
-                self.auto_code_trials_episodes['max_intermarker_gap_duration'] = defaults['auto_code_trials_episodes.max_intermarker_gap_duration']
-            if 'min_duration' not in self.auto_code_trials_episodes:
-                self.auto_code_trials_episodes['min_duration'] = defaults['auto_code_trials_episodes.min_duration']
+        if self.auto_code_trial_episodes:
+            if 'max_gap_duration' not in self.auto_code_trial_episodes:
+                self.auto_code_trial_episodes['max_gap_duration'] = defaults['auto_code_trials_episodes.max_gap_duration']
+            if 'max_intermarker_gap_duration' not in self.auto_code_trial_episodes:
+                self.auto_code_trial_episodes['max_intermarker_gap_duration'] = defaults['auto_code_trials_episodes.max_intermarker_gap_duration']
+            if 'min_duration' not in self.auto_code_trial_episodes:
+                self.auto_code_trial_episodes['min_duration'] = defaults['auto_code_trials_episodes.min_duration']
 
     def _check_planes_per_episode(self):
         for e in self.planes_per_episode:
@@ -147,9 +147,9 @@ class Study:
             for i in self.auto_code_sync_points['markers']:
                 if not any([m.id==i for m in self.individual_markers]):
                     raise ValueError(f'Marker "{i}" specified in auto_code_sync_points.markers, but unknown because not present in individual_markers')
-        if self.auto_code_trials_episodes:
+        if self.auto_code_trial_episodes:
             for f in ['start_markers','end_markers']:
-                for i in self.auto_code_trials_episodes[f]:
+                for i in self.auto_code_trial_episodes[f]:
                     if not any([m.id==i for m in self.individual_markers]):
                         raise ValueError(f'Marker "{i}" specified in auto_code_trials_episodes.{f}, but unknown because not present in individual_markers')
 
@@ -251,7 +251,7 @@ class StudyOverride:
             # arguments they may make sense depending on the processing function that
             # is being called, but we cannot differentiate, so reject to be conservative
             # use whitelist
-            include = {'get_cam_movement_for_et_sync_method','get_cam_movement_for_et_sync_function', 'auto_code_sync_points', 'auto_code_trials_episodes'}
+            include = {'get_cam_movement_for_et_sync_method','get_cam_movement_for_et_sync_function', 'auto_code_sync_points', 'auto_code_trial_episodes'}
             exclude = all_params-include
         self._params = all_params-exclude
         for p in self._params:

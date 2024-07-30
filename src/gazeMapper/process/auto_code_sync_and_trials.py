@@ -17,13 +17,13 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
 
     # get settings for the study
     study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent, config.OverrideLevel.Recording: working_dir}, **study_settings)
-    if not (study_config.auto_code_sync_points or study_config.auto_code_trials_episodes):
+    if not (study_config.auto_code_sync_points or study_config.auto_code_trial_episodes):
         raise ValueError(f'No automatic sync point detection or trial episode coding is defined for this study, nothing to do')
     rec_def = study_config.session_def.get_recording_def(working_dir.name)
 
     if not study_config.auto_code_sync_points:
-        if not (study_config.auto_code_trials_episodes and (not study_config.sync_ref_recording or rec_def.name==study_config.sync_ref_recording)):
-            if not study_config.auto_code_trials_episodes:
+        if not (study_config.auto_code_trial_episodes and (not study_config.sync_ref_recording or rec_def.name==study_config.sync_ref_recording)):
+            if not study_config.auto_code_trial_episodes:
                 raise RuntimeError('Nothing to do, neither auto_code_sync_points nor auto_code_trials_episodes are defined')
             else:
                 raise RuntimeError(f'Nothing to do, auto_code_trials_episodes is defined, but you have a sync_ref_recording ({study_config.sync_ref_recording}) and this ({rec_def.name}) isn\'t it')
@@ -56,9 +56,9 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
         [episodes[annotation.Event.Sync_Camera].append(i) for i in marker_starts if i not in episodes[annotation.Event.Sync_Camera]]
 
     # automatic trial episode coding
-    if study_config.auto_code_trials_episodes and (not study_config.sync_ref_recording or rec_def.name==study_config.sync_ref_recording):
+    if study_config.auto_code_trial_episodes and (not study_config.sync_ref_recording or rec_def.name==study_config.sync_ref_recording):
         # get marker files
-        markers = {m.id: marker.load_file(m, working_dir) for m in study_config.individual_markers if m.id in study_config.auto_code_trials_episodes['start_markers']+study_config.auto_code_trials_episodes['end_markers']}
+        markers = {m.id: marker.load_file(m, working_dir) for m in study_config.individual_markers if m.id in study_config.auto_code_trial_episodes['start_markers']+study_config.auto_code_trial_episodes['end_markers']}
         # recode so we have a boolean with when markers are present
         markers = {i: marker.code_marker_for_presence(markers[i]) for i in markers}
         # fill gaps in marker detection
@@ -68,16 +68,16 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
         marker_starts: dict[int,list[int]] = {}
         marker_ends  : dict[int,list[int]] = {}
         for i in markers:
-            marker_starts[i], marker_ends[i] = get_marker_starts_ends(markers[i], study_config.auto_code_trials_episodes['max_gap_duration'], study_config.auto_code_trials_episodes['min_duration'])
+            marker_starts[i], marker_ends[i] = get_marker_starts_ends(markers[i], study_config.auto_code_trial_episodes['max_gap_duration'], study_config.auto_code_trial_episodes['min_duration'])
         # find potential trial starts and ends
-        if len(study_config.auto_code_trials_episodes['start_markers'])>1:
-            starts = get_trial_from_markers(marker_starts, marker_ends, study_config.auto_code_trials_episodes['start_markers'], study_config.auto_code_trials_episodes['max_intermarker_gap_duration'], side='end')
+        if len(study_config.auto_code_trial_episodes['start_markers'])>1:
+            starts = get_trial_from_markers(marker_starts, marker_ends, study_config.auto_code_trial_episodes['start_markers'], study_config.auto_code_trial_episodes['max_intermarker_gap_duration'], side='end')
         else:
-            starts = marker_ends  [study_config.auto_code_trials_episodes['start_markers'][0]]
-        if len(study_config.auto_code_trials_episodes[ 'end_markers' ])>1:
-            ends   = get_trial_from_markers(marker_starts, marker_ends, study_config.auto_code_trials_episodes[ 'end_markers' ], study_config.auto_code_trials_episodes['max_intermarker_gap_duration'], side='start')
+            starts = marker_ends  [study_config.auto_code_trial_episodes['start_markers'][0]]
+        if len(study_config.auto_code_trial_episodes[ 'end_markers' ])>1:
+            ends   = get_trial_from_markers(marker_starts, marker_ends, study_config.auto_code_trial_episodes[ 'end_markers' ], study_config.auto_code_trial_episodes['max_intermarker_gap_duration'], side='start')
         else:
-            ends   = marker_starts[study_config.auto_code_trials_episodes[ 'end_markers' ][0]]
+            ends   = marker_starts[study_config.auto_code_trial_episodes[ 'end_markers' ][0]]
         # now match trial starts and ends
         # strategy: run through starts and find latest start that is before first end (discard ends that are before the start)
         # keep pointer into array keeping track of ends and start already discarded or consumed
