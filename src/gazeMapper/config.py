@@ -52,6 +52,8 @@ class Study:
                  sync_ref_average_recordings: list[str],
 
                  # setup with defaults
+                 sync_et_to_cam_use_average: bool=True,
+
                  get_cam_movement_for_et_sync_function: dict[str,str|dict[str,Any]]|None=None,
 
                  auto_code_sync_points: AutoCodeSyncPoints|None=None,
@@ -82,6 +84,8 @@ class Study:
 
         self.get_cam_movement_for_et_sync_method    = get_cam_movement_for_et_sync_method
         self.get_cam_movement_for_et_sync_function  = get_cam_movement_for_et_sync_function
+
+        self.sync_et_to_cam_use_average = sync_et_to_cam_use_average
 
         self.sync_ref_recording         = sync_ref_recording
         self.sync_ref_do_time_stretch   = sync_ref_do_time_stretch
