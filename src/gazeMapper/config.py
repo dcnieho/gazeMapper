@@ -107,9 +107,9 @@ class Study:
         self.auto_code_sync_points                          = auto_code_sync_points
         self.auto_code_trial_episodes                       = auto_code_trial_episodes
 
-        self.export_output3D                                = export_output3D,
-        self.export_output2D                                = export_output2D,
-        self.export_only_code_marker_presence               = export_only_code_marker_presence,
+        self.export_output3D                                = export_output3D
+        self.export_output2D                                = export_output2D
+        self.export_only_code_marker_presence               = export_only_code_marker_presence
 
         self.validate_do_global_shift                       = validate_do_global_shift
         self.validate_max_dist_fac                          = validate_max_dist_fac
