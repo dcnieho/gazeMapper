@@ -232,10 +232,18 @@ class StudyOverride:
 
     def __init__(self, level: OverrideLevel, **kwargs):
         self.level = level
-        study_init = inspect.signature(Study.__init__)
+        all_params = set(inspect.signature(Study.__init__).parameters)
         exclude = {'self', 'session_def', 'planes', 'individual_markers', 'working_directory', 'planes_per_episode'}
-        # TODO: depending on level, disallow more
-        self._params = set(study_init.parameters)-exclude
+        # above is Session-level disallowed parameters. Depending on level, disallow more
+        if level in [OverrideLevel.Recording, OverrideLevel.FunctionArgs]:
+            # these make no sense on a recording level as they are settings for
+            # processing functions that run on a whole session at once. As function
+            # arguments they may make sense depending on the processing function that
+            # is being called, but we cannot differentiate, so reject to be conservative
+            # use whitelist
+            include = {'get_cam_movement_for_et_sync_method','get_cam_movement_for_et_sync_function', 'auto_code_sync_points', 'auto_code_trials_episodes'}
+            exclude = all_params-include
+        self._params = all_params-exclude
         for p in self._params:
             setattr(self,p,None)
         for p in kwargs:
@@ -243,7 +251,7 @@ class StudyOverride:
                 if self.level==OverrideLevel.FunctionArgs:
                     err_text = 'with parameter overrides provided as extra arguments to the processing function'
                 else:
-                    err_text = f'with parameter overrides configured for a {self.level.name}'
+                    err_text = f'with {self.level.name}-level parameter overrides'
                 raise TypeError(f"{StudyOverride.__name__}.__init__(): you are not allowed to override the '{p}' parameter of a {Study.__name__} class {err_text}")
             if p not in self._params:
                 raise TypeError(f"{StudyOverride.__name__}.__init__(): got an unknown parameter '{p}'")
