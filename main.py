@@ -2,6 +2,9 @@
 import sys
 import os
 import multiprocessing
+import argparse
+import ctypes
+
 
 if getattr(sys, "frozen", False):
     if not sys.platform.startswith("win"):
@@ -19,6 +22,14 @@ if getattr(sys, "frozen", False):
 
 if __name__=="__main__":
     multiprocessing.freeze_support()
+    parser = argparse.ArgumentParser(description="gazeMapper")
+    parser.add_argument('--hide', action='store_true', help="hide console window")
+    args = parser.parse_args()
 
-    import gazeMapper
+    if args.hide:
+        ctypes.windll.user32.ShowWindow(ctypes.windll.kernel32.GetConsoleWindow(), 0)
+
+    import gazeMapper.GUI
+    gazeMapper.GUI.set_up()
     gazeMapper.GUI.run()
+    gazeMapper.GUI.clean_up()
