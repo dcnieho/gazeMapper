@@ -2,16 +2,16 @@ import pathlib
 
 from glassesTools import eyetracker, importing, marker
 
-from src.gazeMapper import camera_recording, config, episode, session, plane
-from src.gazeMapper.process.code_episodes import process as do_coding
-from src.gazeMapper.process.detect_markers import process as detect_markers
-from src.gazeMapper.process.sync_et_to_cam import process as sync_et_to_cam
-from src.gazeMapper.process.sync_to_ref import process as sync_to_ref
-from src.gazeMapper.process.gaze_to_plane import process as gaze_to_plane
-from src.gazeMapper.process.export_trials import process as export_trials
-from src.gazeMapper.process.run_validation import process as run_validation
-from src.gazeMapper.process.auto_code_sync_and_trials import process as auto_code_sync_and_trials
-from src.gazeMapper.process.make_video import process as make_video
+from gazeMapper import camera_recording, config, episode, session, plane
+from gazeMapper.process.code_episodes import process as do_coding
+from gazeMapper.process.detect_markers import process as detect_markers
+from gazeMapper.process.sync_et_to_cam import process as sync_et_to_cam
+from gazeMapper.process.sync_to_ref import process as sync_to_ref
+from gazeMapper.process.gaze_to_plane import process as gaze_to_plane
+from gazeMapper.process.export_trials import process as export_trials
+from gazeMapper.process.run_validation import process as run_validation
+from gazeMapper.process.auto_code_sync_and_trials import process as auto_code_sync_and_trials
+from gazeMapper.process.make_video import process as make_video
 
 
 which = 3
