@@ -16,7 +16,7 @@ import glassesValidator
 
 from ... import version
 from .. import async_thread
-from . import msgbox, utils
+from . import callbacks, msgbox, utils
 
 
 class GUI:
@@ -178,6 +178,10 @@ class GUI:
         self._need_set_window_title = False
 
 
+    def load_project(self, path: pathlib.Path):
+        pass
+
+
     def _sessions_pane_drawer(self):
         if not self.project_dir:
             self._draw_unopened_interface()
@@ -200,10 +204,10 @@ class GUI:
 
         imgui.set_cursor_pos((but_x, but_y))
         if imgui.button(ifa6.ICON_FA_FOLDER_PLUS+" New project", size=(but_width, but_height)):
-            pass
+            utils.push_popup(self, callbacks.get_folder_picker(self, reason='creating'))
         imgui.same_line(spacing=10*imgui.get_style().item_spacing.x)
         if imgui.button(ifa6.ICON_FA_FOLDER_OPEN+" Open project", size=(but_width, but_height)):
-            pass
+            utils.push_popup(self, callbacks.get_folder_picker(self, reason='loading'))
 
     def _project_settings_drawer(self):
         pass

@@ -3,9 +3,11 @@ import functools
 import traceback
 from imgui_bundle import imgui, icons_fontawesome_6 as ifa6
 import sys
+import pathlib
 from typing import Any, Callable
 
 from . import msgbox
+from ... import config
 
 
 # https://gist.github.com/Willy-JL/f733c960c6b0d2284bcbee0316f88878
@@ -14,6 +16,36 @@ def get_traceback(*exc_info: list):
     tb_lines = traceback.format_exception(*exc_info)
     tb = "".join(tb_lines)
     return tb
+
+
+def trim_str(text: str, length=None, till_newline=True, newline_ellipsis=False):
+    if text and till_newline:
+        temp = text.splitlines()
+        if temp:
+            text = temp[0]
+        if len(temp)>1 and newline_ellipsis:
+            text += '..'
+    if length:
+        text = (text[:length-2] + '..') if len(text) > length else text
+    return text
+
+
+def is_project_folder(path: str | pathlib.Path):
+    path = pathlib.Path(path)
+    if not path.is_dir():
+        return False
+    # a project directory should contain a 'config'
+    # folder and inside that a 'study_def.json' file
+    return (path/'config').is_dir() and (path/'config'/config.Study.default_json_file_name).is_file()
+
+def init_project_folder(path: str | pathlib.Path):
+    path = pathlib.Path(path)
+    if not path.is_dir():
+        raise ValueError(f'The provided path is not a folder. Provided path: {path}')
+    config_dir = path/'config'
+    if not config_dir.is_dir():
+        config_dir.mkdir()
+    # make empty 'study_def.json' file
 
 
 def set_all(input: dict[int, bool], value, subset: list[int] = None, predicate: Callable = None):
