@@ -219,13 +219,16 @@ class Study:
             if not any([r.name==w for r in self.session_def.recordings]):
                 raise ValueError(f'Recording "{w}" not known, check {field} in the study configuration')
 
-    def store_as_json(self, path: str | pathlib.Path):
+    def store_as_json(self, path: str|pathlib.Path):
         path = pathlib.Path(path)
         # this stores only the planes_per_episode variable to json, rest is read from other files
         # instead to remain flexible and make it easy for users to rename, etc
-        if path.is_dir():
-            path = path / self.default_json_file_name
-        with open(path, 'w') as f:
+        f_path = path
+        if f_path.is_dir():
+            f_path /= self.default_json_file_name
+        else:
+            path = f_path.parent
+        with open(f_path, 'w') as f:
             to_dump = {k:getattr(self,k) for k in vars(self) if not k.startswith('_') and k not in ['session_def','planes','working_directory']}    # session_def and planes will be populated from contents in the provided folder, and working_directory as the provided path
             to_dump['planes_per_episode'] = [(k, to_dump['planes_per_episode'][k]) for k in to_dump['planes_per_episode']]   # pack as list of tuples for storage
             # optional arguments
@@ -234,9 +237,9 @@ class Study:
             # dump to file
             json.dump(to_dump, f, cls=utils.CustomTypeEncoder, indent=2)
         # this doesn't store any files itself, but triggers the contained info to be stored
-        self.session_def.store_as_json(self.working_directory / 'session_def.json')
+        self.session_def.store_as_json(path)
         for p in self.planes:
-            p_dir = self.working_directory / p.name
+            p_dir = path / p.name
             if not p_dir.is_dir():
                 p_dir.mkdir()
             p.store_as_json(p_dir)
