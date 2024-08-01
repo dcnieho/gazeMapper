@@ -248,6 +248,14 @@ class Study:
             p.store_as_json(p_dir)
 
     @staticmethod
+    def get_empty(path: str | pathlib.Path) -> 'Study':
+        # returns a minimally set up config, with every required argument set empty, and the rest default-initialized
+        return Study(
+            session.SessionDefinition(),
+            [],{},[],[],path
+        )
+
+    @staticmethod
     def load_from_json(path: str | pathlib.Path) -> 'Study':
         path = pathlib.Path(path)
         if path.is_dir():
