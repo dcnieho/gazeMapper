@@ -40,7 +40,7 @@ def try_load_project(g, path: str|pathlib.Path, action='loading'):
         if action=='creating':
             buttons = {
                 ifa6.ICON_FA_CHECK+" Yes": lambda: g.load_project(path),
-                ifa6.ICON_FA_BAN+" No": None
+                ifa6.ICON_FA_CIRCLE_XMARK+" No": None
             }
             utils.push_popup(g, msgbox.msgbox, "Create new project", "The selected folder is already a project folder.\nDo you want to open it?", msgbox.MsgBox.question, buttons)
         else:
@@ -55,7 +55,7 @@ def try_load_project(g, path: str|pathlib.Path, action='loading'):
             utils.init_project_folder(path)
             buttons = {
                 ifa6.ICON_FA_CHECK+" Yes": lambda: g.load_project(path),
-                ifa6.ICON_FA_BAN+" No": None
+                ifa6.ICON_FA_CIRCLE_XMARK+" No": None
             }
             utils.push_popup(g, msgbox.msgbox, "Open new project", "Do you want to open the new project folder?", msgbox.MsgBox.question, buttons)
         if action=='creating':
@@ -63,6 +63,6 @@ def try_load_project(g, path: str|pathlib.Path, action='loading'):
         else:
             buttons = {
                 ifa6.ICON_FA_CHECK+" Yes": lambda: init_project_and_ask(),
-                ifa6.ICON_FA_BAN+" No": None
+                ifa6.ICON_FA_CIRCLE_XMARK+" No": None
             }
             utils.push_popup(g, msgbox.msgbox, "Create new project", "The selected folder is empty. Do you want to use it as a new project folder?", msgbox.MsgBox.warn, buttons)

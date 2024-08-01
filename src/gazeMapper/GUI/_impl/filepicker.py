@@ -708,7 +708,7 @@ class FilePicker:
         cancelled = closed = False
 
         # Cancel button
-        if imgui.button(ifa6.ICON_FA_BAN+" Cancel"):
+        if imgui.button(ifa6.ICON_FA_CIRCLE_XMARK+" Cancel"):
             imgui.close_current_popup()
             cancelled = closed = True
         # Ok button
@@ -740,7 +740,7 @@ class FilePicker:
         closed = False
         size = imgui.ImVec2(imgui.get_item_rect_size().x, 0)
         if leave_space_for_bottom_bar:
-            button_text_size = imgui.calc_text_size(ifa6.ICON_FA_BAN+" Cancel")
+            button_text_size = imgui.calc_text_size(ifa6.ICON_FA_CIRCLE_XMARK+" Cancel")
             bottom_margin = button_text_size.y+imgui.get_style().frame_padding.y*2+imgui.get_style().item_spacing.y
             size.y = -bottom_margin
         imgui.begin_child("##folder_contents", size=size)
@@ -1087,7 +1087,7 @@ class DialogProvider:
             return 0 if imgui.is_key_released(imgui.Key.enter) else None
         buttons = {
             ifa6.ICON_FA_CHECK+" Make folder": lambda: self.action_provider('make_dir',parent/new_folder_name),
-            ifa6.ICON_FA_BAN+" Cancel": None
+            ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
         }
         utils.push_popup(self.gui, lambda: utils.popup("Make folder", _new_folder_popup, buttons = buttons, closable=True))
 
@@ -1114,6 +1114,6 @@ class DialogProvider:
             return 0 if imgui.is_key_released(imgui.Key.enter) else None
         buttons = {
             ifa6.ICON_FA_CHECK+" Rename": lambda: self.action_provider('rename_path', item, item.parent / item_name),
-            ifa6.ICON_FA_BAN+" Cancel": None
+            ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
         }
         utils.push_popup(self.gui, lambda: utils.popup("Rename item", _rename_item_popup, buttons = buttons, closable=True))
