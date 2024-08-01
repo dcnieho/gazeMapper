@@ -275,7 +275,13 @@ class GUI:
             return
         elif not self.can_accept_sessions:
             imgui.text('This study does not have at least one defined recording and one defined plane.')
-            imgui.text('Set these up in the Project settings tab before you can continue.')
+            imgui.align_text_to_frame_padding()
+            imgui.text('Set these up in the')
+            imgui.same_line()
+            if imgui.button('Project settings##button'):
+                self._to_focus = self._project_settings_pane.label
+            imgui.same_line()
+            imgui.text('tab before you can continue.')
             return
 
     def _draw_unopened_interface(self):
