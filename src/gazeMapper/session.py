@@ -42,6 +42,8 @@ def get_video_path(rec_info: EyeTrackerRecording|camera_recording.Recording) -> 
         return rec_info.get_scene_video_path()
 
 class SessionDefinition:
+    default_json_file_name = 'session_def.json'
+
     def __init__(self, recordings: list[RecordingDefinition]=None):
         if recordings is None:
             recordings = []
@@ -58,12 +60,16 @@ class SessionDefinition:
 
     def store_as_json(self, path: str | pathlib.Path):
         path = pathlib.Path(path)
+        if path.is_dir():
+            path /= self.default_json_file_name
         with open(path, 'w') as f:
             json.dump(self, f, cls=utils.CustomTypeEncoder, indent=2)
 
     @staticmethod
     def load_from_json(path: str | pathlib.Path) -> 'Session':
         path = pathlib.Path(path)
+        if path.is_dir():
+            path /= Session.default_json_file_name
         with open(path, 'r') as f:
             return json.load(f, object_hook=utils.json_reconstitute)
 utils.register_type(utils.CustomTypeEntry(SessionDefinition,'__session.SessionDefinition__',lambda x: {'recordings': x.recordings}, lambda x: SessionDefinition(**x)))
