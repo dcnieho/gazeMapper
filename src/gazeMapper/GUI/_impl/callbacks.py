@@ -3,6 +3,7 @@ from imgui_bundle import icons_fontawesome_6 as ifa6
 
 
 from . import filepicker, msgbox, utils
+from ... import config, plane
 
 def get_folder_picker(g, reason: str):
     from . import gui
@@ -66,3 +67,15 @@ def try_load_project(g, path: str|pathlib.Path, action='loading'):
                 ifa6.ICON_FA_CIRCLE_XMARK+" No": None
             }
             utils.push_popup(g, msgbox.msgbox, "Create new project", "The selected folder is empty. Do you want to use it as a new project folder?", msgbox.MsgBox.warn, buttons)
+
+def make_plane(study_config: config.Study, type: plane.Type, name: str):
+    # make plane
+    p_def = plane.Definition(type, name)
+    # store to file
+    path = config.guess_config_dir(study_config.working_directory)
+    p_dir = path / p_def.name
+    if not p_dir.is_dir():
+        p_dir.mkdir()
+    p_def.store_as_json(p_dir)
+    # append to known planes
+    study_config.planes.append(p_def)

@@ -421,7 +421,7 @@ class GUI:
                 return 0 if imgui.is_key_released(imgui.Key.enter) else None
 
             buttons = {
-                ifa6.ICON_FA_CHECK+" Create plane": (lambda: None, lambda: not _valid_plane_name() or new_plane_type is None),
+                ifa6.ICON_FA_CHECK+" Create plane": (lambda: callbacks.make_plane(self.study_config, new_plane_type, new_plane_name), lambda: not _valid_plane_name() or new_plane_type is None),
                 ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
             }
             utils.push_popup(self, lambda: utils.popup("Add image", _add_plane_popup, buttons = buttons, outside=False))
