@@ -271,7 +271,7 @@ class Study:
                 continue
             planes.append(plane.Definition.load_from_json(p_file))
 
-        return Study(sess_def, planes, working_directory=path, **kwds)
+        return Study(sess_def, planes, working_directory=path.parent, **kwds)
 
 def guess_config_dir(working_dir: str|pathlib.Path, config_dir_name: str = "config", json_file_name: str = Study.default_json_file_name) -> pathlib.Path:
     # can be invoked with either:
