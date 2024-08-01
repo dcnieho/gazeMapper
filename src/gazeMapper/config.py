@@ -68,16 +68,15 @@ class Study:
                  individual_markers                             : list[marker.Marker],
                  working_directory                              : str|pathlib.Path,
 
-                 get_cam_movement_for_et_sync_method            : str,
-
-                 sync_ref_recording                             : str,
-                 sync_ref_do_time_stretch                       : bool,
-                 sync_ref_stretch_which                         : str,
-                 sync_ref_average_recordings                    : list[str],
-
                  # setup with defaults
-                 sync_et_to_cam_use_average                     : bool=True,
+                 sync_ref_recording                             : str|None                          = None,
+                 sync_ref_do_time_stretch                       : bool|None                         = None,
+                 sync_ref_stretch_which                         : str|None                          = None,
+                 sync_ref_average_recordings                    : list[str]|None                    = None,
 
+                 sync_et_to_cam_use_average                     : bool                              = True,
+
+                 get_cam_movement_for_et_sync_method            : str                               = 'plane',
                  get_cam_movement_for_et_sync_function          : dict[str,str|dict[str,Any]]|None  = None,
 
                  auto_code_sync_points                          : AutoCodeSyncPoints|None           = None,
@@ -164,12 +163,16 @@ class Study:
     def _check_all(self):
         self._check_planes_per_episode()
         self._check_auto_markers()
-        self._check_recordings([self.sync_ref_recording], 'sync_ref_recording')
-        self._check_recordings(self.sync_ref_average_recordings, 'sync_average_recordings')
         self._check_recordings(self.make_video_which, 'make_video_which')
         self._check_recordings(self.video_recording_colors, 'video_recording_colors')
-        if self.sync_ref_recording in self.sync_ref_average_recordings:
-            raise ValueError(f'Recording {self.sync_ref_recording} is the reference recording for sync, should not be specified in sync_average_recordings')
+        if self.sync_ref_recording is not None:
+            self._check_recordings([self.sync_ref_recording], 'sync_ref_recording')
+            for a in ['sync_ref_do_time_stretch', 'sync_ref_stretch_which', 'sync_ref_average_recordings']:
+                if getattr(self,a) is None:
+                    raise ValueError(f'a should be set in the study setup when sync_ref_recording is set')
+            self._check_recordings(self.sync_ref_average_recordings, 'sync_average_recordings')
+            if self.sync_ref_recording in self.sync_ref_average_recordings:
+                raise ValueError(f'Recording {self.sync_ref_recording} is the reference recording for sync, should not be specified in sync_average_recordings')
         if self.get_cam_movement_for_et_sync_method not in ['','plane','function']:
             raise ValueError('get_cam_movement_for_et_sync_method parameter should be an empty string, "plane", or "function"')
         if self.get_cam_movement_for_et_sync_method=='function':
@@ -215,8 +218,8 @@ class Study:
                     if not any([m.id==i for m in self.individual_markers]):
                         raise ValueError(f'Marker "{i}" specified in auto_code_trials_episodes.{f}, but unknown because not present in individual_markers')
 
-    def _check_recordings(self, which, field):
-        if not which:
+    def _check_recordings(self, which: list[str]|None, field: str):
+        if which is None:
             return
         for w in which:
             if not any([r.name==w for r in self.session_def.recordings]):
