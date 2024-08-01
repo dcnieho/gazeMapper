@@ -231,9 +231,12 @@ class Study:
         with open(f_path, 'w') as f:
             to_dump = {k:getattr(self,k) for k in vars(self) if not k.startswith('_') and k not in ['session_def','planes','working_directory']}    # session_def and planes will be populated from contents in the provided folder, and working_directory as the provided path
             to_dump['planes_per_episode'] = [(k, to_dump['planes_per_episode'][k]) for k in to_dump['planes_per_episode']]   # pack as list of tuples for storage
-            # optional arguments
-            if self.get_cam_movement_for_et_sync_method=='function':
-                to_dump['get_cam_movement_for_et_sync_function'] = self.get_cam_movement_for_et_sync_function
+            # filter out defaulted
+            to_dump = {k:to_dump[k] for k in to_dump if k not in study_defaults or study_defaults[k]!=to_dump[k]}
+            # also filter out defaults in some subfields
+            for k,ds in zip(['auto_code_sync_points','auto_code_trial_episodes'], [auto_code_sync_points_defaults, auto_code_trial_episodes_defaults]):
+                if k in to_dump:
+                    to_dump[k] = {kk:to_dump[k][kk] for kk in to_dump[k] if kk not in ds or ds[kk]!=to_dump[k][kk]}
             # dump to file
             json.dump(to_dump, f, cls=utils.CustomTypeEncoder, indent=2)
         # this doesn't store any files itself, but triggers the contained info to be stored
