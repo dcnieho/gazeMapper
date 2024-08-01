@@ -48,6 +48,8 @@ def init_project_folder(path: str | pathlib.Path):
     if not config_dir.is_dir():
         config_dir.mkdir()
     # make empty 'study_def.json' file
+    study_config = config.Study.get_empty(path)
+    study_config.store_as_json(config_dir)
 
 
 def set_all(input: dict[int, bool], value, subset: list[int] = None, predicate: Callable = None):
