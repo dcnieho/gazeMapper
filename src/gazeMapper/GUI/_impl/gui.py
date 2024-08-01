@@ -257,8 +257,16 @@ class GUI:
         self._to_focus = self._sessions_pane.label  # ensure sessions pane remains focused
 
     def _determine_can_accept_sessions(self):
-        # need to have at least one session defined and one plane
-        self.can_accept_sessions = self.study_config.session_def.recordings and self.study_config.planes
+        # need to have:
+        # 1. at least one recording defined in the session;
+        # 2. one plane set up
+        # 3. one episode to code
+        # 4. one plane linked to one episode
+        self.can_accept_sessions = \
+            self.study_config.session_def.recordings and \
+            self.study_config.planes and \
+            self.study_config.episodes_to_code and \
+            self.study_config.planes_per_episode
 
     def close_project(self):
         self._project_settings_pane.is_visible = False
