@@ -16,7 +16,7 @@ import glassesValidator
 
 from ... import config, session, version
 from .. import async_thread
-from . import callbacks, msgbox, utils
+from . import callbacks, filepicker, msgbox, utils
 
 
 class GUI:
@@ -70,6 +70,25 @@ class GUI:
         self._icon_font = msgbox.icon_font = \
             hello_imgui.load_font("fonts/Font_Awesome_6_Free-Solid-900.otf", msg_box_size, large_icons_params)
 
+    def _setup_glfw(self):
+        win = glfw_utils.glfw_window_hello_imgui()
+        glfw.set_drop_callback(win, self._drop_callback)
+
+    def _drop_callback(self, window: glfw._GLFWwindow, items: list[str]):
+        paths = [pathlib.Path(item) for item in items]
+        if self.popup_stack and isinstance(picker := self.popup_stack[-1], filepicker.FilePicker):
+            picker.set_dir(paths)
+        else:
+            if self.project_dir is not None:
+                # import recordings
+                pass
+            else:
+                # load project
+                if len(paths)!=1 or not (path := paths[0]).is_dir():
+                    utils.push_popup(msgbox.msgbox, "Project opening error", "Only a single project directory should be drag-dropped on the glassesValidator GUI.", msgbox.MsgBox.error, more="Dropped paths:\n"+('\n'.join([str(p) for p in paths])))
+                else:
+                    callbacks.try_load_project(self, path, 'loading')
+
     def run(self):
         # Hello ImGui params (they hold the settings as well as the Gui callbacks)
         runner_params = hello_imgui.RunnerParams()
@@ -78,6 +97,7 @@ class GUI:
 
         runner_params.app_window_params.window_geometry.size = (1400, 700)
         runner_params.app_window_params.restore_previous_geometry = True
+        runner_params.callbacks.post_init_add_platform_backend_callbacks = self._setup_glfw
         runner_params.callbacks.load_additional_fonts = self._load_fonts
         runner_params.callbacks.pre_new_frame = self._update_windows
         runner_params.callbacks.before_exit = self._exiting
