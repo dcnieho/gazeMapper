@@ -29,7 +29,14 @@ class GUI:
         self.sessions: list[session.Session] = None
 
 
+        self._window_list: list[hello_imgui.DockableWindow] = []
+        self._to_dock         = []
+        self._to_focus        = None
         self._need_set_window_title = False
+        self._main_dock_node_id = None
+
+        self._sessions_pane: hello_imgui.DockableWindow = None
+        self._project_settings_pane: hello_imgui.DockableWindow = None
         self._show_demo_window = False
 
         self._icon_font: imgui.ImFont = None
@@ -74,7 +81,7 @@ class GUI:
         win = glfw_utils.glfw_window_hello_imgui()
         glfw.set_drop_callback(win, self._drop_callback)
 
-    def _drop_callback(self, window: glfw._GLFWwindow, items: list[str]):
+    def _drop_callback(self, _: glfw._GLFWwindow, items: list[str]):
         paths = [pathlib.Path(item) for item in items]
         if self.popup_stack and isinstance(picker := self.popup_stack[-1], filepicker.FilePicker):
             picker.set_dir(paths)
@@ -127,11 +134,11 @@ class GUI:
 
         # define first windows
         self._sessions_pane = self._make_main_space_window("Sessions", self._sessions_pane_drawer)
-        self._project_settings = self._make_main_space_window("Project settings", self._project_settings_drawer, is_visible=False)
+        self._project_settings_pane = self._make_main_space_window("Project settings", self._project_settings_pane_drawer, is_visible=False)
         # transmit them to HelloImGui
         runner_params.docking_params.dockable_windows = [
             self._sessions_pane,
-            self._project_settings,
+            self._project_settings_pane,
         ]
 
         addons_params = immapp.AddOnsParams()
@@ -162,6 +169,33 @@ class GUI:
         if self._need_set_window_title:
             self._set_window_title()
 
+        # update windows to be shown
+        if self._window_list:
+            hello_imgui.get_runner_params().docking_params.dockable_windows = self._window_list
+            self._window_list = []
+        else:
+            # check if any computer detail windows were closed. Those should be removed from the list
+            hello_imgui.get_runner_params().docking_params.dockable_windows = \
+                [w for w in hello_imgui.get_runner_params().docking_params.dockable_windows if w.is_visible or w.label in ['Project settings']]
+
+        # we also handle docking requests here
+        if self._to_dock and self._main_dock_node_id:
+            for w in self._to_dock:
+                imgui.internal.dock_builder_dock_window(w, self._main_dock_node_id)
+            self._to_dock = []
+
+        # handle focus requests, which apparently need to be delayed
+        # one frame for them to work also in case its a new window
+        if self._to_focus is not None:
+            if isinstance(self._to_focus,str):
+                self._to_focus = [self._to_focus,1]
+            if self._to_focus[1]>0:
+                self._to_focus[1] -= 1
+            else:
+                for w in hello_imgui.get_runner_params().docking_params.dockable_windows:
+                    if w.label==self._to_focus[0]:
+                        w.focus_window_at_next_frame = True
+                self._to_focus = None
 
     def _show_app_menu_items(self):
         disabled = not self.project_dir
@@ -208,6 +242,10 @@ class GUI:
         self.sessions = session.get_sessions_from_directory(path)
 
         self._need_set_window_title = True
+        self._project_settings_pane.is_visible = True
+        # trigger update so visibility change is honored
+        self._window_list = [self._sessions_pane, self._project_settings_pane]
+        self._to_focus = self._sessions_pane.label  # ensure sessions pane remains focused
 
     def close_project(self):
         self.project_dir = None
@@ -215,9 +253,17 @@ class GUI:
         self.sessions = None
 
         self._need_set_window_title = True
+        self._project_settings_pane.is_visible = False
+        # trigger update so visibility change is honored, also delete other windows in the process
+        self._window_list = [self._sessions_pane, self._project_settings_pane]
 
 
     def _sessions_pane_drawer(self):
+        if not self._main_dock_node_id:
+            # this window is docked to the right dock node, if we don't
+            # have it yet, query id of this dock node as we'll need it for later
+            # windows
+            self._main_dock_node_id = imgui.get_window_dock_id()
         if not self.project_dir:
             self._draw_unopened_interface()
             return
@@ -244,7 +290,7 @@ class GUI:
         if imgui.button(ifa6.ICON_FA_FOLDER_OPEN+" Open project", size=(but_width, but_height)):
             utils.push_popup(self, callbacks.get_folder_picker(self, reason='loading'))
 
-    def _project_settings_drawer(self):
+    def _project_settings_pane_drawer(self):
         pass
 
     def _draw_about_popup(self):
