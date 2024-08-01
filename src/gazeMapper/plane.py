@@ -3,6 +3,8 @@ import pathlib
 import cv2
 import json
 import typeguard
+import inspect
+import typing
 
 from glassesTools import plane, utils
 from glassesValidator.config import get_validation_setup
@@ -15,9 +17,6 @@ class Type(utils.AutoName):
 utils.register_type(utils.CustomTypeEntry(Type,'__enum.plane.Type__',str, lambda x: getattr(Type, x.split('.')[1])))
 types = [p for p in Type]
 
-
-defaults = {Type.GlassesValidator: {'use_default': True}, Type.Plane_2D: {'marker_border_bits': 1, 'min_num_markers': 3, 'aruco_dict': cv2.aruco.DICT_4X4_250, 'ref_image_size': 1920}}
-valid_fields = {Type.GlassesValidator: ['use_default'], Type.Plane_2D: ['marker_file', 'marker_size', 'plane_size', 'marker_border_bits', 'min_num_markers', 'origin', 'unit', 'aruco_dict', 'ref_image_size']}
 class Definition:
     default_json_file_name = 'plane_def.json'
 
@@ -53,20 +52,20 @@ class Definition:
         # check provided info
         if self.type==Type.GlassesValidator:
             # prevent bugs
-            for a in valid_fields[Type.Plane_2D]:
+            for a in definition_valid_fields[Type.Plane_2D]:
                 if getattr(self,a) is not None:
                     raise ValueError(f"The {a} input argument should not be set when the plane is a GlassesValidator plane (would be ignored)")
             if self.use_default is None:
-                self.use_default = defaults[Type.GlassesValidator]['use_default']
+                self.use_default = definition_defaults[Type.GlassesValidator]['use_default']
         else:
             # prevent bugs
-            for a in valid_fields[Type.GlassesValidator]:
+            for a in definition_valid_fields[Type.GlassesValidator]:
                 if getattr(self,a) is not None:
                     raise ValueError(f"The {a} input argument is for GlassesValidator planes. It should not be set when the plane is not a GlassesValidator plane (would be ignored)")
             # set defaults
-            for a in defaults[Type.Plane_2D]:
+            for a in definition_defaults[Type.Plane_2D]:
                 if getattr(self,a) is None:
-                    setattr(self,a,defaults[Type.Plane_2D][a])
+                    setattr(self,a,definition_defaults[Type.Plane_2D][a])
 
     def store_as_json(self, path: str | pathlib.Path):
         path = pathlib.Path(path)
@@ -74,9 +73,9 @@ class Definition:
             path /= self.default_json_file_name
         with open(path, 'w') as f:
             other_type = Type.GlassesValidator if self.type==Type.Plane_2D else Type.Plane_2D
-            to_dump = {k:getattr(self,k) for k in vars(self) if not k.startswith('_') and k not in ['name']+valid_fields[other_type]}    # name will be populated from the provided path, fields for the other type should not be stored
+            to_dump = {k:getattr(self,k) for k in vars(self) if not k.startswith('_') and k not in ['name']+definition_valid_fields[other_type]}    # name will be populated from the provided path, fields for the other type should not be stored
             # filter out defaulted
-            to_dump = {k:v for k in to_dump if (v:=to_dump[k]) is not None and (k not in defaults[self.type] or defaults[self.type][k]!=v)}
+            to_dump = {k:v for k in to_dump if (v:=to_dump[k]) is not None and (k not in definition_defaults[self.type] or definition_defaults[self.type][k]!=v)}
             json.dump(to_dump, f, cls=utils.CustomTypeEncoder, indent=2)
 
     @staticmethod
@@ -87,6 +86,11 @@ class Definition:
         with open(path, 'r') as f:
             kwds = json.load(f, object_hook=utils.json_reconstitute)
         return Definition(name=path.parent.name, **kwds)
+definition_defaults = {Type.GlassesValidator: {'use_default': True}, Type.Plane_2D: {'marker_border_bits': 1, 'min_num_markers': 3, 'aruco_dict': cv2.aruco.DICT_4X4_250, 'ref_image_size': 1920}}
+definition_valid_fields = {Type.GlassesValidator: ['use_default'], Type.Plane_2D: ['marker_file', 'marker_size', 'plane_size', 'marker_border_bits', 'min_num_markers', 'origin', 'unit', 'aruco_dict', 'ref_image_size']}
+_params = inspect.signature(Definition.__init__).parameters
+definition_parameter_types = {k:utils.unpack_none_union(_params[k].annotation) for k in _params if k!='self'}
+del _params
 
 
 def get_plane_from_path(path: str|pathlib.Path) -> plane.Plane:
