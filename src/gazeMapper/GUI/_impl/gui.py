@@ -4,6 +4,7 @@ import concurrent
 import sys
 import platform
 import webbrowser
+from typing import Callable
 
 import imgui_bundle
 from imgui_bundle import imgui, immapp, imgui_md, hello_imgui, glfw_utils, icons_fontawesome_6 as ifa6
@@ -33,6 +34,7 @@ class GUI:
         self._window_list: list[hello_imgui.DockableWindow] = []
         self._to_dock         = []
         self._to_focus        = None
+        self._after_window_update_callback: Callable[[],None] = None
         self._need_set_window_title = False
         self._main_dock_node_id = None
 
@@ -198,6 +200,11 @@ class GUI:
                         w.focus_window_at_next_frame = True
                 self._to_focus = None
 
+        # if any callback set, call it once then remove
+        if self._after_window_update_callback:
+            self._after_window_update_callback()
+            self._after_window_update_callback = None
+
     def _show_app_menu_items(self):
         disabled = not self.project_dir
         if disabled:
@@ -254,14 +261,18 @@ class GUI:
         self.can_accept_sessions = self.study_config.session_def.recordings and self.study_config.planes
 
     def close_project(self):
-        self.project_dir = None
-        self.study_config = None
-        self.sessions = None
-
-        self._need_set_window_title = True
         self._project_settings_pane.is_visible = False
         # trigger update so visibility change is honored, also delete other windows in the process
         self._window_list = [self._sessions_pane, self._project_settings_pane]
+
+        # defer rest of unloading until windows deleted, as some of these variables will be accessed during this draw loop
+        self._after_window_update_callback = self._finish_unload_project
+
+    def _finish_unload_project(self):
+        self.project_dir = None
+        self.study_config = None
+        self.sessions = None
+        self._need_set_window_title = True
 
 
     def _sessions_pane_drawer(self):
