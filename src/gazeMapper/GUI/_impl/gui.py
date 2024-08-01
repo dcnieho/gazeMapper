@@ -27,6 +27,7 @@ class GUI:
         self.project_dir: pathlib.Path = None
         self.study_config: config.Study = None
         self.sessions: list[session.Session] = None
+        self.can_accept_sessions = False
 
 
         self._window_list: list[hello_imgui.DockableWindow] = []
@@ -240,12 +241,17 @@ class GUI:
         self.project_dir = path
         self.study_config = config.Study.load_from_json(config.guess_config_dir(path))
         self.sessions = session.get_sessions_from_directory(path)
+        self._determine_can_accept_sessions()
 
         self._need_set_window_title = True
         self._project_settings_pane.is_visible = True
         # trigger update so visibility change is honored
         self._window_list = [self._sessions_pane, self._project_settings_pane]
         self._to_focus = self._sessions_pane.label  # ensure sessions pane remains focused
+
+    def _determine_can_accept_sessions(self):
+        # need to have at least one session defined and one plane
+        self.can_accept_sessions = self.study_config.session_def.recordings and self.study_config.planes
 
     def close_project(self):
         self.project_dir = None
@@ -266,6 +272,10 @@ class GUI:
             self._main_dock_node_id = imgui.get_window_dock_id()
         if not self.project_dir:
             self._draw_unopened_interface()
+            return
+        elif not self.can_accept_sessions:
+            imgui.text('This study does not have at least one defined recording and one defined plane.')
+            imgui.text('Set these up in the Project settings tab before you can continue.')
             return
 
     def _draw_unopened_interface(self):
