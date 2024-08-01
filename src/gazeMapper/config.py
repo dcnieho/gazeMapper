@@ -273,6 +273,12 @@ class Study:
 
         return Study(sess_def, planes, working_directory=path.parent, **kwds)
 
+# get defaults for default argument of study constructor
+_params = inspect.signature(Study.__init__).parameters
+study_defaults = {k:d for k in _params if (d:=_params[k].default)!=inspect._empty}
+study_types    = {k:_params[k].annotation for k in _params}
+del _params
+
 def guess_config_dir(working_dir: str|pathlib.Path, config_dir_name: str = "config", json_file_name: str = Study.default_json_file_name) -> pathlib.Path:
     # can be invoked with either:
     # 1. the project folder;
@@ -303,8 +309,7 @@ class StudyOverride:
 
     def __init__(self, level: OverrideLevel, **kwargs):
         self.level = level
-        all_types  = typing.get_type_hints(Study.__init__)
-        all_params = set(all_types.keys())
+        all_params = set(study_types.keys())
         exclude = {'self', 'session_def', 'planes', 'individual_markers', 'working_directory', 'planes_per_episode'}
         # above is Session-level disallowed parameters. Depending on level, disallow more
         if level in [OverrideLevel.Recording, OverrideLevel.FunctionArgs]:
@@ -337,7 +342,7 @@ class StudyOverride:
                 raise TypeError(f"{StudyOverride.__name__}.__init__(): you are not allowed to override the '{p}' parameter of a {Study.__name__} class {err_text}")
             if p not in self._params:
                 raise TypeError(f"{StudyOverride.__name__}.__init__(): got an unknown parameter '{p}'")
-            typeguard.check_type(kwargs[p], all_types[p], typecheck_fail_callback=lambda x,_: typecheck_exception_handler(x,p,level), collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
+            typeguard.check_type(kwargs[p], study_types[p], typecheck_fail_callback=lambda x,_: typecheck_exception_handler(x,p,level), collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
             setattr(self,p,kwargs[p])
 
     def apply(self, study: Study) -> Study:
