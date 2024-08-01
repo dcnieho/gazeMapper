@@ -13,6 +13,7 @@ class Type(utils.AutoName):
     GlassesValidator= auto()
     Plane_2D        = auto()
 utils.register_type(utils.CustomTypeEntry(Type,'__enum.plane.Type__',str, lambda x: getattr(Type, x.split('.')[1])))
+types = [p for p in Type]
 
 
 defaults = {Type.GlassesValidator: {'use_default': True}, Type.Plane_2D: {'marker_border_bits': 1, 'min_num_markers': 3, 'aruco_dict': cv2.aruco.DICT_4X4_250, 'ref_image_size': 1920}}

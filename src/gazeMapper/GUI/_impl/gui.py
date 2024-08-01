@@ -15,7 +15,7 @@ import OpenGL.GL as gl
 import glassesTools
 import glassesValidator
 
-from ... import config, session, version
+from ... import config, plane, session, version
 from .. import async_thread
 from . import callbacks, filepicker, msgbox, utils
 
@@ -357,6 +357,55 @@ class GUI:
     def _plane_editor_pane_drawer(self):
         if not self.study_config.planes:
             imgui.text_colored((1.,0.,0.,1.),'*At minimum one plane should be defined')
+        for p in self.study_config.planes:
+            imgui.text(p.name)
+        if imgui.button('+ new plane'):
+            new_plane_name = ''
+            new_plane_type: plane.Type = None
+            def _valid_plane_name():
+                nonlocal new_plane_name
+                return new_plane_name and not any((p.name==new_plane_name for p in self.study_config.planes))
+            def _add_plane_popup():
+                nonlocal new_plane_name
+                nonlocal new_plane_type
+                imgui.dummy((30*imgui.calc_text_size('x').x,0))
+                if imgui.begin_table("##new_plane_info",2):
+                    imgui.table_setup_column("##new_plane_infos_left", imgui.TableColumnFlags_.width_fixed)
+                    imgui.table_setup_column("##new_plane_infos_right", imgui.TableColumnFlags_.width_stretch)
+                    imgui.table_next_row()
+                    imgui.table_next_column()
+                    imgui.align_text_to_frame_padding()
+                    invalid = not _valid_plane_name()
+                    if invalid:
+                        imgui.push_style_color(imgui.Col_.text, imgui.color_convert_float4_to_u32((1.,0.,0.,1.)))
+                    imgui.text("Plane name")
+                    if invalid:
+                        imgui.pop_style_color()
+                    imgui.table_next_column()
+                    imgui.set_next_item_width(-1)
+                    _,new_plane_name = imgui.input_text("##new_plane_name",new_plane_name)
+                    imgui.table_next_row()
+                    imgui.table_next_column()
+                    imgui.align_text_to_frame_padding()
+                    invalid = new_plane_type is None
+                    if invalid:
+                        imgui.push_style_color(imgui.Col_.text, imgui.color_convert_float4_to_u32((1.,0.,0.,1.)))
+                    imgui.text("Plane type")
+                    if invalid:
+                        imgui.pop_style_color()
+                    imgui.table_next_column()
+                    imgui.set_next_item_width(-1)
+                    p_idx = plane.types.index(new_plane_type) if new_plane_type is not None else -1
+                    _,p_idx = imgui.combo("##plane_type_selector", p_idx, [p.value for p in plane.types])
+                    new_plane_type = None if p_idx==-1 else plane.types[p_idx]
+                    imgui.end_table()
+                return 0 if imgui.is_key_released(imgui.Key.enter) else None
+
+            buttons = {
+                ifa6.ICON_FA_CHECK+" Create plane": (lambda: None, lambda: not _valid_plane_name() or new_plane_type is None),
+                ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
+            }
+            utils.push_popup(self, lambda: utils.popup("Add image", _add_plane_popup, buttons = buttons, outside=False))
 
     def _episode_setup_pane_drawer(self):
         if not self.study_config.episodes_to_code:
