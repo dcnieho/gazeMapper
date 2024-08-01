@@ -2,6 +2,7 @@ import pathlib
 import pandas as pd
 from typing import overload, Any
 from collections import defaultdict
+import typeguard
 
 from glassesTools import marker as gt_marker, utils
 
@@ -9,6 +10,7 @@ from . import naming
 
 
 class Marker:
+    @typeguard.typechecked
     def __init__(self, id:int, size:float):
         self.id     = id
         self.size   = size

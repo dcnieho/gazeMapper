@@ -1,6 +1,7 @@
 from enum import Enum, auto
 import pathlib
 import json
+import typeguard
 
 from glassesTools import importing, utils
 from glassesTools.recording import Recording as EyeTrackerRecording
@@ -16,6 +17,7 @@ utils.register_type(utils.CustomTypeEntry(RecordingType,'__enum.session.Recordin
 
 
 class RecordingDefinition:
+    @typeguard.typechecked
     def __init__(self, name:str, type:RecordingType):
         self.name = name
         self.type = type
@@ -23,7 +25,8 @@ utils.register_type(utils.CustomTypeEntry(RecordingDefinition,'__session.Recordi
 
 
 class Recording:
-    def __init__(self, defition: RecordingDefinition, info:EyeTrackerRecording|camera_recording.Recording=None):
+    @typeguard.typechecked
+    def __init__(self, defition: RecordingDefinition, info:EyeTrackerRecording|camera_recording.Recording|None=None):
         self.defition   = defition
         self.info       = info
 utils.register_type(utils.CustomTypeEntry(Recording,'__session.Recording__',lambda x: {'defition': x.defition, 'info': x.info}, lambda x: Recording(**x)))
@@ -44,7 +47,8 @@ def get_video_path(rec_info: EyeTrackerRecording|camera_recording.Recording) -> 
 class SessionDefinition:
     default_json_file_name = 'session_def.json'
 
-    def __init__(self, recordings: list[RecordingDefinition]=None):
+    @typeguard.typechecked
+    def __init__(self, recordings: list[RecordingDefinition]|None=None):
         if recordings is None:
             recordings = []
         self.recordings = recordings
@@ -63,7 +67,8 @@ class SessionDefinition:
         if path.is_dir():
             path /= self.default_json_file_name
         with open(path, 'w') as f:
-            json.dump(self, f, cls=utils.CustomTypeEncoder, indent=2)
+            to_dump = {k:getattr(self,k) for k in vars(self) if not k.startswith('_')}
+            json.dump(to_dump, f, cls=utils.CustomTypeEncoder, indent=2)
 
     @staticmethod
     def load_from_json(path: str | pathlib.Path) -> 'Session':
@@ -71,14 +76,16 @@ class SessionDefinition:
         if path.is_dir():
             path /= Session.default_json_file_name
         with open(path, 'r') as f:
-            return json.load(f, object_hook=utils.json_reconstitute)
+            kwds = json.load(f, object_hook=utils.json_reconstitute)
+        return SessionDefinition(**kwds)
 utils.register_type(utils.CustomTypeEntry(SessionDefinition,'__session.SessionDefinition__',lambda x: {'recordings': x.recordings}, lambda x: SessionDefinition(**x)))
 
 
 class Session:
     default_json_file_name = 'session_info.json'
 
-    def __init__(self, definition: SessionDefinition, name: str, working_directory: str|pathlib.Path = None, recordings: dict[str,Recording] = None):
+    @typeguard.typechecked
+    def __init__(self, definition: SessionDefinition, name: str, working_directory: str|pathlib.Path|None = None, recordings: dict[str,Recording]|None = None):
         self.definition = definition
         self.name = name
         self.working_directory: pathlib.Path = pathlib.Path(working_directory) if working_directory else None
