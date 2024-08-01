@@ -1,6 +1,7 @@
 import pathlib
 import json
 import typing
+import inspect
 import copy
 import enum
 import typeguard
@@ -12,19 +13,11 @@ from glassesValidator import process as gv_process
 from . import marker, plane, session
 
 
-defaults = {
-    'auto_code_sync_points.max_gap_duration': 4,
-    'auto_code_sync_points.min_duration': 6,
-
-    'auto_code_trials_episodes.max_gap_duration': 4,
-    'auto_code_trials_episodes.max_intermarker_gap_duration': 15,
-    'auto_code_trials_episodes.min_duration': 6,
-}
-
 class AutoCodeSyncPoints(TypedDict, total=False):
     max_gap_duration: int
     min_duration: int
     markers: list[int]
+auto_code_sync_points_defaults = {'max_gap_duration': 4, 'min_duration': 6}
 
 class AutoCodeTrialEpisodes(TypedDict, total=False):
     max_gap_duration: int
@@ -32,6 +25,7 @@ class AutoCodeTrialEpisodes(TypedDict, total=False):
     min_duration: int
     start_markers: list[int]
     end_markers: list[int]
+auto_code_trial_episodes_defaults = {'max_gap_duration': 4, 'max_intermarker_gap_duration': 15, 'min_duration': 6}
 
 class I2MCSettings(TypedDict, total=False):
     xres: int
@@ -190,16 +184,16 @@ class Study:
 
         if self.auto_code_sync_points:
             if 'max_gap_duration' not in self.auto_code_sync_points:
-                self.auto_code_sync_points['max_gap_duration'] = defaults['auto_code_sync_points.max_gap_duration']
+                self.auto_code_sync_points['max_gap_duration'] = auto_code_sync_points_defaults['max_gap_duration']
             if 'min_duration' not in self.auto_code_sync_points:
-                self.auto_code_sync_points['min_duration'] = defaults['auto_code_sync_points.min_duration']
+                self.auto_code_sync_points['min_duration'] = auto_code_sync_points_defaults['min_duration']
         if self.auto_code_trial_episodes:
             if 'max_gap_duration' not in self.auto_code_trial_episodes:
-                self.auto_code_trial_episodes['max_gap_duration'] = defaults['auto_code_trials_episodes.max_gap_duration']
+                self.auto_code_trial_episodes['max_gap_duration'] = auto_code_trial_episodes_defaults['max_gap_duration']
             if 'max_intermarker_gap_duration' not in self.auto_code_trial_episodes:
-                self.auto_code_trial_episodes['max_intermarker_gap_duration'] = defaults['auto_code_trials_episodes.max_intermarker_gap_duration']
+                self.auto_code_trial_episodes['max_intermarker_gap_duration'] = auto_code_trial_episodes_defaults['max_intermarker_gap_duration']
             if 'min_duration' not in self.auto_code_trial_episodes:
-                self.auto_code_trial_episodes['min_duration'] = defaults['auto_code_trials_episodes.min_duration']
+                self.auto_code_trial_episodes['min_duration'] = auto_code_trial_episodes_defaults['min_duration']
 
     def _check_planes_per_episode(self):
         for e in self.planes_per_episode:
