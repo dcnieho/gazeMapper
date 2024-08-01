@@ -180,7 +180,7 @@ class FilePicker:
         self.allow_multiple = allow_multiple
         self._is_dir_picker = False
         self.predicate_selectable: Callable[[int], bool] = None
-        self.set_dir_picker(dir_picker)
+        self.set_is_dir_picker(dir_picker)
         self._show_only_dirs = False
         self.predicate_showable: Callable[[int], bool] = None
         self.set_show_only_dirs(self._is_dir_picker)   # by default, a dir picker only shows dirs
@@ -188,6 +188,7 @@ class FilePicker:
         self.loc: pathlib.Path = None
         self.refreshing = False
         self.new_loc = False
+        self.select_when_loaded: list[pathlib.Path] = None
         self.history: list[str|pathlib.Path] = []
         self.history_loc = -1
         self.path_bar_popup: dict[str,Any] = {}
@@ -197,7 +198,7 @@ class FilePicker:
         self.goto(start_dir or '.')
         self._request_listing('root')   # request root listing so we have the drive names
 
-    def set_dir_picker(self, is_dir_picker):
+    def set_is_dir_picker(self, is_dir_picker):
         self._is_dir_picker = is_dir_picker
         if self._is_dir_picker:
             self.predicate_selectable = lambda iid: self.items[iid].is_dir
@@ -218,6 +219,17 @@ class FilePicker:
                 path = 'root'
             is_root = path=='root'
         return is_root
+
+    def set_dir(self, paths: str|pathlib.Path|list[str|pathlib.Path]):
+        if not isinstance(paths,list):
+            paths = [paths]
+        paths = [pathlib.Path(p) for p in paths]
+
+        if len(paths)==1 and paths[0].is_dir():
+            self.goto(paths[0])
+        else:
+            self.select_when_loaded = paths
+            self.goto(paths[0].parent)
 
     def goto(self, path: str | pathlib.Path, add_history=True):
         is_root = self._is_root(path)
@@ -286,7 +298,10 @@ class FilePicker:
     def _update_listing(self, path: str|pathlib.Path, from_cache: bool):
         previously_selected = []
         with self.items_lock:
-            if not self.new_loc:
+            if self.select_when_loaded:
+                previously_selected = self.select_when_loaded
+                self.select_when_loaded = None
+            elif not self.new_loc:
                 previously_selected = [self.items[iid].full_path for iid in self.items if iid in self.selected and self.selected[iid]]
             self.items.clear()
             self.selected.clear()
