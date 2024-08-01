@@ -293,14 +293,14 @@ class GUI:
             self._unopened_interface_drawer()
             return
         elif not self.can_accept_sessions:
-            imgui.text('This study''s set up is incomplete.')
+            imgui.text_colored(imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.64)), "This study's set up is incomplete.")
             imgui.align_text_to_frame_padding()
-            imgui.text('Finish the setup in the')
+            imgui.text_colored(imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.64)), 'Finish the setup in the')
             imgui.same_line()
             if imgui.button('Project settings##button'):
                 self._to_focus = self._project_settings_pane.label
             imgui.same_line()
-            imgui.text('tab before you can import and process recording sessions.')
+            imgui.text_colored(imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.64)), 'tab before you can import and process recording sessions.')
             return
 
     def _unopened_interface_drawer(self):
@@ -326,16 +326,35 @@ class GUI:
             utils.push_popup(self, callbacks.get_folder_picker(self, reason='loading'))
 
     def _project_settings_pane_drawer(self):
+        def _indicate_needs_attention():
+            imgui.push_style_color(imgui.Col_.button,         imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.43)))
+            imgui.push_style_color(imgui.Col_.button_hovered, imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.64)))
+            imgui.push_style_color(imgui.Col_.button_active,  imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.93)))
         # options handled in separate panes
         new_win_params: tuple[str,Callable[[],None]] = None
+        needs_attention = not self.study_config.session_def.recordings
+        if needs_attention:
+            _indicate_needs_attention()
         if imgui.button("Edit session definition"):
             new_win_params = ('Session definition', self._session_definition_pane_drawer)
+        if needs_attention:
+            imgui.pop_style_color(3)
         imgui.same_line()
+        needs_attention = not self.study_config.planes
+        if needs_attention:
+            _indicate_needs_attention()
         if imgui.button("Edit planes"):
             new_win_params = ('Plane editor', self._plane_editor_pane_drawer)
+        if needs_attention:
+            imgui.pop_style_color(3)
         imgui.same_line()
+        needs_attention = not self.study_config.episodes_to_code or not self.study_config.planes_per_episode
+        if needs_attention:
+            _indicate_needs_attention()
         if imgui.button("Episode setup"):
             new_win_params = ('Episode setup', self._episode_setup_pane_drawer)
+        if needs_attention:
+            imgui.pop_style_color(3)
         imgui.same_line()
         if imgui.button("Edit individual markers"):
             new_win_params = ('Individual marker editor', self._individual_marker_setup_pane_drawer)
@@ -352,11 +371,11 @@ class GUI:
 
     def _session_definition_pane_drawer(self):
         if not self.study_config.session_def.recordings:
-            imgui.text_colored((1.,0.,0.,1.),'*At minimum one recording should be defined')
+            imgui.text_colored(imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.64)),'*At minimum one recording should be defined')
 
     def _plane_editor_pane_drawer(self):
         if not self.study_config.planes:
-            imgui.text_colored((1.,0.,0.,1.),'*At minimum one plane should be defined')
+            imgui.text_colored(imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.64)),'*At minimum one plane should be defined')
         for p in self.study_config.planes:
             imgui.text(p.name)
         if imgui.button('+ new plane'):
@@ -377,7 +396,7 @@ class GUI:
                     imgui.align_text_to_frame_padding()
                     invalid = not _valid_plane_name()
                     if invalid:
-                        imgui.push_style_color(imgui.Col_.text, imgui.color_convert_float4_to_u32((1.,0.,0.,1.)))
+                        imgui.push_style_color(imgui.Col_.text, imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.64)))
                     imgui.text("Plane name")
                     if invalid:
                         imgui.pop_style_color()
@@ -389,7 +408,7 @@ class GUI:
                     imgui.align_text_to_frame_padding()
                     invalid = new_plane_type is None
                     if invalid:
-                        imgui.push_style_color(imgui.Col_.text, imgui.color_convert_float4_to_u32((1.,0.,0.,1.)))
+                        imgui.push_style_color(imgui.Col_.text, imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.64)))
                     imgui.text("Plane type")
                     if invalid:
                         imgui.pop_style_color()
@@ -409,12 +428,12 @@ class GUI:
 
     def _episode_setup_pane_drawer(self):
         if not self.study_config.episodes_to_code:
-            imgui.text_colored((1.,0.,0.,1.),'*At minimum one episode should be selected to be coded')
+            imgui.text_colored(imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.64)),'*At minimum one episode should be selected to be coded')
         if not self.study_config.planes_per_episode:
-            imgui.text_colored((1.,0.,0.,1.),'*At minimum one plane should be linked to at minimum one episode')
+            imgui.text_colored(imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.64)),'*At minimum one plane should be linked to at minimum one episode')
         if not self.study_config.planes:
             imgui.align_text_to_frame_padding()
-            imgui.text_colored((1.,0.,0.,1.),'*At minimum one plane should be defined.')
+            imgui.text_colored(imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.64)),'*At minimum one plane should be defined.')
             imgui.same_line()
             tab_lbl = 'Plane editor'
             if imgui.button('Edit planes'):
@@ -426,7 +445,7 @@ class GUI:
                     self._to_dock.append(tab_lbl)
                 self._to_focus = tab_lbl
             imgui.same_line()
-            imgui.text_colored((1.,0.,0.,1.),'to set this up.')
+            imgui.text_colored(imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.64)),'to set this up.')
 
     def _individual_marker_setup_pane_drawer(self):
         pass
