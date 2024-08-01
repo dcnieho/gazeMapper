@@ -183,12 +183,22 @@ def popup(label: str, popup_content: Callable, buttons: dict[str, Callable] = No
             new_pos_x = cur_pos_x + imgui.get_content_region_avail().x - btns_width
             if new_pos_x > cur_pos_x:
                 imgui.set_cursor_pos_x(new_pos_x)
-            for i, (label,callback) in enumerate(buttons.items()):
+            for i, (label,callbacks) in enumerate(buttons.items()):
+                if isinstance(callbacks,tuple):
+                    callback = callbacks[0]
+                    disabled = len(callbacks)>1 and callbacks[1]()
+                else:
+                    callback = callbacks
+                    disabled = False
+                if disabled:
+                    imgui.begin_disabled()
                 if imgui.button(label) or activate_button==i:
                     if callback:
                         callback()
                     imgui.close_current_popup()
                     closed = True
+                if disabled:
+                    imgui.end_disabled()
                 imgui.same_line()
     else:
         opened = 0
