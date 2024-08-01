@@ -14,7 +14,7 @@ import OpenGL.GL as gl
 import glassesTools
 import glassesValidator
 
-from ... import version
+from ... import config, session, version
 from .. import async_thread
 from . import callbacks, msgbox, utils
 
@@ -25,6 +25,8 @@ class GUI:
         self.running     = False
 
         self.project_dir: pathlib.Path = None
+        self.study_config: config.Study = None
+        self.sessions: list[session.Session] = None
 
 
         self._need_set_window_title = False
@@ -141,12 +143,8 @@ class GUI:
 
 
     def _show_app_menu_items(self):
-        if imgui.menu_item(ifa6.ICON_FA_FOLDER_PLUS+" New project", "", False):
-            pass
-        if imgui.menu_item(ifa6.ICON_FA_FOLDER_OPEN+" Open project", "", False):
-            pass
         if imgui.menu_item(ifa6.ICON_FA_CIRCLE_XMARK+" Close project", "", False)[0]:
-            pass
+            self.close_project()
 
     def _show_menu_gui(self):
         # this is always called, so we handle popups here
@@ -179,7 +177,18 @@ class GUI:
 
 
     def load_project(self, path: pathlib.Path):
-        pass
+        self.project_dir = path
+        self.study_config = config.Study.load_from_json(config.guess_config_dir(path))
+        self.sessions = session.get_sessions_from_directory(path)
+
+        self._need_set_window_title = True
+
+    def close_project(self):
+        self.project_dir = None
+        self.study_config = None
+        self.sessions = None
+
+        self._need_set_window_title = True
 
 
     def _sessions_pane_drawer(self):
