@@ -7,7 +7,7 @@ import pathlib
 from typing import Any, Callable
 
 from . import msgbox
-from ... import config
+from ... import config, session
 
 
 # https://gist.github.com/Willy-JL/f733c960c6b0d2284bcbee0316f88878
@@ -35,8 +35,10 @@ def is_project_folder(path: str | pathlib.Path):
     if not path.is_dir():
         return False
     # a project directory should contain a 'config'
-    # folder and inside that a 'study_def.json' file
-    return (path/'config').is_dir() and (path/'config'/config.Study.default_json_file_name).is_file()
+    # folder and inside that are 'study_def.json' and 'session_def.json' file
+    return (path/'config').is_dir() and \
+        (path/'config'/config.Study.default_json_file_name).is_file() and \
+        (path/'config'/session.SessionDefinition.default_json_file_name).is_file()
 
 def init_project_folder(path: str | pathlib.Path):
     path = pathlib.Path(path)
