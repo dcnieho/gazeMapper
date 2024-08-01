@@ -219,7 +219,9 @@ class Study:
             if not any([r.name==w for r in self.session_def.recordings]):
                 raise ValueError(f'Recording "{w}" not known, check {field} in the study configuration')
 
-    def store_as_json(self, path: str|pathlib.Path):
+    def store_as_json(self, path: str|pathlib.Path|None):
+        if not path:
+            path = guess_config_dir(self.working_directory)
         path = pathlib.Path(path)
         # this stores only the planes_per_episode variable to json, rest is read from other files
         # instead to remain flexible and make it easy for users to rename, etc
