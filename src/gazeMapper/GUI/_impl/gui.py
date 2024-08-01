@@ -151,7 +151,7 @@ class GUI:
     def _exiting(self):
         self.running = False
 
-    def _make_main_space_window(self, name, gui_func, can_be_closed=False, is_visible=True):
+    def _make_main_space_window(self, name: str, gui_func: Callable[[],None], can_be_closed=False, is_visible=True):
         main_space_view = hello_imgui.DockableWindow()
         main_space_view.label = name
         main_space_view.dock_space_name = "MainDockSpace"
@@ -224,7 +224,7 @@ class GUI:
         # now actual menu
         if imgui.begin_menu("Help"):
             if imgui.menu_item("About", "", False)[0]:
-                utils.push_popup(self, self._draw_about_popup)
+                utils.push_popup(self, self._about_popup_drawer)
             self._show_demo_window = imgui.menu_item("Debug window", "", self._show_demo_window)[1]
             imgui.end_menu()
 
@@ -290,20 +290,20 @@ class GUI:
             # windows
             self._main_dock_node_id = imgui.get_window_dock_id()
         if not self.project_dir:
-            self._draw_unopened_interface()
+            self._unopened_interface_drawer()
             return
         elif not self.can_accept_sessions:
-            imgui.text('This study does not have at least one defined recording and one defined plane.')
+            imgui.text('This study''s set up is incomplete.')
             imgui.align_text_to_frame_padding()
-            imgui.text('Set these up in the')
+            imgui.text('Finish the setup in the')
             imgui.same_line()
             if imgui.button('Project settings##button'):
                 self._to_focus = self._project_settings_pane.label
             imgui.same_line()
-            imgui.text('tab before you can continue.')
+            imgui.text('tab before you can import and process recording sessions.')
             return
 
-    def _draw_unopened_interface(self):
+    def _unopened_interface_drawer(self):
         avail      = imgui.get_content_region_avail()
         but_width  = 200*hello_imgui.dpi_window_size_factor()
         but_height = 100*hello_imgui.dpi_window_size_factor()
@@ -326,9 +326,63 @@ class GUI:
             utils.push_popup(self, callbacks.get_folder_picker(self, reason='loading'))
 
     def _project_settings_pane_drawer(self):
+        # options handled in separate panes
+        new_win_params: tuple[str,Callable[[],None]] = None
+        if imgui.button("Edit session definition"):
+            new_win_params = ('Session definition', self._session_definition_pane_drawer)
+        imgui.same_line()
+        if imgui.button("Edit planes"):
+            new_win_params = ('Plane editor', self._plane_editor_pane_drawer)
+        imgui.same_line()
+        if imgui.button("Episode setup"):
+            new_win_params = ('Episode setup', self._episode_setup_pane_drawer)
+        imgui.same_line()
+        if imgui.button("Edit individual markers"):
+            new_win_params = ('Individual marker editor', self._individual_marker_setup_pane_drawer)
+        if new_win_params is not None:
+            if not any((w.label==new_win_params[0] for w in hello_imgui.get_runner_params().docking_params.dockable_windows)):
+                new_win = self._make_main_space_window(*new_win_params, can_be_closed=True)
+                if not self._window_list:
+                    self._window_list = hello_imgui.get_runner_params().docking_params.dockable_windows
+                self._window_list.append(new_win)
+                self._to_dock.append(new_win_params[0])
+            self._to_focus = new_win_params[0]
+
+        # rest of settings handled here in a settings tree
+
+    def _session_definition_pane_drawer(self):
+        if not self.study_config.session_def.recordings:
+            imgui.text_colored((1.,0.,0.,1.),'*At minimum one recording should be defined')
+
+    def _plane_editor_pane_drawer(self):
+        if not self.study_config.planes:
+            imgui.text_colored((1.,0.,0.,1.),'*At minimum one plane should be defined')
+
+    def _episode_setup_pane_drawer(self):
+        if not self.study_config.episodes_to_code:
+            imgui.text_colored((1.,0.,0.,1.),'*At minimum one episode should be selected to be coded')
+        if not self.study_config.planes_per_episode:
+            imgui.text_colored((1.,0.,0.,1.),'*At minimum one plane should be linked to at minimum one episode')
+        if not self.study_config.planes:
+            imgui.align_text_to_frame_padding()
+            imgui.text_colored((1.,0.,0.,1.),'*At minimum one plane should be defined. Go to')
+            imgui.same_line()
+            tab_lbl = 'Edit planes'
+            if imgui.button(tab_lbl):
+                if not any((w.label==tab_lbl for w in hello_imgui.get_runner_params().docking_params.dockable_windows)):
+                    new_win = self._make_main_space_window(tab_lbl, self._plane_editor_pane_drawer, can_be_closed=True)
+                    if not self._window_list:
+                        self._window_list = hello_imgui.get_runner_params().docking_params.dockable_windows
+                    self._window_list.append(new_win)
+                    self._to_dock.append(tab_lbl)
+                self._to_focus = tab_lbl
+            imgui.same_line()
+            imgui.text_colored((1.,0.,0.,1.),'to set this up.')
+
+    def _individual_marker_setup_pane_drawer(self):
         pass
 
-    def _draw_about_popup(self):
+    def _about_popup_drawer(self):
         def popup_content():
             _60 = 60*hello_imgui.dpi_window_size_factor()
             _200 = 200*hello_imgui.dpi_window_size_factor()
