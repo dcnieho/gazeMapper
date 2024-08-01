@@ -45,7 +45,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
     sub_pixel_fac = 8   # for anti-aliased drawing
 
     # get settings for the study
-    study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent}, **study_settings)
+    study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir}, **study_settings)
     if not study_config.make_video_which:
         raise ValueError(f'There are no videos to be made (make_video_which is not defined or null in the study setup)')
 
