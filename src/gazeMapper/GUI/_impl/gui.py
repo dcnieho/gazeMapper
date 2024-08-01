@@ -365,10 +365,10 @@ class GUI:
             imgui.text_colored((1.,0.,0.,1.),'*At minimum one plane should be linked to at minimum one episode')
         if not self.study_config.planes:
             imgui.align_text_to_frame_padding()
-            imgui.text_colored((1.,0.,0.,1.),'*At minimum one plane should be defined. Go to')
+            imgui.text_colored((1.,0.,0.,1.),'*At minimum one plane should be defined.')
             imgui.same_line()
-            tab_lbl = 'Edit planes'
-            if imgui.button(tab_lbl):
+            tab_lbl = 'Plane editor'
+            if imgui.button('Edit planes'):
                 if not any((w.label==tab_lbl for w in hello_imgui.get_runner_params().docking_params.dockable_windows)):
                     new_win = self._make_main_space_window(tab_lbl, self._plane_editor_pane_drawer, can_be_closed=True)
                     if not self._window_list:
