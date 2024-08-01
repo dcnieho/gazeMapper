@@ -148,6 +148,7 @@ class GUI:
         main_space_view.gui_function = gui_func
         main_space_view.can_be_closed = can_be_closed
         main_space_view.is_visible = is_visible
+        main_space_view.remember_is_visible = False
         return main_space_view
 
     def _update_windows(self):
