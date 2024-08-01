@@ -2,7 +2,7 @@ from enum import auto
 import pathlib
 import cv2
 import json
-import numpy as np
+import typeguard
 
 from glassesTools import plane, utils
 from glassesValidator.config import get_validation_setup
@@ -15,59 +15,68 @@ class Type(utils.AutoName):
 utils.register_type(utils.CustomTypeEntry(Type,'__enum.plane.Type__',str, lambda x: getattr(Type, x.split('.')[1])))
 
 
+defaults = {Type.GlassesValidator: {'use_default': True}, Type.Plane_2D: {'marker_border_bits': 1, 'min_num_markers': 3, 'aruco_dict': cv2.aruco.DICT_4X4_250, 'ref_image_size': 1920}}
+valid_fields = {Type.GlassesValidator: ['use_default'], Type.Plane_2D: ['marker_file', 'marker_size', 'plane_size', 'marker_border_bits', 'min_num_markers', 'origin', 'unit', 'aruco_dict', 'ref_image_size']}
 class Definition:
     default_json_file_name = 'plane_def.json'
 
+    @typeguard.typechecked(collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
     def __init__(self,
                  type               : Type,
-                 use_default        : bool                  = False,
-                 name               : str                   = None,
-                 marker_file        : str|pathlib.Path      = None,
-                 marker_size        : float                 = None,
-                 marker_border_bits : int                   = 1,
-                 min_num_markers    : int                   = 3,
-                 plane_size         : tuple[float, float]   = None,
-                 origin             : tuple[float, float]   = None,
-                 unit               : str                   = None,
-                 aruco_dict         : int                   = cv2.aruco.DICT_4X4_250,
-                 ref_image_size     : int                   = 1920):
-        self.type                                           = type
-        self.name                                           = name
-        self.use_default            : bool                  = use_default           # applies only to glassesValidator planes. If False, denotes this is the default/built-in glassesValidator plane, if True, denotes custom settings are expected
+                 name               : str,
+                 use_default        : bool|None                 = None,
+                 marker_file        : str|pathlib.Path|None     = None,
+                 marker_size        : float|None                = None,
+                 marker_border_bits : int|None                  = None,
+                 min_num_markers    : int|None                  = None,
+                 plane_size         : list[float]|None          = None,
+                 origin             : list[float]|None          = None,
+                 unit               : str|None                  = None,
+                 aruco_dict         : int|None                  = None,
+                 ref_image_size     : int|None                  = None
+                 ):
+        self.type               = type
+        self.name               = name
+        self.use_default        = use_default           # applies only to glassesValidator planes. If False, denotes this is the default/built-in glassesValidator plane, if True, denotes custom settings are expected
         # the below are only for non-glassesValidator planes
-        self.marker_file            : str|pathlib.Path      = marker_file           # if str or Path: file from which to read markers. Else direction N_markerx4 array. Should contain centers of markers
-        self.marker_size            : float                 = marker_size           # in "unit" units
-        self.plane_size             : tuple[float, float]   = plane_size            # in "unit" units
-        self.marker_border_bits     : int                   = marker_border_bits
-        self.min_num_markers        : int                   = min_num_markers       # minimum number of markers that should be to run pose estimation w.r.t. the plane
-        self.origin                 : tuple[float, float]   = origin                # center of plane, in coordinates of the input file
-        self.unit                   : str                   = unit
-        self.aruco_dict             : int                   = aruco_dict
-        self.ref_image_size         : int                   = ref_image_size        # largest dimension
+        self.marker_file        = marker_file           # if str or Path: file from which to read markers. Else direction N_markerx4 array. Should contain centers of markers
+        self.marker_size        = marker_size           # in "unit" units
+        self.plane_size         = plane_size            # in "unit" units
+        self.marker_border_bits = marker_border_bits
+        self.min_num_markers    = min_num_markers       # minimum number of markers that should be to run pose estimation w.r.t. the plane
+        self.origin             = origin                # center of plane, in coordinates of the input file
+        self.unit               = unit
+        self.aruco_dict         = aruco_dict
+        self.ref_image_size     = ref_image_size        # largest dimension
 
         # check provided info
         if self.type==Type.GlassesValidator:
             # prevent bugs
-            if self.marker_file is not None:
-                raise ValueError("The marker_file input argument should not be set when the plane is a GlassesValidator plane (would be ignored)")
-            if self.marker_size is not None:
-                raise ValueError("The marker_size input argument should not be set when the plane is a GlassesValidator plane (would be ignored)")
-            # NB: all the other parameters are also ignored, but have meaningful defaults, so can't be checked
+            for a in valid_fields[Type.Plane_2D]:
+                if getattr(self,a) is not None:
+                    raise ValueError(f"The {a} input argument should not be set when the plane is a GlassesValidator plane (would be ignored)")
+            if self.use_default is None:
+                self.use_default = defaults[Type.GlassesValidator]['use_default']
         else:
-            if self.marker_file is None:
-                raise ValueError("The marker_file input argument should be provided")
-            if self.marker_size is None:
-                raise ValueError("The marker_size input argument should be provided")
             # prevent bugs
-            if self.use_default:
-                raise ValueError("The use_default input argument is for GlassesValidator planes. It should be set to False (default) when the plane is not a GlassesValidator plane (would be ignored)")
+            for a in valid_fields[Type.GlassesValidator]:
+                if getattr(self,a) is not None:
+                    raise ValueError(f"The {a} input argument is for GlassesValidator planes. It should not be set when the plane is not a GlassesValidator plane (would be ignored)")
+            # set defaults
+            for a in defaults[Type.Plane_2D]:
+                if getattr(self,a) is None:
+                    setattr(self,a,defaults[Type.Plane_2D][a])
 
     def store_as_json(self, path: str | pathlib.Path):
         path = pathlib.Path(path)
         if path.is_dir():
             path /= self.default_json_file_name
         with open(path, 'w') as f:
-            json.dump(self, f, cls=utils.CustomTypeEncoder, indent=2)
+            other_type = Type.GlassesValidator if self.type==Type.Plane_2D else Type.Plane_2D
+            to_dump = {k:getattr(self,k) for k in vars(self) if not k.startswith('_') and k not in ['name']+valid_fields[other_type]}    # name will be populated from the provided path, fields for the other type should not be stored
+            # filter out defaulted
+            to_dump = {k:v for k in to_dump if (v:=to_dump[k]) is not None and (k not in defaults[self.type] or defaults[self.type][k]!=v)}
+            json.dump(to_dump, f, cls=utils.CustomTypeEncoder, indent=2)
 
     @staticmethod
     def load_from_json(path: str | pathlib.Path) -> 'Definition':
@@ -75,13 +84,8 @@ class Definition:
         if path.is_dir():
             path /= Definition.default_json_file_name
         with open(path, 'r') as f:
-            dfntn = json.load(f, object_hook=utils.json_reconstitute)
-        dfntn.name=path.parent.name
-        return dfntn
-
-    def _to_dict(self):
-        return {k:getattr(self,k) for k in vars(self) if not k.startswith('_') and k not in ['name']}    # name will be populated from the provided path
-utils.register_type(utils.CustomTypeEntry(Definition,'__plane.Definition',lambda x: x._to_dict(), lambda x: Definition(**x)))
+            kwds = json.load(f, object_hook=utils.json_reconstitute)
+        return Definition(name=path.parent.name, **kwds)
 
 
 def get_plane_from_path(path: str|pathlib.Path) -> plane.Plane:
