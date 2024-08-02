@@ -17,7 +17,7 @@ import glassesValidator
 
 from ... import config, plane, session, version
 from .. import async_thread
-from . import callbacks, filepicker, msgbox, utils
+from . import callbacks, filepicker, msgbox, settings_editor, utils
 
 
 class GUI:
@@ -368,6 +368,10 @@ class GUI:
             self._to_focus = new_win_params[0]
 
         # rest of settings handled here in a settings tree
+        fields = [k for k in config.study_parameter_types.keys() if k in config.study_defaults]
+        editor = settings_editor.SettingEditor(self.study_config, fields, config.study_parameter_types, config.study_defaults)
+        editor.draw()
+
 
     def _session_definition_pane_drawer(self):
         if not self.study_config.session_def.recordings:
