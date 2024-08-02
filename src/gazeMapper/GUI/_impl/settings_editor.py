@@ -7,23 +7,15 @@ from glassesTools.timeline_gui import color_darken
 
 _C = typing.TypeVar("_C")
 _T = typing.TypeVar("_T")
-class SettingEditor:
-    def __init__(self, obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[_C], tuple[typing.Any]]]):
-        self.obj                    = obj
-        self.fields                 = fields
-        self.types                  = types
-        self.defaults               = defaults
-        self.possible_value_getters = possible_value_getters
+def draw(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[_C], tuple[typing.Any]]]) -> bool:
+    if not fields:
+        return
 
-    def draw(self) -> bool:
-        if not self.fields:
-            return
+    table_is_started, changed = _draw_impl(obj, fields, types, defaults, possible_value_getters)
+    if table_is_started:
+        imgui.end_table()
 
-        table_is_started, changed = _draw_impl(self.obj, self.fields, self.types, self.defaults, self.possible_value_getters)
-        if table_is_started:
-            imgui.end_table()
-
-        return changed
+    return changed, obj
 
 
 def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_getter: typing.Callable[[_C],tuple[_T]]|None) -> tuple[bool, typing.Type, typing.Type]:
