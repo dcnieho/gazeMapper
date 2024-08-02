@@ -132,6 +132,8 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
     else:
         imgui_md.render(f'**{field}**')
     imgui.table_next_column()
+    # TODO: should handle None value: print as <not set> and bring up editor upon clicking on it, or something like that
+    # maybe store ID of currently editing None to bypass this print and go to the below editor?
     match base_type:
         case builtins.bool:
             new_val = imgui.checkbox(f'##{field}', val)[1]
