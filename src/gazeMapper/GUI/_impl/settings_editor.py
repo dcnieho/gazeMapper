@@ -17,6 +17,7 @@ class SettingEditor:
 
     def _draw_impl(self, level=0, table_is_started=False) -> tuple[bool,bool]:
         changed = False
+        max_fields_width = max([imgui.calc_text_size(f) for f in self.fields], key=lambda x: x.x).x*1.1   # 10% extra to be safe
         for f in self.fields:
             need_new_level, base_type, f_type = _get_field_type(f, self.obj, self.types[f], self.possible_value_getters[f] if f in self.possible_value_getters else None)
 
@@ -34,8 +35,8 @@ class SettingEditor:
                 table_is_started = imgui.begin_table(f"##settings_level_{level}", 2)
                 if not table_is_started:
                     continue
-                imgui.table_setup_column("setting")
-                imgui.table_setup_column("value")
+                imgui.table_setup_column("setting", imgui.TableColumnFlags_.width_fixed, init_width_or_weight=max_fields_width)
+                imgui.table_setup_column("value", imgui.TableColumnFlags_.width_stretch)
 
             changed |= self._draw_field(f, self.obj, base_type, f_type, self.defaults[f] if f in self.defaults else None)
         return table_is_started, changed
