@@ -230,7 +230,7 @@ class Study:
     def _known_recording_names(self) -> list[str]:
         return tuple(r.name for r in self.session_def.recordings)
 
-    def store_as_json(self, path: str|pathlib.Path|None):
+    def store_as_json(self, path: str|pathlib.Path|None=None):
         if not path:
             path = guess_config_dir(self.working_directory)
         path = pathlib.Path(path)
