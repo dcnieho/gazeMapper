@@ -7,7 +7,7 @@ from glassesTools.timeline_gui import color_darken
 
 _C = typing.TypeVar("_C")
 _T = typing.TypeVar("_T")
-def draw(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[_C], tuple[typing.Any]]]) -> bool:
+def draw(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[_C], tuple[typing.Any]]]) -> tuple[bool,_C]:
     if not fields:
         return
 
