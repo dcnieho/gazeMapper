@@ -38,16 +38,17 @@ def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_get
         n_type = None
     match base_type:
         case builtins.bool | builtins.str | builtins.int | builtins.float | typing.Literal:
-            is_container = False
+            is_dict = False
             if n_type is not None:
                 # apply type override
                 f_type = n_type
                 base_type = typing.Literal
 
         case _ if typing.is_typeddict(f_type):
-            is_container = True
+            is_dict = True
         case builtins.dict | builtins.list:
-            is_container = True
+            is_dict = base_type==builtins.dict
+            # possibly replace inner type of container
             if n_type is not None:
                 v_type = type(typing.get_args(n_type)[0])
                 o_types= typing.get_args(f_type)
@@ -58,27 +59,23 @@ def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_get
                 f_type = base_type[tuple(n_type if r else o for o,r in zip(o_types, which))]
         case _:
             raise ValueError(f'type of {field} ({f_type}) not handled')
-    return is_container, base_type, f_type
+    return is_dict, base_type, f_type
 
 def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[_C], tuple[typing.Any]]], level=0, table_is_started=False) -> tuple[bool,bool]:
     changed = False
-    max_fields_width = max([imgui.calc_text_size(f) for f in fields], key=lambda x: x.x).x*1.1   # 10% extra to be safe
+    max_fields_width = max([imgui.calc_text_size(f) for f in fields], key=lambda x: x.x, default=imgui.calc_text_size('xxxxx')).x*1.1   # 10% extra to be safe
     for f in fields:
-        need_new_level, base_type, f_type = _get_field_type(f, obj, types[f], possible_value_getters[f] if f in possible_value_getters else None)
+        is_dict, base_type, f_type = _get_field_type(f, obj, types[f], possible_value_getters[f] if f in possible_value_getters else None)
 
-        if need_new_level:
-            if base_type==builtins.list:
-                # temporary, this does not need a new level but a special input type
-                # should be rendered as a tag list [A x][B x] with either text input if
-                # unconstrained subtype (e.g. int, str, use typecheck utility), or
-                # dropdown if known list of options
-                imgui.text(f'{f}: {f_type}')
-                continue
-            # recurse
+        if is_dict:
             if table_is_started:
                 imgui.end_table()
                 table_is_started = False
             if imgui.tree_node_ex(f,imgui.TreeNodeFlags_.framed):
+                this_changed, made_obj, new_sub_obj = _draw_dict_editor(obj.get(f,None) if isinstance(obj,dict) else getattr(obj,f), f_type)
+                changed |= this_changed
+                if this_changed and made_obj:
+                    setattr(obj,f,new_sub_obj)
                 imgui.tree_pop()
             continue
 
@@ -93,10 +90,30 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
         changed |= _draw_field(f, obj, base_type, f_type, defaults[f] if f in defaults else None)
     return table_is_started, changed
 
+def _draw_dict_editor(obj: _T, o_type: typing.Type):
+    if (made_obj := obj is None):
+        obj = o_type()
+
+    if typing.is_typeddict(o_type):
+        has_add_remove = False
+        types = o_type.__annotations__
+        fields = list(types.keys())
+    else:
+        has_add_remove = True
+        fields = list(obj.keys())
+        types = {k:type(obj[k]) for k in obj}
+
+    table_is_started, changed = _draw_impl(obj, fields, types, {}, {})
+    if table_is_started:
+        imgui.end_table()
+
+    return changed, made_obj, obj
+
+
 def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type, default: _T|None) -> bool:
     imgui.table_next_row()
     imgui.table_next_column()
-    val = getattr(obj,field)
+    val = obj.get(field,f_type()) if isinstance(obj,dict) else getattr(obj,field)
     if (is_default := val==default):
         imgui.align_text_to_frame_padding()
         imgui.text_colored(imgui.ImVec4(*color_darken(imgui.ImColor(imgui.get_style_color_vec4(imgui.Col_.text)), .75)), field)
@@ -112,6 +129,13 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
             new_val = imgui.input_int(f'##{field}', val)[1]
         case builtins.float:
             new_val = imgui.input_double(f'##{field}', val)[1]
+        case builtins.list:
+            # temporary, this does not need a new level but a special input type
+            # should be rendered as a tag list [A x][B x] with either text input if
+            # unconstrained subtype (e.g. int, str, use typecheck utility), or
+            # dropdown if known list of options
+            imgui.text(f'{f_type}')
+            new_val = val
         case typing.Literal:
             values = typing.get_args(f_type)
             p_idx = values.index(val)
@@ -119,6 +143,9 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
             new_val = values[p_idx]
 
     if (changed := new_val!=val):
-        setattr(obj,field,new_val)
+        if isinstance(obj,dict):
+            obj[field] = new_val
+        else:
+            setattr(obj,field,new_val)
 
     return changed
