@@ -46,7 +46,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
 
     # get settings for the study
     study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir}, **study_settings)
-    if not study_config.make_video_which:
+    if not study_config.video_make_which:
         raise ValueError(f'There are no videos to be made (make_video_which is not defined or null in the study setup)')
 
     # get session info
@@ -189,7 +189,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                 raise RuntimeError(f'Camera sync points found for recording {r} ({episodes_as_ref_flat[r][annotation.Event.Sync_Camera]}) that do not occur among the reference recordings sync points ({study_config.sync_ref_recording}, {episodes_as_ref_flat[study_config.sync_ref_recording][annotation.Event.Sync_Camera]}). That means the sync logic must have failed')
         # load plane gazes
         if not (study_config.video_process_planes_for_all_frames or study_config.video_process_individual_markers_for_all_frames):
-            to_load = [r for r in recs if r not in study_config.make_video_which]
+            to_load = [r for r in recs if r not in study_config.video_make_which]
             for r in to_load:
                 all_poses[r] = {}
                 for p in plane_names:
@@ -197,7 +197,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
 
     # build pose estimator
     for rec in recs:
-        if rec not in study_config.make_video_which and not (study_config.video_process_planes_for_all_frames or study_config.video_process_individual_markers_for_all_frames):
+        if rec not in study_config.video_make_which and not (study_config.video_process_planes_for_all_frames or study_config.video_process_individual_markers_for_all_frames):
             continue
         in_videos[rec] = session.get_video_path(session_info.recordings[rec].info)     # get video file to process
         pose_estimators[rec] = aruco.PoseEstimator(in_videos[rec], videos_ts[rec], camera_params[rec])
@@ -214,7 +214,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
         if study_config.sync_ref_recording and rec!=study_config.sync_ref_recording:
             pose_estimators[rec].set_do_report_frames(False)
 
-        if rec in study_config.make_video_which:
+        if rec in study_config.video_make_which:
             pose_estimators[rec].set_visualize_on_frame(True)
             pose_estimators[rec].sub_pixel_fac                      = sub_pixel_fac
             pose_estimators[rec].show_detected_markers              = study_config.video_show_detected_markers
@@ -225,7 +225,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
             pose_estimators[rec].show_unexpected_markers            = study_config.video_show_unexpected_markers
             pose_estimators[rec].show_rejected_markers              = study_config.video_show_rejected_markers
 
-        if rec in study_config.make_video_which or rec==study_config.sync_ref_recording:
+        if rec in study_config.video_make_which or rec==study_config.sync_ref_recording:
             # get video file info
             vid_info[rec] = pose_estimators[rec].get_video_info()
             # override fps with frame timestamp info
@@ -236,9 +236,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
 
     video_sets: list[tuple[str, set[str], set[str]]] = []
     if study_config.sync_ref_recording:
-        video_sets.append((study_config.sync_ref_recording,{r for r in study_config.make_video_which if r!=study_config.sync_ref_recording}, recs))
+        video_sets.append((study_config.sync_ref_recording,{r for r in study_config.video_make_which if r!=study_config.sync_ref_recording}, recs))
     else:
-        video_sets.extend([(r,set(),set()) for r in study_config.make_video_which])
+        video_sets.extend([(r,set(),set()) for r in study_config.video_make_which])
 
     # per set of videos
     should_exit = False
@@ -256,7 +256,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
         all_vids    = set([lead_vid]) | other_vids
         # videos to be written out may not be equal to all_vids. This can occur if we
         # have a study_config.sync_ref_recording, but config is not to make a video for it
-        write_vids  = {v for v in all_vids if v in study_config.make_video_which}
+        write_vids  = {v for v in all_vids if v in study_config.video_make_which}
 
         if has_gui:
             # clean up any previous windows (except main window, this will have to be renamed only)

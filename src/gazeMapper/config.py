@@ -86,7 +86,7 @@ class Study:
                  validate_include_data_loss                     : bool                              = False,
                  validate_I2MC_settings                         : I2MCSettings|None                 = None,
 
-                 make_video_which                               : list[str]|None                    = None,
+                 video_make_which                               : list[str]|None                    = None,
                  video_recording_colors                         : dict[str,list[int]]|None          = None,
                  video_process_planes_for_all_frames            : bool                              = False,
                  video_process_annotations_for_all_recordings   : bool                              = True,
@@ -134,7 +134,7 @@ class Study:
         self.validate_include_data_loss                     = validate_include_data_loss
         self.validate_I2MC_settings                         = validate_I2MC_settings
 
-        self.make_video_which                               = make_video_which
+        self.video_make_which                               = video_make_which
         self.video_recording_colors                         = video_recording_colors
         self.video_process_planes_for_all_frames            = video_process_planes_for_all_frames   # if True, all planes are processed for all frames, if False, only according to the planes_per_episode setup and the coding
         self.video_process_annotations_for_all_recordings   = video_process_annotations_for_all_recordings   # if True, all coded episodes for all planes of all recordings are processed (so e.g. if validation coded for one recording in the session, that plane is processed for all)
@@ -156,7 +156,7 @@ class Study:
     def _check_all(self):
         self._check_planes_per_episode()
         self._check_auto_markers()
-        self._check_recordings(self.make_video_which, 'make_video_which')
+        self._check_recordings(self.video_make_which, 'make_video_which')
         self._check_recordings(self.video_recording_colors, 'video_recording_colors')
         if self.sync_ref_recording is not None:
             self._check_recordings([self.sync_ref_recording], 'sync_ref_recording')
@@ -181,6 +181,7 @@ class Study:
             if annotation.Event.Trial not in self.episodes_to_code:
                 raise ValueError(f'The auto_code_trials_episodes option is configured, but {annotation.Event.Trial} episodes are not set to be coded in episodes_to_code. Fix episodes_to_code.')
 
+        # set defaults
         if self.auto_code_sync_points:
             if 'max_gap_duration' not in self.auto_code_sync_points:
                 self.auto_code_sync_points['max_gap_duration'] = auto_code_sync_points_defaults['max_gap_duration']
