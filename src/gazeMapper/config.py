@@ -161,7 +161,7 @@ class Study:
     def _check_all(self):
         self._check_planes_per_episode()
         self._check_auto_markers()
-        self._check_recordings(self.video_make_which, 'make_video_which')
+        self._check_recordings(self.video_make_which, 'video_make_which')
         self._check_recordings(self.video_recording_colors, 'video_recording_colors')
         if self.sync_ref_recording is not None:
             self._check_recordings([self.sync_ref_recording], 'sync_ref_recording')
