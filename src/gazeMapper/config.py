@@ -167,7 +167,7 @@ class Study:
             self._check_recordings([self.sync_ref_recording], 'sync_ref_recording')
             for a in ['sync_ref_do_time_stretch', 'sync_ref_stretch_which', 'sync_ref_average_recordings']:
                 if getattr(self,a) is None:
-                    raise ValueError(f'a should be set in the study setup when sync_ref_recording is set')
+                    raise ValueError(f'{a} should be set in the study setup when sync_ref_recording is set')
             self._check_recordings(self.sync_ref_average_recordings, 'sync_average_recordings')
             if self.sync_ref_recording in self.sync_ref_average_recordings:
                 raise ValueError(f'Recording {self.sync_ref_recording} is the reference recording for sync, should not be specified in sync_average_recordings')
