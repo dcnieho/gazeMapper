@@ -372,9 +372,15 @@ class GUI:
         fields = [k for k in config.study_parameter_types.keys() if k in config.study_defaults]
         changed, new_config = settings_editor.draw(copy.deepcopy(self.study_config), fields, config.study_parameter_types, config.study_defaults, config.study_parameter_possible_value_getters)
         if changed:
-            new_config._check_all()
-            self.study_config = new_config
-            self.study_config.store_as_json()
+            try:
+                new_config._check_all()
+            except Exception as e:
+                # do not persist invalid config, inform user of problem
+                utils.push_popup(self, msgbox.msgbox, "Settings error", f"You cannot make this change to the project's settings:\n{e}", msgbox.MsgBox.error)
+            else:
+                # persist changed config
+                self.study_config = new_config
+                self.study_config.store_as_json()
 
 
     def _session_definition_pane_drawer(self):
