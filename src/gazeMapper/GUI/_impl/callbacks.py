@@ -1,4 +1,5 @@
 import pathlib
+import typing
 from imgui_bundle import icons_fontawesome_6 as ifa6
 
 
@@ -7,7 +8,7 @@ from ... import config, plane
 
 def get_folder_picker(g, reason: str):
     from . import gui
-    g: gui.GUI = g
+    g = typing.cast(gui.GUI,g)  # indicate type to typechecker
     def select_callback(selected):
         match reason:
             case 'loading' | 'creating':
@@ -25,7 +26,7 @@ def get_folder_picker(g, reason: str):
 
 def try_load_project(g, path: str|pathlib.Path, action='loading'):
     from . import gui
-    g: gui.GUI = g
+    g = typing.cast(gui.GUI,g)  # indicate type to typechecker
     if isinstance(path,list):
         if not path:
             utils.push_popup(g, msgbox.msgbox, "Project opening error", "A single project directory should be provided. None provided so cannot open.", msgbox.MsgBox.error, more="Dropped paths:\n"+('\n'.join([str(p) for p in path])))
