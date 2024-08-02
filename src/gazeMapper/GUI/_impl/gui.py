@@ -5,6 +5,7 @@ import sys
 import platform
 import webbrowser
 from typing import Callable
+import copy
 
 import imgui_bundle
 from imgui_bundle import imgui, immapp, imgui_md, hello_imgui, glfw_utils, icons_fontawesome_6 as ifa6
@@ -369,8 +370,11 @@ class GUI:
 
         # rest of settings handled here in a settings tree
         fields = [k for k in config.study_parameter_types.keys() if k in config.study_defaults]
-        editor = settings_editor.SettingEditor(self.study_config, fields, config.study_parameter_types, config.study_defaults, config.study_parameter_possible_value_getters)
-        editor.draw()
+        changed, new_config = settings_editor.draw(copy.deepcopy(self.study_config), fields, config.study_parameter_types, config.study_defaults, config.study_parameter_possible_value_getters)
+        if changed:
+            new_config._check_all()
+            self.study_config = new_config
+            self.study_config.store_as_json()
 
 
     def _session_definition_pane_drawer(self):
