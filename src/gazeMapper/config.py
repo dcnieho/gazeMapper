@@ -4,7 +4,7 @@ import inspect
 import copy
 import enum
 import typeguard
-from typing import Any, TypedDict
+from typing import Any, Literal, TypedDict
 
 from glassesTools import annotation, utils
 from glassesValidator import process as gv_process
@@ -49,6 +49,11 @@ class I2MCSettings(TypedDict, total=False):
     maxMergeTime: float
     minFixDur: float
 
+class CamMovementForEtSyncFunction(TypedDict):
+    module_or_file: str
+    function: str
+    parameters: dict[str,Any]
+
 class Study:
     default_json_file_name = 'study_def.json'
 
@@ -64,13 +69,13 @@ class Study:
                  # setup with defaults
                  sync_ref_recording                             : str|None                          = None,
                  sync_ref_do_time_stretch                       : bool|None                         = None,
-                 sync_ref_stretch_which                         : str|None                          = None,
+                 sync_ref_stretch_which                         : Literal['ref','other']|None       = None,
                  sync_ref_average_recordings                    : list[str]|None                    = None,
 
                  sync_et_to_cam_use_average                     : bool                              = True,
 
-                 get_cam_movement_for_et_sync_method            : str                               = 'plane',
-                 get_cam_movement_for_et_sync_function          : dict[str,str|dict[str,Any]]|None  = None,
+                 get_cam_movement_for_et_sync_method            : Literal['','plane','function']    = 'plane',
+                 get_cam_movement_for_et_sync_function          : CamMovementForEtSyncFunction|None = None,
 
                  auto_code_sync_points                          : AutoCodeSyncPoints|None           = None,
                  auto_code_trial_episodes                       : AutoCodeTrialEpisodes|None        = None,
@@ -216,8 +221,11 @@ class Study:
         if which is None:
             return
         for w in which:
-            if not any([r.name==w for r in self.session_def.recordings]):
+            if not self._check_recording(w):
                 raise ValueError(f'Recording "{w}" not known, check {field} in the study configuration')
+
+    def _check_recording(self, rec: str):
+        return any([r.name==rec for r in self.session_def.recordings])
 
     def store_as_json(self, path: str|pathlib.Path|None):
         if not path:
