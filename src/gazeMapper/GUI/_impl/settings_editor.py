@@ -25,7 +25,7 @@ def draw(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: di
     if not fields:
         return
 
-    table_is_started, changed, _, obj = _draw_impl(obj, fields, types, defaults, possible_value_getters)
+    table_is_started, changed, _, obj = _draw_impl(obj, fields, types, defaults, possible_value_getters, [])
     if table_is_started:
         imgui.end_table()
 
@@ -71,14 +71,14 @@ def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_get
             raise ValueError(f'type of {field} ({f_type}) not handled')
     return is_dict, base_type, f_type
 
-def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[_C], tuple[typing.Any]]], level=0, table_is_started=False) -> tuple[bool,bool,bool,_C]:
+def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[_C], tuple[typing.Any]]], mark: list[str], level=0, table_is_started=False) -> tuple[bool,bool,bool,_C]:
     changed = False
     max_fields_width = _get_fields_text_width(fields)*1.1   # 10% extra to be safe
     ret_new_obj = False
     for f in fields:
         is_dict, base_type, f_type = _get_field_type(f, obj, types[f], possible_value_getters[f] if f in possible_value_getters else None)
 
-        if is_dict:
+        if is_dict and not f in mark:
             if table_is_started:
                 imgui.end_table()
                 table_is_started = False
@@ -96,14 +96,14 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
             if not table_is_started:
                 continue
 
-        this_changed, new_f_obj = _draw_field(f, obj, base_type, f_type, defaults[f] if f in defaults else None)
+        this_changed, new_f_obj = _draw_field(f, obj, base_type, f_type, defaults[f] if f in defaults else None, mark=f in mark)
         changed |= this_changed
         if this_changed and new_f_obj is not None:
             ret_new_obj = True
             obj = new_f_obj
     return table_is_started, changed, ret_new_obj, obj
 
-def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None, types: dict[typing.Any, typing.Type]=None, defaults:dict[typing.Any, typing.Any]=None) -> tuple[bool,bool,_T]:
+def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None, types: dict[typing.Any, typing.Type]=None, defaults:dict[typing.Any, typing.Any]=None, mark: list[str]=None) -> tuple[bool,bool,_T]:
     made_or_replaced_obj = False
     if (made_or_replaced_obj := obj is None):
         obj = o_type()
@@ -128,7 +128,7 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
     table_is_started = _start_table(level, first_column_width)
     if not table_is_started:
         return False, made_or_replaced_obj, obj
-    table_is_started, changed, ret_new_obj, obj = _draw_impl(obj, fields, types, defaults, {}, level, table_is_started)
+    table_is_started, changed, ret_new_obj, obj = _draw_impl(obj, fields, types, defaults, {}, mark, level, table_is_started)
     made_or_replaced_obj |= ret_new_obj
     if not table_is_started and has_add_remove:
         table_is_started = _start_table(level, first_column_width)
@@ -154,11 +154,14 @@ def _start_table(level, first_column_width):
     imgui.table_setup_column("value", imgui.TableColumnFlags_.width_stretch)
     return table_is_started
 
-def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type, default: _T|None) -> bool:
+def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type, default: _T|None, mark: bool) -> bool:
     imgui.table_next_row()
     imgui.table_next_column()
     val = obj.get(field,f_type()) if isinstance(obj,dict) else getattr(obj,field)
-    if (is_default := val==default):
+    if mark:
+        imgui.align_text_to_frame_padding()
+        imgui.text_colored(imgui.ImVec4(*imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.64))), field)
+    elif (is_default := val==default):
         imgui.align_text_to_frame_padding()
         imgui.text_colored(imgui.ImVec4(*color_darken(imgui.ImColor(imgui.get_style_color_vec4(imgui.Col_.text)), .75)), field)
     else:
@@ -167,6 +170,9 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
     # TODO: should handle None value: print as <not set> and bring up editor upon clicking on it, or something like that
     # maybe store ID of currently editing None to bypass this print and go to the below editor?
     match base_type:
+        case _ if val is None:
+            new_val = val
+            imgui.text('<not set>')
         case builtins.bool:
             new_val = imgui.checkbox(f'##{field}', val)[1]
         case builtins.str:
