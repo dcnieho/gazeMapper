@@ -57,12 +57,12 @@ class CamMovementForEtSyncFunction(TypedDict):
 class Study:
     default_json_file_name = 'study_def.json'
 
-    @typeguard.typechecked(collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
+    #@typeguard.typechecked(collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
     def __init__(self,
                  session_def                                    : session.SessionDefinition,
                  planes                                         : list[plane.Definition],
-                 planes_per_episode                             : dict[annotation.Event,list[str]],
-                 episodes_to_code                               : list[annotation.Event],
+                 planes_per_episode                             : dict[annotation.Event,set[str]],
+                 episodes_to_code                               : set[annotation.Event],
                  individual_markers                             : list[marker.Marker],
                  working_directory                              : str|pathlib.Path,
 
@@ -70,7 +70,7 @@ class Study:
                  sync_ref_recording                             : str|None                          = None,
                  sync_ref_do_time_stretch                       : bool|None                         = None,
                  sync_ref_stretch_which                         : Literal['ref','other']|None       = None,
-                 sync_ref_average_recordings                    : list[str]|None                    = None,
+                 sync_ref_average_recordings                    : set[str]|None                     = None,
 
                  sync_et_to_cam_use_average                     : bool                              = True,
 
@@ -86,12 +86,12 @@ class Study:
 
                  validate_do_global_shift                       : bool                              = True,
                  validate_max_dist_fac                          : float                             = .5,
-                 validate_dq_types                              : list[gv_process.DataQualityType]|None = None,
+                 validate_dq_types                              : set[gv_process.DataQualityType]|None = None,
                  validate_allow_dq_fallback                     : bool                              = False,
                  validate_include_data_loss                     : bool                              = False,
                  validate_I2MC_settings                         : I2MCSettings|None                 = None,
 
-                 video_make_which                               : list[str]|None                    = None,
+                 video_make_which                               : set[str]|None                     = None,
                  video_recording_colors                         : dict[str,list[int]]|None          = None,
                  video_process_planes_for_all_frames            : bool                              = False,
                  video_process_annotations_for_all_recordings   : bool                              = True,
