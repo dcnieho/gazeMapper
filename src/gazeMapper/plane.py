@@ -69,6 +69,13 @@ class Definition:
             if getattr(self,a) is None:
                 setattr(self,a,definition_defaults[self.type][a])
 
+    def missing_fields(self) -> list[str]:
+        missing: list[str] = []
+        for a in definition_valid_fields[self.type]:
+            if getattr(self,a) is None:
+                missing.append(a)
+        return missing
+
     def store_as_json(self, path: str | pathlib.Path):
         path = pathlib.Path(path)
         if path.is_dir():
