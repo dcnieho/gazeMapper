@@ -392,7 +392,9 @@ class GUI:
             imgui.text_colored(imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.64)),'*At minimum one plane should be defined')
         for p in self.study_config.planes:
             if imgui.tree_node_ex(f'{p.name} ({p.type.value})', imgui.TreeNodeFlags_.framed):
-                settings_editor.draw_dict_editor(p, type(p), 0, plane.definition_valid_fields[p.type], plane.definition_parameter_types, plane.definition_defaults[p.type])
+                changed = settings_editor.draw_dict_editor(p, type(p), 0, plane.definition_valid_fields[p.type], plane.definition_parameter_types, plane.definition_defaults[p.type])[0]
+                if changed:
+                    p.store_as_json(config.guess_config_dir(self.study_config.working_directory)/p.name)
                 if imgui.button(ifa6.ICON_FA_TRASH_CAN+' delete plane'):
                     callbacks.delete_plane(self.study_config, p)
                 imgui.tree_pop()
