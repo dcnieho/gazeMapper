@@ -52,23 +52,19 @@ class Definition:
         self.aruco_dict         = aruco_dict
         self.ref_image_size     = ref_image_size        # largest dimension
 
-        # check provided info
+        # check provided info (prevent bugs)
         if self.type==Type.GlassesValidator:
-            # prevent bugs
             for a in definition_valid_fields[Type.Plane_2D]:
                 if getattr(self,a) is not None:
                     raise ValueError(f"The {a} input argument should not be set when the plane is a GlassesValidator plane (would be ignored)")
-            if self.use_default is None:
-                self.use_default = definition_defaults[Type.GlassesValidator]['use_default']
         else:
-            # prevent bugs
             for a in definition_valid_fields[Type.GlassesValidator]:
                 if getattr(self,a) is not None:
                     raise ValueError(f"The {a} input argument is for GlassesValidator planes. It should not be set when the plane is not a GlassesValidator plane (would be ignored)")
-            # set defaults
-            for a in definition_defaults[Type.Plane_2D]:
-                if getattr(self,a) is None:
-                    setattr(self,a,definition_defaults[Type.Plane_2D][a])
+        # set defaults
+        for a in definition_defaults[self.type]:
+            if getattr(self,a) is None:
+                setattr(self,a,definition_defaults[self.type][a])
 
     def store_as_json(self, path: str | pathlib.Path):
         path = pathlib.Path(path)
