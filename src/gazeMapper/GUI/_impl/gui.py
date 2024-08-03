@@ -341,7 +341,7 @@ class GUI:
         if needs_attention:
             imgui.pop_style_color(3)
         imgui.same_line()
-        needs_attention = not self.study_config.planes
+        needs_attention = not self.study_config.planes or any((not p.has_complete_setup() for p in self.study_config.planes))
         if needs_attention:
             _indicate_needs_attention()
         if imgui.button("Edit planes"):
