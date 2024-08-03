@@ -25,7 +25,7 @@ def draw(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: di
     if not fields:
         return
 
-    table_is_started, changed = _draw_impl(obj, fields, types, defaults, possible_value_getters)
+    table_is_started, changed, _, obj = _draw_impl(obj, fields, types, defaults, possible_value_getters)
     if table_is_started:
         imgui.end_table()
 
@@ -71,9 +71,10 @@ def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_get
             raise ValueError(f'type of {field} ({f_type}) not handled')
     return is_dict, base_type, f_type
 
-def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[_C], tuple[typing.Any]]], level=0, table_is_started=False) -> tuple[bool,bool]:
+def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[_C], tuple[typing.Any]]], level=0, table_is_started=False) -> tuple[bool,bool,bool,_C]:
     changed = False
     max_fields_width = _get_fields_text_width(fields)*1.1   # 10% extra to be safe
+    ret_new_obj = False
     for f in fields:
         is_dict, base_type, f_type = _get_field_type(f, obj, types[f], possible_value_getters[f] if f in possible_value_getters else None)
 
@@ -95,11 +96,16 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
             if not table_is_started:
                 continue
 
-        changed |= _draw_field(f, obj, base_type, f_type, defaults[f] if f in defaults else None)
-    return table_is_started, changed
+        this_changed, new_f_obj = _draw_field(f, obj, base_type, f_type, defaults[f] if f in defaults else None)
+        changed |= this_changed
+        if this_changed and new_f_obj is not None:
+            ret_new_obj = True
+            obj = new_f_obj
+    return table_is_started, changed, ret_new_obj, obj
 
-def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None, types: dict[typing.Any, typing.Type]=None, defaults:dict[typing.Any, typing.Any]=None):
-    if (made_obj := obj is None):
+def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None, types: dict[typing.Any, typing.Type]=None, defaults:dict[typing.Any, typing.Any]=None) -> tuple[bool,bool,_T]:
+    made_or_replaced_obj = False
+    if (made_or_replaced_obj := obj is None):
         obj = o_type()
 
     if typing.is_typeddict(o_type):
@@ -121,12 +127,13 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
     first_column_width = _get_fields_text_width(fields, backup_str='xadd itemx')*1.1
     table_is_started = _start_table(level, first_column_width)
     if not table_is_started:
-        return
-    table_is_started, changed = _draw_impl(obj, fields, types, defaults, {}, level, table_is_started)
+        return False, made_or_replaced_obj, obj
+    table_is_started, changed, ret_new_obj, obj = _draw_impl(obj, fields, types, defaults, {}, level, table_is_started)
+    made_or_replaced_obj |= ret_new_obj
     if not table_is_started and has_add_remove:
         table_is_started = _start_table(level, first_column_width)
         if not table_is_started:
-            return
+            return changed, made_or_replaced_obj, obj
     if has_add_remove:
         imgui.table_next_row()
         imgui.table_next_column()
@@ -134,7 +141,7 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
     if table_is_started:
         imgui.end_table()
 
-    return changed, made_obj, obj
+    return changed, made_or_replaced_obj, obj
 
 def _get_fields_text_width(fields, backup_str='xxxxx'):
     return max([imgui.calc_text_size(f) for f in fields], key=lambda x: x.x, default=imgui.calc_text_size(backup_str)).x
@@ -190,10 +197,14 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
             _,p_idx = imgui.combo(f"##{field}", p_idx, str_values, popup_max_height_in_items=min(10,len(values)))
             new_val = values[p_idx]
 
+    new_obj = None
     if (changed := new_val!=val):
         if isinstance(obj,dict):
             obj[field] = new_val
+        elif is_NamedTuple_type(type(obj)):
+            # tuples are immutable, have to return new instance
+            new_obj = obj._replace(**{field:new_val})
         else:
             setattr(obj,field,new_val)
 
-    return changed
+    return changed, new_obj
