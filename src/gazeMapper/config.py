@@ -7,7 +7,7 @@ import typeguard
 import typing
 from typing import Any, Literal, TypedDict
 
-from glassesTools import annotation, utils
+from glassesTools import annotation, plane as gt_plane, utils
 from glassesValidator import process as gv_process
 
 from . import marker, plane, session
@@ -33,14 +33,14 @@ class I2MCSettings(TypedDict, total=False):
     freq: float
     missingx: float
     missingy: float
-    scrSz: list[float, float]
+    scrSz: gt_plane.Coordinate
     disttoscreen: float
     windowtimeInterp: float
     edgeSampInterp: int
     maxdisp: float
     windowtime: float
     steptime: float
-    downsamples: list[int]
+    downsamples: set[int]
     downsampFilter: bool
     chebyOrder: int
     maxerrors: int
