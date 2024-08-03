@@ -29,8 +29,8 @@ class Definition:
                  marker_size        : float|None                = None,
                  marker_border_bits : int|None                  = None,
                  min_num_markers    : int|None                  = None,
-                 plane_size         : list[float]|None          = None,
-                 origin             : list[float]|None          = None,
+                 plane_size         : plane.Coordinate|None     = None,
+                 origin             : plane.Coordinate|None     = None,
                  unit               : str|None                  = None,
                  aruco_dict         : int|None                  = None,
                  ref_image_size     : int|None                  = None
@@ -85,6 +85,10 @@ class Definition:
             path /= Definition.default_json_file_name
         with open(path, 'r') as f:
             kwds = json.load(f, object_hook=utils.json_reconstitute)
+        # help with named tuple roundtrip
+        for k in ['plane_size', 'origin']:
+            if k in kwds:
+                kwds[k] = plane.Coordinate(*kwds[k])
         return Definition(name=path.parent.name, **kwds)
 definition_defaults = {Type.GlassesValidator: {'use_default': True}, Type.Plane_2D: {'marker_border_bits': 1, 'min_num_markers': 3, 'aruco_dict': cv2.aruco.DICT_4X4_250, 'ref_image_size': 1920}}
 definition_valid_fields = {Type.GlassesValidator: ['use_default'], Type.Plane_2D: ['marker_file', 'marker_size', 'plane_size', 'marker_border_bits', 'min_num_markers', 'origin', 'unit', 'aruco_dict', 'ref_image_size']}
