@@ -4,6 +4,7 @@ import inspect
 import copy
 import enum
 import typeguard
+import typing
 from typing import Any, Literal, TypedDict
 
 from glassesTools import annotation, utils
@@ -54,6 +55,11 @@ class CamMovementForEtSyncFunction(TypedDict):
     function: str
     parameters: dict[str,Any]
 
+class RgbColor(typing.NamedTuple):
+    r: int
+    g: int
+    b: int
+
 class Study:
     default_json_file_name = 'study_def.json'
 
@@ -92,7 +98,7 @@ class Study:
                  validate_I2MC_settings                         : I2MCSettings|None                 = None,
 
                  video_make_which                               : set[str]|None                     = None,
-                 video_recording_colors                         : dict[str,list[int]]|None          = None,
+                 video_recording_colors                         : dict[str,RgbColor]|None           = None,
                  video_process_planes_for_all_frames            : bool                              = False,
                  video_process_annotations_for_all_recordings   : bool                              = True,
                  video_show_detected_markers                    : bool                              = True,
@@ -279,6 +285,9 @@ class Study:
         with open(d_path, 'r') as f:
             kwds = json.load(f, object_hook=utils.json_reconstitute)
         kwds['planes_per_episode'] = {k:v for k,v in kwds['planes_per_episode']}  # stored as list of tuples, unpack
+        # help with named tuple roundtrip
+        if 'video_recording_colors' in kwds:
+            kwds['video_recording_colors'] = {k: RgbColor(*kwds['video_recording_colors'][k]) for k in kwds['video_recording_colors']}
         # get session def
         s_path = path / 'session_def.json'
         if not s_path.is_file():
