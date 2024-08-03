@@ -63,7 +63,7 @@ def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_get
             is_dict = True
         case _ if is_NamedTuple_type(f_type):
             is_dict = True
-        case builtins.dict | builtins.list:
+        case builtins.dict | builtins.list | builtins.set:
             is_dict = base_type==builtins.dict
             # possibly replace inner type of container
             if n_type is not None:
@@ -193,7 +193,7 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
             new_val = imgui.input_int(f'##{field}', val)[1]
         case builtins.float:
             new_val = imgui.input_double(f'##{field}', val)[1]
-        case builtins.list:
+        case builtins.list | builtins.set:
             # temporary, this does not need a new level but a special input type
             # should be rendered as a tag list [A x][B x] with either text input if
             # unconstrained subtype (e.g. int, str, use typecheck utility), or
