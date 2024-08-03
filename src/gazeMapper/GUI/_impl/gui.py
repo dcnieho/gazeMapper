@@ -391,10 +391,17 @@ class GUI:
         if not self.study_config.planes:
             imgui.text_colored(imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.64)),'*At minimum one plane should be defined')
         for i,p in enumerate(self.study_config.planes):
-            if imgui.tree_node_ex(f'{p.name} ({p.type.value})', imgui.TreeNodeFlags_.framed):
-                changed, _, new_p = settings_editor.draw_dict_editor(copy.deepcopy(p), type(p), 0, plane.definition_valid_fields[p.type], plane.definition_parameter_types, plane.definition_defaults[p.type])
+            missing_fields = p.missing_fields()
+            extra = ''
+            if missing_fields:
+                extra = '*'
+                imgui.push_style_color(imgui.Col_.text, imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.64)))
+            if (opened:=imgui.tree_node_ex(f'{extra}{p.name} ({p.type.value})', imgui.TreeNodeFlags_.framed)):
+                imgui.pop_style_color()
+                changed, _, new_p = settings_editor.draw_dict_editor(copy.deepcopy(p), type(p), 0, plane.definition_valid_fields[p.type], plane.definition_parameter_types, plane.definition_defaults[p.type], mark = missing_fields)
                 if changed:
                     try:
+                        new_p.aruco_dict = None
                         new_p._do_checks()
                     except Exception as e:
                         # do not persist invalid config, inform user of problem
@@ -406,6 +413,8 @@ class GUI:
                 if imgui.button(ifa6.ICON_FA_TRASH_CAN+' delete plane'):
                     callbacks.delete_plane(self.study_config, p)
                 imgui.tree_pop()
+            if not opened and missing_fields:
+                imgui.pop_style_color()
         if imgui.button('+ new plane'):
             new_plane_name = ''
             new_plane_type: plane.Type = None
