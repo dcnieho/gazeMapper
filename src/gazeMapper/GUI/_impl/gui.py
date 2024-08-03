@@ -18,7 +18,7 @@ import glassesValidator
 
 from ... import config, plane, session, version
 from .. import async_thread
-from . import callbacks, filepicker, msgbox, settings_editor, utils
+from . import callbacks, colors, filepicker, msgbox, settings_editor, utils
 
 
 class GUI:
@@ -294,14 +294,14 @@ class GUI:
             self._unopened_interface_drawer()
             return
         elif not self.can_accept_sessions:
-            imgui.text_colored(imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.64)), "This study's set up is incomplete.")
+            imgui.text_colored(colors.error, "This study's set up is incomplete.")
             imgui.align_text_to_frame_padding()
-            imgui.text_colored(imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.64)), 'Finish the setup in the')
+            imgui.text_colored(colors.error, 'Finish the setup in the')
             imgui.same_line()
             if imgui.button('Project settings##button'):
                 self._to_focus = self._project_settings_pane.label
             imgui.same_line()
-            imgui.text_colored(imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.64)), 'tab before you can import and process recording sessions.')
+            imgui.text_colored(colors.error, 'tab before you can import and process recording sessions.')
             return
 
     def _unopened_interface_drawer(self):
@@ -328,9 +328,9 @@ class GUI:
 
     def _project_settings_pane_drawer(self):
         def _indicate_needs_attention():
-            imgui.push_style_color(imgui.Col_.button,         imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.43)))
-            imgui.push_style_color(imgui.Col_.button_hovered, imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.64)))
-            imgui.push_style_color(imgui.Col_.button_active,  imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.93)))
+            imgui.push_style_color(imgui.Col_.button,         colors.error_dark)
+            imgui.push_style_color(imgui.Col_.button_hovered, colors.error)
+            imgui.push_style_color(imgui.Col_.button_active,  colors.error_bright)
         # options handled in separate panes
         new_win_params: tuple[str,Callable[[],None]] = None
         needs_attention = not self.study_config.session_def.recordings
@@ -385,17 +385,17 @@ class GUI:
 
     def _session_definition_pane_drawer(self):
         if not self.study_config.session_def.recordings:
-            imgui.text_colored(imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.64)),'*At minimum one recording should be defined')
+            imgui.text_colored(colors.error,'*At minimum one recording should be defined')
 
     def _plane_editor_pane_drawer(self):
         if not self.study_config.planes:
-            imgui.text_colored(imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.64)),'*At minimum one plane should be defined')
+            imgui.text_colored(colors.error,'*At minimum one plane should be defined')
         for i,p in enumerate(self.study_config.planes):
             missing_fields = p.missing_fields()
             extra = ''
             if missing_fields:
                 extra = '*'
-                imgui.push_style_color(imgui.Col_.text, imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.64)))
+                imgui.push_style_color(imgui.Col_.text, colors.error)
             if (opened:=imgui.tree_node_ex(f'{extra}{p.name} ({p.type.value})', imgui.TreeNodeFlags_.framed)):
                 imgui.pop_style_color()
                 changed, _, new_p = settings_editor.draw_dict_editor(copy.deepcopy(p), type(p), 0, plane.definition_valid_fields[p.type], plane.definition_parameter_types, plane.definition_defaults[p.type], mark = missing_fields)
@@ -433,7 +433,7 @@ class GUI:
                     imgui.align_text_to_frame_padding()
                     invalid = not _valid_plane_name()
                     if invalid:
-                        imgui.push_style_color(imgui.Col_.text, imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.64)))
+                        imgui.push_style_color(imgui.Col_.text, colors.error)
                     imgui.text("Plane name")
                     if invalid:
                         imgui.pop_style_color()
@@ -445,7 +445,7 @@ class GUI:
                     imgui.align_text_to_frame_padding()
                     invalid = new_plane_type is None
                     if invalid:
-                        imgui.push_style_color(imgui.Col_.text, imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.64)))
+                        imgui.push_style_color(imgui.Col_.text, colors.error)
                     imgui.text("Plane type")
                     if invalid:
                         imgui.pop_style_color()
@@ -465,12 +465,12 @@ class GUI:
 
     def _episode_setup_pane_drawer(self):
         if not self.study_config.episodes_to_code:
-            imgui.text_colored(imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.64)),'*At minimum one episode should be selected to be coded')
+            imgui.text_colored(colors.error,'*At minimum one episode should be selected to be coded')
         if not self.study_config.planes_per_episode:
-            imgui.text_colored(imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.64)),'*At minimum one plane should be linked to at minimum one episode')
+            imgui.text_colored(colors.error,'*At minimum one plane should be linked to at minimum one episode')
         if not self.study_config.planes:
             imgui.align_text_to_frame_padding()
-            imgui.text_colored(imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.64)),'*At minimum one plane should be defined.')
+            imgui.text_colored(colors.error,'*At minimum one plane should be defined.')
             imgui.same_line()
             tab_lbl = 'Plane editor'
             if imgui.button('Edit planes'):
@@ -482,7 +482,7 @@ class GUI:
                     self._to_dock.append(tab_lbl)
                 self._to_focus = tab_lbl
             imgui.same_line()
-            imgui.text_colored(imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.64)),'to set this up.')
+            imgui.text_colored(colors.error,'to set this up.')
 
     def _individual_marker_setup_pane_drawer(self):
         pass

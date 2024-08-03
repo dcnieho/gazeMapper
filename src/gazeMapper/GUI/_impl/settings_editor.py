@@ -8,6 +8,7 @@ from imgui_bundle import imgui, imgui_md
 from glassesTools.timeline_gui import color_darken
 
 from ... import plane
+from . import colors
 
 def is_NamedTuple_type(x):
   return (inspect.isclass(x) and issubclass(x, tuple) and
@@ -167,7 +168,7 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
     val = obj.get(field,f_type()) if isinstance(obj,dict) else getattr(obj,field)
     if mark:
         imgui.align_text_to_frame_padding()
-        imgui.text_colored(imgui.ImVec4(*imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.64))), field)
+        imgui.text_colored(colors.error, field)
     elif (is_default := val==default):
         imgui.align_text_to_frame_padding()
         imgui.text_colored(imgui.ImVec4(*color_darken(imgui.ImColor(imgui.get_style_color_vec4(imgui.Col_.text)), .75)), field)
