@@ -86,7 +86,7 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
     for f in fields:
         is_dict, base_type, f_type = _get_field_type(f, obj, types[f], possible_value_getters[f] if f in possible_value_getters else None)
 
-        if is_dict and not f in mark:
+        if is_dict and (not mark or not f in mark):
             if table_is_started:
                 imgui.end_table()
                 table_is_started = False
@@ -104,7 +104,7 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
             if not table_is_started:
                 continue
 
-        this_changed, new_f_obj = _draw_field(f, obj, base_type, f_type, defaults[f] if f in defaults else None, mark=f in mark)
+        this_changed, new_f_obj = _draw_field(f, obj, base_type, f_type, defaults[f] if f in defaults else None, mark=mark is not None and f in mark)
         changed |= this_changed
         if this_changed and new_f_obj is not None:
             ret_new_obj = True
