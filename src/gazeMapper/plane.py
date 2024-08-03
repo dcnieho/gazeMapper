@@ -52,6 +52,9 @@ class Definition:
         self.aruco_dict         = aruco_dict
         self.ref_image_size     = ref_image_size        # largest dimension
 
+        self._do_checks()
+
+    def _do_checks(self):
         # check provided info (prevent bugs)
         if self.type==Type.GlassesValidator:
             for a in definition_valid_fields[Type.Plane_2D]:

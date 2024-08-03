@@ -390,11 +390,19 @@ class GUI:
     def _plane_editor_pane_drawer(self):
         if not self.study_config.planes:
             imgui.text_colored(imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.64)),'*At minimum one plane should be defined')
-        for p in self.study_config.planes:
+        for i,p in enumerate(self.study_config.planes):
             if imgui.tree_node_ex(f'{p.name} ({p.type.value})', imgui.TreeNodeFlags_.framed):
-                changed = settings_editor.draw_dict_editor(p, type(p), 0, plane.definition_valid_fields[p.type], plane.definition_parameter_types, plane.definition_defaults[p.type])[0]
+                changed, _, new_p = settings_editor.draw_dict_editor(copy.deepcopy(p), type(p), 0, plane.definition_valid_fields[p.type], plane.definition_parameter_types, plane.definition_defaults[p.type])
                 if changed:
-                    p.store_as_json(config.guess_config_dir(self.study_config.working_directory)/p.name)
+                    try:
+                        new_p._do_checks()
+                    except Exception as e:
+                        # do not persist invalid config, inform user of problem
+                        utils.push_popup(self, msgbox.msgbox, "Settings error", f"You cannot make this change to the settings for plane {p.name}:\n{e}", msgbox.MsgBox.error)
+                    else:
+                        # persist changed config
+                        self.study_config.planes[i] = new_p
+                        new_p.store_as_json(config.guess_config_dir(self.study_config.working_directory)/p.name)
                 if imgui.button(ifa6.ICON_FA_TRASH_CAN+' delete plane'):
                     callbacks.delete_plane(self.study_config, p)
                 imgui.tree_pop()
