@@ -37,8 +37,16 @@ def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_get
     if possible_value_getter:
         # we have a set of possible values known at runtime: override unconstrained type to a Literal
         vals = possible_value_getter(obj)
-        if len({type(v) for v in vals})!=1:
+        if (num_types:=len({type(v) for v in vals}))>1:
             raise ValueError(f'Cannot perform type replacement. possible_value_getter should return a set of values that all have the same type')
+        elif num_types==1:
+            v_type = type(vals[0])
+        else:
+            # no types, use function signature
+            val_types = typing.get_args(inspect.signature(possible_value_getter).return_annotation)
+            if len(val_types)!=1:
+                raise ValueError(f'Cannot perform type replacement. possible_value_getter either has no type annotation or can return more than one type')
+            v_type = val_types[0]
         n_type = typing.Literal[vals]
     else:
         n_type = None
@@ -58,8 +66,7 @@ def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_get
             is_dict = base_type==builtins.dict
             # possibly replace inner type of container
             if n_type is not None:
-                v_type = type(typing.get_args(n_type)[0])
-                o_types= typing.get_args(f_type)
+                o_types = typing.get_args(f_type)
                 which = tuple(o==v_type for o in o_types)
                 if sum(which)!=1:
                     raise ValueError(f'Input type ({f_type}) has no or more than one subscripted types that match the type of the set of possible values ({v_type}), cannot replace {v_type} with {n_type}')
