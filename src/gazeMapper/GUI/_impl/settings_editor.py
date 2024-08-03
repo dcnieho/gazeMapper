@@ -1,9 +1,23 @@
 import typing
 import builtins
+import inspect
+import pathlib
 
 from imgui_bundle import imgui, imgui_md
 
 from glassesTools.timeline_gui import color_darken
+
+from ... import plane
+
+def is_NamedTuple_type(x):
+  return (inspect.isclass(x) and issubclass(x, tuple) and
+          hasattr(x, '_asdict') and callable(x._asdict) and
+          hasattr(x, '__annotations__') and
+          getattr(x, '_fields', None) is not None)
+
+val_to_str_registry: dict[typing.Type, dict[typing.Any, str]] = {
+    plane.ArucoDictType: plane.aruco_dicts_to_str
+}
 
 _C = typing.TypeVar("_C")
 _T = typing.TypeVar("_T")
@@ -38,6 +52,8 @@ def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_get
 
         case _ if typing.is_typeddict(f_type):
             is_dict = True
+        case _ if is_NamedTuple_type(f_type):
+            is_dict = True
         case builtins.dict | builtins.list:
             is_dict = base_type==builtins.dict
             # possibly replace inner type of container
@@ -49,6 +65,8 @@ def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_get
                     raise ValueError(f'Input type ({f_type}) has no or more than one subscripted types that match the type of the set of possible values ({v_type}), cannot replace {v_type} with {n_type}')
                 # now, replace type
                 f_type = base_type[tuple(n_type if r else o for o,r in zip(o_types, which))]
+        case typing.Union if f_type==typing.Union[str, pathlib.Path]:
+            is_dict = False
         case _:
             raise ValueError(f'type of {field} ({f_type}) not handled')
     return is_dict, base_type, f_type
@@ -64,7 +82,7 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
                 imgui.end_table()
                 table_is_started = False
             if imgui.tree_node_ex(f,imgui.TreeNodeFlags_.framed):
-                this_changed, made_obj, new_sub_obj = _draw_dict_editor(obj.get(f,None) if isinstance(obj,dict) else getattr(obj,f), f_type, level+1)
+                this_changed, made_obj, new_sub_obj = draw_dict_editor(obj.get(f,None) if isinstance(obj,dict) else getattr(obj,f), f_type, level+1)
                 changed |= this_changed
                 if this_changed and made_obj:
                     setattr(obj,f,new_sub_obj)
@@ -80,7 +98,7 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
         changed |= _draw_field(f, obj, base_type, f_type, defaults[f] if f in defaults else None)
     return table_is_started, changed
 
-def _draw_dict_editor(obj: _T, o_type: typing.Type, level: int):
+def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None, types: dict[typing.Any, typing.Type]=None, defaults:dict[typing.Any, typing.Any]=None):
     if (made_obj := obj is None):
         obj = o_type()
 
@@ -88,16 +106,23 @@ def _draw_dict_editor(obj: _T, o_type: typing.Type, level: int):
         has_add_remove = False
         types = o_type.__annotations__
         fields = list(types.keys())
+    elif is_NamedTuple_type(o_type):
+        has_add_remove = False
+        types = o_type.__annotations__
+        fields= list(o_type._fields)
     else:
-        has_add_remove = True
-        fields = list(obj.keys())
-        types = {k:type(obj[k]) for k in obj}
+        has_add_remove = fields is None
+        if has_add_remove:
+            fields = list(obj.keys())
+            types = {k:type(obj[k]) for k in obj}
+    if defaults is None:
+        defaults = {}
 
     first_column_width = _get_fields_text_width(fields, backup_str='xadd itemx')*1.1
     table_is_started = _start_table(level, first_column_width)
     if not table_is_started:
         return
-    table_is_started, changed = _draw_impl(obj, fields, types, {}, {}, level, table_is_started)
+    table_is_started, changed = _draw_impl(obj, fields, types, defaults, {}, level, table_is_started)
     if not table_is_started and has_add_remove:
         table_is_started = _start_table(level, first_column_width)
         if not table_is_started:
@@ -139,6 +164,10 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
             new_val = imgui.checkbox(f'##{field}', val)[1]
         case builtins.str:
             new_val = imgui.input_text(f'##{field}', val)[1]
+        case typing.Union if f_type==typing.Union[str, pathlib.Path]:
+            new_val = imgui.input_text(f'##{field}', str(val))[1]
+            if isinstance(val,pathlib.Path):
+                new_val = pathlib.Path(new_val)
         case builtins.int:
             new_val = imgui.input_int(f'##{field}', val)[1]
         case builtins.float:
@@ -153,7 +182,12 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
         case typing.Literal:
             values = typing.get_args(f_type)
             p_idx = values.index(val)
-            _,p_idx = imgui.combo(f"##{field}", p_idx, values, popup_max_height_in_items=min(10,len(values)))
+            str_values = values
+            if f_type in val_to_str_registry:
+                str_values = [val_to_str_registry[f_type][v] for v in str_values]
+            elif not isinstance(str_values[0],str):
+                str_values = [str(v) for v in str_values]
+            _,p_idx = imgui.combo(f"##{field}", p_idx, str_values, popup_max_height_in_items=min(10,len(values)))
             new_val = values[p_idx]
 
     if (changed := new_val!=val):
