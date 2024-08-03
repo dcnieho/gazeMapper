@@ -116,18 +116,25 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
     if (made_or_replaced_obj := obj is None):
         obj = o_type()
 
+    has_add = has_remove = False
     if typing.is_typeddict(o_type):
-        has_add_remove = False
         types = o_type.__annotations__
         fields = list(types.keys())
     elif is_NamedTuple_type(o_type):
-        has_add_remove = False
         types = o_type.__annotations__
         fields= list(o_type._fields)
     else:
-        has_add_remove = fields is None
-        if has_add_remove:
+        k_type = typing.get_args(o_type)[0]
+        all_fields = None
+        if typing.get_origin(k_type)==typing.Literal:
+            all_fields = set(typing.get_args(k_type))
+        has_add = has_remove = fields is None
+        if has_add:
             fields = list(obj.keys())
+            if all_fields is not None and not (all_fields-set(fields)):
+                # nothing more to add, all possible keys exhausted
+                has_add = False
+                # but keep has_remove to True
             types = {k:type(obj[k]) for k in obj}
     if defaults is None:
         defaults = {}
@@ -138,11 +145,11 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
         return False, made_or_replaced_obj, obj
     table_is_started, changed, ret_new_obj, obj = _draw_impl(obj, fields, types, defaults, {}, mark, level, table_is_started)
     made_or_replaced_obj |= ret_new_obj
-    if not table_is_started and has_add_remove:
+    if not table_is_started and has_add:
         table_is_started = _start_table(level, first_column_width)
         if not table_is_started:
             return changed, made_or_replaced_obj, obj
-    if has_add_remove:
+    if has_add:
         imgui.table_next_row()
         imgui.table_next_column()
         imgui.button('add item')
