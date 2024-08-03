@@ -391,7 +391,9 @@ class GUI:
         if not self.study_config.planes:
             imgui.text_colored(imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.64)),'*At minimum one plane should be defined')
         for p in self.study_config.planes:
-            imgui.text(p.name)
+            if imgui.tree_node_ex(f'{p.name} ({p.type.value})', imgui.TreeNodeFlags_.framed):
+                settings_editor.draw_dict_editor(p, type(p), 0, plane.definition_valid_fields[p.type], plane.definition_parameter_types, plane.definition_defaults[p.type])
+                imgui.tree_pop()
         if imgui.button('+ new plane'):
             new_plane_name = ''
             new_plane_type: plane.Type = None
