@@ -393,6 +393,8 @@ class GUI:
         for p in self.study_config.planes:
             if imgui.tree_node_ex(f'{p.name} ({p.type.value})', imgui.TreeNodeFlags_.framed):
                 settings_editor.draw_dict_editor(p, type(p), 0, plane.definition_valid_fields[p.type], plane.definition_parameter_types, plane.definition_defaults[p.type])
+                if imgui.button(ifa6.ICON_FA_TRASH_CAN+' delete plane'):
+                    callbacks.delete_plane(self.study_config, p)
                 imgui.tree_pop()
         if imgui.button('+ new plane'):
             new_plane_name = ''

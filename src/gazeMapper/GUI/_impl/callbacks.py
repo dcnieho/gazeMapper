@@ -1,5 +1,6 @@
 import pathlib
 import typing
+import shutil
 from imgui_bundle import icons_fontawesome_6 as ifa6
 
 
@@ -80,3 +81,9 @@ def make_plane(study_config: config.Study, type: plane.Type, name: str):
     p_def.store_as_json(p_dir)
     # append to known planes
     study_config.planes.append(p_def)
+
+def delete_plane(study_config: config.Study, plane: plane.Definition):
+    path = config.guess_config_dir(study_config.working_directory)
+    p_dir = path / plane.name
+    shutil.rmtree(p_dir)
+    study_config.planes = [p for p in study_config.planes if p.name!=plane.name]
