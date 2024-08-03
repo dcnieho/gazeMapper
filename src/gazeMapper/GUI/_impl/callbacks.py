@@ -83,7 +83,9 @@ def make_plane(study_config: config.Study, type: plane.Type, name: str):
     study_config.planes.append(p_def)
 
 def delete_plane(study_config: config.Study, plane: plane.Definition):
+    # remove config directory for the plane
     path = config.guess_config_dir(study_config.working_directory)
     p_dir = path / plane.name
     shutil.rmtree(p_dir)
+    # remove from known planes
     study_config.planes = [p for p in study_config.planes if p.name!=plane.name]
