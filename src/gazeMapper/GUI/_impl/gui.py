@@ -29,6 +29,10 @@ class GUI:
         self.project_dir: pathlib.Path = None
         self.study_config: config.Study = None
         self.sessions: list[session.Session] = None
+
+        self.need_setup_recordings = True
+        self.need_setup_plane = True
+        self.need_setup_episode = True
         self.can_accept_sessions = False
 
 
@@ -216,7 +220,8 @@ class GUI:
             imgui.end_disabled()
 
     def _show_menu_gui(self):
-        # this is always called, so we handle popups here
+        # this is always called, so we handle popups and other state here
+        self._check_project_setups_state()
         utils.handle_popup_stack(self.popup_stack)
         # also handle showing of debug windows
         if self._show_demo_window:
@@ -249,7 +254,6 @@ class GUI:
         self.project_dir = path
         self.study_config = config.Study.load_from_json(config.guess_config_dir(path))
         self.sessions = session.get_sessions_from_directory(path)
-        self._determine_can_accept_sessions()
 
         self._need_set_window_title = True
         self._project_settings_pane.is_visible = True
@@ -257,17 +261,20 @@ class GUI:
         self._window_list = [self._sessions_pane, self._project_settings_pane]
         self._to_focus = self._sessions_pane.label  # ensure sessions pane remains focused
 
-    def _determine_can_accept_sessions(self):
+    def _check_project_setups_state(self):
         # need to have:
         # 1. at least one recording defined in the session;
         # 2. one plane set up
         # 3. one episode to code
         # 4. one plane linked to one episode
+        self.need_setup_recordings = not self.study_config or not self.study_config.session_def.recordings
+        self.need_setup_plane = not self.study_config or not self.study_config.planes or any((not p.has_complete_setup() for p in self.study_config.planes))
+        self.need_setup_episode = not self.study_config or not self.study_config.episodes_to_code or not self.study_config.planes_per_episode
+
         self.can_accept_sessions = \
-            self.study_config.session_def.recordings and \
-            self.study_config.planes and \
-            self.study_config.episodes_to_code and \
-            self.study_config.planes_per_episode
+            not self.need_setup_recordings and \
+            not self.need_setup_plane and \
+            not self.need_setup_episode
 
     def close_project(self):
         self._project_settings_pane.is_visible = False
@@ -333,30 +340,30 @@ class GUI:
             imgui.push_style_color(imgui.Col_.button_active,  colors.error_bright)
         # options handled in separate panes
         new_win_params: tuple[str,Callable[[],None]] = None
-        needs_attention = not self.study_config.session_def.recordings
-        if needs_attention:
+        if self.need_setup_recordings:
             _indicate_needs_attention()
         if imgui.button("Edit session definition"):
             new_win_params = ('Session definition', self._session_definition_pane_drawer)
-        if needs_attention:
+        if self.need_setup_recordings:
             imgui.pop_style_color(3)
         imgui.same_line()
-        needs_attention = not self.study_config.planes or any((not p.has_complete_setup() for p in self.study_config.planes))
-        if needs_attention:
+
+        if self.need_setup_plane:
             _indicate_needs_attention()
         if imgui.button("Edit planes"):
             new_win_params = ('Plane editor', self._plane_editor_pane_drawer)
-        if needs_attention:
+        if self.need_setup_plane:
             imgui.pop_style_color(3)
         imgui.same_line()
-        needs_attention = not self.study_config.episodes_to_code or not self.study_config.planes_per_episode
-        if needs_attention:
+
+        if self.need_setup_episode:
             _indicate_needs_attention()
         if imgui.button("Episode setup"):
             new_win_params = ('Episode setup', self._episode_setup_pane_drawer)
-        if needs_attention:
+        if self.need_setup_episode:
             imgui.pop_style_color(3)
         imgui.same_line()
+
         if imgui.button("Edit individual markers"):
             new_win_params = ('Individual marker editor', self._individual_marker_setup_pane_drawer)
         if new_win_params is not None:
