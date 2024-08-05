@@ -233,8 +233,8 @@ class Study:
     def _check_recording(self, rec: str) -> bool:
         return any([r==rec for r in self._known_recording_names()])
 
-    def _known_recording_names(self) -> list[str]:
-        return tuple(r.name for r in self.session_def.recordings)
+    def _known_recording_names(self) -> set[str]:
+        return {r.name for r in self.session_def.recordings}
 
     def store_as_json(self, path: str|pathlib.Path|None=None):
         if not path:
