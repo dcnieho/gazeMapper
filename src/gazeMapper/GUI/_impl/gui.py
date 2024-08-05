@@ -491,6 +491,9 @@ class GUI:
             imgui.same_line()
             imgui.text_colored(colors.error,'to set this up.')
 
+        # episodes to be coded
+        settings_editor.draw(self.study_config, ['episodes_to_code', 'planes_per_episode'], config.study_parameter_types, {}, {})
+
     def _individual_marker_setup_pane_drawer(self):
         pass
 
