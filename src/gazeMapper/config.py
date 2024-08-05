@@ -231,10 +231,7 @@ class Study:
                 raise ValueError(f'Recording "{w}" not known, check {field} in the study configuration')
 
     def _check_recording(self, rec: str) -> bool:
-        return any([r==rec for r in self._known_recording_names()])
-
-    def _known_recording_names(self) -> set[str]:
-        return {r.name for r in self.session_def.recordings}
+        return any([r.name==rec for r in self.session_def.recordings])
 
     def store_as_json(self, path: str|pathlib.Path|None=None):
         if not path:
@@ -310,7 +307,6 @@ class Study:
 _params = inspect.signature(Study.__init__).parameters
 study_defaults = {k:d for k in _params if (d:=_params[k].default)!=inspect._empty}
 study_parameter_types = {k:utils.unpack_none_union(_params[k].annotation) for k in _params if k!='self'}
-study_parameter_possible_value_getters = {'video_make_which': Study._known_recording_names, 'video_recording_colors': Study._known_recording_names, 'sync_ref_recording': Study._known_recording_names, 'sync_ref_average_recordings': Study._known_recording_names}
 del _params
 
 def guess_config_dir(working_dir: str|pathlib.Path, config_dir_name: str = "config", json_file_name: str = Study.default_json_file_name) -> pathlib.Path:
