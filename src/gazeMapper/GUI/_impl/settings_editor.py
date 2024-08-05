@@ -23,7 +23,7 @@ val_to_str_registry: dict[typing.Type, dict[typing.Any, str]] = {
 
 _C = typing.TypeVar("_C")
 _T = typing.TypeVar("_T")
-def draw(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[_C], set[typing.Any]]]) -> tuple[bool,_C]:
+def draw(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[], set[typing.Any]]]) -> tuple[bool,_C]:
     if not fields:
         return
 
@@ -33,31 +33,62 @@ def draw(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: di
 
     return changed, obj
 
+def _replace_type_arg(f_type: typing.Type, base_type: typing.Type, v_type, n_type, fail_is_ok=False) -> typing.Type:
+    o_types = typing.get_args(f_type)
+    which = tuple(o==v_type for o in o_types)
+    exc = None
+    if sum(which)>1:
+        exc = ValueError(f'Input type ({f_type}) has more than one subscripted types that match the type of the set of possible values ({v_type}), cannot replace {v_type} with {n_type}')
+    elif not any(which):
+        # try to recurse. find subscripted types
+        subscripted = tuple(t!=(ot:=typing.get_origin(t)) and ot!=typing.Literal for t in o_types)
+        if not any(subscripted):
+            exc = ValueError(f'Input type ({f_type}) has no subscripted types that match the type of the set of possible values ({v_type}), cannot replace {v_type} with {n_type}')
+        else:
+            for i,b in enumerate(subscripted):
+                if not b:
+                    continue
+                n_sub_type = _replace_type_arg(o_types[i], typing.get_origin(o_types[i]), v_type, n_type, fail_is_ok=True)
+                if n_sub_type!=o_types[i]:
+                    # success. substitute and return
+                    t_args = list(o_types[:i]) + [n_sub_type] + list(o_types[i+1:])
+                    return base_type[tuple(t_args)]
+    else:
+        # now, replace type
+        return base_type[tuple(n_type if r else o for o,r in zip(o_types, which))]
+    if exc and not fail_is_ok:
+        raise exc
+    return f_type   # failed, but its ok, return unchanged
 
-def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_getter: typing.Callable[[_C],set[_T]]|None) -> tuple[bool, typing.Type, typing.Type]:
+def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_getter: typing.Callable[[],set[_T]]|None) -> tuple[bool, typing.Type, typing.Type]:
     base_type = typing.get_origin(f_type) or f_type  # for instance str[int]->str, and or for str->str
     if possible_value_getter:
-        # we have a set of possible values known at runtime: override unconstrained type to a Literal
-        vals = tuple(possible_value_getter(obj))
-        if (num_types:=len({type(v) for v in vals}))>1:
-            raise ValueError(f'Cannot perform type replacement. possible_value_getter should return a set of values that all have the same type')
-        elif num_types==1:
-            v_type = type(vals[0])
-        else:
-            # no types, use function signature
-            val_types = typing.get_args(inspect.signature(possible_value_getter).return_annotation)
-            if len(val_types)!=1:
-                raise ValueError(f'Cannot perform type replacement. possible_value_getter either has no type annotation or can return more than one type')
-            v_type = val_types[0]
-        n_type = typing.Literal[vals]
+        if not isinstance(possible_value_getter,list):
+            possible_value_getter = [possible_value_getter]
+        n_type: list[typing.Type] = []
+        v_type: list[typing.Type] = []
+        for pvg in possible_value_getter:
+            # we have a set of possible values known at runtime: override unconstrained type to a Literal
+            vals = tuple(pvg())
+            if (num_types:=len({type(v) for v in vals}))>1:
+                raise ValueError(f'Cannot perform type replacement. possible_value_getter should return a set of values that all have the same type')
+            elif num_types==1:
+                v_type.append(type(vals[0]))
+            else:
+                # no types, use function signature
+                val_types = typing.get_args(inspect.signature(pvg).return_annotation)
+                if len(val_types)!=1:
+                    raise ValueError(f'Cannot perform type replacement. possible_value_getter either has no type annotation or can return more than one type')
+                v_type.append(val_types[0])
+            n_type.append(typing.Literal[vals])
     else:
         n_type = None
     match base_type:
         case builtins.bool | builtins.str | builtins.int | builtins.float | typing.Literal:
             is_dict = False
-            if n_type is not None:
+            if n_type:
                 # apply type override
-                f_type = n_type
+                f_type = n_type[0]
                 base_type = typing.Literal
 
         case _ if typing.is_typeddict(f_type):
@@ -68,19 +99,15 @@ def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_get
             is_dict = base_type==builtins.dict
             # possibly replace inner type of container
             if n_type is not None:
-                o_types = typing.get_args(f_type)
-                which = tuple(o==v_type for o in o_types)
-                if sum(which)!=1:
-                    raise ValueError(f'Input type ({f_type}) has no or more than one subscripted types that match the type of the set of possible values ({v_type}), cannot replace {v_type} with {n_type}')
-                # now, replace type
-                f_type = base_type[tuple(n_type if r else o for o,r in zip(o_types, which))]
+                for vt,nt in zip(v_type,n_type):
+                    f_type = _replace_type_arg(f_type, base_type, vt, nt)
         case typing.Union if f_type==typing.Union[str, pathlib.Path]:
             is_dict = False
         case _:
             raise ValueError(f'type of {field} ({f_type}) not handled')
     return is_dict, base_type, f_type
 
-def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[_C], set[typing.Any]]], mark: list[str], level=0, table_is_started=False) -> tuple[bool,bool,bool,_C]:
+def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[], set[typing.Any]]], mark: list[str], level=0, table_is_started=False) -> tuple[bool,bool,bool,_C]:
     changed = False
     max_fields_width = _get_fields_text_width(fields)*1.1   # 10% extra to be safe
     ret_new_obj = False
@@ -126,15 +153,27 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
         fields= list(o_type._fields)
     else:
         all_fields = None
+        types = None
+        all_type = None
+        kv_type = typing.get_args(o_type)
         if possible_value_getter:
-            all_fields = set(possible_value_getter(obj))
+            if isinstance(possible_value_getter,list):
+                possible_value_getter = possible_value_getter[0] # first one should be for keys
+            all_fields = set(possible_value_getter())
         else:
-            kv_type = typing.get_args(o_type)
             if kv_type:
                 if typing.get_origin(kv_type[0])==typing.Literal:
                     all_fields = set(typing.get_args(kv_type[0]))
                 elif issubclass(kv_type[0], enum.Enum):
                     all_fields = set((e for e in kv_type[0]))
+        if kv_type and len(kv_type)==2:
+            # get value type, if meaningful
+            if typing.get_origin(kv_type[1]) not in [typing.Any, typing.Union]:
+                if all_fields:
+                    types = {k:kv_type[1] for k in all_fields}
+                else:
+                    all_type = kv_type[1]
+                    
         has_add = has_remove = fields is None
         if has_add:
             fields = list(obj.keys())
@@ -142,7 +181,11 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
                 # nothing more to add, all possible keys exhausted
                 has_add = False
                 # but keep has_remove to True
-            types = {k:type(obj[k]) for k in obj}
+            if not types:
+                if all_type:
+                    types = {k:all_type for k in obj}
+                else:
+                    types = {k:type(obj[k]) for k in obj}
     if defaults is None:
         defaults = {}
 
