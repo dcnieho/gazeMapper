@@ -124,9 +124,9 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
         types = o_type.__annotations__
         fields= list(o_type._fields)
     else:
-        k_type = typing.get_args(o_type)[0]
+        k_type = typing.get_args(o_type)
         all_fields = None
-        if typing.get_origin(k_type)==typing.Literal:
+        if k_type and typing.get_origin(k_type[0])==typing.Literal:
             all_fields = set(typing.get_args(k_type))
         has_add = has_remove = fields is None
         if has_add:
