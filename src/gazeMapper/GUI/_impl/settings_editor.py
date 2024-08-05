@@ -2,6 +2,7 @@ import typing
 import builtins
 import inspect
 import pathlib
+import enum
 
 from imgui_bundle import imgui, imgui_md
 
@@ -124,10 +125,13 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
         types = o_type.__annotations__
         fields= list(o_type._fields)
     else:
-        k_type = typing.get_args(o_type)
+        kv_type = typing.get_args(o_type)
         all_fields = None
-        if k_type and typing.get_origin(k_type[0])==typing.Literal:
-            all_fields = set(typing.get_args(k_type))
+        if kv_type:
+            if typing.get_origin(kv_type[0])==typing.Literal:
+                all_fields = set(typing.get_args(kv_type[0]))
+            elif issubclass(kv_type[0], enum.Enum):
+                all_fields = set((e for e in kv_type[0]))
         has_add = has_remove = fields is None
         if has_add:
             fields = list(obj.keys())
@@ -158,7 +162,9 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
 
     return changed, made_or_replaced_obj, obj
 
-def _get_fields_text_width(fields, backup_str='xxxxx'):
+def _get_fields_text_width(fields: list[str], backup_str='xxxxx'):
+    if fields and isinstance(fields[0], enum.Enum):
+        fields = [f.value for f in fields]
     return max([imgui.calc_text_size(f) for f in fields], key=lambda x: x.x, default=imgui.calc_text_size(backup_str)).x
 
 def _start_table(level, first_column_width):
@@ -170,17 +176,24 @@ def _start_table(level, first_column_width):
     return table_is_started
 
 def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type, default: _T|None, mark: bool) -> bool:
+    if base_type is None:
+        base_type = typing.get_origin(f_type)
     imgui.table_next_row()
     imgui.table_next_column()
     val = obj.get(field,f_type()) if isinstance(obj,dict) else getattr(obj,field)
+    field_lbl = field
+    if isinstance(field_lbl, enum.Enum):
+        field_lbl = field_lbl.value
+    if not isinstance(field_lbl, str):
+        field_lbl = str(field_lbl)
     if mark:
         imgui.align_text_to_frame_padding()
-        imgui.text_colored(colors.error, field)
+        imgui.text_colored(colors.error, field_lbl)
     elif (is_default := val==default):
         imgui.align_text_to_frame_padding()
-        imgui.text_colored(imgui.ImVec4(*color_darken(imgui.ImColor(imgui.get_style_color_vec4(imgui.Col_.text)), .75)), field)
+        imgui.text_colored(imgui.ImVec4(*color_darken(imgui.ImColor(imgui.get_style_color_vec4(imgui.Col_.text)), .75)), field_lbl)
     else:
-        imgui_md.render(f'**{field}**')
+        imgui_md.render(f'**{field_lbl}**')
     imgui.table_next_column()
     # TODO: should handle None value: print as <not set> and bring up editor upon clicking on it, or something like that
     # maybe store ID of currently editing None to bypass this print and go to the below editor?
