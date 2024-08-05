@@ -11,21 +11,20 @@ from glassesTools import annotation, plane as gt_plane, utils
 from glassesValidator import process as gv_process
 
 from . import marker, plane, session
+from .typed_dict_defaults import TypedDictDefault
 
 
-class AutoCodeSyncPoints(TypedDict, total=False):
-    max_gap_duration: int
-    min_duration: int
+class AutoCodeSyncPoints(TypedDictDefault, total=False):
     markers: list[int]
-auto_code_sync_points_defaults = {'max_gap_duration': 4, 'min_duration': 6}
+    max_gap_duration: int = 4
+    min_duration: int = 6
 
-class AutoCodeTrialEpisodes(TypedDict, total=False):
-    max_gap_duration: int
-    max_intermarker_gap_duration: int
-    min_duration: int
+class AutoCodeTrialEpisodes(TypedDictDefault, total=False):
     start_markers: list[int]
     end_markers: list[int]
-auto_code_trial_episodes_defaults = {'max_gap_duration': 4, 'max_intermarker_gap_duration': 15, 'min_duration': 6}
+    max_gap_duration: int = 4
+    max_intermarker_gap_duration: int = 15
+    min_duration: int = 6
 
 class I2MCSettings(TypedDict, total=False):
     xres: int
@@ -63,7 +62,7 @@ class RgbColor(typing.NamedTuple):
 class Study:
     default_json_file_name = 'study_def.json'
 
-    #@typeguard.typechecked(collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
+    @typeguard.typechecked(collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
     def __init__(self,
                  session_def                                    : session.SessionDefinition,
                  planes                                         : list[plane.Definition],
@@ -192,19 +191,13 @@ class Study:
             if annotation.Event.Trial not in self.episodes_to_code:
                 raise ValueError(f'The auto_code_trials_episodes option is configured, but {annotation.Event.Trial} episodes are not set to be coded in episodes_to_code. Fix episodes_to_code.')
 
-        # set defaults
+        # ensure some members are of the right class, and apply defaults
         if self.auto_code_sync_points:
-            if 'max_gap_duration' not in self.auto_code_sync_points:
-                self.auto_code_sync_points['max_gap_duration'] = auto_code_sync_points_defaults['max_gap_duration']
-            if 'min_duration' not in self.auto_code_sync_points:
-                self.auto_code_sync_points['min_duration'] = auto_code_sync_points_defaults['min_duration']
+            self.auto_code_sync_points = AutoCodeSyncPoints(self.auto_code_sync_points)
+            self.auto_code_sync_points.apply_defaults()
         if self.auto_code_trial_episodes:
-            if 'max_gap_duration' not in self.auto_code_trial_episodes:
-                self.auto_code_trial_episodes['max_gap_duration'] = auto_code_trial_episodes_defaults['max_gap_duration']
-            if 'max_intermarker_gap_duration' not in self.auto_code_trial_episodes:
-                self.auto_code_trial_episodes['max_intermarker_gap_duration'] = auto_code_trial_episodes_defaults['max_intermarker_gap_duration']
-            if 'min_duration' not in self.auto_code_trial_episodes:
-                self.auto_code_trial_episodes['min_duration'] = auto_code_trial_episodes_defaults['min_duration']
+            self.auto_code_trial_episodes = AutoCodeTrialEpisodes(self.auto_code_trial_episodes)
+            self.auto_code_trial_episodes.apply_defaults()
 
     def _check_planes_per_episode(self):
         for e in self.planes_per_episode:
@@ -250,9 +243,9 @@ class Study:
             # filter out defaulted
             to_dump = {k:to_dump[k] for k in to_dump if k not in study_defaults or study_defaults[k]!=to_dump[k]}
             # also filter out defaults in some subfields
-            for k,ds in zip(['auto_code_sync_points','auto_code_trial_episodes'], [auto_code_sync_points_defaults, auto_code_trial_episodes_defaults]):
+            for k in ['auto_code_sync_points','auto_code_trial_episodes']:
                 if k in to_dump:
-                    to_dump[k] = {kk:to_dump[k][kk] for kk in to_dump[k] if kk not in ds or ds[kk]!=to_dump[k][kk]}
+                    to_dump[k] = {kk:to_dump[k][kk] for kk in to_dump[k] if kk not in to_dump[k]._field_defaults or to_dump[k]._field_defaults[kk]!=to_dump[k][kk]}
             # dump to file
             json.dump(to_dump, f, cls=utils.CustomTypeEncoder, indent=2)
         # this doesn't store any files itself, but triggers the contained info to be stored

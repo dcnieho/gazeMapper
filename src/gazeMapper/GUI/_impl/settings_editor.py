@@ -8,7 +8,7 @@ from imgui_bundle import imgui, imgui_md
 
 from glassesTools.timeline_gui import color_darken
 
-from ... import plane
+from ... import plane, typed_dict_defaults
 from . import colors
 
 def is_NamedTuple_type(x):
@@ -93,6 +93,8 @@ def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_get
 
         case _ if typing.is_typeddict(f_type):
             is_dict = True
+        case _ if typed_dict_defaults.is_typeddictdefault(f_type):
+            is_dict = True
         case _ if is_NamedTuple_type(f_type):
             is_dict = True
         case builtins.dict | builtins.list | builtins.set:
@@ -151,6 +153,10 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
     if typing.is_typeddict(o_type):
         types = o_type.__annotations__
         fields = list(types.keys())
+    if typed_dict_defaults.is_typeddictdefault(o_type):
+        types = o_type.__annotations__
+        fields = list(types.keys())
+        defaults = o_type._field_defaults.copy()
     elif is_NamedTuple_type(o_type):
         types = o_type.__annotations__
         fields= list(o_type._fields)
