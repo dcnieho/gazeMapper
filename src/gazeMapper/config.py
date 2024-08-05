@@ -56,9 +56,9 @@ class CamMovementForEtSyncFunction(TypedDict):
     parameters: dict[str,Any]
 
 class RgbColor(typing.NamedTuple):
-    r: int
-    g: int
-    b: int
+    r: int = 0
+    g: int = 0
+    b: int = 0
 
 class Study:
     default_json_file_name = 'study_def.json'
