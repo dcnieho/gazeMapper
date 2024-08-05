@@ -122,7 +122,10 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
                 this_changed, made_obj, new_sub_obj = draw_dict_editor(obj.get(f,None) if isinstance(obj,dict) else getattr(obj,f), f_type, level+1, possible_value_getter=possible_value_getters.get(f,None))
                 changed |= this_changed
                 if this_changed and made_obj:
-                    setattr(obj,f,new_sub_obj)
+                    if isinstance(obj,dict):
+                        obj[f] = new_sub_obj
+                    else:
+                        setattr(obj,f,new_sub_obj)
                 imgui.tree_pop()
             continue
 
