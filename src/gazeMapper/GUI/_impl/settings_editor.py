@@ -112,7 +112,7 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
             obj = new_f_obj
     return table_is_started, changed, ret_new_obj, obj
 
-def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None, types: dict[typing.Any, typing.Type]=None, defaults:dict[typing.Any, typing.Any]=None, possible_value_getter: typing.Callable[[_C], set[typing.Any]]=None, mark: list[str]=None) -> tuple[bool,bool,_T]:
+def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None, types: dict[typing.Any, typing.Type]=None, defaults:dict[typing.Any, typing.Any]=None, possible_value_getter: typing.Callable[[_T], set[typing.Any]]=None, mark: list[str]=None) -> tuple[bool,bool,_T]:
     made_or_replaced_obj = False
     if (made_or_replaced_obj := obj is None):
         obj = o_type()
@@ -125,13 +125,16 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
         types = o_type.__annotations__
         fields= list(o_type._fields)
     else:
-        kv_type = typing.get_args(o_type)
         all_fields = None
-        if kv_type:
-            if typing.get_origin(kv_type[0])==typing.Literal:
-                all_fields = set(typing.get_args(kv_type[0]))
-            elif issubclass(kv_type[0], enum.Enum):
-                all_fields = set((e for e in kv_type[0]))
+        if possible_value_getter:
+            all_fields = set(possible_value_getter(obj))
+        else:
+            kv_type = typing.get_args(o_type)
+            if kv_type:
+                if typing.get_origin(kv_type[0])==typing.Literal:
+                    all_fields = set(typing.get_args(kv_type[0]))
+                elif issubclass(kv_type[0], enum.Enum):
+                    all_fields = set((e for e in kv_type[0]))
         has_add = has_remove = fields is None
         if has_add:
             fields = list(obj.keys())
