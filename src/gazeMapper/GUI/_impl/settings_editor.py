@@ -151,6 +151,7 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
     elif is_NamedTuple_type(o_type):
         types = o_type.__annotations__
         fields= list(o_type._fields)
+        defaults = o_type._field_defaults.copy()
     else:
         all_fields = None
         types = None
