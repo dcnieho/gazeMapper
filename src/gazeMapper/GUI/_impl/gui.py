@@ -478,7 +478,7 @@ class GUI:
                 ifa6.ICON_FA_CHECK+" Create plane": (lambda: callbacks.make_plane(self.study_config, new_plane_type, new_plane_name), lambda: not _valid_plane_name() or new_plane_type is None),
                 ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
             }
-            utils.push_popup(self, lambda: utils.popup("Add image", _add_plane_popup, buttons = buttons, outside=False))
+            utils.push_popup(self, lambda: utils.popup("Add plane", _add_plane_popup, buttons = buttons, outside=False))
 
     def _episode_setup_pane_drawer(self):
         if not self.study_config.episodes_to_code:
