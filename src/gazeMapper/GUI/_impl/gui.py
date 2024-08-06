@@ -255,8 +255,13 @@ class GUI:
 
     def load_project(self, path: pathlib.Path):
         self.project_dir = path
-        self.study_config = config.Study.load_from_json(config.guess_config_dir(path))
-        self.sessions = session.get_sessions_from_directory(path)
+        try:
+            self.study_config = config.Study.load_from_json(config.guess_config_dir(path))
+            self.sessions = session.get_sessions_from_directory(path)
+        except Exception as e:
+            utils.push_popup(self, msgbox.msgbox, "Project loading error", f"Failed to load the project at {path}:\n{e}", msgbox.MsgBox.error)
+            self.close_project()
+            return
 
         def _get_known_recordings() -> set[str]:
             return {r.name for r in self.study_config.session_def.recordings}
