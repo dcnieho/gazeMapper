@@ -25,6 +25,7 @@ class GUI:
     def __init__(self):
         self.popup_stack = []
         self.running     = False
+        settings_editor.set_gui_instance(self)
 
         self.project_dir: pathlib.Path = None
         self.study_config: config.Study = None

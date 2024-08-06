@@ -7,10 +7,10 @@ import enum
 from imgui_bundle import imgui, imgui_md, icons_fontawesome_6 as ifa6
 
 from glassesTools.timeline_gui import color_darken
-from glassesTools import utils
+from glassesTools import utils as gt_utils
 
 from ... import plane, typed_dict_defaults
-from . import colors
+from . import colors, utils
 
 def is_NamedTuple_type(x):
   return (inspect.isclass(x) and issubclass(x, tuple) and
@@ -25,6 +25,11 @@ val_to_str_registry: dict[typing.Type, dict[typing.Any, str]] = {
 _C = typing.TypeVar("_C")
 _T = typing.TypeVar("_T")
 MarkDict = dict[str,typing.Union[None,'MarkDict']]
+
+_gui_instance = None
+def set_gui_instance(gui):
+    global _gui_instance
+    _gui_instance = gui
 
 def draw(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[], set[typing.Any]]]) -> tuple[bool,_C]:
     if not fields:
@@ -65,7 +70,7 @@ def _replace_type_arg(f_type: typing.Type, base_type: typing.Type, v_type, n_typ
 
 def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_getter: typing.Callable[[],set[_T]]|None) -> tuple[bool, typing.Type, typing.Type, bool]:
     # peel off union with None, if any
-    f_type, nullable = utils.unpack_none_union(f_type)
+    f_type, nullable = gt_utils.unpack_none_union(f_type)
     base_type = typing.get_origin(f_type) or f_type  # for instance str[int]->str, and or for str->str
     if possible_value_getter:
         if not isinstance(possible_value_getter,list):
@@ -198,7 +203,7 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
                     types = {k:kv_type[1] for k in all_fields}
                 else:
                     all_type = kv_type[1]
-                    
+
         has_add = has_remove = fields is None
         if has_add:
             fields = list(obj.keys())
@@ -230,11 +235,73 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
     if has_add:
         imgui.table_next_row()
         imgui.table_next_column()
-        imgui.button('add item')
+        iid = imgui.get_id('##adder')
+        if draw_dict_editor.new_item and iid==draw_dict_editor.new_item[0]:
+            obj = draw_dict_editor.new_item[1]
+            changed = True
+            made_or_replaced_obj = True
+            draw_dict_editor.new_item = None
+        if imgui.button('add item'):
+            new_item_name = ''
+            new_item_type: typing.Type = None
+            def _do_add_item():
+                nonlocal obj
+                nonlocal iid
+                nonlocal new_item_name
+                nonlocal new_item_type
+                t = getattr(builtins,new_item_type)
+                obj[new_item_name] = t()
+                draw_dict_editor.new_item = (iid,obj)
+            def _valid_item_name():
+                nonlocal new_item_name
+                return new_item_name and not new_item_name in obj
+            def _add_item_popup():
+                nonlocal new_item_name
+                nonlocal new_item_type
+                imgui.dummy((30*imgui.calc_text_size('x').x,0))
+                if imgui.begin_table("##new_item_info",2):
+                    imgui.table_setup_column("##new_item_infos_left", imgui.TableColumnFlags_.width_fixed)
+                    imgui.table_setup_column("##new_item_infos_right", imgui.TableColumnFlags_.width_stretch)
+                    imgui.table_next_row()
+                    imgui.table_next_column()
+                    imgui.align_text_to_frame_padding()
+                    invalid = not _valid_item_name()
+                    if invalid:
+                        imgui.push_style_color(imgui.Col_.text, colors.error)
+                    imgui.text("Item name")
+                    if invalid:
+                        imgui.pop_style_color()
+                    imgui.table_next_column()
+                    imgui.set_next_item_width(-1)
+                    _,new_item_name = imgui.input_text("##new_item_name",new_item_name)
+                    imgui.table_next_row()
+                    imgui.table_next_column()
+                    imgui.align_text_to_frame_padding()
+                    invalid = new_item_type is None
+                    if invalid:
+                        imgui.push_style_color(imgui.Col_.text, colors.error)
+                    imgui.text("Item type")
+                    if invalid:
+                        imgui.pop_style_color()
+                    imgui.table_next_column()
+                    imgui.set_next_item_width(-1)
+                    types = ['bool','str','int','float']
+                    t_idx = types.index(new_item_type) if new_item_type is not None else -1
+                    _,t_idx = imgui.combo("##item_type_selector", t_idx, types)
+                    new_item_type = None if t_idx==-1 else types[t_idx]
+                    imgui.end_table()
+                return 0 if imgui.is_key_released(imgui.Key.enter) else None
+
+            buttons = {
+                ifa6.ICON_FA_CHECK+" Create item": (_do_add_item, lambda: not _valid_item_name() or new_item_type is None),
+                ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
+            }
+            utils.push_popup(_gui_instance, lambda: utils.popup("Add item", _add_item_popup, buttons = buttons, outside=False))
     if table_is_started:
         imgui.end_table()
 
     return changed, made_or_replaced_obj, obj
+draw_dict_editor.new_item = None
 
 def _get_fields_text_width(fields: list[str], backup_str='xxxxx'):
     if fields and isinstance(fields[0], enum.Enum):
