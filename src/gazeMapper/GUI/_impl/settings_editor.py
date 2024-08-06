@@ -4,7 +4,7 @@ import inspect
 import pathlib
 import enum
 
-from imgui_bundle import imgui, imgui_md
+from imgui_bundle import imgui, imgui_md, icons_fontawesome_6 as ifa6
 
 from glassesTools.timeline_gui import color_darken
 from glassesTools import utils
@@ -301,6 +301,10 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
             new_val = values[p_idx]
         case _:
             imgui.text(f'type {f_type} not handled')
+    if nullable and val is not None:
+        imgui.same_line()
+        if imgui.button(ifa6.ICON_FA_HANDS_BUBBLES+ f' unset##{field_lbl}'):
+            new_val = None
 
     new_obj = None
     if (changed := new_val!=val or new_edit):
