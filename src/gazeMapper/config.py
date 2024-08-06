@@ -26,28 +26,23 @@ class AutoCodeTrialEpisodes(TypedDictDefault, total=False):
     max_intermarker_gap_duration: int = 15
     min_duration: int = 6
 
-class I2MCSettings(TypedDict, total=False):
-    xres: int
-    yres: int
-    freq: float
-    missingx: float
-    missingy: float
-    scrSz: gt_plane.Coordinate
-    disttoscreen: float
-    windowtimeInterp: float
-    edgeSampInterp: int
-    maxdisp: float
-    windowtime: float
-    steptime: float
-    downsamples: set[int]
-    downsampFilter: bool
-    chebyOrder: int
-    maxerrors: int
-    cutoffstd: float
-    onoffsetThresh: float
-    maxMergeDist: float
-    maxMergeTime: float
-    minFixDur: float
+class I2MCSettings(TypedDictDefault, total=False):
+    # None where fields are set by code dynamically based on the data. When value applied here, it overrides this dynamic parameter setting
+    freq            : float|None    = None
+    windowtimeInterp: float         = .25       # s
+    edgeSampInterp  : int           = 2
+    maxdisp         : float         = 50        # mm
+    windowtime      : float         = .2        # s
+    steptime        : float         = .02       # s
+    downsamples     : set[int]|None = None
+    downsampFilter  : bool|None     = None
+    chebyOrder      : int|None      = None
+    maxerrors       : int           = 100
+    cutoffstd       : float|None    = None
+    onoffsetThresh  : float         = 3.
+    maxMergeDist    : float         = 20        # mm
+    maxMergeTime    : float         = 81        # ms
+    minFixDur       : float         = 50        # ms
 
 class CamMovementForEtSyncFunction(TypedDict):
     module_or_file: str
@@ -82,8 +77,8 @@ class Study:
                  get_cam_movement_for_et_sync_method            : Literal['','plane','function']    = 'plane',
                  get_cam_movement_for_et_sync_function          : CamMovementForEtSyncFunction|None = None,
 
-                 auto_code_sync_points                          : AutoCodeSyncPoints|None           = None,
-                 auto_code_trial_episodes                       : AutoCodeTrialEpisodes|None        = None,
+                 auto_code_sync_points                          : AutoCodeSyncPoints                = AutoCodeSyncPoints(),
+                 auto_code_trial_episodes                       : AutoCodeTrialEpisodes             = AutoCodeTrialEpisodes(),
 
                  export_output3D                                : bool                              = False,
                  export_output2D                                : bool                              = True,
@@ -94,7 +89,7 @@ class Study:
                  validate_dq_types                              : set[gv_process.DataQualityType]|None = None,
                  validate_allow_dq_fallback                     : bool                              = False,
                  validate_include_data_loss                     : bool                              = False,
-                 validate_I2MC_settings                         : I2MCSettings|None                 = None,
+                 validate_I2MC_settings                         : I2MCSettings                      = I2MCSettings(),
 
                  video_make_which                               : set[str]|None                     = None,
                  video_recording_colors                         : dict[str,RgbColor]|None           = None,
@@ -192,12 +187,12 @@ class Study:
                 raise ValueError(f'The auto_code_trials_episodes option is configured, but {annotation.Event.Trial} episodes are not set to be coded in episodes_to_code. Fix episodes_to_code.')
 
         # ensure some members are of the right class, and apply defaults
-        if self.auto_code_sync_points:
-            self.auto_code_sync_points = AutoCodeSyncPoints(self.auto_code_sync_points)
-            self.auto_code_sync_points.apply_defaults()
-        if self.auto_code_trial_episodes:
-            self.auto_code_trial_episodes = AutoCodeTrialEpisodes(self.auto_code_trial_episodes)
-            self.auto_code_trial_episodes.apply_defaults()
+        self.auto_code_sync_points = AutoCodeSyncPoints(self.auto_code_sync_points)
+        self.auto_code_sync_points.apply_defaults()
+        self.auto_code_trial_episodes = AutoCodeTrialEpisodes(self.auto_code_trial_episodes)
+        self.auto_code_trial_episodes.apply_defaults()
+        self.validate_I2MC_settings = I2MCSettings(self.validate_I2MC_settings)
+        self.validate_I2MC_settings.apply_defaults()
 
     def _check_planes_per_episode(self):
         for e in self.planes_per_episode:
@@ -243,7 +238,7 @@ class Study:
             # filter out defaulted
             to_dump = {k:to_dump[k] for k in to_dump if k not in study_defaults or study_defaults[k]!=to_dump[k]}
             # also filter out defaults in some subfields
-            for k in ['auto_code_sync_points','auto_code_trial_episodes']:
+            for k in ['auto_code_sync_points','auto_code_trial_episodes','validate_I2MC_settings']:
                 if k in to_dump:
                     to_dump[k] = {kk:to_dump[k][kk] for kk in to_dump[k] if kk not in to_dump[k]._field_defaults or to_dump[k]._field_defaults[kk]!=to_dump[k][kk]}
                     if not to_dump[k]:
