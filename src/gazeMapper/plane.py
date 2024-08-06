@@ -47,7 +47,7 @@ class Definition:
             json.dump(to_dump, f, cls=utils.CustomTypeEncoder, indent=2)
 
     @staticmethod
-    def load_from_json(path: str | pathlib.Path) -> 'Definition':
+    def load_from_json(path: str | pathlib.Path):
         path = pathlib.Path(path)
         if path.is_dir():
             path /= Definition.default_json_file_name
@@ -57,9 +57,7 @@ class Definition:
         for k in ['plane_size', 'origin']:
             if k in kwds:
                 kwds[k] = plane.Coordinate(*kwds[k])
-        cls = Definition_GlassesValidator if kwds['type']==Type.GlassesValidator else Definition_Plane_2D
-        kwds.pop('type')
-        return cls(name=path.parent.name, **kwds)
+        return make(name=path.parent.name, **kwds)
 
 class Definition_GlassesValidator(Definition):
     @typeguard.typechecked(collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
@@ -110,6 +108,10 @@ class Definition_Plane_2D(Definition):
 
     def has_complete_setup(self) -> bool:
         return not self.wrong_fields()
+
+def make(type: Type, name: str, **kwargs) -> Definition_GlassesValidator|Definition_Plane_2D:
+    cls = Definition_GlassesValidator if type==Type.GlassesValidator else Definition_Plane_2D
+    return cls(name=name, **kwargs)
 
 
 definition_defaults: dict[Type, dict['str', typing.Any]] = {}
