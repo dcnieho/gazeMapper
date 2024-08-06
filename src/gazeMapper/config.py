@@ -7,7 +7,7 @@ import typeguard
 import typing
 from typing import Any, Literal, TypedDict
 
-from glassesTools import annotation, plane as gt_plane, utils
+from glassesTools import annotation, utils
 from glassesValidator import process as gv_process
 
 from . import marker, plane, session
@@ -15,16 +15,16 @@ from .typed_dict_defaults import TypedDictDefault
 
 
 class AutoCodeSyncPoints(TypedDictDefault, total=False):
-    markers: list[int]
-    max_gap_duration: int = 4
-    min_duration: int = 6
+    markers         : list[int]
+    max_gap_duration: int       = 4
+    min_duration    : int       = 6
 
 class AutoCodeTrialEpisodes(TypedDictDefault, total=False):
-    start_markers: list[int]
-    end_markers: list[int]
-    max_gap_duration: int = 4
-    max_intermarker_gap_duration: int = 15
-    min_duration: int = 6
+    start_markers               : list[int]
+    end_markers                 : list[int]
+    max_gap_duration            : int       = 4
+    max_intermarker_gap_duration: int       = 15
+    min_duration                : int       = 6
 
 class I2MCSettings(TypedDictDefault, total=False):
     # None where fields are set by code dynamically based on the data. When value applied here, it overrides this dynamic parameter setting
@@ -45,9 +45,9 @@ class I2MCSettings(TypedDictDefault, total=False):
     minFixDur       : float         = 50        # ms
 
 class CamMovementForEtSyncFunction(TypedDict):
-    module_or_file: str
-    function: str
-    parameters: dict[str,Any]
+    module_or_file  : str
+    function        : str
+    parameters      : dict[str,Any]
 
 class RgbColor(typing.NamedTuple):
     r: int = 0
