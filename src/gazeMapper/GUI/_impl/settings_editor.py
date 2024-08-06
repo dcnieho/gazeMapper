@@ -214,7 +214,7 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
     if defaults is None:
         defaults = {}
 
-    first_column_width = _get_fields_text_width(fields, backup_str='xadd itemx')*1.1
+    first_column_width = max([_get_fields_text_width(fields, backup_str='xadd itemx'), _get_fields_text_width(['xadd itemx'])])*1.1
     table_is_started = _start_table(level, first_column_width)
     if not table_is_started:
         return False, made_or_replaced_obj, obj
