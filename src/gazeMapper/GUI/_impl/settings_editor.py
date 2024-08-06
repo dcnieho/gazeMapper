@@ -294,6 +294,8 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
                 str_values = [str(v) for v in str_values]
             _,p_idx = imgui.combo(f"##{field}", p_idx, str_values, popup_max_height_in_items=min(10,len(values)))
             new_val = values[p_idx]
+        case _:
+            imgui.text(f'type {f_type} not handled')
 
     new_obj = None
     if (changed := new_val!=val):
