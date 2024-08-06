@@ -31,9 +31,9 @@ class Definition:
         self.type               = type
         self.name               = name
 
-    def wrong_fields(self):
+    def wrong_fields(self) -> dict[str,None|dict[str,None]]:
         raise NotImplementedError()
-    def has_complete_setup(self):
+    def has_complete_setup(self) -> bool:
         raise NotImplementedError()
 
     def store_as_json(self, path: str | pathlib.Path):
@@ -68,8 +68,8 @@ class Definition_GlassesValidator(Definition):
         super().__init__(Type.GlassesValidator, name)
         self.use_default= use_default   # If True, denotes this is the default/built-in glassesValidator plane, if False, denotes custom settings are expected
 
-    def wrong_fields(self) -> list[str]:
-        return []
+    def wrong_fields(self) -> dict[str,None|dict[str,None]]:
+        return {}
 
     def has_complete_setup(self) -> bool:
         return True
@@ -99,12 +99,14 @@ class Definition_Plane_2D(Definition):
         self.aruco_dict         = aruco_dict
         self.ref_image_size     = ref_image_size        # largest dimension
 
-    def wrong_fields(self) -> list[str]:
-        missing: list[str] = []
+    def wrong_fields(self) -> dict[str,None|dict[str,None]]:
+        wrong: dict[str,None|dict[str,None]] = {}
         for a in ['marker_file','marker_size','plane_size']:
-            if not getattr(self,a) or a=='plane_size' and any([c==0 for c in self.plane_size]):
-                missing.append(a)
-        return missing
+            if not getattr(self,a):
+                wrong[a] = None
+            elif a=='plane_size' and any(missing:=[c==0 for c in self.plane_size]):
+                wrong[a] = {k:None for k,m in zip(self.plane_size._fields,missing) if m}
+        return wrong
 
     def has_complete_setup(self) -> bool:
         return not self.wrong_fields()
