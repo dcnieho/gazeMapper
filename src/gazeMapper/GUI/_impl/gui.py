@@ -419,7 +419,8 @@ class GUI:
                 extra = '*'
                 imgui.push_style_color(imgui.Col_.text, colors.error)
             if (opened:=imgui.tree_node_ex(f'{extra}{p.name} ({p.type.value})', imgui.TreeNodeFlags_.framed)):
-                imgui.pop_style_color()
+                if missing_fields:
+                    imgui.pop_style_color()
                 changed, _, new_p = settings_editor.draw_dict_editor(copy.deepcopy(p), type(p), 0, plane.definition_valid_fields[p.type], plane.definition_parameter_types, plane.definition_defaults[p.type], mark = missing_fields)
                 if changed:
                     try:
