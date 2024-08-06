@@ -259,12 +259,17 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
     else:
         imgui_md.render(f'**{field_lbl}**')
     imgui.table_next_column()
-    # TODO: should handle None value: print as <not set> and bring up editor upon clicking on it, or something like that
-    # maybe store ID of currently editing None to bypass this print and go to the below editor?
+    new_edit = False
+    if val is None and _draw_field.should_edit_id and _draw_field.should_edit_id==imgui.get_id(field_lbl):
+        val = f_type()
+        _draw_field.should_edit_id = None
+        new_edit = True
     match base_type:
         case _ if val is None:
             new_val = val
-            imgui.text('<not set>')
+            imgui.text('<not set>, click to set')
+            if imgui.is_item_clicked(imgui.MouseButton_.left):
+                _draw_field.should_edit_id = imgui.get_id(field_lbl)
         case builtins.bool:
             new_val = imgui.checkbox(f'##{field}', val)[1]
         case builtins.str:
@@ -298,7 +303,7 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
             imgui.text(f'type {f_type} not handled')
 
     new_obj = None
-    if (changed := new_val!=val):
+    if (changed := new_val!=val or new_edit):
         if isinstance(obj,dict):
             obj[field] = new_val
         elif is_NamedTuple_type(type(obj)):
@@ -308,3 +313,4 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
             setattr(obj,field,new_val)
 
     return changed, new_obj
+_draw_field.should_edit_id = None
