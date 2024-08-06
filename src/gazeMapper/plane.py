@@ -108,7 +108,7 @@ class Definition:
 definition_defaults = {Type.GlassesValidator: {'use_default': True}, Type.Plane_2D: {'marker_border_bits': 1, 'min_num_markers': 3, 'aruco_dict': cv2.aruco.DICT_4X4_250, 'ref_image_size': 1920}}
 definition_valid_fields = {Type.GlassesValidator: ['use_default'], Type.Plane_2D: ['marker_file', 'marker_size', 'plane_size', 'marker_border_bits', 'min_num_markers', 'origin', 'unit', 'aruco_dict', 'ref_image_size']}
 _params = inspect.signature(Definition.__init__).parameters
-definition_parameter_types = {k:utils.unpack_none_union(_params[k].annotation) for k in _params if k!='self'}
+definition_parameter_types = {k:_params[k].annotation for k in _params if k!='self'}
 del _params
 
 
