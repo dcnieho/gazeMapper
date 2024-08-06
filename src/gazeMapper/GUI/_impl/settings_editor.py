@@ -7,6 +7,7 @@ import enum
 from imgui_bundle import imgui, imgui_md
 
 from glassesTools.timeline_gui import color_darken
+from glassesTools import utils
 
 from ... import plane, typed_dict_defaults
 from . import colors
@@ -60,7 +61,9 @@ def _replace_type_arg(f_type: typing.Type, base_type: typing.Type, v_type, n_typ
         raise exc
     return f_type   # failed, but its ok, return unchanged
 
-def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_getter: typing.Callable[[],set[_T]]|None) -> tuple[bool, typing.Type, typing.Type]:
+def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_getter: typing.Callable[[],set[_T]]|None) -> tuple[bool, typing.Type, typing.Type, bool]:
+    # peel off union with None, if any
+    f_type, nullable = utils.unpack_none_union(f_type)
     base_type = typing.get_origin(f_type) or f_type  # for instance str[int]->str, and or for str->str
     if possible_value_getter:
         if not isinstance(possible_value_getter,list):
@@ -107,14 +110,14 @@ def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_get
             is_dict = False
         case _:
             raise ValueError(f'type of {field} ({f_type}) not handled')
-    return is_dict, base_type, f_type
+    return is_dict, base_type, f_type, nullable
 
 def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[], set[typing.Any]]], mark: list[str], level=0, table_is_started=False) -> tuple[bool,bool,bool,_C]:
     changed = False
     max_fields_width = _get_fields_text_width(fields)*1.1   # 10% extra to be safe
     ret_new_obj = False
     for f in fields:
-        is_dict, base_type, f_type = _get_field_type(f, obj, types[f], possible_value_getters[f] if f in possible_value_getters else None)
+        is_dict, base_type, f_type, nullable = _get_field_type(f, obj, types[f], possible_value_getters[f] if f in possible_value_getters else None)
 
         if is_dict and (not mark or not f in mark):
             if table_is_started:
@@ -137,7 +140,7 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
             if not table_is_started:
                 continue
 
-        this_changed, new_f_obj = _draw_field(f, obj, base_type, f_type, defaults[f] if f in defaults else None, mark=mark is not None and f in mark)
+        this_changed, new_f_obj = _draw_field(f, obj, base_type, f_type, nullable, defaults[f] if f in defaults else None, mark=mark is not None and f in mark)
         changed |= this_changed
         if this_changed and new_f_obj is not None:
             ret_new_obj = True
@@ -230,9 +233,7 @@ def _start_table(level, first_column_width):
     imgui.table_setup_column("value", imgui.TableColumnFlags_.width_stretch)
     return table_is_started
 
-def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type, default: _T|None, mark: bool) -> bool:
-    if base_type is None:
-        base_type = typing.get_origin(f_type)
+def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type, nullable: bool, default: _T|None, mark: bool) -> bool:
     imgui.table_next_row()
     imgui.table_next_column()
     val = obj.get(field,f_type()) if isinstance(obj,dict) else getattr(obj,field)
