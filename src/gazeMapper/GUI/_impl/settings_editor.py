@@ -24,6 +24,8 @@ val_to_str_registry: dict[typing.Type, dict[typing.Any, str]] = {
 
 _C = typing.TypeVar("_C")
 _T = typing.TypeVar("_T")
+MarkDict = dict[str,typing.Union[None,'MarkDict']]
+
 def draw(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[], set[typing.Any]]]) -> tuple[bool,_C]:
     if not fields:
         return
@@ -112,7 +114,7 @@ def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_get
             raise ValueError(f'type of {field} ({f_type}) not handled')
     return is_dict, base_type, f_type, nullable
 
-def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[], set[typing.Any]]], mark: list[str], level=0, table_is_started=False) -> tuple[bool,bool,bool,_C]:
+def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[], set[typing.Any]]], mark: MarkDict, level=0, table_is_started=False) -> tuple[bool,bool,bool,_C]:
     changed = False
     max_fields_width = _get_fields_text_width(fields)*1.1   # 10% extra to be safe
     ret_new_obj = False
@@ -128,7 +130,7 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
             if imgui.tree_node_ex(f,imgui.TreeNodeFlags_.framed):
                 if mark and f in mark:
                     imgui.pop_style_color()
-                this_changed, made_obj, new_sub_obj = draw_dict_editor(obj.get(f,None) if isinstance(obj,dict) else getattr(obj,f), f_type, level+1, possible_value_getter=possible_value_getters.get(f,None))
+                this_changed, made_obj, new_sub_obj = draw_dict_editor(obj.get(f,None) if isinstance(obj,dict) else getattr(obj,f), f_type, level+1, possible_value_getter=possible_value_getters.get(f,None), mark=mark.get(f,None))
                 changed |= this_changed
                 if this_changed and made_obj:
                     if isinstance(obj,dict):
@@ -146,14 +148,14 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
             if not table_is_started:
                 continue
 
-        this_changed, new_f_obj = _draw_field(f, obj, base_type, f_type, nullable, defaults[f] if f in defaults else None, mark=mark is not None and f in mark)
+        this_changed, new_f_obj = _draw_field(f, obj, base_type, f_type, nullable, defaults.get(f,None), mark=mark and f in mark)
         changed |= this_changed
         if this_changed and new_f_obj is not None:
             ret_new_obj = True
             obj = new_f_obj
     return table_is_started, changed, ret_new_obj, obj
 
-def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None, types: dict[typing.Any, typing.Type]=None, defaults:dict[typing.Any, typing.Any]=None, possible_value_getter: typing.Callable[[_T], set[typing.Any]]=None, mark: list[str]=None) -> tuple[bool,bool,_T]:
+def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None, types: dict[typing.Any, typing.Type]=None, defaults:dict[typing.Any, typing.Any]=None, possible_value_getter: typing.Callable[[_T], set[typing.Any]]=None, mark: MarkDict=None) -> tuple[bool,bool,_T]:
     made_or_replaced_obj = False
     if (made_or_replaced_obj := obj is None):
         obj = o_type()
