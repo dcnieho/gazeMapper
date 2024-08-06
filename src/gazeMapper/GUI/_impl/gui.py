@@ -508,7 +508,17 @@ class GUI:
             imgui.text_colored(colors.error,'to set this up.')
 
         # episodes to be coded
-        settings_editor.draw(self.study_config, ['episodes_to_code', 'planes_per_episode'], config.study_parameter_types, {}, self._possible_value_getters)
+        changed, new_config = settings_editor.draw(copy.deepcopy(self.study_config), ['episodes_to_code', 'planes_per_episode'], config.study_parameter_types, {}, self._possible_value_getters)
+        if changed:
+            try:
+                new_config._check_all()
+            except Exception as e:
+                # do not persist invalid config, inform user of problem
+                utils.push_popup(self, msgbox.msgbox, "Settings error", f"You cannot make this change to the project's settings:\n{e}", msgbox.MsgBox.error)
+            else:
+                # persist changed config
+                self.study_config = new_config
+                self.study_config.store_as_json()
 
     def _individual_marker_setup_pane_drawer(self):
         pass
