@@ -250,10 +250,11 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
         field_lbl = field_lbl.value
     if not isinstance(field_lbl, str):
         field_lbl = str(field_lbl)
+    is_default = val==default
     if mark:
         imgui.align_text_to_frame_padding()
         imgui.text_colored(colors.error, field_lbl)
-    elif (is_default := val==default):
+    elif is_default:
         imgui.align_text_to_frame_padding()
         imgui.text_colored(imgui.ImVec4(*color_darken(imgui.ImColor(imgui.get_style_color_vec4(imgui.Col_.text)), .75)), field_lbl)
     else:
@@ -305,6 +306,10 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
         imgui.same_line()
         if imgui.button(ifa6.ICON_FA_HANDS_BUBBLES+ f' unset##{field_lbl}'):
             new_val = None
+    if not is_default and default is not None:
+        imgui.same_line()
+        if imgui.button(f' default##{field_lbl}'):
+            new_val = default
 
     new_obj = None
     if (changed := new_val!=val or new_edit):
