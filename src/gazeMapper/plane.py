@@ -31,7 +31,7 @@ class Definition:
         self.type               = type
         self.name               = name
 
-    def missing_fields(self):
+    def wrong_fields(self):
         raise NotImplementedError()
     def has_complete_setup(self):
         raise NotImplementedError()
@@ -70,7 +70,7 @@ class Definition_GlassesValidator(Definition):
         super().__init__(Type.GlassesValidator, name)
         self.use_default= use_default   # If True, denotes this is the default/built-in glassesValidator plane, if False, denotes custom settings are expected
 
-    def missing_fields(self) -> list[str]:
+    def wrong_fields(self) -> list[str]:
         return []
 
     def has_complete_setup(self) -> bool:
@@ -101,15 +101,15 @@ class Definition_Plane_2D(Definition):
         self.aruco_dict         = aruco_dict
         self.ref_image_size     = ref_image_size        # largest dimension
 
-    def missing_fields(self) -> list[str]:
+    def wrong_fields(self) -> list[str]:
         missing: list[str] = []
         for a in ['marker_file','marker_size','plane_size']:
-            if getattr(self,a) is None or a=='plane_size' and any([c==0 for c in self.plane_size]):
+            if not getattr(self,a) or a=='plane_size' and any([c==0 for c in self.plane_size]):
                 missing.append(a)
         return missing
 
     def has_complete_setup(self) -> bool:
-        return not self.missing_fields()
+        return not self.wrong_fields()
 
 
 definition_defaults: dict[Type, dict['str', typing.Any]] = {}
