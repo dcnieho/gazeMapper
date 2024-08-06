@@ -246,6 +246,8 @@ class Study:
             for k in ['auto_code_sync_points','auto_code_trial_episodes']:
                 if k in to_dump:
                     to_dump[k] = {kk:to_dump[k][kk] for kk in to_dump[k] if kk not in to_dump[k]._field_defaults or to_dump[k]._field_defaults[kk]!=to_dump[k][kk]}
+                    if not to_dump[k]:
+                        to_dump.pop(k)
             # dump to file
             json.dump(to_dump, f, cls=utils.CustomTypeEncoder, indent=2)
         # this doesn't store any files itself, but triggers the contained info to be stored
