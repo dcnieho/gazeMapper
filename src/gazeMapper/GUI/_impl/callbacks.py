@@ -72,7 +72,7 @@ def try_load_project(g, path: str|pathlib.Path, action='loading'):
 
 def make_plane(study_config: config.Study, type: plane.Type, name: str):
     # make plane
-    p_def = plane.Definition(type, name)
+    p_def = plane.make(type, name)
     # store to file
     path = config.guess_config_dir(study_config.working_directory)
     p_dir = path / p_def.name
