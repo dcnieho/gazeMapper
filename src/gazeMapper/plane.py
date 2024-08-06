@@ -26,69 +26,22 @@ class Definition:
     @typeguard.typechecked(collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
     def __init__(self,
                  type               : Type,
-                 name               : str,
-                 use_default        : bool|None                 = None,
-                 marker_file        : str|pathlib.Path|None     = None,
-                 marker_size        : float|None                = None,
-                 marker_border_bits : int|None                  = None,
-                 min_num_markers    : int|None                  = None,
-                 plane_size         : plane.Coordinate|None     = None,
-                 origin             : plane.Coordinate|None     = None,
-                 unit               : str|None                  = None,
-                 aruco_dict         : ArucoDictType|None        = None,
-                 ref_image_size     : int|None                  = None
+                 name               : str
                  ):
         self.type               = type
         self.name               = name
-        self.use_default        = use_default           # applies only to glassesValidator planes. If False, denotes this is the default/built-in glassesValidator plane, if True, denotes custom settings are expected
-        # the below are only for non-glassesValidator planes
-        self.marker_file        = marker_file           # if str or Path: file from which to read markers. Else direction N_markerx4 array. Should contain centers of markers
-        self.marker_size        = marker_size           # in "unit" units
-        self.plane_size         = plane_size            # in "unit" units
-        self.marker_border_bits = marker_border_bits
-        self.min_num_markers    = min_num_markers       # minimum number of markers that should be to run pose estimation w.r.t. the plane
-        self.origin             = origin                # center of plane, in coordinates of the input file
-        self.unit               = unit
-        self.aruco_dict         = aruco_dict
-        self.ref_image_size     = ref_image_size        # largest dimension
 
-        self._do_checks()
-
-    def _do_checks(self):
-        # check provided info (prevent bugs)
-        if self.type==Type.GlassesValidator:
-            for a in definition_valid_fields[Type.Plane_2D]:
-                if getattr(self,a) is not None:
-                    raise ValueError(f"The {a} input argument should not be set when the plane is a GlassesValidator plane (would be ignored)")
-        else:
-            for a in definition_valid_fields[Type.GlassesValidator]:
-                if getattr(self,a) is not None:
-                    raise ValueError(f"The {a} input argument is for GlassesValidator planes. It should not be set when the plane is not a GlassesValidator plane (would be ignored)")
-        # set defaults
-        for a in definition_defaults[self.type]:
-            if getattr(self,a) is None:
-                setattr(self,a,definition_defaults[self.type][a])
-
-    def missing_fields(self) -> list[str]:
-        missing: list[str] = []
-        for a in definition_valid_fields[self.type]:
-            if getattr(self,a) is None:
-                missing.append(a)
-        return missing
-
-    def has_complete_setup(self) -> bool:
-        for a in definition_valid_fields[self.type]:
-            if getattr(self,a) is None:
-                return False
-        return True
+    def missing_fields(self):
+        raise NotImplementedError()
+    def has_complete_setup(self):
+        raise NotImplementedError()
 
     def store_as_json(self, path: str | pathlib.Path):
         path = pathlib.Path(path)
         if path.is_dir():
             path /= self.default_json_file_name
         with open(path, 'w') as f:
-            other_type = Type.GlassesValidator if self.type==Type.Plane_2D else Type.Plane_2D
-            to_dump = {k:getattr(self,k) for k in vars(self) if not k.startswith('_') and k not in ['name']+definition_valid_fields[other_type]}    # name will be populated from the provided path, fields for the other type should not be stored
+            to_dump = {k:getattr(self,k) for k in vars(self) if not k.startswith('_') and k not in ['name']}    # name will be populated from the provided path
             # filter out defaulted
             to_dump = {k:v for k in to_dump if (v:=to_dump[k]) is not None and (k not in definition_defaults[self.type] or definition_defaults[self.type][k]!=v)}
             json.dump(to_dump, f, cls=utils.CustomTypeEncoder, indent=2)
@@ -104,12 +57,68 @@ class Definition:
         for k in ['plane_size', 'origin']:
             if k in kwds:
                 kwds[k] = plane.Coordinate(*kwds[k])
-        return Definition(name=path.parent.name, **kwds)
-definition_defaults = {Type.GlassesValidator: {'use_default': True}, Type.Plane_2D: {'marker_border_bits': 1, 'min_num_markers': 3, 'aruco_dict': cv2.aruco.DICT_4X4_250, 'ref_image_size': 1920}}
-definition_valid_fields = {Type.GlassesValidator: ['use_default'], Type.Plane_2D: ['marker_file', 'marker_size', 'plane_size', 'marker_border_bits', 'min_num_markers', 'origin', 'unit', 'aruco_dict', 'ref_image_size']}
-_params = inspect.signature(Definition.__init__).parameters
-definition_parameter_types = {k:_params[k].annotation for k in _params if k!='self'}
-del _params
+        cls = Definition_GlassesValidator if kwds['type']==Type.GlassesValidator else Definition_Plane_2D
+        kwds.pop('type')
+        return cls(name=path.parent.name, **kwds)
+
+class Definition_GlassesValidator(Definition):
+    @typeguard.typechecked(collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
+    def __init__(self,
+                 name               : str,
+                 use_default        : bool = True,
+                 ):
+        super().__init__(Type.GlassesValidator, name)
+        self.use_default= use_default   # If True, denotes this is the default/built-in glassesValidator plane, if False, denotes custom settings are expected
+
+    def missing_fields(self) -> list[str]:
+        return []
+
+    def has_complete_setup(self) -> bool:
+        return True
+
+class Definition_Plane_2D(Definition):
+    @typeguard.typechecked(collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
+    def __init__(self,
+                 name               : str,
+                 marker_file        : str|pathlib.Path|None = None, # should be set, no suitable default
+                 marker_size        : float|None            = None, # should be set, no suitable default
+                 marker_border_bits : int                   = 1,
+                 min_num_markers    : int                   = 3,
+                 plane_size         : plane.Coordinate      = plane.Coordinate(0., 0.), # should be set to something non-zero
+                 origin             : plane.Coordinate      = plane.Coordinate(0., 0.),
+                 unit               : str                   = '',
+                 aruco_dict         : ArucoDictType         = cv2.aruco.DICT_4X4_250,
+                 ref_image_size     : int                   = 1920
+                 ):
+        super().__init__(Type.Plane_2D, name)
+        self.marker_file        = marker_file           # if str or Path: file from which to read markers. Else direction N_markerx4 array. Should contain centers of markers
+        self.marker_size        = marker_size           # in "unit" units
+        self.plane_size         = plane_size            # in "unit" units
+        self.marker_border_bits = marker_border_bits
+        self.min_num_markers    = min_num_markers       # minimum number of markers that should be to run pose estimation w.r.t. the plane
+        self.origin             = origin                # center of plane, in coordinates of the input file
+        self.unit               = unit
+        self.aruco_dict         = aruco_dict
+        self.ref_image_size     = ref_image_size        # largest dimension
+
+    def missing_fields(self) -> list[str]:
+        missing: list[str] = []
+        for a in ['marker_file','marker_size','plane_size']:
+            if getattr(self,a) is None or a=='plane_size' and any([c==0 for c in self.plane_size]):
+                missing.append(a)
+        return missing
+
+    def has_complete_setup(self) -> bool:
+        return not self.missing_fields()
+
+
+definition_defaults: dict[Type, dict['str', typing.Any]] = {}
+definition_parameter_types: dict[Type, dict['str', typing.Type]] = {}
+for _t,_cls in zip([Type.GlassesValidator, Type.Plane_2D],[Definition_GlassesValidator, Definition_Plane_2D]):
+    _params = inspect.signature(_cls.__init__).parameters
+    definition_defaults[_t]        = {k:d for k in _params if (d:=_params[k].default)!=inspect._empty}
+    definition_parameter_types[_t] = {k:_params[k].annotation for k in _params if k!='self'}
+    del _params
 
 
 def get_plane_from_path(path: str|pathlib.Path) -> plane.Plane:
