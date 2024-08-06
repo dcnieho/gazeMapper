@@ -31,7 +31,7 @@ def set_gui_instance(gui):
     global _gui_instance
     _gui_instance = gui
 
-def draw(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[], set[typing.Any]]], mark: MarkDict|None) -> tuple[bool,_C]:
+def draw(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[], set[typing.Any]]], mark: MarkDict|None=None) -> tuple[bool,_C]:
     if not fields:
         return
 
@@ -171,6 +171,7 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
         obj = o_type()
 
     has_add = has_remove = False
+    missing_fields = None
     if typing.is_typeddict(o_type):
         types = o_type.__annotations__
         fields = list(types.keys())
@@ -211,10 +212,12 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
         has_add = has_remove = fields is None
         if has_add:
             fields = list(obj.keys())
-            if all_fields is not None and not (all_fields-set(fields)):
-                # nothing more to add, all possible keys exhausted
-                has_add = False
-                # but keep has_remove to True
+            if all_fields is not None:
+                missing_fields = all_fields-set(fields)
+                if not missing_fields:
+                    # nothing more to add, all possible keys exhausted
+                    has_add = False
+                    # but keep has_remove to True
             if not types:
                 if all_type:
                     types = {k:all_type for k in obj}
@@ -251,15 +254,22 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
             def _do_add_item():
                 nonlocal obj
                 nonlocal iid
+                nonlocal missing_fields
+                nonlocal types
                 nonlocal new_item_name
                 nonlocal new_item_type
-                t = getattr(builtins,new_item_type)
-                obj[new_item_name] = t()
+                if missing_fields:
+                    obj[new_item_name] = types[new_item_name]()
+                else:
+                    t = getattr(builtins,new_item_type)
+                    obj[new_item_name] = t()
                 draw_dict_editor.new_item = (iid,obj)
             def _valid_item_name():
+                nonlocal missing_fields
                 nonlocal new_item_name
-                return new_item_name and not new_item_name in obj
+                return True if missing_fields else new_item_name and not new_item_name in obj
             def _add_item_popup():
+                nonlocal missing_fields
                 nonlocal new_item_name
                 nonlocal new_item_type
                 imgui.dummy((30*imgui.calc_text_size('x').x,0))
@@ -277,27 +287,34 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
                         imgui.pop_style_color()
                     imgui.table_next_column()
                     imgui.set_next_item_width(-1)
-                    _,new_item_name = imgui.input_text("##new_item_name",new_item_name)
-                    imgui.table_next_row()
-                    imgui.table_next_column()
-                    imgui.align_text_to_frame_padding()
-                    invalid = new_item_type is None
-                    if invalid:
-                        imgui.push_style_color(imgui.Col_.text, colors.error)
-                    imgui.text("Item type")
-                    if invalid:
-                        imgui.pop_style_color()
-                    imgui.table_next_column()
-                    imgui.set_next_item_width(-1)
-                    types = ['bool','str','int','float']
-                    t_idx = types.index(new_item_type) if new_item_type is not None else -1
-                    _,t_idx = imgui.combo("##item_type_selector", t_idx, types)
-                    new_item_type = None if t_idx==-1 else types[t_idx]
+                    if missing_fields:
+                        items = sorted(list(missing_fields), key=lambda x: x.value)
+                        items_str = [x.value for x in items]
+                        idx = items.index(new_item_name) if new_item_name else -1
+                        _,idx = imgui.combo("##item_selector", idx, items_str)
+                        new_item_name = None if idx==-1 else items[idx]
+                    else:
+                        _,new_item_name = imgui.input_text("##new_item_name",new_item_name)
+                        imgui.table_next_row()
+                        imgui.table_next_column()
+                        imgui.align_text_to_frame_padding()
+                        invalid = new_item_type is None
+                        if invalid:
+                            imgui.push_style_color(imgui.Col_.text, colors.error)
+                        imgui.text("Item type")
+                        if invalid:
+                            imgui.pop_style_color()
+                        imgui.table_next_column()
+                        imgui.set_next_item_width(-1)
+                        types = ['bool','str','int','float']
+                        t_idx = types.index(new_item_type) if new_item_type is not None else -1
+                        _,t_idx = imgui.combo("##item_type_selector", t_idx, types)
+                        new_item_type = None if t_idx==-1 else types[t_idx]
                     imgui.end_table()
                 return 0 if imgui.is_key_released(imgui.Key.enter) else None
 
             buttons = {
-                ifa6.ICON_FA_CHECK+" Create item": (_do_add_item, lambda: not _valid_item_name() or new_item_type is None),
+                ifa6.ICON_FA_CHECK+f" {'Add' if missing_fields else 'Create'} item": (_do_add_item, lambda: not _valid_item_name() or (not missing_fields and new_item_type is None)),
                 ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
             }
             utils.push_popup(_gui_instance, lambda: utils.popup("Add item", _add_item_popup, buttons = buttons, outside=False))
