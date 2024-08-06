@@ -119,11 +119,15 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
     for f in fields:
         is_dict, base_type, f_type, nullable = _get_field_type(f, obj, types[f], possible_value_getters[f] if f in possible_value_getters else None)
 
-        if is_dict and (not mark or not f in mark):
+        if is_dict:
             if table_is_started:
                 imgui.end_table()
                 table_is_started = False
+            if mark and f in mark:
+                imgui.push_style_color(imgui.Col_.text, colors.error)
             if imgui.tree_node_ex(f,imgui.TreeNodeFlags_.framed):
+                if mark and f in mark:
+                    imgui.pop_style_color()
                 this_changed, made_obj, new_sub_obj = draw_dict_editor(obj.get(f,None) if isinstance(obj,dict) else getattr(obj,f), f_type, level+1, possible_value_getter=possible_value_getters.get(f,None))
                 changed |= this_changed
                 if this_changed and made_obj:
@@ -132,6 +136,8 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
                     else:
                         setattr(obj,f,new_sub_obj)
                 imgui.tree_pop()
+            elif mark and f in mark:
+                imgui.pop_style_color()
             continue
 
         # simple field, set up for drawing
