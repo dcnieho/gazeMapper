@@ -393,7 +393,7 @@ class GUI:
 
         # rest of settings handled here in a settings tree
         fields = [k for k in config.study_parameter_types.keys() if k in config.study_defaults]
-        changed, new_config = settings_editor.draw(copy.deepcopy(self.study_config), fields, config.study_parameter_types, config.study_defaults, self._possible_value_getters)
+        changed, new_config = settings_editor.draw(copy.deepcopy(self.study_config), fields, config.study_parameter_types, config.study_defaults, self._possible_value_getters, self.study_config.wrong_fields())
         if changed:
             try:
                 new_config._check_all()

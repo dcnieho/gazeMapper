@@ -14,6 +14,8 @@ from . import marker, plane, session
 from .typed_dict_defaults import TypedDictDefault
 
 
+MarkDict = dict[str,typing.Union[None,'MarkDict']]
+
 class AutoCodeSyncPoints(TypedDictDefault, total=False):
     markers         : list[int]
     max_gap_duration: int       = 4
@@ -220,6 +222,13 @@ class Study:
 
     def _check_recording(self, rec: str) -> bool:
         return any([r.name==rec for r in self.session_def.recordings])
+
+    def wrong_fields(self) -> MarkDict:
+        problems: MarkDict = {}
+        if self.get_cam_movement_for_et_sync_method=='function':
+            t = utils.unpack_none_union(study_parameter_types['get_cam_movement_for_et_sync_function'])[0]
+            problems['get_cam_movement_for_et_sync_function'] = {k:None for k in t.__required_keys__ if k not in self.get_cam_movement_for_et_sync_function or (k!='parameters' and not self.get_cam_movement_for_et_sync_function[k])}
+        return problems
 
     def store_as_json(self, path: str|pathlib.Path|None=None):
         if not path:

@@ -10,6 +10,7 @@ from glassesTools.timeline_gui import color_darken
 from glassesTools import utils as gt_utils
 
 from ... import plane, typed_dict_defaults
+from ...config import MarkDict
 from . import colors, utils
 
 def is_NamedTuple_type(x):
@@ -24,18 +25,17 @@ val_to_str_registry: dict[typing.Type, dict[typing.Any, str]] = {
 
 _C = typing.TypeVar("_C")
 _T = typing.TypeVar("_T")
-MarkDict = dict[str,typing.Union[None,'MarkDict']]
 
 _gui_instance = None
 def set_gui_instance(gui):
     global _gui_instance
     _gui_instance = gui
 
-def draw(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[], set[typing.Any]]]) -> tuple[bool,_C]:
+def draw(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[], set[typing.Any]]], mark: MarkDict|None) -> tuple[bool,_C]:
     if not fields:
         return
 
-    table_is_started, changed, _, obj, _ = _draw_impl(obj, fields, types, defaults, possible_value_getters, {})
+    table_is_started, changed, _, obj, _ = _draw_impl(obj, fields, types, defaults, possible_value_getters, mark or {})
     if table_is_started:
         imgui.end_table()
 
