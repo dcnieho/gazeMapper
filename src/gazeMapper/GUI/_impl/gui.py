@@ -413,12 +413,13 @@ class GUI:
         if not self.study_config.planes:
             imgui.text_colored(colors.error,'*At minimum one plane should be defined')
         for i,p in enumerate(self.study_config.planes):
-            missing_fields = p.missing_fields()
+            missing_fields = p.wrong_fields()
             extra = ''
+            lbl = f'{p.name} ({p.type.value})'
             if missing_fields:
                 extra = '*'
                 imgui.push_style_color(imgui.Col_.text, colors.error)
-            if imgui.tree_node_ex(f'{extra}{p.name} ({p.type.value})', imgui.TreeNodeFlags_.framed):
+            if imgui.tree_node_ex(f'{extra}{lbl}###{lbl}', imgui.TreeNodeFlags_.framed):
                 if missing_fields:
                     imgui.pop_style_color()
                 changed, _, new_p = settings_editor.draw_dict_editor(copy.deepcopy(p), type(p), 0, list(plane.definition_parameter_types[p.type].keys()), plane.definition_parameter_types[p.type], plane.definition_defaults[p.type], mark = missing_fields)
