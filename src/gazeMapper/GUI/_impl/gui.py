@@ -418,25 +418,18 @@ class GUI:
             if missing_fields:
                 extra = '*'
                 imgui.push_style_color(imgui.Col_.text, colors.error)
-            if (opened:=imgui.tree_node_ex(f'{extra}{p.name} ({p.type.value})', imgui.TreeNodeFlags_.framed)):
+            if imgui.tree_node_ex(f'{extra}{p.name} ({p.type.value})', imgui.TreeNodeFlags_.framed):
                 if missing_fields:
                     imgui.pop_style_color()
-                changed, _, new_p = settings_editor.draw_dict_editor(copy.deepcopy(p), type(p), 0, plane.definition_valid_fields[p.type], plane.definition_parameter_types, plane.definition_defaults[p.type], mark = missing_fields)
+                changed, _, new_p = settings_editor.draw_dict_editor(copy.deepcopy(p), type(p), 0, list(plane.definition_parameter_types[p.type].keys()), plane.definition_parameter_types[p.type], plane.definition_defaults[p.type], mark = missing_fields)
                 if changed:
-                    try:
-                        new_p.aruco_dict = None
-                        new_p._do_checks()
-                    except Exception as e:
-                        # do not persist invalid config, inform user of problem
-                        utils.push_popup(self, msgbox.msgbox, "Settings error", f"You cannot make this change to the settings for plane {p.name}:\n{e}", msgbox.MsgBox.error)
-                    else:
-                        # persist changed config
-                        self.study_config.planes[i] = new_p
-                        new_p.store_as_json(config.guess_config_dir(self.study_config.working_directory)/p.name)
+                    # persist changed config
+                    self.study_config.planes[i] = new_p
+                    new_p.store_as_json(config.guess_config_dir(self.study_config.working_directory)/p.name)
                 if imgui.button(ifa6.ICON_FA_TRASH_CAN+' delete plane'):
                     callbacks.delete_plane(self.study_config, p)
                 imgui.tree_pop()
-            if not opened and missing_fields:
+            elif missing_fields:
                 imgui.pop_style_color()
         if imgui.button('+ new plane'):
             new_plane_name = ''
