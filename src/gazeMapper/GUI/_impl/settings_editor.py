@@ -153,7 +153,7 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
     if typing.is_typeddict(o_type):
         types = o_type.__annotations__
         fields = list(types.keys())
-    if typed_dict_defaults.is_typeddictdefault(o_type):
+    elif typed_dict_defaults.is_typeddictdefault(o_type):
         types = o_type.__annotations__
         fields = list(types.keys())
         defaults = o_type._field_defaults.copy()
@@ -163,7 +163,6 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
         defaults = o_type._field_defaults.copy()
     else:
         all_fields = None
-        types = None
         all_type = None
         kv_type = typing.get_args(o_type)
         if possible_value_getter:
