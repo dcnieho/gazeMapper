@@ -30,7 +30,7 @@ def draw(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: di
     if not fields:
         return
 
-    table_is_started, changed, _, obj = _draw_impl(obj, fields, types, defaults, possible_value_getters, [])
+    table_is_started, changed, _, obj = _draw_impl(obj, fields, types, defaults, possible_value_getters, {})
     if table_is_started:
         imgui.end_table()
 
@@ -213,7 +213,7 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
     table_is_started = _start_table(level, first_column_width)
     if not table_is_started:
         return False, made_or_replaced_obj, obj
-    table_is_started, changed, ret_new_obj, obj = _draw_impl(obj, fields, types, defaults, {}, mark, level, table_is_started)
+    table_is_started, changed, ret_new_obj, obj = _draw_impl(obj, fields, types, defaults, {}, mark or {}, level, table_is_started)
     made_or_replaced_obj |= ret_new_obj
     if not table_is_started and has_add:
         table_is_started = _start_table(level, first_column_width)
