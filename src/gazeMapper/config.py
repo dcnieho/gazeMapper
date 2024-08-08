@@ -14,7 +14,7 @@ from . import marker, plane, session
 from .typed_dict_defaults import TypedDictDefault
 
 
-MarkDict = dict[str,typing.Union[None,'MarkDict']]
+MarkDict = dict[str,typing.Union[None,str,'MarkDict']]
 
 class AutoCodeSyncPoints(TypedDictDefault, total=False):
     markers         : list[int]
@@ -232,9 +232,9 @@ class Study:
         if self.sync_ref_recording is not None:
             for a in ['sync_ref_do_time_stretch', 'sync_ref_stretch_which', 'sync_ref_average_recordings']:
                 if getattr(self,a) is None:
-                    problems[a] = None
+                    problems[a] = f'{a} should be set when sync_ref_recording is set'
             if self.sync_ref_average_recordings and self.sync_ref_recording in self.sync_ref_average_recordings:
-                problems['sync_ref_average_recordings'] is None
+                problems['sync_ref_average_recordings'] = f'Recording {self.sync_ref_recording} is the reference recording for sync, should not be specified in sync_average_recordings'
         return problems
 
     def store_as_json(self, path: str|pathlib.Path|None=None):

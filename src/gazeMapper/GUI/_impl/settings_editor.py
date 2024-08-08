@@ -156,7 +156,10 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
             if not table_is_started:
                 continue
 
-        this_changed, new_f_obj, removed = _draw_field(f, obj, base_type, f_type, nullable, defaults.get(f,None), mark=mark and f in mark, has_remove=has_remove)
+        this_mark = False
+        if f in mark:
+            this_mark = mark[f] if mark[f] is not None else True
+        this_changed, new_f_obj, removed = _draw_field(f, obj, base_type, f_type, nullable, defaults.get(f,None), mark=this_mark, has_remove=has_remove)
         if removed:
             removed_field = f
         changed |= this_changed
@@ -337,7 +340,7 @@ def _start_table(level, first_column_width):
     imgui.table_setup_column("value", imgui.TableColumnFlags_.width_stretch)
     return table_is_started
 
-def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type, nullable: bool, default: _T|None, mark: bool, has_remove: bool) -> bool:
+def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type, nullable: bool, default: _T|None, mark: bool|str, has_remove: bool) -> bool:
     imgui.table_next_row()
     imgui.table_next_column()
     val = obj.get(field,f_type()) if isinstance(obj,dict) else getattr(obj,field)
@@ -350,6 +353,8 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
     if mark:
         imgui.align_text_to_frame_padding()
         imgui.text_colored(colors.error, field_lbl)
+        if isinstance(mark,str):
+            utils.draw_hover_text(mark,text='', hovered_flags=imgui.HoveredFlags_.for_tooltip | imgui.HoveredFlags_.delay_normal)
     elif is_default:
         imgui.align_text_to_frame_padding()
         imgui.text_colored(imgui.ImVec4(*color_darken(imgui.ImColor(imgui.get_style_color_vec4(imgui.Col_.text)), .75)), field_lbl)
