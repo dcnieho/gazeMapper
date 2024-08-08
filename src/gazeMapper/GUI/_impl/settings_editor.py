@@ -359,7 +359,10 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
     new_edit = False
     removed = False
     if val is None and _draw_field.should_edit_id and _draw_field.should_edit_id==imgui.get_id(field_lbl):
-        val = f_type()
+        if base_type==typing.Literal:
+            val = typing.get_args(f_type)[0]
+        else:
+            val = f_type()
         _draw_field.should_edit_id = None
         new_edit = True
     match base_type:
