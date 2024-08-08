@@ -138,6 +138,8 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
             if imgui.tree_node_ex(f,imgui.TreeNodeFlags_.framed):
                 if mark and f in mark:
                     imgui.pop_style_color()
+                    if isinstance(mark[f],str):
+                        utils.draw_hover_text(mark[f],text='', hovered_flags=imgui.HoveredFlags_.for_tooltip | imgui.HoveredFlags_.delay_normal)
                 this_changed, made_obj, new_sub_obj = draw_dict_editor(obj.get(f,None) if isinstance(obj,dict) else getattr(obj,f), f_type, level+1, possible_value_getter=possible_value_getters.get(f,None), mark=mark.get(f,None))
                 changed |= this_changed
                 if this_changed and made_obj:
