@@ -180,13 +180,13 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
     if typing.is_typeddict(o_type):
         types = o_type.__annotations__
         fields = list(types.keys())
-        if not mark:
+        if not mark and not made_or_replaced_obj:   # don't mark as error if the obj was unset (None)
             mark = {k:f'{k} is required' for k in o_type.__required_keys__ if k not in obj}
     elif typed_dict_defaults.is_typeddictdefault(o_type):
         types = o_type.__annotations__
         fields = list(types.keys())
         defaults = o_type._field_defaults.copy()
-        if not mark:
+        if not mark and not made_or_replaced_obj:   # don't mark as error if the obj was unset (None)
             mark = {k:f'{k} is required' for k in o_type.__required_keys__ if k not in obj}
     elif is_NamedTuple_type(o_type):
         types = o_type.__annotations__
