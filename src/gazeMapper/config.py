@@ -176,8 +176,8 @@ class Study:
                 raise ValueError(f'Recording {self.sync_ref_recording} is the reference recording for sync, should not be specified in sync_average_recordings')
         if self.get_cam_movement_for_et_sync_method not in ['','plane','function']:
             raise ValueError('get_cam_movement_for_et_sync_method parameter should be an empty string, "plane", or "function"')
-        if self.get_cam_movement_for_et_sync_method=='function':
-            if not all([x in self.get_cam_movement_for_et_sync_function for x in ["module_or_file","function","parameters"]]):
+        if on_construct and self.get_cam_movement_for_et_sync_method=='function':
+            if not self.get_cam_movement_for_et_sync_function or not all([x in self.get_cam_movement_for_et_sync_function for x in ["module_or_file","function","parameters"]]):
                 raise ValueError('if get_cam_movement_for_et_sync_method is set to "function", get_cam_movement_for_et_sync_function should be a dict specifying "module_or_file", "function", and "parameters"')
         for e in self.planes_per_episode:
             if e not in self.episodes_to_code:
@@ -228,7 +228,7 @@ class Study:
         problems: MarkDict = {}
         if self.get_cam_movement_for_et_sync_method=='function':
             t = utils.unpack_none_union(study_parameter_types['get_cam_movement_for_et_sync_function'])[0]
-            problems['get_cam_movement_for_et_sync_function'] = {k:None for k in t.__required_keys__ if k not in self.get_cam_movement_for_et_sync_function or (k!='parameters' and not self.get_cam_movement_for_et_sync_function[k])}
+            problems['get_cam_movement_for_et_sync_function'] = {k:f'{k} should be set when get_cam_movement_for_et_sync_function is set to "function"' for k in t.__required_keys__ if not self.get_cam_movement_for_et_sync_function or k not in self.get_cam_movement_for_et_sync_function or (k!='parameters' and not self.get_cam_movement_for_et_sync_function[k])}
         if self.sync_ref_recording is not None:
             for a in ['sync_ref_do_time_stretch', 'sync_ref_stretch_which', 'sync_ref_average_recordings']:
                 if getattr(self,a) is None:
