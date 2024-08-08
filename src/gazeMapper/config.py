@@ -158,20 +158,21 @@ class Study:
         self.video_show_gaze_vec_in_other                   = video_show_gaze_vec_in_other
         self.video_gaze_to_plane_margin                     = video_gaze_to_plane_margin    # fraction of plane size, added to each side of the plane
 
-        self._check_all()
+        self._check_all(on_construct=True)
 
-    def _check_all(self):
+    def _check_all(self, on_construct=False):
         self._check_planes_per_episode()
         self._check_auto_markers()
         self._check_recordings(self.video_make_which, 'video_make_which')
         self._check_recordings(self.video_recording_colors, 'video_recording_colors')
         if self.sync_ref_recording is not None:
             self._check_recordings([self.sync_ref_recording], 'sync_ref_recording')
-            for a in ['sync_ref_do_time_stretch', 'sync_ref_stretch_which', 'sync_ref_average_recordings']:
-                if getattr(self,a) is None:
-                    raise ValueError(f'{a} should be set in the study setup when sync_ref_recording is set')
+            if on_construct:
+                for a in ['sync_ref_do_time_stretch', 'sync_ref_stretch_which', 'sync_ref_average_recordings']:
+                    if getattr(self,a) is None:
+                        raise ValueError(f'{a} should be set in the study setup when sync_ref_recording is set')
             self._check_recordings(self.sync_ref_average_recordings, 'sync_average_recordings')
-            if self.sync_ref_recording in self.sync_ref_average_recordings:
+            if on_construct and self.sync_ref_recording in self.sync_ref_average_recordings:
                 raise ValueError(f'Recording {self.sync_ref_recording} is the reference recording for sync, should not be specified in sync_average_recordings')
         if self.get_cam_movement_for_et_sync_method not in ['','plane','function']:
             raise ValueError('get_cam_movement_for_et_sync_method parameter should be an empty string, "plane", or "function"')
@@ -228,6 +229,12 @@ class Study:
         if self.get_cam_movement_for_et_sync_method=='function':
             t = utils.unpack_none_union(study_parameter_types['get_cam_movement_for_et_sync_function'])[0]
             problems['get_cam_movement_for_et_sync_function'] = {k:None for k in t.__required_keys__ if k not in self.get_cam_movement_for_et_sync_function or (k!='parameters' and not self.get_cam_movement_for_et_sync_function[k])}
+        if self.sync_ref_recording is not None:
+            for a in ['sync_ref_do_time_stretch', 'sync_ref_stretch_which', 'sync_ref_average_recordings']:
+                if getattr(self,a) is None:
+                    problems[a] = None
+            if self.sync_ref_average_recordings and self.sync_ref_recording in self.sync_ref_average_recordings:
+                problems['sync_ref_average_recordings'] is None
         return problems
 
     def store_as_json(self, path: str|pathlib.Path|None=None):
