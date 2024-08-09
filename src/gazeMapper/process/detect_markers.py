@@ -132,7 +132,7 @@ def _get_plane_setup(study_config: config.Study,
     for p in planes:
         p_def = [pl for pl in study_config.planes if pl.name==p][0]
         pl = plane.get_plane_from_definition(p_def, config_dir/p)
-        planes_setup[p] = {'plane': pl, 'aruco_dict': p_def.aruco_dict, 'aruco_params': {'markerBorderBits': p_def.marker_border_bits}, 'min_num_markers': p_def.min_num_markers}
+        planes_setup[p] = {'plane': pl} | plane.get_plane_setup(p_def, config_dir/p)
         if episodes:
             # determine for which frames this plane should be used
             anal_episodes = [k for k in study_config.planes_per_episode if p in study_config.planes_per_episode[k]]

@@ -153,3 +153,17 @@ def get_plane_from_definition(plane_def: Definition, path: str | pathlib.Path) -
         if plane_def.origin is not None:
             pl.set_origin(plane_def.origin)
         return pl
+
+def get_plane_setup(plane_def: Definition, path: str | pathlib.Path):
+    if plane_def.type==Type.GlassesValidator:
+        validator_config_dir = None # use glassesValidator built-in/default
+        if not plane_def.use_default:
+            validator_config_dir = path
+        validation_setup = get_validation_setup(validator_config_dir)
+        return {'aruco_dict': Poster.default_aruco_dict,
+                'aruco_params': {'markerBorderBits': validation_setup['markerBorderBits']},
+                'min_num_markers': validation_setup['minNumMarkers']}
+    else:
+        return {'aruco_dict': plane_def.aruco_dict,
+                'aruco_params': {'markerBorderBits': plane_def.marker_border_bits},
+                'min_num_markers': plane_def.min_num_markers}
