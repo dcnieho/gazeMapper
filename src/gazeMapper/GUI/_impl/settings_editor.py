@@ -326,7 +326,7 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
             utils.push_popup(_gui_instance, lambda: utils.popup("Add item", _add_item_popup, buttons = buttons, outside=False))
     if table_is_started:
         imgui.end_table()
-    if nullable:
+    if nullable and not made_or_replaced_obj:
         if has_add:
             imgui.same_line()
         if imgui.button(ifa6.ICON_FA_HANDS_BUBBLES+ f' unset group'):
@@ -335,7 +335,7 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
             changed = True
     removed = False
     if removable:
-        if has_add or nullable:
+        if has_add or (nullable and not made_or_replaced_obj):
             imgui.same_line()
         if imgui.button(ifa6.ICON_FA_TRASH_CAN+f' remove group'):
             removed = True
