@@ -9,7 +9,7 @@ from imgui_bundle import imgui, imgui_md, icons_fontawesome_6 as ifa6
 from glassesTools.timeline_gui import color_darken
 from glassesTools import utils as gt_utils
 
-from ... import plane, typed_dict_defaults, types as _types
+from ... import typed_dict_defaults, types as _types
 from . import colors, utils
 
 def is_NamedTuple_type(x):
