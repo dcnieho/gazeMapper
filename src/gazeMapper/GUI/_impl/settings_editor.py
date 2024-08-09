@@ -293,8 +293,8 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
                     imgui.table_next_column()
                     imgui.set_next_item_width(-1)
                     if missing_fields:
-                        items = sorted(list(missing_fields), key=lambda x: x.value)
-                        items_str = [x.value for x in items]
+                        items = sorted(list(missing_fields), key=lambda x: x.value if isinstance(x, enum.Enum) else x)
+                        items_str = [x.value if isinstance(x, enum.Enum) else str(x) for x in items]
                         idx = items.index(new_item_name) if new_item_name else -1
                         _,idx = imgui.combo("##item_selector", idx, items_str)
                         new_item_name = None if idx==-1 else items[idx]
