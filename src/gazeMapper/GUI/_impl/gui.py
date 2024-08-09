@@ -265,6 +265,8 @@ class GUI:
 
         def _get_known_recordings() -> set[str]:
             return {r.name for r in self.study_config.session_def.recordings}
+        def _get_known_individual_markers() -> set[str]:
+            return {m.id for m in self.study_config.individual_markers}
         def _get_known_planes() -> set[str]:
             return {p.name for p in self.study_config.planes}
         self._possible_value_getters = {
@@ -272,7 +274,9 @@ class GUI:
             'video_recording_colors': _get_known_recordings,
             'sync_ref_recording': _get_known_recordings,
             'sync_ref_average_recordings': _get_known_recordings,
-            'planes_per_episode': [lambda: self.study_config.episodes_to_code, _get_known_planes]
+            'planes_per_episode': [lambda: self.study_config.episodes_to_code, _get_known_planes],
+            'auto_code_sync_points': {'markers': _get_known_individual_markers},
+            'auto_code_trial_episodes': {'start_markers': _get_known_individual_markers, 'end_markers': _get_known_individual_markers}
         }
 
         self._need_set_window_title = True
