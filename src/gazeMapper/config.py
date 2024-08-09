@@ -308,7 +308,7 @@ class Study:
 
         return Study(sess_def, planes, working_directory=path.parent, **kwds)
 
-# get defaults for default argument of study constructor
+# get defaults for default argument of Study constructor
 _params = inspect.signature(Study.__init__).parameters
 study_defaults = {k:d for k in _params if (d:=_params[k].default)!=inspect._empty}
 study_parameter_types = {k:_params[k].annotation for k in _params if k!='self'}
