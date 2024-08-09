@@ -16,7 +16,7 @@ import OpenGL.GL as gl
 import glassesTools
 import glassesValidator
 
-from ... import config, plane, session, version
+from ... import config, marker, plane, session, version
 from .. import async_thread
 from . import callbacks, colors, filepicker, msgbox, settings_editor, utils
 
@@ -593,21 +593,40 @@ class GUI:
                 self.study_config.store_as_json()
 
     def _individual_marker_setup_pane_drawer(self):
-        table_is_started = imgui.begin_table(f"##markers_def_list", 2)
+        table_is_started = imgui.begin_table(f"##markers_def_list", 4)
         if not table_is_started:
             return
         imgui.table_setup_column("marker ID", imgui.TableColumnFlags_.width_fixed)
-        imgui.table_setup_column("size", imgui.TableColumnFlags_.width_stretch)
+        imgui.table_setup_column("size", imgui.TableColumnFlags_.width_fixed)
+        imgui.table_setup_column("aruco_dict", imgui.TableColumnFlags_.width_fixed)
+        imgui.table_setup_column("marker_border_bits", imgui.TableColumnFlags_.width_stretch)
         imgui.table_headers_row()
+        changed = False
         for m in self.study_config.individual_markers:
             imgui.table_next_row()
             imgui.table_next_column()
             imgui.text(str(m.id))
             imgui.table_next_column()
-            imgui.text(str(m.size))
+            imgui.set_next_item_width(imgui.calc_text_size('xxxxx.xxxxxx').x+2*imgui.get_style().frame_padding.x)
+            new_val = settings_editor.draw_value(f'size_{m.id}', m.size, marker.marker_parameter_types['size'], False, marker.marker_defaults.get('size',None), False, False)[0]
+            if (this_changed:=m.size!=new_val):
+                m.size = new_val
+                changed |= this_changed
+            imgui.table_next_column()
+            new_val = settings_editor.draw_value(f'aruco_dict_{m.id}', m.aruco_dict, marker.marker_parameter_types['aruco_dict'], False, marker.marker_defaults.get('aruco_dict',None), False, False)[0]
+            if (this_changed:=m.aruco_dict!=new_val):
+                m.aruco_dict = new_val
+                changed |= this_changed
+            imgui.table_next_column()
+            new_val = settings_editor.draw_value(f'marker_border_bits_{m.id}', m.marker_border_bits, marker.marker_parameter_types['marker_border_bits'], False, marker.marker_defaults.get('marker_border_bits',None), False, False)[0]
+            if (this_changed:=m.marker_border_bits!=new_val):
+                m.marker_border_bits = new_val
+                changed |= this_changed
             imgui.same_line()
             if imgui.button(ifa6.ICON_FA_TRASH_CAN+f' delete marker##{m.id}'):
                 callbacks.delete_individual_marker(self.study_config, m)
+        if changed:
+            self.study_config.store_as_json()
         imgui.end_table()
         if imgui.button('+ new individual marker'):
             new_mark_id = -1
