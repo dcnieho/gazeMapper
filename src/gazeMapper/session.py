@@ -9,11 +9,11 @@ from glassesTools.recording import Recording as EyeTrackerRecording
 from . import camera_recording
 
 
-class RecordingType(Enum):
+class RecordingType(utils.AutoName):
     EyeTracker  = auto()
     Camera      = auto()
 utils.register_type(utils.CustomTypeEntry(RecordingType,'__enum.session.RecordingType__',str, lambda x: getattr(RecordingType, x.split('.')[1])))
-
+recording_types = [r for r in RecordingType]
 
 
 class RecordingDefinition:
