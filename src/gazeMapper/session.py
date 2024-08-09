@@ -74,7 +74,7 @@ class SessionDefinition:
     def load_from_json(path: str | pathlib.Path) -> 'Session':
         path = pathlib.Path(path)
         if path.is_dir():
-            path /= Session.default_json_file_name
+            path /= SessionDefinition.default_json_file_name
         with open(path, 'r') as f:
             kwds = json.load(f, object_hook=utils.json_reconstitute)
         return SessionDefinition(**kwds)
