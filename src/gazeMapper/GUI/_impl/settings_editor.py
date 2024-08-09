@@ -345,8 +345,10 @@ def _start_table(level, first_column_width):
 def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type, nullable: bool, default: _T|None, mark: bool|str, has_remove: bool) -> bool:
     imgui.table_next_row()
     imgui.table_next_column()
-    val = obj.get(field,None) if isinstance(obj,dict) else getattr(obj,field)
-    if val is None:
+    special_val = '**special_val_when_not_found'
+    val = obj.get(field,special_val) if isinstance(obj,dict) else getattr(obj,field)
+    is_none = val is None
+    if val==special_val:
         try:
             val = f_type()
         except:
@@ -417,7 +419,7 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
             new_val = values[p_idx]
         case _:
             imgui.text(f'type {f_type} not handled')
-    if nullable and val is not None:
+    if nullable and not is_none:
         imgui.same_line()
         if imgui.button(ifa6.ICON_FA_HANDS_BUBBLES+ f' unset##{field_lbl}'):
             new_val = None
