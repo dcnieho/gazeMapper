@@ -82,7 +82,7 @@ utils.register_type(utils.CustomTypeEntry(SessionDefinition,'__session.SessionDe
 
 
 class Session:
-    default_json_file_name = 'session_info.json'
+    marker_file_name = 'session.gazeMapper'
 
     @typeguard.typechecked
     def __init__(self, definition: SessionDefinition, name: str, working_directory: str|pathlib.Path|None = None, recordings: dict[str,Recording]|None = None):
@@ -97,6 +97,8 @@ class Session:
         self.working_directory = pathlib.Path(parent_directory) / self.name
         if not self.working_directory.is_dir():
             self.working_directory.mkdir()
+        if not (f:= self.working_directory/Session.marker_file_name).is_file():
+            f.touch()
 
     def import_and_add_recording(self, which: str, rec_info: EyeTrackerRecording|camera_recording.Recording, copy_video = True, source_dir_as_relative_path = False, cam_cal_file: str|pathlib.Path=None) -> Recording:
         rec_def = self.definition.get_recording_def(which)
