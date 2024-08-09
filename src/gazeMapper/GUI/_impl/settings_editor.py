@@ -413,13 +413,15 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
             imgui.text(f'{f_type}')
             new_val = val
         case typing.Literal:
-            values = typing.get_args(f_type)
+            values = list(typing.get_args(f_type))
+            if val is None:
+                values.insert(0,None)
             p_idx = values.index(val)
             str_values = values
             if f_type in val_to_str_registry:
-                str_values = [val_to_str_registry[f_type][v] for v in str_values]
+                str_values = ['' if v is None else val_to_str_registry[f_type][v] for v in str_values]
             elif not isinstance(str_values[0],str):
-                str_values = [str(v) for v in str_values]
+                str_values = ['' if v is None else str(v) for v in str_values]
             _,p_idx = imgui.combo(f"##{field}", p_idx, str_values, popup_max_height_in_items=min(10,len(values)))
             new_val = values[p_idx]
         case _:
