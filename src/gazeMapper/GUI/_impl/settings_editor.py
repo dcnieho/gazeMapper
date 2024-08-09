@@ -19,7 +19,7 @@ def is_NamedTuple_type(x):
           getattr(x, '_fields', None) is not None)
 
 val_to_str_registry: dict[typing.Type, dict[typing.Any, str]] = {
-    plane.ArucoDictType: plane.aruco_dicts_to_str
+    _types.ArucoDictType: _types.aruco_dicts_to_str
 }
 
 _C = typing.TypeVar("_C")

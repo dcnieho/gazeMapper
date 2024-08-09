@@ -19,9 +19,6 @@ class Type(utils.AutoName):
 utils.register_type(utils.CustomTypeEntry(Type,'__enum.plane.Type__',str, lambda x: getattr(Type, x.split('.')[1])))
 types = [p for p in Type]
 
-aruco_dicts_to_str = {getattr(cv2.aruco,k):k for k in ['DICT_4X4_50', 'DICT_4X4_100', 'DICT_4X4_250', 'DICT_4X4_1000', 'DICT_5X5_50', 'DICT_5X5_100', 'DICT_5X5_250', 'DICT_5X5_1000', 'DICT_6X6_50', 'DICT_6X6_100', 'DICT_6X6_250', 'DICT_6X6_1000', 'DICT_7X7_50', 'DICT_7X7_100', 'DICT_7X7_250', 'DICT_7X7_1000', 'DICT_ARUCO_ORIGINAL', 'DICT_APRILTAG_16H5', 'DICT_APRILTAG_25H9', 'DICT_APRILTAG_36H10', 'DICT_APRILTAG_36H11', 'DICT_ARUCO_MIP_36H12']}
-ArucoDictType = typing.Literal[tuple(aruco_dicts_to_str.keys())]
-
 class Definition:
     default_json_file_name = 'plane_def.json'
 
@@ -68,7 +65,7 @@ class Definition_GlassesValidator(Definition):
     @typeguard.typechecked(collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
     def __init__(self,
                  name               : str,
-                 aruco_dict         : ArucoDictType,
+                 aruco_dict         : _types.ArucoDictType,
                  marker_border_bits : int,
                  min_num_markers    : int,
                  ref_image_size     : int,
@@ -103,7 +100,7 @@ class Definition_Plane_2D(Definition):
                  plane_size         : plane.Coordinate      = plane.Coordinate(0., 0.), # should be set to something non-zero
                  origin             : plane.Coordinate      = plane.Coordinate(0., 0.),
                  unit               : str                   = '',
-                 aruco_dict         : ArucoDictType         = cv2.aruco.DICT_4X4_250,
+                 aruco_dict         : _types.ArucoDictType  = cv2.aruco.DICT_4X4_250,
                  ref_image_size     : int                   = 1920
                  ):
         super().__init__(Type.Plane_2D, name)
