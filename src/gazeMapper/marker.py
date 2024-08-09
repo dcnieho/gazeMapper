@@ -4,6 +4,7 @@ from typing import overload, Any
 from collections import defaultdict
 import typeguard
 import cv2
+import inspect
 
 from glassesTools import marker as gt_marker, utils
 
@@ -22,7 +23,20 @@ class Marker:
         self.size               = size
         self.aruco_dict         = aruco_dict
         self.marker_border_bits = marker_border_bits
-utils.register_type(utils.CustomTypeEntry(Marker,'__marker.Marker__',lambda x: {'id': x.id, 'size': x.size, 'aruco_dict': x.aruco_dict, 'marker_border_bits': x.marker_border_bits}, lambda x: Marker(**x)))
+
+    def _to_dict(self) -> dict[str,Any]:
+        out = {'id': self.id, 'size': self.size}
+        for f in ['aruco_dict', 'marker_border_bits']:
+            if (val:=getattr(self,f))!=marker_defaults[f]:
+                out[f] = val
+        return out
+
+utils.register_type(utils.CustomTypeEntry(Marker,'__marker.Marker__', Marker._to_dict, lambda x: Marker(**x)))
+# get defaults for default argument of Marker constructor
+_params = inspect.signature(Marker.__init__).parameters
+marker_defaults = {k:d for k in _params if (d:=_params[k].default)!=inspect._empty}
+marker_parameter_types = {k:_params[k].annotation for k in _params if k!='self'}
+del _params
 
 def get_marker_dict_from_list(markers: list[Marker]) -> dict[int,dict[str]]:
     out = {}
