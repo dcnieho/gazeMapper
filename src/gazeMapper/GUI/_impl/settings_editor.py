@@ -67,10 +67,13 @@ def _replace_type_arg(f_type: typing.Type, base_type: typing.Type, v_type, n_typ
         raise exc
     return f_type   # failed, but its ok, return unchanged
 
+def _get_base_type(f_type: typing.Type) -> typing.Type:
+    return typing.get_origin(f_type) or f_type  # for instance str[int]->str, and or for str->str
+
 def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_getter: typing.Callable[[],set[_T]]|None) -> tuple[bool, typing.Type, typing.Type, bool]:
     # peel off union with None, if any
     f_type, nullable = gt_utils.unpack_none_union(f_type)
-    base_type = typing.get_origin(f_type) or f_type  # for instance str[int]->str, and or for str->str
+    base_type = _get_base_type(f_type)
     if callable(possible_value_getter) or (isinstance(possible_value_getter, list) and all([callable(c) for c in possible_value_getter])):
         if not isinstance(possible_value_getter,list):
             possible_value_getter = [possible_value_getter]
@@ -356,7 +359,7 @@ def _start_table(level, first_column_width):
     imgui.table_setup_column("value", imgui.TableColumnFlags_.width_stretch)
     return table_is_started
 
-def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type, nullable: bool, default: _T|None, problem: bool|str, fixed: bool, has_remove: bool) -> bool:
+def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type, nullable: bool, default: typing.Any|None, problem: bool|str, fixed: bool, has_remove: bool) -> bool:
     imgui.table_next_row()
     imgui.table_next_column()
     special_val = '**special_val_when_not_found'
@@ -387,33 +390,51 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
     else:
         imgui_md.render(f'**{field_lbl}**')
     imgui.table_next_column()
+    new_val, new_edit, removed = draw_value(field_lbl, val, f_type, nullable, default, fixed, has_remove, is_none, base_type)
+
+    new_obj = None
+    if (changed := new_val!=val or new_edit):
+        if isinstance(obj,dict):
+            obj[field] = new_val
+        elif is_NamedTuple_type(type(obj)):
+            # tuples are immutable, have to return new instance
+            new_obj = obj._replace(**{field:new_val})
+        else:
+            setattr(obj,field,new_val)
+
+    return changed, new_obj, removed
+
+def draw_value(field_lbl: str, val: _T, f_type: typing.Type, nullable: bool, default: _T|None, fixed: bool, has_remove: bool, is_none=False, base_type: typing.Type=None) -> tuple[_T|None, bool, bool]:
+    if base_type is None:
+        base_type = _get_base_type(f_type)
+    is_default = val==default
     new_edit = False
     removed = False
-    if val is None and _draw_field.should_edit_id and _draw_field.should_edit_id==imgui.get_id(field_lbl):
+    if val is None and draw_value.should_edit_id and draw_value.should_edit_id==imgui.get_id(field_lbl):
         if base_type==typing.Literal:
             val = typing.get_args(f_type)[0]
         else:
             val = f_type()
-        _draw_field.should_edit_id = None
+        draw_value.should_edit_id = None
         new_edit = True
     match base_type:
         case _ if val is None:
             new_val = val
             imgui.text('<not set>, click to set')
             if imgui.is_item_clicked(imgui.MouseButton_.left):
-                _draw_field.should_edit_id = imgui.get_id(field_lbl)
+                draw_value.should_edit_id = imgui.get_id(field_lbl)
         case builtins.bool:
-            new_val = imgui.checkbox(f'##{field}', val)[1]
+            new_val = imgui.checkbox(f'##{field_lbl}', val)[1]
         case builtins.str:
-            new_val = imgui.input_text(f'##{field}', val)[1]
+            new_val = imgui.input_text(f'##{field_lbl}', val)[1]
         case typing.Union if f_type==typing.Union[str, pathlib.Path]:
-            new_val = imgui.input_text(f'##{field}', str(val))[1]
+            new_val = imgui.input_text(f'##{field_lbl}', str(val))[1]
             if isinstance(val,pathlib.Path):
                 new_val = pathlib.Path(new_val)
         case builtins.int:
-            new_val = imgui.input_int(f'##{field}', val)[1]
+            new_val = imgui.input_int(f'##{field_lbl}', val)[1]
         case builtins.float:
-            new_val = imgui.input_double(f'##{field}', val)[1]
+            new_val = imgui.input_double(f'##{field_lbl}', val)[1]
         case builtins.list | builtins.set:
             # temporary, this does not need a new level but a special input type
             # should be rendered as a tag list [A x][B x] with either text input if
@@ -431,10 +452,12 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
                 str_values = ['' if v is None else val_to_str_registry[f_type][v] for v in str_values]
             elif not isinstance(str_values[0],str):
                 str_values = ['' if v is None else str(v) for v in str_values]
-            _,p_idx = imgui.combo(f"##{field}", p_idx, str_values, popup_max_height_in_items=min(10,len(values)))
+            imgui.set_next_item_width(get_fields_text_width(str_values)+imgui.get_frame_height()+2*imgui.get_style().frame_padding.x)
+            _,p_idx = imgui.combo(f"##{field_lbl}", p_idx, str_values, popup_max_height_in_items=min(10,len(values)))
             new_val = values[p_idx]
         case _:
             imgui.text(f'type {f_type} not handled')
+            new_val = None
     if fixed:
         imgui.end_disabled()
     else:
@@ -451,15 +474,5 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
             if imgui.button(ifa6.ICON_FA_TRASH_CAN+f'##{field_lbl}'):
                 removed = True
 
-    new_obj = None
-    if (changed := new_val!=val or new_edit):
-        if isinstance(obj,dict):
-            obj[field] = new_val
-        elif is_NamedTuple_type(type(obj)):
-            # tuples are immutable, have to return new instance
-            new_obj = obj._replace(**{field:new_val})
-        else:
-            setattr(obj,field,new_val)
-
-    return changed, new_obj, removed
-_draw_field.should_edit_id = None
+    return new_val, new_edit, removed
+draw_value.should_edit_id = None
