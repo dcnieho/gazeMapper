@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 from .. import async_thread
-from . import file_actions, msgbox, utils
+from . import file_actions, msg_box, utils
 
 
 DRIVE_ICON = ifa6.ICON_FA_HARD_DRIVE
@@ -336,7 +336,7 @@ class FilePicker:
                     action_lbl = 'making the folder'
                 case 'rename_path':
                     action_lbl = 'renaming the folder or file'
-            utils.push_popup(self, msgbox.msgbox, "Action error", f'Something went wrong {action_lbl} {path}":\n{result}', msgbox.MsgBox.error)
+            utils.push_popup(self, msg_box.msgbox, "Action error", f'Something went wrong {action_lbl} {path}":\n{result}', msg_box.MsgBox.error)
 
         # trigger refresh of parent path where actions occurred
         self._request_listing(path.parent)

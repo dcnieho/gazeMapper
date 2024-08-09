@@ -6,7 +6,7 @@ import sys
 import pathlib
 from typing import Any, Callable
 
-from . import msgbox
+from . import msg_box
 from ... import config, session
 
 
@@ -212,7 +212,7 @@ def rand_num_str(len=8):
 
 def push_popup(gui, *args, bottom=False, **kwargs):
     if len(args) + len(kwargs) > 1:
-        if args[0] is popup or args[0] is msgbox.msgbox:
+        if args[0] is popup or args[0] is msg_box.msgbox:
             args = list(args)
             args[1] = args[1] + "##popup_" + rand_num_str()
         popup_func = functools.partial(*args, **kwargs)
