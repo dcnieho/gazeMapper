@@ -127,7 +127,7 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
     ret_new_obj = False
     removed_field = None
     for f in fields:
-        is_dict, base_type, f_type, nullable = _get_field_type(f, obj, types[f], possible_value_getters[f] if f in possible_value_getters else None)
+        is_dict, base_type, f_type, nullable = _get_field_type(f, obj, types[f], possible_value_getters.get(f,None) if possible_value_getters else None)
 
         if is_dict:
             if table_is_started:
@@ -140,7 +140,7 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
                     imgui.pop_style_color()
                     if isinstance(mark[f],str):
                         utils.draw_hover_text(mark[f],text='', hovered_flags=imgui.HoveredFlags_.for_tooltip | imgui.HoveredFlags_.delay_normal)
-                this_changed, made_obj, new_sub_obj = draw_dict_editor(obj.get(f,None) if isinstance(obj,dict) else getattr(obj,f), f_type, level+1, possible_value_getters=possible_value_getters.get(f,None), mark=mark.get(f,None))
+                this_changed, made_obj, new_sub_obj = draw_dict_editor(obj.get(f,None) if isinstance(obj,dict) else getattr(obj,f), f_type, level+1, possible_value_getters=possible_value_getters.get(f,None) if possible_value_getters else None, mark=mark.get(f,None))
                 changed |= this_changed
                 if this_changed and made_obj:
                     if isinstance(obj,dict):
