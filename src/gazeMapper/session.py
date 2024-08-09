@@ -153,9 +153,13 @@ class Session:
         return all([r.name in self.recordings for r in self.definition.recordings])
 
     @staticmethod
-    def from_definition(definition: SessionDefinition, path: str | pathlib.Path) -> 'Session':
+    def from_definition(definition: SessionDefinition|None, path: str | pathlib.Path) -> 'Session':
         # for loading a recording directory that doesn't contain a session json file
-        # use the provided definition instead
+        # use the provided definition instead. If no session definition, try to load it
+        if definition is None:
+            from . import config
+            config_dir = config.guess_config_dir(path)
+            definition = config.Study.load_from_json(config_dir).session_def
         sess = Session(definition, name=path.name, working_directory=path)
         sess.load_existing_recordings()
         return sess
