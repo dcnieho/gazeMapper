@@ -5,7 +5,7 @@ from imgui_bundle import icons_fontawesome_6 as ifa6
 
 
 from . import filepicker, msgbox, utils
-from ... import config, plane
+from ... import config, plane, session
 
 def get_folder_picker(g, reason: str):
     from . import gui
@@ -89,3 +89,17 @@ def delete_plane(study_config: config.Study, plane: plane.Definition):
     shutil.rmtree(p_dir)
     # remove from known planes
     study_config.planes = [p for p in study_config.planes if p.name!=plane.name]
+
+def make_recording(study_config: config.Study, r_type: session.RecordingType, name: str):
+    # append to defined recordings
+    study_config.session_def.recordings.append(session.RecordingDefinition(name,r_type))
+    # store config
+    path = config.guess_config_dir(study_config.working_directory)
+    study_config.session_def.store_as_json(path)
+
+def delete_recording(study_config: config.Study, recording: session.RecordingDefinition):
+    # remove from defined recordings
+    study_config.session_def.recordings = [r for r in study_config.session_def.recordings if r.name!=recording.name]
+    # store config
+    path = config.guess_config_dir(study_config.working_directory)
+    study_config.session_def.store_as_json(path)

@@ -414,6 +414,69 @@ class GUI:
     def _session_definition_pane_drawer(self):
         if not self.study_config.session_def.recordings:
             imgui.text_colored(colors.error,'*At minimum one recording should be defined')
+        table_is_started = imgui.begin_table(f"##session_def_list", 2)
+        if not table_is_started:
+            return
+        imgui.table_setup_column("recording", imgui.TableColumnFlags_.width_fixed, init_width_or_weight=settings_editor.get_fields_text_width([r.name for r in self.study_config.session_def.recordings]))
+        imgui.table_setup_column("type", imgui.TableColumnFlags_.width_stretch)
+        imgui.table_headers_row()
+        for i,r in enumerate(self.study_config.session_def.recordings):
+            imgui.table_next_row()
+            imgui.table_next_column()
+            imgui.text(r.name)
+            imgui.table_next_column()
+            imgui.text(r.type.value)
+            imgui.same_line()
+            if imgui.button(ifa6.ICON_FA_TRASH_CAN+f' delete recording##{r.name}'):
+                callbacks.delete_recording(self.study_config, r)
+        imgui.end_table()
+        if imgui.button('+ new recording'):
+            new_rec_name = ''
+            new_rec_type: session.RecordingType = None
+            def _valid_rec_name():
+                nonlocal new_rec_name
+                return new_rec_name and not any((r.name==new_rec_name for r in self.study_config.session_def.recordings))
+            def _add_rec_popup():
+                nonlocal new_rec_name
+                nonlocal new_rec_type
+                imgui.dummy((30*imgui.calc_text_size('x').x,0))
+                if imgui.begin_table("##new_rec_info",2):
+                    imgui.table_setup_column("##new_rec_infos_left", imgui.TableColumnFlags_.width_fixed)
+                    imgui.table_setup_column("##new_rec_infos_right", imgui.TableColumnFlags_.width_stretch)
+                    imgui.table_next_row()
+                    imgui.table_next_column()
+                    imgui.align_text_to_frame_padding()
+                    invalid = not _valid_rec_name()
+                    if invalid:
+                        imgui.push_style_color(imgui.Col_.text, colors.error)
+                    imgui.text("Recording name")
+                    if invalid:
+                        imgui.pop_style_color()
+                    imgui.table_next_column()
+                    imgui.set_next_item_width(-1)
+                    _,new_rec_name = imgui.input_text("##new_rec_name",new_rec_name)
+                    imgui.table_next_row()
+                    imgui.table_next_column()
+                    imgui.align_text_to_frame_padding()
+                    invalid = new_rec_type is None
+                    if invalid:
+                        imgui.push_style_color(imgui.Col_.text, colors.error)
+                    imgui.text("Recording type")
+                    if invalid:
+                        imgui.pop_style_color()
+                    imgui.table_next_column()
+                    imgui.set_next_item_width(-1)
+                    r_idx = session.recording_types.index(new_rec_type) if new_rec_type is not None else -1
+                    _,r_idx = imgui.combo("##rec_type_selector", r_idx, [r.value for r in session.RecordingType])
+                    new_rec_type = None if r_idx==-1 else session.recording_types[r_idx]
+                    imgui.end_table()
+                return 0 if imgui.is_key_released(imgui.Key.enter) else None
+
+            buttons = {
+                ifa6.ICON_FA_CHECK+" Create recording": (lambda: callbacks.make_recording(self.study_config, new_rec_type, new_rec_name), lambda: not _valid_rec_name() or new_rec_type is None),
+                ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
+            }
+            utils.push_popup(self, lambda: utils.popup("Add recording", _add_rec_popup, buttons = buttons, outside=False))
 
     def _plane_editor_pane_drawer(self):
         if not self.study_config.planes:
