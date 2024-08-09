@@ -5,7 +5,7 @@ from imgui_bundle import icons_fontawesome_6 as ifa6
 
 
 from . import filepicker, msgbox, utils
-from ... import config, plane, session
+from ... import config, marker, plane, session
 
 def get_folder_picker(g, reason: str):
     from . import gui
@@ -103,3 +103,15 @@ def delete_recording(study_config: config.Study, recording: session.RecordingDef
     # store config
     path = config.guess_config_dir(study_config.working_directory)
     study_config.session_def.store_as_json(path)
+
+def make_individual_marker(study_config: config.Study, mark_id: int, mark_size: float):
+    # append to defined recordings
+    study_config.individual_markers.append(marker.Marker(mark_id, mark_size))
+    # store config
+    study_config.store_as_json()
+
+def delete_individual_marker(study_config: config.Study, mark: marker.Marker):
+    # remove from defined individual markers
+    study_config.individual_markers = [m for m in study_config.individual_markers if m.id!=mark.id]
+    # store config
+    study_config.store_as_json()

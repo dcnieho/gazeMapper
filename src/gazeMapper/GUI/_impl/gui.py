@@ -420,7 +420,7 @@ class GUI:
         imgui.table_setup_column("recording", imgui.TableColumnFlags_.width_fixed, init_width_or_weight=settings_editor.get_fields_text_width([r.name for r in self.study_config.session_def.recordings]))
         imgui.table_setup_column("type", imgui.TableColumnFlags_.width_stretch)
         imgui.table_headers_row()
-        for i,r in enumerate(self.study_config.session_def.recordings):
+        for r in self.study_config.session_def.recordings:
             imgui.table_next_row()
             imgui.table_next_column()
             imgui.text(r.name)
@@ -584,7 +584,66 @@ class GUI:
                 self.study_config.store_as_json()
 
     def _individual_marker_setup_pane_drawer(self):
-        pass
+        table_is_started = imgui.begin_table(f"##markers_def_list", 2)
+        if not table_is_started:
+            return
+        imgui.table_setup_column("marker ID", imgui.TableColumnFlags_.width_fixed)
+        imgui.table_setup_column("size", imgui.TableColumnFlags_.width_stretch)
+        imgui.table_headers_row()
+        for m in self.study_config.individual_markers:
+            imgui.table_next_row()
+            imgui.table_next_column()
+            imgui.text(str(m.id))
+            imgui.table_next_column()
+            imgui.text(str(m.size))
+            imgui.same_line()
+            if imgui.button(ifa6.ICON_FA_TRASH_CAN+f' delete marker##{m.id}'):
+                callbacks.delete_individual_marker(self.study_config, m)
+        imgui.end_table()
+        if imgui.button('+ new individual marker'):
+            new_mark_id = -1
+            new_mark_size = -1.
+            def _valid_mark_id():
+                nonlocal new_mark_id
+                return new_mark_id>=0 and not any((m.id==new_mark_id for m in self.study_config.individual_markers))
+            def _add_rec_popup():
+                nonlocal new_mark_id
+                nonlocal new_mark_size
+                imgui.dummy((30*imgui.calc_text_size('x').x,0))
+                if imgui.begin_table("##new_mark_info",2):
+                    imgui.table_setup_column("##new_mark_infos_left", imgui.TableColumnFlags_.width_fixed)
+                    imgui.table_setup_column("##new_mark_infos_right", imgui.TableColumnFlags_.width_stretch)
+                    imgui.table_next_row()
+                    imgui.table_next_column()
+                    imgui.align_text_to_frame_padding()
+                    invalid = not _valid_mark_id()
+                    if invalid:
+                        imgui.push_style_color(imgui.Col_.text, colors.error)
+                    imgui.text("Marker ID")
+                    if invalid:
+                        imgui.pop_style_color()
+                    imgui.table_next_column()
+                    imgui.set_next_item_width(-1)
+                    _,new_mark_id = imgui.input_int("##new_mark_id",new_mark_id)
+                    imgui.table_next_row()
+                    imgui.table_next_column()
+                    imgui.align_text_to_frame_padding()
+                    invalid = new_mark_size<=0.
+                    if invalid:
+                        imgui.push_style_color(imgui.Col_.text, colors.error)
+                    imgui.text("Marker size")
+                    if invalid:
+                        imgui.pop_style_color()
+                    imgui.table_next_column()
+                    _,new_mark_size = imgui.input_float("##new_mark_size",new_mark_size)
+                    imgui.end_table()
+                return 0 if imgui.is_key_released(imgui.Key.enter) else None
+
+            buttons = {
+                ifa6.ICON_FA_CHECK+" Create marker": (lambda: callbacks.make_individual_marker(self.study_config, new_mark_id, new_mark_size), lambda: not _valid_mark_id() or new_mark_size<=0.),
+                ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
+            }
+            utils.push_popup(self, lambda: utils.popup("Add marker", _add_rec_popup, buttons = buttons, outside=False))
 
     def _about_popup_drawer(self):
         def popup_content():
