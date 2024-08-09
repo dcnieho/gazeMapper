@@ -354,7 +354,13 @@ def _start_table(level, first_column_width):
 def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type, nullable: bool, default: _T|None, mark: bool|str, has_remove: bool) -> bool:
     imgui.table_next_row()
     imgui.table_next_column()
-    val = obj.get(field,f_type()) if isinstance(obj,dict) else getattr(obj,field)
+    val = obj.get(field,None) if isinstance(obj,dict) else getattr(obj,field)
+    if val is None:
+        try:
+            val = f_type()
+        except:
+            # cannot get or construct val, fall back to None (e.g. happens when type is a literal)
+            val = None
     field_lbl = field
     if isinstance(field_lbl, enum.Enum):
         field_lbl = field_lbl.value
