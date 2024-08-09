@@ -20,7 +20,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
     study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir}, **study_settings)
     if annotation.Event.Trial not in study_config.planes_per_episode:
         raise ValueError('No planes are specified for mapping gaze to during trials, nothing to export')
-    planes = study_config.planes_per_episode[annotation.Event.Trial]
+    planes = list(study_config.planes_per_episode[annotation.Event.Trial])
 
     # get session info
     session_info = session.Session.load_from_json(working_dir)

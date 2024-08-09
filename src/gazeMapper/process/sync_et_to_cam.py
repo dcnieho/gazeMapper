@@ -66,7 +66,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
         case 'plane':
             if annotation.Event.Sync_ET_Data not in study_config.planes_per_episode:
                 raise ValueError(f'No plane specified for syncing eye tracker data to the scene cam, cannot continue')
-            planes = study_config.planes_per_episode[annotation.Event.Sync_ET_Data]
+            planes = list(study_config.planes_per_episode[annotation.Event.Sync_ET_Data])
             if len(planes)!=1:
                 raise NotImplementedError("sync_et_to_cam only supports a single plane being used for synchronizing eye tracking data to the scene camera, contact developer if this is an issue")
             pln = planes[0]

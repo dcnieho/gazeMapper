@@ -75,8 +75,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
         planes: set[str] = set()
         for e in [annotation.Event.Validate, annotation.Event.Trial]:
             if e in study_config.planes_per_episode:
-                for p in study_config.planes_per_episode[e]:
-                    planes.add(p)
+                planes.update(study_config.planes_per_episode[e])
 
         # Read gaze on poster data, if available
         plane_files = [working_dir/f'{naming.world_gaze_prefix}{p}.tsv' for p in planes]

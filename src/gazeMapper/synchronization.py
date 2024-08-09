@@ -50,7 +50,7 @@ def get_sync_for_recs(working_dir: str|pathlib.Path, recs: str|list[str], ref_re
         # get stretch factor for each interval between two sync points
         if average_recordings:
             recs_gr = [r for r in recs if r not in average_recordings]
-            recs_gr.append(average_recordings)
+            recs_gr.append(list(average_recordings))
         else:
             recs_gr = recs
         for r in recs_gr:

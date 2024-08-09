@@ -18,7 +18,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
     study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent, config.OverrideLevel.Recording: working_dir}, **study_settings)
     if annotation.Event.Validate not in study_config.planes_per_episode:
         raise ValueError('No planes to use for validation are specified for the study, nothing to process')
-    planes = study_config.planes_per_episode[annotation.Event.Validate]
+    planes = list(study_config.planes_per_episode[annotation.Event.Validate])
 
     # get info about recording
     rec_def = study_config.session_def.get_recording_def(working_dir.name)
