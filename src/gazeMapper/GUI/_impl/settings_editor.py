@@ -140,7 +140,9 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
                     imgui.pop_style_color()
                     if isinstance(mark[f],str):
                         utils.draw_hover_text(mark[f],text='', hovered_flags=imgui.HoveredFlags_.for_tooltip | imgui.HoveredFlags_.delay_normal)
-                this_changed, made_obj, new_sub_obj = draw_dict_editor(obj.get(f,None) if isinstance(obj,dict) else getattr(obj,f), f_type, level+1, possible_value_getters=possible_value_getters.get(f,None) if possible_value_getters else None, mark=mark.get(f,None))
+                this_changed, made_obj, new_sub_obj, removed = draw_dict_editor(obj.get(f,None) if isinstance(obj,dict) else getattr(obj,f), f_type, level+1, possible_value_getters=possible_value_getters.get(f,None) if possible_value_getters else None, mark=mark.get(f,None), nullable=nullable, removable=has_remove)
+                if removed:
+                    removed_field = f
                 changed |= this_changed
                 if this_changed and made_obj:
                     if isinstance(obj,dict):
@@ -170,7 +172,7 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
             obj = new_f_obj
     return table_is_started, changed, ret_new_obj, obj, removed_field
 
-def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None, types: dict[typing.Any, typing.Type]=None, defaults:dict[typing.Any, typing.Any]=None, possible_value_getters: typing.Callable[[_T], set[typing.Any]]|list[typing.Callable[[_T], set[typing.Any]]]|dict[str,typing.Callable[[_T], set[typing.Any]]]=None, mark: MarkDict=None) -> tuple[bool,bool,_T]:
+def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None, types: dict[typing.Any, typing.Type]=None, defaults:dict[typing.Any, typing.Any]=None, possible_value_getters: typing.Callable[[_T], set[typing.Any]]|list[typing.Callable[[_T], set[typing.Any]]]|dict[str,typing.Callable[[_T], set[typing.Any]]]=None, mark: MarkDict=None, nullable=False, removable=False) -> tuple[bool,bool,_T]:
     made_or_replaced_obj = False
     if (made_or_replaced_obj := obj is None):
         obj = o_type()
@@ -325,8 +327,21 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
             utils.push_popup(_gui_instance, lambda: utils.popup("Add item", _add_item_popup, buttons = buttons, outside=False))
     if table_is_started:
         imgui.end_table()
+    if nullable:
+        if has_add:
+            imgui.same_line()
+        if imgui.button(ifa6.ICON_FA_HANDS_BUBBLES+ f' unset group'):
+            obj = None
+            made_or_replaced_obj = True
+            changed = True
+    removed = False
+    if removable:
+        if has_add or nullable:
+            imgui.same_line()
+        if imgui.button(ifa6.ICON_FA_TRASH_CAN+f' remove group'):
+            removed = True
 
-    return changed, made_or_replaced_obj, obj
+    return changed, made_or_replaced_obj, obj, removed
 draw_dict_editor.new_item = None
 
 def get_fields_text_width(fields: list[str], backup_str='xxxxx'):
