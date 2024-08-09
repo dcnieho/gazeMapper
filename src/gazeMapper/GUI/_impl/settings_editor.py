@@ -9,8 +9,7 @@ from imgui_bundle import imgui, imgui_md, icons_fontawesome_6 as ifa6
 from glassesTools.timeline_gui import color_darken
 from glassesTools import utils as gt_utils
 
-from ... import plane, typed_dict_defaults
-from ...config import MarkDict
+from ... import plane, typed_dict_defaults, types as _types
 from . import colors, utils
 
 def is_NamedTuple_type(x):
@@ -31,11 +30,11 @@ def set_gui_instance(gui):
     global _gui_instance
     _gui_instance = gui
 
-def draw(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[], set[typing.Any]]], mark: MarkDict|None=None) -> tuple[bool,_C]:
+def draw(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[], set[typing.Any]]], problems: _types.ProblemDict|None=None) -> tuple[bool,_C]:
     if not fields:
         return
 
-    table_is_started, changed, _, obj, _ = _draw_impl(obj, fields, types, defaults, possible_value_getters, mark or {})
+    table_is_started, changed, _, obj, _ = _draw_impl(obj, fields, types, defaults, possible_value_getters, problems or {})
     if table_is_started:
         imgui.end_table()
 
@@ -121,7 +120,7 @@ def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_get
             raise ValueError(f'type of {field} ({f_type}) not handled')
     return is_dict, base_type, f_type, nullable
 
-def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[], set[typing.Any]]], mark: MarkDict, level=0, table_is_started=False, has_remove=False) -> tuple[bool,bool,bool,_C,str|None]:
+def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[], set[typing.Any]]], problems: _types.ProblemDict, level=0, table_is_started=False, has_remove=False) -> tuple[bool,bool,bool,_C,str|None]:
     changed = False
     max_fields_width = get_fields_text_width(fields)*1.1   # 10% extra to be safe
     ret_new_obj = False
@@ -133,14 +132,14 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
             if table_is_started:
                 imgui.end_table()
                 table_is_started = False
-            if mark and f in mark:
+            if problems and f in problems:
                 imgui.push_style_color(imgui.Col_.text, colors.error)
             if imgui.tree_node_ex(f,imgui.TreeNodeFlags_.framed):
-                if mark and f in mark:
+                if problems and f in problems:
                     imgui.pop_style_color()
-                    if isinstance(mark[f],str):
-                        utils.draw_hover_text(mark[f],text='', hovered_flags=imgui.HoveredFlags_.for_tooltip | imgui.HoveredFlags_.delay_normal)
-                this_changed, made_obj, new_sub_obj, removed = draw_dict_editor(obj.get(f,None) if isinstance(obj,dict) else getattr(obj,f), f_type, level+1, possible_value_getters=possible_value_getters.get(f,None) if possible_value_getters else None, mark=mark.get(f,None), nullable=nullable, removable=has_remove)
+                    if isinstance(problems[f],str):
+                        utils.draw_hover_text(problems[f],text='', hovered_flags=imgui.HoveredFlags_.for_tooltip | imgui.HoveredFlags_.delay_normal)
+                this_changed, made_obj, new_sub_obj, removed = draw_dict_editor(obj.get(f,None) if isinstance(obj,dict) else getattr(obj,f), f_type, level+1, possible_value_getters=possible_value_getters.get(f,None) if possible_value_getters else None, problems=problems.get(f,None), nullable=nullable, removable=has_remove)
                 if removed:
                     removed_field = f
                 changed |= this_changed
@@ -150,7 +149,7 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
                     else:
                         setattr(obj,f,new_sub_obj)
                 imgui.tree_pop()
-            elif mark and f in mark:
+            elif problems and f in problems:
                 imgui.pop_style_color()
             continue
 
@@ -160,10 +159,10 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
             if not table_is_started:
                 continue
 
-        this_mark = False
-        if f in mark:
-            this_mark = mark[f] if mark[f] is not None else True
-        this_changed, new_f_obj, removed = _draw_field(f, obj, base_type, f_type, nullable, defaults.get(f,None), mark=this_mark, has_remove=has_remove)
+        this_problem = False
+        if f in problems:
+            this_problem = problems[f] if problems[f] is not None else True
+        this_changed, new_f_obj, removed = _draw_field(f, obj, base_type, f_type, nullable, defaults.get(f,None), problem=this_problem, has_remove=has_remove)
         if removed:
             removed_field = f
         changed |= this_changed
@@ -172,7 +171,7 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
             obj = new_f_obj
     return table_is_started, changed, ret_new_obj, obj, removed_field
 
-def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None, types: dict[typing.Any, typing.Type]=None, defaults:dict[typing.Any, typing.Any]=None, possible_value_getters: typing.Callable[[_T], set[typing.Any]]|list[typing.Callable[[_T], set[typing.Any]]]|dict[str,typing.Callable[[_T], set[typing.Any]]]=None, mark: MarkDict=None, nullable=False, removable=False) -> tuple[bool,bool,_T,bool]:
+def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None, types: dict[typing.Any, typing.Type]=None, defaults:dict[typing.Any, typing.Any]=None, possible_value_getters: typing.Callable[[_T], set[typing.Any]]|list[typing.Callable[[_T], set[typing.Any]]]|dict[str,typing.Callable[[_T], set[typing.Any]]]=None, problems: _types.ProblemDict=None, nullable=False, removable=False) -> tuple[bool,bool,_T,bool]:
     made_or_replaced_obj = False
     if (made_or_replaced_obj := obj is None):
         obj = o_type()
@@ -182,14 +181,14 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
     if typing.is_typeddict(o_type):
         types = o_type.__annotations__.copy()
         fields = list(types.keys())
-        if not mark and not made_or_replaced_obj:   # don't mark as error if the obj was unset (None)
-            mark = {k:f'{k} is required' for k in o_type.__required_keys__ if k not in obj}
+        if not problems and not made_or_replaced_obj:   # don't mark as problem if the obj was unset (None)
+            problems = {k:f'{k} is required' for k in o_type.__required_keys__ if k not in obj}
     elif typed_dict_defaults.is_typeddictdefault(o_type):
         types = o_type.__annotations__.copy()
         fields = list(types.keys())
         defaults = o_type._field_defaults.copy()
-        if not mark and not made_or_replaced_obj:   # don't mark as error if the obj was unset (None)
-            mark = {k:f'{k} is required' for k in o_type.__required_keys__ if k not in obj}
+        if not problems and not made_or_replaced_obj:   # don't mark as problem if the obj was unset (None)
+            problems = {k:f'{k} is required' for k in o_type.__required_keys__ if k not in obj}
     elif is_NamedTuple_type(o_type):
         types = o_type.__annotations__.copy()
         fields= list(o_type._fields)
@@ -237,7 +236,7 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
     table_is_started = _start_table(level, first_column_width)
     if not table_is_started:
         return False, made_or_replaced_obj, obj, False
-    table_is_started, changed, ret_new_obj, obj, removed_field = _draw_impl(obj, fields, types, defaults, possible_value_getters if isinstance(possible_value_getters,dict) else None, mark or {}, level, table_is_started, has_remove=has_remove)
+    table_is_started, changed, ret_new_obj, obj, removed_field = _draw_impl(obj, fields, types, defaults, possible_value_getters if isinstance(possible_value_getters,dict) else None, problems or {}, level, table_is_started, has_remove=has_remove)
     if removed_field:
         obj.pop(removed_field)
         changed = True
@@ -357,7 +356,7 @@ def _start_table(level, first_column_width):
     imgui.table_setup_column("value", imgui.TableColumnFlags_.width_stretch)
     return table_is_started
 
-def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type, nullable: bool, default: _T|None, mark: bool|str, has_remove: bool) -> bool:
+def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type, nullable: bool, default: _T|None, problem: bool|str, has_remove: bool) -> bool:
     imgui.table_next_row()
     imgui.table_next_column()
     special_val = '**special_val_when_not_found'
@@ -375,11 +374,11 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
     if not isinstance(field_lbl, str):
         field_lbl = str(field_lbl)
     is_default = val==default
-    if mark:
+    if problem:
         imgui.align_text_to_frame_padding()
         imgui.text_colored(colors.error, field_lbl)
-        if isinstance(mark,str):
-            utils.draw_hover_text(mark,text='', hovered_flags=imgui.HoveredFlags_.for_tooltip | imgui.HoveredFlags_.delay_normal)
+        if isinstance(problem,str):
+            utils.draw_hover_text(problem,text='', hovered_flags=imgui.HoveredFlags_.for_tooltip | imgui.HoveredFlags_.delay_normal)
     elif is_default or is_none:
         imgui.align_text_to_frame_padding()
         imgui.text_colored(imgui.ImVec4(*color_darken(imgui.ImColor(imgui.get_style_color_vec4(imgui.Col_.text)), .75)), field_lbl)

@@ -10,11 +10,10 @@ from typing import Any, Literal, TypedDict
 from glassesTools import annotation, utils
 from glassesValidator import process as gv_process
 
-from . import marker, plane, session
+from . import marker, plane, session, types
 from .typed_dict_defaults import TypedDictDefault
 
 
-MarkDict = dict[str,typing.Union[None,str,'MarkDict']]
 
 class AutoCodeSyncPoints(TypedDictDefault, total=False):
     markers         : list[int]
@@ -224,8 +223,8 @@ class Study:
     def _check_recording(self, rec: str) -> bool:
         return any([r.name==rec for r in self.session_def.recordings])
 
-    def wrong_fields(self) -> MarkDict:
-        problems: MarkDict = {}
+    def field_problems(self) -> types.ProblemDict:
+        problems: types.ProblemDict = {}
         if self.get_cam_movement_for_et_sync_method=='function':
             t = utils.unpack_none_union(study_parameter_types['get_cam_movement_for_et_sync_function'])[0]
             problems['get_cam_movement_for_et_sync_function'] = {k:f'{k} should be set when get_cam_movement_for_et_sync_function is set to "function"' for k in t.__required_keys__ if not self.get_cam_movement_for_et_sync_function or k not in self.get_cam_movement_for_et_sync_function or (k!='parameters' and not self.get_cam_movement_for_et_sync_function[k])}

@@ -10,6 +10,8 @@ from glassesTools import plane, utils
 from glassesValidator.config import get_validation_setup
 from glassesValidator.config.poster import Poster
 
+from . import types as _types
+
 
 class Type(utils.AutoName):
     GlassesValidator= auto()
@@ -31,7 +33,7 @@ class Definition:
         self.type               = type
         self.name               = name
 
-    def wrong_fields(self) -> dict[str,None|dict[str,None]]:
+    def field_problems(self) -> _types.ProblemDict:
         raise NotImplementedError()
     def has_complete_setup(self) -> bool:
         raise NotImplementedError()
@@ -68,7 +70,7 @@ class Definition_GlassesValidator(Definition):
         super().__init__(Type.GlassesValidator, name)
         self.use_default= use_default   # If True, denotes this is the default/built-in glassesValidator plane, if False, denotes custom settings are expected
 
-    def wrong_fields(self) -> dict[str,None|dict[str,None]]:
+    def field_problems(self) -> _types.ProblemDict:
         return {}
 
     def has_complete_setup(self) -> bool:
@@ -99,7 +101,7 @@ class Definition_Plane_2D(Definition):
         self.aruco_dict         = aruco_dict
         self.ref_image_size     = ref_image_size        # largest dimension
 
-    def wrong_fields(self) -> dict[str,None|dict[str,None]]:
+    def field_problems(self) -> _types.ProblemDict:
         wrong: dict[str,None|dict[str,None]] = {}
         for a in ['marker_file','marker_size','plane_size']:
             if not getattr(self,a):
@@ -109,7 +111,7 @@ class Definition_Plane_2D(Definition):
         return wrong
 
     def has_complete_setup(self) -> bool:
-        return not self.wrong_fields()
+        return not self.field_problems()
 
 def make(type: Type, name: str, **kwargs) -> Definition_GlassesValidator|Definition_Plane_2D:
     cls = Definition_GlassesValidator if type==Type.GlassesValidator else Definition_Plane_2D

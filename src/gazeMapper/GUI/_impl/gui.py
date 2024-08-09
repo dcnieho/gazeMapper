@@ -402,7 +402,7 @@ class GUI:
 
         # rest of settings handled here in a settings tree
         fields = [k for k in config.study_parameter_types.keys() if k in config.study_defaults]
-        changed, new_config = settings_editor.draw(copy.deepcopy(self.study_config), fields, config.study_parameter_types, config.study_defaults, self._possible_value_getters, self.study_config.wrong_fields())
+        changed, new_config = settings_editor.draw(copy.deepcopy(self.study_config), fields, config.study_parameter_types, config.study_defaults, self._possible_value_getters, self.study_config.field_problems())
         if changed:
             try:
                 new_config._check_all()
@@ -486,16 +486,16 @@ class GUI:
         if not self.study_config.planes:
             imgui.text_colored(colors.error,'*At minimum one plane should be defined')
         for i,p in enumerate(self.study_config.planes):
-            missing_fields = p.wrong_fields()
+            problem_fields = p.field_problems()
             extra = ''
             lbl = f'{p.name} ({p.type.value})'
-            if missing_fields:
+            if problem_fields:
                 extra = '*'
                 imgui.push_style_color(imgui.Col_.text, colors.error)
             if imgui.tree_node_ex(f'{extra}{lbl}###{lbl}', imgui.TreeNodeFlags_.framed):
-                if missing_fields:
+                if problem_fields:
                     imgui.pop_style_color()
-                changed, _, new_p, _ = settings_editor.draw_dict_editor(copy.deepcopy(p), type(p), 0, list(plane.definition_parameter_types[p.type].keys()), plane.definition_parameter_types[p.type], plane.definition_defaults[p.type], mark = missing_fields)
+                changed, _, new_p, _ = settings_editor.draw_dict_editor(copy.deepcopy(p), type(p), 0, list(plane.definition_parameter_types[p.type].keys()), plane.definition_parameter_types[p.type], plane.definition_defaults[p.type], problems = problem_fields)
                 if changed:
                     # persist changed config
                     self.study_config.planes[i] = new_p
@@ -505,7 +505,7 @@ class GUI:
                 if imgui.button(ifa6.ICON_FA_TRASH_CAN+' delete plane'):
                     callbacks.delete_plane(self.study_config, p)
                 imgui.tree_pop()
-            elif missing_fields:
+            elif problem_fields:
                 imgui.pop_style_color()
         if imgui.button('+ new plane'):
             new_plane_name = ''
