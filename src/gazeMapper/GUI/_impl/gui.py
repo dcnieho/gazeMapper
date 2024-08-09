@@ -427,8 +427,10 @@ class GUI:
         for r in self.study_config.session_def.recordings:
             imgui.table_next_row()
             imgui.table_next_column()
+            imgui.align_text_to_frame_padding()
             imgui.text(r.name)
             imgui.table_next_column()
+            imgui.align_text_to_frame_padding()
             imgui.text(r.type.value)
             imgui.same_line()
             if imgui.button(ifa6.ICON_FA_TRASH_CAN+f' delete recording##{r.name}'):
@@ -605,6 +607,7 @@ class GUI:
         for m in self.study_config.individual_markers:
             imgui.table_next_row()
             imgui.table_next_column()
+            imgui.align_text_to_frame_padding()
             imgui.text(str(m.id))
             imgui.table_next_column()
             imgui.set_next_item_width(imgui.calc_text_size('xxxxx.xxxxxx').x+2*imgui.get_style().frame_padding.x)
