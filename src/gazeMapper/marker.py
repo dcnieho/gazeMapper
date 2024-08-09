@@ -3,18 +3,26 @@ import pandas as pd
 from typing import overload, Any
 from collections import defaultdict
 import typeguard
+import cv2
 
 from glassesTools import marker as gt_marker, utils
 
-from . import naming
+from . import naming, types as _types
 
 
 class Marker:
     @typeguard.typechecked
-    def __init__(self, id:int, size:float):
-        self.id     = id
-        self.size   = size
-utils.register_type(utils.CustomTypeEntry(Marker,'__marker.Marker__',lambda x: {'id': x.id, 'size': x.size}, lambda x: Marker(**x)))
+    def __init__(self,
+                 id                 : int,
+                 size               : float,
+                 aruco_dict         : _types.ArucoDictType = cv2.aruco.DICT_4X4_250,
+                 marker_border_bits : int                  = 1
+                 ):
+        self.id                 = id
+        self.size               = size
+        self.aruco_dict         = aruco_dict
+        self.marker_border_bits = marker_border_bits
+utils.register_type(utils.CustomTypeEntry(Marker,'__marker.Marker__',lambda x: {'id': x.id, 'size': x.size, 'aruco_dict': x.aruco_dict, 'marker_border_bits': x.marker_border_bits}, lambda x: Marker(**x)))
 
 def get_marker_dict_from_list(markers: list[Marker]) -> dict[int,dict[str]]:
     out = {}
