@@ -123,7 +123,7 @@ def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_get
 
 def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[], set[typing.Any]]], mark: MarkDict, level=0, table_is_started=False, has_remove=False) -> tuple[bool,bool,bool,_C,str|None]:
     changed = False
-    max_fields_width = _get_fields_text_width(fields)*1.1   # 10% extra to be safe
+    max_fields_width = get_fields_text_width(fields)*1.1   # 10% extra to be safe
     ret_new_obj = False
     removed_field = None
     for f in fields:
@@ -231,7 +231,7 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
     if defaults is None:
         defaults = {}
 
-    first_column_width = max([_get_fields_text_width(fields, backup_str='xadd itemx'), _get_fields_text_width(['xadd itemx'])])*1.1
+    first_column_width = max([get_fields_text_width(fields, backup_str='xadd itemx'), get_fields_text_width(['xadd itemx'])])*1.1
     table_is_started = _start_table(level, first_column_width)
     if not table_is_started:
         return False, made_or_replaced_obj, obj
@@ -329,7 +329,7 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
     return changed, made_or_replaced_obj, obj
 draw_dict_editor.new_item = None
 
-def _get_fields_text_width(fields: list[str], backup_str='xxxxx'):
+def get_fields_text_width(fields: list[str], backup_str='xxxxx'):
     if fields and isinstance(fields[0], enum.Enum):
         fields = [f.value for f in fields]
     return max([imgui.calc_text_size(f) for f in fields], key=lambda x: x.x, default=imgui.calc_text_size(backup_str)).x
