@@ -70,9 +70,9 @@ def try_load_project(g, path: str|pathlib.Path, action='loading'):
             }
             utils.push_popup(g, msgbox.msgbox, "Create new project", "The selected folder is empty. Do you want to use it as a new project folder?", msgbox.MsgBox.warn, buttons)
 
-def make_plane(study_config: config.Study, type: plane.Type, name: str):
+def make_plane(study_config: config.Study, p_type: plane.Type, name: str):
     # make plane
-    p_def = plane.make(type, name)
+    p_def = plane.make(p_type, name)
     # store to file
     path = config.guess_config_dir(study_config.working_directory)
     p_dir = path / p_def.name
