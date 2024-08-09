@@ -35,6 +35,8 @@ class Definition:
 
     def field_problems(self) -> _types.ProblemDict:
         raise NotImplementedError()
+    def fixed_fields(self) -> _types.NestedDict:
+        raise NotImplementedError()
     def has_complete_setup(self) -> bool:
         raise NotImplementedError()
 
@@ -43,7 +45,7 @@ class Definition:
         if path.is_dir():
             path /= self.default_json_file_name
         with open(path, 'w') as f:
-            to_dump = {k:getattr(self,k) for k in vars(self) if not k.startswith('_') and k not in ['name']}    # name will be populated from the provided path
+            to_dump = {k:getattr(self,k) for k in vars(self) if not k.startswith('_') and k not in ['name']+list(self.fixed_fields().keys())}    # name will be populated from the provided path
             # filter out defaulted
             to_dump = {k:v for k in to_dump if (v:=to_dump[k]) is not None and (k not in definition_defaults[self.type] or definition_defaults[self.type][k]!=v)}
             json.dump(to_dump, f, cls=utils.CustomTypeEncoder, indent=2)
@@ -59,19 +61,33 @@ class Definition:
         for k in ['plane_size', 'origin']:
             if k in kwds:
                 kwds[k] = plane.Coordinate(*kwds[k])
-        return make(name=path.parent.name, **kwds)
+        kwds['p_type'] = kwds.pop('type')
+        return make(path=path.parent, name=path.parent.name, **kwds)
 
 class Definition_GlassesValidator(Definition):
     @typeguard.typechecked(collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
     def __init__(self,
                  name               : str,
+                 aruco_dict         : ArucoDictType,
+                 marker_border_bits : int,
+                 min_num_markers    : int,
+                 ref_image_size     : int,
                  use_default        : bool = True,
                  ):
         super().__init__(Type.GlassesValidator, name)
         self.use_default= use_default   # If True, denotes this is the default/built-in glassesValidator plane, if False, denotes custom settings are expected
+        # custom settings
+        self.aruco_dict         = aruco_dict
+        self.marker_border_bits = marker_border_bits
+        self.min_num_markers    = min_num_markers       # minimum number of markers that should be to run pose estimation w.r.t. the plane
+        self.ref_image_size     = ref_image_size        # largest dimension
 
     def field_problems(self) -> _types.ProblemDict:
         return {}
+
+    def fixed_fields(self) -> _types.NestedDict:
+        # these cannot be edited from the GUI, are for info only
+        return {k:None for k in ['aruco_dict', 'marker_border_bits', 'min_num_markers', 'ref_image_size']}
 
     def has_complete_setup(self) -> bool:
         return True
@@ -110,11 +126,23 @@ class Definition_Plane_2D(Definition):
                 wrong[a] = {k:None for k,m in zip(self.plane_size._fields,missing) if m}
         return wrong
 
+    def fixed_fields(self) -> _types.NestedDict:
+        return {}
+
     def has_complete_setup(self) -> bool:
         return not self.field_problems()
 
-def make(type: Type, name: str, **kwargs) -> Definition_GlassesValidator|Definition_Plane_2D:
-    cls = Definition_GlassesValidator if type==Type.GlassesValidator else Definition_Plane_2D
+def make(path: pathlib.Path, p_type: Type, name: str, **kwargs) -> Definition_GlassesValidator|Definition_Plane_2D:
+    cls = Definition_GlassesValidator if p_type==Type.GlassesValidator else Definition_Plane_2D
+    if p_type==Type.GlassesValidator:
+        validator_config_dir = None # use glassesValidator built-in/default
+        if 'use_default' in kwargs and not kwargs['use_default']:
+            validator_config_dir = path
+        validation_setup = get_validation_setup(validator_config_dir)
+        kwargs['aruco_dict'] = Poster.default_aruco_dict
+        kwargs['marker_border_bits'] = validation_setup['markerBorderBits']
+        kwargs['min_num_markers'] = validation_setup['minNumMarkers']
+        kwargs['ref_image_size'] = validation_setup['referencePosterSize']
     return cls(name=name, **kwargs)
 
 
@@ -156,16 +184,7 @@ def get_plane_from_definition(plane_def: Definition, path: str | pathlib.Path) -
             pl.set_origin(plane_def.origin)
         return pl
 
-def get_plane_setup(plane_def: Definition, path: str | pathlib.Path):
-    if plane_def.type==Type.GlassesValidator:
-        validator_config_dir = None # use glassesValidator built-in/default
-        if not plane_def.use_default:
-            validator_config_dir = path
-        validation_setup = get_validation_setup(validator_config_dir)
-        return {'aruco_dict': Poster.default_aruco_dict,
-                'aruco_params': {'markerBorderBits': validation_setup['markerBorderBits']},
-                'min_num_markers': validation_setup['minNumMarkers']}
-    else:
-        return {'aruco_dict': plane_def.aruco_dict,
-                'aruco_params': {'markerBorderBits': plane_def.marker_border_bits},
-                'min_num_markers': plane_def.min_num_markers}
+def get_plane_setup(plane_def: Definition):
+    return {'aruco_dict': plane_def.aruco_dict,
+            'aruco_params': {'markerBorderBits': plane_def.marker_border_bits},
+            'min_num_markers': plane_def.min_num_markers}
