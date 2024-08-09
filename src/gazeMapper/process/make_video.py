@@ -78,7 +78,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
         episodes_seq_nrs[rec] = {e: [str(x) for x in range(1,len(episodes[rec][e])+1)] for e in episodes[rec]}
 
         # Read gaze data
-        if rec_def.type==session.RecordingType.EyeTracker:
+        if rec_def.type==session.RecordingType.Eye_Tracker:
             # NB: we want to use synced gaze data for these videos, if available
             gazes_head[rec]     = gaze_headref.read_dict_from_file(rec_working_dir / 'gazeData.tsv', ts_column_suffixes=['ref', 'VOR', ''])[0]
             # check we have timestamps synced to ref, if relevant

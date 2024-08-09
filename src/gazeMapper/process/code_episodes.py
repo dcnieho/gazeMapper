@@ -67,7 +67,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
         # no episode.Event.Sync_ET_Data for camera recordings, remove
         if annotation.Event.Sync_ET_Data in study_config.episodes_to_code:
             study_config.episodes_to_code.remove(annotation.Event.Sync_ET_Data)
-    elif rec_type==session.RecordingType.EyeTracker:
+    elif rec_type==session.RecordingType.Eye_Tracker:
         # Read gaze data
         has_gaze = True
         gazes = gaze_headref.read_dict_from_file(working_dir / 'gazeData.tsv', ts_column_suffixes=['VOR',''])[0]

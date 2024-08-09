@@ -40,7 +40,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, f
 
     # get info about recording
     rec_def = study_config.session_def.get_recording_def(working_dir.name)
-    if rec_def.type!=session.RecordingType.EyeTracker:
+    if rec_def.type!=session.RecordingType.Eye_Tracker:
         raise ValueError(f'You can only run gaze_to_plane on eye tracker recordings, not on a {str(rec_def.type).split(".")[1]} recording')
 
     # get episodes for which to transform gaze

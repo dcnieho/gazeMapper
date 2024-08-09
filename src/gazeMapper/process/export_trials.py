@@ -24,7 +24,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
 
     # get session info
     session_info = session.Session.load_from_json(working_dir)
-    recs    = [r for r in session_info.recordings if session_info.recordings[r].defition.type==session.RecordingType.EyeTracker]
+    recs    = [r for r in session_info.recordings if session_info.recordings[r].defition.type==session.RecordingType.Eye_Tracker]
 
     # per recording, read the relevant files and put them all together
     for r in recs:

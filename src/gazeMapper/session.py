@@ -10,7 +10,7 @@ from . import camera_recording
 
 
 class RecordingType(utils.AutoName):
-    EyeTracker  = auto()
+    Eye_Tracker = auto()
     Camera      = auto()
 utils.register_type(utils.CustomTypeEntry(RecordingType,'__enum.session.RecordingType__',str, lambda x: getattr(RecordingType, x.split('.')[1])))
 recording_types = [r for r in RecordingType]
@@ -34,7 +34,7 @@ utils.register_type(utils.CustomTypeEntry(Recording,'__session.Recording__',lamb
 def read_recording_info(working_dir: pathlib.Path, rec_type: RecordingType) -> tuple[EyeTrackerRecording|camera_recording.Recording, pathlib.Path]:
     if rec_type==RecordingType.Camera:
         rec_info = camera_recording.Recording.load_from_json(working_dir)
-    elif rec_type==RecordingType.EyeTracker:
+    elif rec_type==RecordingType.Eye_Tracker:
         rec_info = EyeTrackerRecording.load_from_json(working_dir)
     return rec_info, get_video_path(rec_info)
 
@@ -104,7 +104,7 @@ class Session:
 
         # do import
         rec_info.working_directory = self.working_directory / rec_def.name
-        if rec_def.type==RecordingType.EyeTracker:
+        if rec_def.type==RecordingType.Eye_Tracker:
             rec_info = importing.do_import(rec_info=rec_info, copy_scene_video=copy_video, source_dir_as_relative_path=source_dir_as_relative_path, cam_cal_file=cam_cal_file)
         else:
             rec_info = camera_recording.do_import(rec_info=rec_info, copy_video=copy_video, source_dir_as_relative_path=source_dir_as_relative_path, cam_cal_file=cam_cal_file)
@@ -126,7 +126,7 @@ class Session:
 
         # get info about recording
         rec_def = self.definition.get_recording_def(which)
-        if rec_def.type==RecordingType.EyeTracker:
+        if rec_def.type==RecordingType.Eye_Tracker:
             rec_info = EyeTrackerRecording.load_from_json(r_fold)
         else:
             rec_info = camera_recording.Recording.load_from_json(r_fold)
@@ -137,7 +137,7 @@ class Session:
 
     def check_recording_info(self, which: str, rec_info: EyeTrackerRecording|camera_recording.Recording):
         rec_def = self.definition.get_recording_def(which)
-        if rec_def.type==RecordingType.EyeTracker:
+        if rec_def.type==RecordingType.Eye_Tracker:
             if not isinstance(rec_info,EyeTrackerRecording):
                 raise TypeError(f"The provided rec_info is not for an eye tracker recording, but {which} is an eye tracker recording")
         elif rec_def.type==RecordingType.Camera:
