@@ -152,30 +152,6 @@ class Session:
     def has_all_recordings(self) -> bool:
         return all([r.name in self.recordings for r in self.definition.recordings])
 
-    def store_as_json(self, path: str | pathlib.Path = None):
-        if path is None:
-            path = self.working_directory
-        path = pathlib.Path(path)
-        if path.is_dir():
-            path /= self.default_json_file_name
-        with open(path, 'w') as f:
-            to_dump = {k:getattr(self,k) for k in vars(self) if not k.startswith('_') and k not in ['name','working_directory','recordings']}   # Name will be populated from name of session/provided folder, recordings from each subfolder in the session/provided folder, and working_directory as the provided path
-            # dump to file
-            json.dump(to_dump, f, cls=utils.CustomTypeEncoder, indent=2)
-
-    @staticmethod
-    def load_from_json(path: str | pathlib.Path) -> 'Session':
-        path = pathlib.Path(path)
-        if path.is_dir():
-            path /= Session.default_json_file_name
-        # load session setup
-        with open(path, 'r') as f:
-            sess = Session(**json.load(f, object_hook=utils.json_reconstitute), name=path.parent.name, working_directory=path.parent)
-        # load recordings that are present
-        sess.load_existing_recordings()
-
-        return sess
-
     @staticmethod
     def from_definition(definition: SessionDefinition, path: str | pathlib.Path) -> 'Session':
         # for loading a recording directory that doesn't contain a session json file
