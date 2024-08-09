@@ -50,7 +50,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
         raise ValueError(f'There are no videos to be made (make_video_which is not defined or null in the study setup)')
 
     # get session info
-    session_info = session.Session.load_from_json(working_dir)
+    session_info = session.Session.from_definition(study_config.session_def, working_dir)
 
     # load info for all recordings in the recording session and setup wanted output videos
     episodes        : dict[str, dict[annotation.Event, list[list[int]]]]            = {}

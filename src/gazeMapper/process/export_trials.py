@@ -23,7 +23,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
     planes = list(study_config.planes_per_episode[annotation.Event.Trial])
 
     # get session info
-    session_info = session.Session.load_from_json(working_dir)
+    session_info = session.Session.from_definition(study_config.session_def, working_dir)
     recs    = [r for r in session_info.recordings if session_info.recordings[r].defition.type==session.RecordingType.Eye_Tracker]
 
     # per recording, read the relevant files and put them all together

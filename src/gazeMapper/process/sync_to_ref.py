@@ -37,7 +37,7 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
     #    the average may provide a better estimate of the stretch factor to use.
 
     # get session info
-    session_info = session.Session.load_from_json(working_dir)
+    session_info = session.Session.from_definition(study_config.session_def, working_dir)
 
     # get info from reference recording
     ref_episodes = synchronization.get_coding_file(working_dir / study_config.sync_ref_recording)
