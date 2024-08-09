@@ -172,7 +172,7 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
             obj = new_f_obj
     return table_is_started, changed, ret_new_obj, obj, removed_field
 
-def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None, types: dict[typing.Any, typing.Type]=None, defaults:dict[typing.Any, typing.Any]=None, possible_value_getters: typing.Callable[[_T], set[typing.Any]]|list[typing.Callable[[_T], set[typing.Any]]]|dict[str,typing.Callable[[_T], set[typing.Any]]]=None, mark: MarkDict=None, nullable=False, removable=False) -> tuple[bool,bool,_T]:
+def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None, types: dict[typing.Any, typing.Type]=None, defaults:dict[typing.Any, typing.Any]=None, possible_value_getters: typing.Callable[[_T], set[typing.Any]]|list[typing.Callable[[_T], set[typing.Any]]]|dict[str,typing.Callable[[_T], set[typing.Any]]]=None, mark: MarkDict=None, nullable=False, removable=False) -> tuple[bool,bool,_T,bool]:
     made_or_replaced_obj = False
     if (made_or_replaced_obj := obj is None):
         obj = o_type()
@@ -236,7 +236,7 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
     first_column_width = max([get_fields_text_width(fields, backup_str='xadd itemx'), get_fields_text_width(['xadd itemx'])])*1.1
     table_is_started = _start_table(level, first_column_width)
     if not table_is_started:
-        return False, made_or_replaced_obj, obj
+        return False, made_or_replaced_obj, obj, False
     table_is_started, changed, ret_new_obj, obj, removed_field = _draw_impl(obj, fields, types, defaults, possible_value_getters if isinstance(possible_value_getters,dict) else None, mark or {}, level, table_is_started, has_remove=has_remove)
     if removed_field:
         obj.pop(removed_field)
@@ -245,7 +245,7 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
     if not table_is_started and has_add:
         table_is_started = _start_table(level, first_column_width)
         if not table_is_started:
-            return changed, made_or_replaced_obj, obj
+            return changed, made_or_replaced_obj, obj, False
     if has_add:
         imgui.table_next_row()
         imgui.table_next_column()
