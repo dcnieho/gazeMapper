@@ -3,6 +3,7 @@ import typing
 import shutil
 from imgui_bundle import icons_fontawesome_6 as ifa6
 
+from glassesValidator.config import deploy_validation_config, get_validation_setup
 
 from . import filepicker, msgbox, utils
 from ... import config, marker, plane, session
@@ -89,6 +90,20 @@ def delete_plane(study_config: config.Study, plane: plane.Definition):
     shutil.rmtree(p_dir)
     # remove from known planes
     study_config.planes = [p for p in study_config.planes if p.name!=plane.name]
+
+def glasses_validator_plane_check_config(study_config: config.Study, pl: plane.Definition_GlassesValidator):
+    if not isinstance(pl, plane.Definition_GlassesValidator) or pl.use_default:
+        return
+    # check if there are already are validation setup files
+    working_dir = config.guess_config_dir(study_config.working_directory)/pl.name
+    try:
+        get_validation_setup(working_dir)
+    except:
+        # no config file, deploy
+        deploy_validation_config(working_dir)
+    else:
+        # already exists, nothing to do
+        pass
 
 def make_recording(study_config: config.Study, r_type: session.RecordingType, name: str):
     # append to defined recordings

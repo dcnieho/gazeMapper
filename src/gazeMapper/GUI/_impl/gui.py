@@ -500,6 +500,8 @@ class GUI:
                     # persist changed config
                     self.study_config.planes[i] = new_p
                     new_p.store_as_json(config.guess_config_dir(self.study_config.working_directory)/p.name)
+                    if new_p.type==plane.Type.GlassesValidator and not new_p.use_default:
+                        callbacks.glasses_validator_plane_check_config(self.study_config, new_p)
                 if imgui.button(ifa6.ICON_FA_TRASH_CAN+' delete plane'):
                     callbacks.delete_plane(self.study_config, p)
                 imgui.tree_pop()
