@@ -177,30 +177,21 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
 
     has_add = has_remove = False
     missing_fields = None
-    handled = False
     if typing.is_typeddict(o_type):
         types = o_type.__annotations__.copy()
         fields = list(types.keys())
         if not mark and not made_or_replaced_obj:   # don't mark as error if the obj was unset (None)
             mark = {k:f'{k} is required' for k in o_type.__required_keys__ if k not in obj}
-        handled = True
     elif typed_dict_defaults.is_typeddictdefault(o_type):
         types = o_type.__annotations__.copy()
         fields = list(types.keys())
         defaults = o_type._field_defaults.copy()
         if not mark and not made_or_replaced_obj:   # don't mark as error if the obj was unset (None)
             mark = {k:f'{k} is required' for k in o_type.__required_keys__ if k not in obj}
-        handled = True
     elif is_NamedTuple_type(o_type):
         types = o_type.__annotations__.copy()
         fields= list(o_type._fields)
         defaults = o_type._field_defaults.copy()
-        handled = True
-
-    if handled:
-        if isinstance(possible_value_getters, dict):
-            for f in fields:
-                _, _, types[f], _ = _get_field_type(f, obj, types[f], possible_value_getters.get(f,None))
     else:
         all_fields = None
         all_type = None
@@ -244,7 +235,7 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
     table_is_started = _start_table(level, first_column_width)
     if not table_is_started:
         return False, made_or_replaced_obj, obj
-    table_is_started, changed, ret_new_obj, obj, removed_field = _draw_impl(obj, fields, types, defaults, {}, mark or {}, level, table_is_started, has_remove=has_remove)
+    table_is_started, changed, ret_new_obj, obj, removed_field = _draw_impl(obj, fields, types, defaults, possible_value_getters if isinstance(possible_value_getters,dict) else None, mark or {}, level, table_is_started, has_remove=has_remove)
     if removed_field:
         obj.pop(removed_field)
         changed = True
