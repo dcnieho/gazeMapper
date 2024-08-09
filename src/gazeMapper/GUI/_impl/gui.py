@@ -18,7 +18,7 @@ import glassesValidator
 
 from ... import config, marker, plane, session, version
 from .. import async_thread
-from . import callbacks, colors, file_picker, msg_box, settings_editor, utils
+from . import callbacks, colors, file_picker, image_helper, msg_box, settings_editor, utils
 
 
 class GUI:
@@ -52,6 +52,8 @@ class GUI:
 
         self._icon_font: imgui.ImFont = None
         self._big_font: imgui.ImFont = None
+
+        self._marker_preview_cache: dict[tuple[int,int,int], image_helper.ImageHelper] = {}
 
         # Show errors in threads
         def asyncexcepthook(future: asyncio.Future):
@@ -608,7 +610,15 @@ class GUI:
             imgui.table_next_row()
             imgui.table_next_column()
             imgui.align_text_to_frame_padding()
-            imgui.text(str(m.id))
+            imgui.selectable(str(m.id), False)
+            if imgui.is_item_hovered(imgui.HoveredFlags_.for_tooltip|imgui.HoveredFlags_.delay_normal):
+                imgui.begin_tooltip()
+                key = m.id,m.aruco_dict,m.marker_border_bits
+                sz = int(200*hello_imgui.dpi_window_size_factor())
+                if key not in self._marker_preview_cache:
+                    self._marker_preview_cache[key] = utils.get_aruco_marker_image(sz, *key)
+                self._marker_preview_cache[key].render(width=sz, height=sz)
+                imgui.end_tooltip()
             imgui.table_next_column()
             imgui.set_next_item_width(imgui.calc_text_size('xxxxx.xxxxxx').x+2*imgui.get_style().frame_padding.x)
             new_val = settings_editor.draw_value(f'size_{m.id}', m.size, marker.marker_parameter_types['size'], False, marker.marker_defaults.get('size',None), False, False)[0]

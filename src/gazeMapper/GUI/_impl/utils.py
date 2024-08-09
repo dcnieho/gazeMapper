@@ -5,8 +5,10 @@ from imgui_bundle import imgui, icons_fontawesome_6 as ifa6
 import sys
 import pathlib
 from typing import Any, Callable
+import numpy as np
+import cv2
 
-from . import msg_box
+from . import image_helper, msg_box
 from ... import config, session
 
 
@@ -264,3 +266,8 @@ def my_checkbox(label: str, state: bool, frame_size: tuple=None, frame_padding_o
     if state:
         imgui.pop_style_color(3)
     return result
+
+def get_aruco_marker_image(sz: int, id:int, dictionary_id: int, marker_border_bits: int):
+    marker_image = np.zeros((sz, sz), dtype=np.uint8)
+    marker_image = cv2.aruco.generateImageMarker(cv2.aruco.getPredefinedDictionary(dictionary_id), id, sz, marker_image, marker_border_bits)
+    return image_helper.ImageHelper(marker_image)
