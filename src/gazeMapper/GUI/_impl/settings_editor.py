@@ -365,7 +365,7 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
         imgui.text_colored(colors.error, field_lbl)
         if isinstance(mark,str):
             utils.draw_hover_text(mark,text='', hovered_flags=imgui.HoveredFlags_.for_tooltip | imgui.HoveredFlags_.delay_normal)
-    elif is_default:
+    elif is_default or is_none:
         imgui.align_text_to_frame_padding()
         imgui.text_colored(imgui.ImVec4(*color_darken(imgui.ImColor(imgui.get_style_color_vec4(imgui.Col_.text)), .75)), field_lbl)
     else:
