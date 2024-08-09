@@ -72,7 +72,7 @@ def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_get
     # peel off union with None, if any
     f_type, nullable = gt_utils.unpack_none_union(f_type)
     base_type = typing.get_origin(f_type) or f_type  # for instance str[int]->str, and or for str->str
-    if possible_value_getter:
+    if callable(possible_value_getter) or (isinstance(possible_value_getter, list) and all([callable(c) for c in possible_value_getter])):
         if not isinstance(possible_value_getter,list):
             possible_value_getter = [possible_value_getter]
         n_type: list[typing.Type] = []
@@ -140,7 +140,7 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
                     imgui.pop_style_color()
                     if isinstance(mark[f],str):
                         utils.draw_hover_text(mark[f],text='', hovered_flags=imgui.HoveredFlags_.for_tooltip | imgui.HoveredFlags_.delay_normal)
-                this_changed, made_obj, new_sub_obj = draw_dict_editor(obj.get(f,None) if isinstance(obj,dict) else getattr(obj,f), f_type, level+1, possible_value_getter=possible_value_getters.get(f,None), mark=mark.get(f,None))
+                this_changed, made_obj, new_sub_obj = draw_dict_editor(obj.get(f,None) if isinstance(obj,dict) else getattr(obj,f), f_type, level+1, possible_value_getters=possible_value_getters.get(f,None), mark=mark.get(f,None))
                 changed |= this_changed
                 if this_changed and made_obj:
                     if isinstance(obj,dict):
@@ -170,36 +170,45 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
             obj = new_f_obj
     return table_is_started, changed, ret_new_obj, obj, removed_field
 
-def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None, types: dict[typing.Any, typing.Type]=None, defaults:dict[typing.Any, typing.Any]=None, possible_value_getter: typing.Callable[[_T], set[typing.Any]]=None, mark: MarkDict=None) -> tuple[bool,bool,_T]:
+def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None, types: dict[typing.Any, typing.Type]=None, defaults:dict[typing.Any, typing.Any]=None, possible_value_getters: typing.Callable[[_T], set[typing.Any]]|list[typing.Callable[[_T], set[typing.Any]]]|dict[str,typing.Callable[[_T], set[typing.Any]]]=None, mark: MarkDict=None) -> tuple[bool,bool,_T]:
     made_or_replaced_obj = False
     if (made_or_replaced_obj := obj is None):
         obj = o_type()
 
     has_add = has_remove = False
     missing_fields = None
+    handled = False
     if typing.is_typeddict(o_type):
-        types = o_type.__annotations__
+        types = o_type.__annotations__.copy()
         fields = list(types.keys())
         if not mark and not made_or_replaced_obj:   # don't mark as error if the obj was unset (None)
             mark = {k:f'{k} is required' for k in o_type.__required_keys__ if k not in obj}
+        handled = True
     elif typed_dict_defaults.is_typeddictdefault(o_type):
-        types = o_type.__annotations__
+        types = o_type.__annotations__.copy()
         fields = list(types.keys())
         defaults = o_type._field_defaults.copy()
         if not mark and not made_or_replaced_obj:   # don't mark as error if the obj was unset (None)
             mark = {k:f'{k} is required' for k in o_type.__required_keys__ if k not in obj}
+        handled = True
     elif is_NamedTuple_type(o_type):
-        types = o_type.__annotations__
+        types = o_type.__annotations__.copy()
         fields= list(o_type._fields)
         defaults = o_type._field_defaults.copy()
+        handled = True
+
+    if handled:
+        if isinstance(possible_value_getters, dict):
+            for f in fields:
+                _, _, types[f], _ = _get_field_type(f, obj, types[f], possible_value_getters.get(f,None))
     else:
         all_fields = None
         all_type = None
         kv_type = typing.get_args(o_type)
-        if possible_value_getter:
-            if isinstance(possible_value_getter,list):
-                possible_value_getter = possible_value_getter[0] # first one should be for keys
-            all_fields = set(possible_value_getter())
+        if possible_value_getters and not isinstance(possible_value_getters, dict):
+            if isinstance(possible_value_getters,list):
+                possible_value_getters = possible_value_getters[0] # first one should be for keys
+            all_fields = set(possible_value_getters())
         else:
             if kv_type:
                 if typing.get_origin(kv_type[0])==typing.Literal:
