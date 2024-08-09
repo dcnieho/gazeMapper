@@ -487,6 +487,7 @@ class GUI:
             imgui.text_colored(colors.error,'*At minimum one plane should be defined')
         for i,p in enumerate(self.study_config.planes):
             problem_fields = p.field_problems()
+            fixed_fields   = p.fixed_fields()
             extra = ''
             lbl = f'{p.name} ({p.type.value})'
             if problem_fields:
@@ -495,13 +496,15 @@ class GUI:
             if imgui.tree_node_ex(f'{extra}{lbl}###{lbl}', imgui.TreeNodeFlags_.framed):
                 if problem_fields:
                     imgui.pop_style_color()
-                changed, _, new_p, _ = settings_editor.draw_dict_editor(copy.deepcopy(p), type(p), 0, list(plane.definition_parameter_types[p.type].keys()), plane.definition_parameter_types[p.type], plane.definition_defaults[p.type], problems = problem_fields)
+                changed, _, new_p, _ = settings_editor.draw_dict_editor(copy.deepcopy(p), type(p), 0, list(plane.definition_parameter_types[p.type].keys()), plane.definition_parameter_types[p.type], plane.definition_defaults[p.type], problems=problem_fields, fixed=fixed_fields)
                 if changed:
                     # persist changed config
-                    self.study_config.planes[i] = new_p
-                    new_p.store_as_json(config.guess_config_dir(self.study_config.working_directory)/p.name)
+                    plane_dir = config.guess_config_dir(self.study_config.working_directory)/p.name
+                    new_p.store_as_json(plane_dir)
                     if new_p.type==plane.Type.GlassesValidator and not new_p.use_default:
                         callbacks.glasses_validator_plane_check_config(self.study_config, new_p)
+                    # recreate plane so any settings changes (e.g. applied defaults) are reflected in the gui
+                    self.study_config.planes[i] = plane.Definition.load_from_json(plane_dir)
                 if imgui.button(ifa6.ICON_FA_TRASH_CAN+' delete plane'):
                     callbacks.delete_plane(self.study_config, p)
                 imgui.tree_pop()
