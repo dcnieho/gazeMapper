@@ -8,7 +8,7 @@ import inspect
 
 from glassesTools import marker as gt_marker, utils
 
-from . import naming, types as _types
+from . import naming, type_utils
 
 
 class Marker:
@@ -16,8 +16,8 @@ class Marker:
     def __init__(self,
                  id                 : int,
                  size               : float,
-                 aruco_dict         : _types.ArucoDictType = cv2.aruco.DICT_4X4_250,
-                 marker_border_bits : int                  = 1
+                 aruco_dict         : type_utils.ArucoDictType  = cv2.aruco.DICT_4X4_250,
+                 marker_border_bits : int                       = 1
                  ):
         self.id                 = id
         self.size               = size

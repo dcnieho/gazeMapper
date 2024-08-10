@@ -9,7 +9,7 @@ from imgui_bundle import imgui, imgui_md, icons_fontawesome_6 as ifa6
 from glassesTools.timeline_gui import color_darken
 from glassesTools import utils as gt_utils
 
-from ... import typed_dict_defaults, types as _types
+from ... import type_utils, typed_dict_defaults
 from . import colors, utils
 
 def is_NamedTuple_type(x):
@@ -19,7 +19,7 @@ def is_NamedTuple_type(x):
           getattr(x, '_fields', None) is not None)
 
 val_to_str_registry: dict[typing.Type, dict[typing.Any, str]] = {
-    _types.ArucoDictType: _types.aruco_dicts_to_str
+    type_utils.ArucoDictType: type_utils.aruco_dicts_to_str
 }
 
 _C = typing.TypeVar("_C")
@@ -30,7 +30,7 @@ def set_gui_instance(gui):
     global _gui_instance
     _gui_instance = gui
 
-def draw(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[], set[typing.Any]]], problems: _types.ProblemDict|None=None, fixed: _types.NestedDict|None=None) -> tuple[bool,_C]:
+def draw(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[], set[typing.Any]]], problems: type_utils.ProblemDict|None=None, fixed: type_utils.NestedDict|None=None) -> tuple[bool,_C]:
     if not fields:
         return
 
@@ -123,7 +123,7 @@ def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_get
             raise ValueError(f'type of {field} ({f_type}) not handled')
     return is_dict, base_type, f_type, nullable
 
-def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[], set[typing.Any]]], problems: _types.ProblemDict, fixed: _types.NestedDict, level=0, table_is_started=False, has_remove=False) -> tuple[bool,bool,bool,_C,str|None]:
+def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[], set[typing.Any]]], problems: type_utils.ProblemDict, fixed: type_utils.NestedDict, level=0, table_is_started=False, has_remove=False) -> tuple[bool,bool,bool,_C,str|None]:
     changed = False
     max_fields_width = get_fields_text_width(fields)*1.1   # 10% extra to be safe
     ret_new_obj = False
@@ -177,7 +177,7 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
             obj = new_f_obj
     return table_is_started, changed, ret_new_obj, obj, removed_field
 
-def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None, types: dict[typing.Any, typing.Type]=None, defaults:dict[typing.Any, typing.Any]=None, possible_value_getters: typing.Callable[[_T], set[typing.Any]]|list[typing.Callable[[_T], set[typing.Any]]]|dict[str,typing.Callable[[_T], set[typing.Any]]]=None, problems: _types.ProblemDict=None, fixed: _types.NestedDict=None, nullable=False, removable=False) -> tuple[bool,bool,_T,bool]:
+def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None, types: dict[typing.Any, typing.Type]=None, defaults:dict[typing.Any, typing.Any]=None, possible_value_getters: typing.Callable[[_T], set[typing.Any]]|list[typing.Callable[[_T], set[typing.Any]]]|dict[str,typing.Callable[[_T], set[typing.Any]]]=None, problems: type_utils.ProblemDict=None, fixed: type_utils.NestedDict=None, nullable=False, removable=False) -> tuple[bool,bool,_T,bool]:
     made_or_replaced_obj = False
     if (made_or_replaced_obj := obj is None):
         obj = o_type()

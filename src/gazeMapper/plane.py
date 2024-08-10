@@ -10,7 +10,7 @@ from glassesTools import plane, utils
 from glassesValidator.config import get_validation_setup
 from glassesValidator.config.poster import Poster
 
-from . import types as _types
+from . import type_utils
 
 
 class Type(utils.AutoName):
@@ -30,9 +30,9 @@ class Definition:
         self.type               = type
         self.name               = name
 
-    def field_problems(self) -> _types.ProblemDict:
+    def field_problems(self) -> type_utils.ProblemDict:
         raise NotImplementedError()
-    def fixed_fields(self) -> _types.NestedDict:
+    def fixed_fields(self) -> type_utils.NestedDict:
         raise NotImplementedError()
     def has_complete_setup(self) -> bool:
         raise NotImplementedError()
@@ -65,7 +65,7 @@ class Definition_GlassesValidator(Definition):
     @typeguard.typechecked(collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
     def __init__(self,
                  name               : str,
-                 aruco_dict         : _types.ArucoDictType,
+                 aruco_dict         : type_utils.ArucoDictType,
                  marker_border_bits : int,
                  min_num_markers    : int,
                  ref_image_size     : int,
@@ -79,10 +79,10 @@ class Definition_GlassesValidator(Definition):
         self.min_num_markers    = min_num_markers       # minimum number of markers that should be to run pose estimation w.r.t. the plane
         self.ref_image_size     = ref_image_size        # largest dimension
 
-    def field_problems(self) -> _types.ProblemDict:
+    def field_problems(self) -> type_utils.ProblemDict:
         return {}
 
-    def fixed_fields(self) -> _types.NestedDict:
+    def fixed_fields(self) -> type_utils.NestedDict:
         # these cannot be edited from the GUI, are for info only
         return {k:None for k in ['aruco_dict', 'marker_border_bits', 'min_num_markers', 'ref_image_size']}
 
@@ -93,15 +93,15 @@ class Definition_Plane_2D(Definition):
     @typeguard.typechecked(collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
     def __init__(self,
                  name               : str,
-                 marker_file        : str|pathlib.Path|None = None, # should be set, no suitable default
-                 marker_size        : float|None            = None, # should be set, no suitable default
-                 marker_border_bits : int                   = 1,
-                 min_num_markers    : int                   = 3,
-                 plane_size         : plane.Coordinate      = plane.Coordinate(0., 0.), # should be set to something non-zero
-                 origin             : plane.Coordinate      = plane.Coordinate(0., 0.),
-                 unit               : str                   = '',
-                 aruco_dict         : _types.ArucoDictType  = cv2.aruco.DICT_4X4_250,
-                 ref_image_size     : int                   = 1920
+                 marker_file        : str|pathlib.Path|None     = None, # should be set, no suitable default
+                 marker_size        : float|None                = None, # should be set, no suitable default
+                 marker_border_bits : int                       = 1,
+                 min_num_markers    : int                       = 3,
+                 plane_size         : plane.Coordinate          = plane.Coordinate(0., 0.), # should be set to something non-zero
+                 origin             : plane.Coordinate          = plane.Coordinate(0., 0.),
+                 unit               : str                       = '',
+                 aruco_dict         : type_utils.ArucoDictType  = cv2.aruco.DICT_4X4_250,
+                 ref_image_size     : int                       = 1920
                  ):
         super().__init__(Type.Plane_2D, name)
         self.marker_file        = marker_file           # if str or Path: file from which to read markers. Else direction N_markerx4 array. Should contain centers of markers
@@ -114,7 +114,7 @@ class Definition_Plane_2D(Definition):
         self.aruco_dict         = aruco_dict
         self.ref_image_size     = ref_image_size        # largest dimension
 
-    def field_problems(self) -> _types.ProblemDict:
+    def field_problems(self) -> type_utils.ProblemDict:
         wrong: dict[str,None|dict[str,None]] = {}
         for a in ['marker_file','marker_size','plane_size']:
             if not getattr(self,a):
@@ -123,7 +123,7 @@ class Definition_Plane_2D(Definition):
                 wrong[a] = {k:None for k,m in zip(self.plane_size._fields,missing) if m}
         return wrong
 
-    def fixed_fields(self) -> _types.NestedDict:
+    def fixed_fields(self) -> type_utils.NestedDict:
         return {}
 
     def has_complete_setup(self) -> bool:

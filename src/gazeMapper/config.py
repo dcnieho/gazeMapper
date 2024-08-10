@@ -10,7 +10,7 @@ from typing import Any, Literal, TypedDict
 from glassesTools import annotation, utils
 from glassesValidator import process as gv_process
 
-from . import marker, plane, session, types
+from . import marker, plane, session, type_utils
 from .typed_dict_defaults import TypedDictDefault
 
 
@@ -228,8 +228,8 @@ class Study:
     def _check_recording(self, rec: str) -> bool:
         return any([r.name==rec for r in self.session_def.recordings])
 
-    def field_problems(self) -> types.ProblemDict:
-        problems: types.ProblemDict = {}
+    def field_problems(self) -> types_utils.ProblemDict:
+        problems: types_utils.ProblemDict = {}
         if self.sync_ref_recording is not None:
             for a in ['sync_ref_do_time_stretch', 'sync_ref_stretch_which', 'sync_ref_average_recordings']:
                 if getattr(self,a) is None:
