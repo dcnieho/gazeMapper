@@ -16,11 +16,17 @@ def merge_problem_dicts(a: ProblemDict, b: ProblemDict):
                 merge_problem_dicts(a[key], b[key])
             elif isinstance(a[key], dict) or isinstance(b[key], dict):
                 if isinstance(a[key], dict):
-                    a[key]['problem_with_this_key'] = b[key]
+                    if 'problem_with_this_key' in a[key]:
+                        a[key]['problem_with_this_key'] = '\n'.join([a[key]['problem_with_this_key'], b[key]])
+                    else:
+                        a[key]['problem_with_this_key'] = b[key]
                 else:
                     temp = a[key]
                     a[key] = b[key].copy()
-                    a[key]['problem_with_this_key'] = temp
+                    if 'problem_with_this_key' in a[key]:
+                        a[key]['problem_with_this_key'] = '\n'.join([a[key]['problem_with_this_key'], temp])
+                    else:
+                        a[key]['problem_with_this_key'] = temp
             elif a[key] is None:
                 a[key] = b[key]
             elif b[key] is None:
