@@ -16,7 +16,7 @@ import OpenGL.GL as gl
 import glassesTools
 import glassesValidator
 
-from ... import config, marker, plane, session, version
+from ... import config, marker, plane, session, type_utils, version
 from .. import async_thread
 from . import callbacks, colors, file_picker, image_helper, msg_box, settings_editor, utils
 
@@ -53,6 +53,7 @@ class GUI:
         self._icon_font: imgui.ImFont = None
         self._big_font: imgui.ImFont = None
 
+        self._problems_cache: type_utils.ProblemDict = {}
         self._marker_preview_cache: dict[tuple[int,int,int], image_helper.ImageHelper] = {}
 
         # Show errors in threads
@@ -288,6 +289,8 @@ class GUI:
         self._to_focus = self._sessions_pane.label  # ensure sessions pane remains focused
 
     def _check_project_setups_state(self):
+        if self.study_config is not None:
+            self._problems_cache = self.study_config.field_problems()
         # need to have:
         # 1. at least one recording defined in the session;
         # 2. one plane set up
@@ -295,9 +298,10 @@ class GUI:
         # 4. one plane linked to one episode
         self.need_setup_recordings = not self.study_config or not self.study_config.session_def.recordings
         self.need_setup_plane = not self.study_config or not self.study_config.planes or any((not p.has_complete_setup() for p in self.study_config.planes))
-        self.need_setup_episode = not self.study_config or not self.study_config.episodes_to_code or not self.study_config.planes_per_episode
+        self.need_setup_episode = not self.study_config or not self.study_config.episodes_to_code or not self.study_config.planes_per_episode or any((x in self._problems_cache for x in ['episodes_to_code', 'planes_per_episode']))
 
         self.can_accept_sessions = \
+            not self._problems_cache and \
             not self.need_setup_recordings and \
             not self.need_setup_plane and \
             not self.need_setup_episode
@@ -403,8 +407,11 @@ class GUI:
             self._to_focus = new_win_params[0]
 
         # rest of settings handled here in a settings tree
+        if any((k not in ['episodes_to_code', 'planes_per_episode'] for k in self._problems_cache)):
+            imgui.text_colored(colors.error,'*There are problems in the below setup that need to be resolved')
+
         fields = [k for k in config.study_parameter_types.keys() if k in config.study_defaults]
-        changed, new_config = settings_editor.draw(copy.deepcopy(self.study_config), fields, config.study_parameter_types, config.study_defaults, self._possible_value_getters, self.study_config.field_problems())
+        changed, new_config = settings_editor.draw(copy.deepcopy(self.study_config), fields, config.study_parameter_types, config.study_defaults, self._possible_value_getters, self._problems_cache)
         if changed:
             try:
                 new_config.check_valid(strict_check=False)
@@ -582,9 +589,11 @@ class GUI:
                 self._to_focus = tab_lbl
             imgui.same_line()
             imgui.text_colored(colors.error,'to set this up.')
+        if any((x in self._problems_cache for x in ['episodes_to_code', 'planes_per_episode'])):
+            imgui.text_colored(colors.error,'*There are problems in the below setup that need to be resolved')
 
         # episodes to be coded
-        changed, new_config = settings_editor.draw(copy.deepcopy(self.study_config), ['episodes_to_code', 'planes_per_episode'], config.study_parameter_types, {}, self._possible_value_getters, self.study_config.field_problems())
+        changed, new_config = settings_editor.draw(copy.deepcopy(self.study_config), ['episodes_to_code', 'planes_per_episode'], config.study_parameter_types, {}, self._possible_value_getters, self._problems_cache)
         if changed:
             try:
                 new_config.check_valid(strict_check=False)
