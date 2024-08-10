@@ -187,9 +187,17 @@ class Study:
         problems: type_utils.ProblemDict = {}
         if which is None:
             return problems
+        missing_recs: list[str] = []
         for w in which:
             if not self._check_recording(w):
-                raise ValueError(f'Recording "{w}" not known, check {field} in the study configuration')
+                if strict_check:
+                    raise ValueError(f'Recording "{w}" not known, check {field} in the study configuration')
+                else:
+                    missing_recs.append(w)
+        if missing_recs:
+            problems[field] = f'Recording(s) {missing_recs[0] if len(missing_recs)==1 else missing_recs} not known'
+            if isinstance(getattr(self,field),dict):
+                type_utils.merge_problem_dicts(problems,{field: {r:f'Recording {r} not known' for r in missing_recs}})
         return problems
 
     def _check_recording(self, rec: str) -> bool:
