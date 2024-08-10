@@ -129,7 +129,8 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
     ret_new_obj = False
     removed_field = None
     for f in fields:
-        is_dict, base_type, f_type, nullable = _get_field_type(f, obj, types[f], possible_value_getters.get(f,None) if possible_value_getters else None)
+        tp = types[f] if f in types else list(types.values())[0]    # backup only needed when we have an invalid config (e.g. trying to show planes_per_episode entry for an episode that is no longer set to be coded)
+        is_dict, base_type, f_type, nullable = _get_field_type(f, obj, tp, possible_value_getters.get(f,None) if possible_value_getters else None)
 
         if is_dict:
             if table_is_started:
