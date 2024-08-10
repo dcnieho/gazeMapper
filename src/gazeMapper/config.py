@@ -209,7 +209,7 @@ class Study:
             if missing_planes:
                 if 'planes_per_episode' not in problems:
                     problems['planes_per_episode'] = {}
-                problems['planes_per_episode'][e] = f'Plane(s) {missing_planes} not known.'
+                problems['planes_per_episode'][e] = f'Plane(s) {missing_planes[0] if len(missing_planes)==1 else missing_planes} not known.'
         return problems
 
     def _check_episodes_to_code(self, strict_check) -> type_utils.ProblemDict:
@@ -260,7 +260,7 @@ class Study:
                         missing_markers.append(i)
             if missing_markers:
                 problems['auto_code_sync_points'] = {}
-                problems['auto_code_sync_points']['markers'] = f'The markers {missing_markers} are not defined in individual_markers'
+                problems['auto_code_sync_points']['markers'] = f'The markers {missing_markers[0] if len(missing_markers)==1 else missing_markers} are not defined in individual_markers'
         if self.auto_code_trial_episodes:
             for f in ['start_markers','end_markers']:
                 missing_markers: list[int] = []
@@ -273,7 +273,7 @@ class Study:
                 if missing_markers:
                     if 'auto_code_trial_episodes' not in problems:
                         problems['auto_code_trial_episodes'] = {}
-                    problems['auto_code_trial_episodes'][f] = f'The markers {missing_markers} are not defined in individual_markers'
+                    problems['auto_code_trial_episodes'][f] = f'The markers {missing_markers[0] if len(missing_markers)==1 else missing_markers} are not defined in individual_markers'
         return problems
 
     def _check_sync_ref(self, strict_check):
