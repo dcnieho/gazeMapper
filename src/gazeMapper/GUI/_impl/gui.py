@@ -332,7 +332,7 @@ class GUI:
             self._unopened_interface_drawer()
             return
         elif not self.can_accept_sessions:
-            imgui.text_colored(colors.error, "This study's set up is incomplete.")
+            imgui.text_colored(colors.error, "This study's set up is incomplete or has a problem.")
             imgui.align_text_to_frame_padding()
             imgui.text_colored(colors.error, 'Finish the setup in the')
             imgui.same_line()
