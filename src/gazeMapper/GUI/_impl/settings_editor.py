@@ -244,7 +244,7 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
     table_is_started = _start_table(level, first_column_width)
     if not table_is_started:
         return False, made_or_replaced_obj, obj, False
-    table_is_started, changed, ret_new_obj, obj, removed_field = _draw_impl(obj, fields, types, defaults, possible_value_getters if isinstance(possible_value_getters,dict) else None, problems or {}, fixed or {}, level, table_is_started, has_remove=has_remove)
+    table_is_started, changed, ret_new_obj, obj, removed_field = _draw_impl(obj, fields, types, defaults, possible_value_getters if isinstance(possible_value_getters,dict) else None, problems if isinstance(problems,dict) else {}, fixed or {}, level, table_is_started, has_remove=has_remove)
     if removed_field:
         obj.pop(removed_field)
         changed = True
