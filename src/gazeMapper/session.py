@@ -167,13 +167,14 @@ class Session:
         return sess
 
 
-def get_sessions_from_directory(path: str|pathlib.Path) -> list[Session]:
+def get_sessions_from_directory(path: str|pathlib.Path, session_def: SessionDefinition|None=None) -> list[Session]:
     path = pathlib.Path(path)
 
     # try to get config, we'll need that to load recording sessions
-    from . import config
-    config_dir = config.guess_config_dir(path)
-    sess_def = config.Study.load_from_json(config_dir).session_def
+    if session_def is None:
+        from . import config
+        config_dir = config.guess_config_dir(path)
+        session_def = config.Study.load_from_json(config_dir).session_def
 
     # iterate through all folders in the provided path and check if the folder contains
     # a session marker file. If so, try to to load the folder as a session, ignoring errors
@@ -187,7 +188,7 @@ def get_sessions_from_directory(path: str|pathlib.Path) -> list[Session]:
             continue
 
         try:
-            sess = Session.from_definition(sess_def, d)
+            sess = Session.from_definition(session_def, d)
         except:
             pass
         else:
