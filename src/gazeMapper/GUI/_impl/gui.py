@@ -584,7 +584,7 @@ class GUI:
             imgui.text_colored(colors.error,'to set this up.')
 
         # episodes to be coded
-        changed, new_config = settings_editor.draw(copy.deepcopy(self.study_config), ['episodes_to_code', 'planes_per_episode'], config.study_parameter_types, {}, self._possible_value_getters)
+        changed, new_config = settings_editor.draw(copy.deepcopy(self.study_config), ['episodes_to_code', 'planes_per_episode'], config.study_parameter_types, {}, self._possible_value_getters, self.study_config.field_problems())
         if changed:
             try:
                 new_config.check_valid(strict_check=False)

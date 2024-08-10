@@ -216,7 +216,7 @@ class Study:
             for f in ['start_markers','end_markers']:
                 for i in self.auto_code_trial_episodes[f]:
                     if not any([m.id==i for m in self.individual_markers]):
-                        raise ValueError(f'Marker "{i}" specified in auto_code_trials_episodes.{f}, but unknown because not present in individual_markers')
+                        raise ValueError(f'Marker "{i}" specified in auto_code_trial_episodes.{f}, but unknown because not present in individual_markers')
 
     def _check_recordings(self, which: list[str]|None, field: str):
         if which is None:
@@ -230,15 +230,30 @@ class Study:
 
     def field_problems(self) -> types.ProblemDict:
         problems: types.ProblemDict = {}
-        if self.get_cam_movement_for_et_sync_method=='function':
-            t = utils.unpack_none_union(study_parameter_types['get_cam_movement_for_et_sync_function'])[0]
-            problems['get_cam_movement_for_et_sync_function'] = {k:f'{k} should be set when get_cam_movement_for_et_sync_function is set to "function"' for k in t.__required_keys__ if not self.get_cam_movement_for_et_sync_function or k not in self.get_cam_movement_for_et_sync_function or (k!='parameters' and not self.get_cam_movement_for_et_sync_function[k])}
         if self.sync_ref_recording is not None:
             for a in ['sync_ref_do_time_stretch', 'sync_ref_stretch_which', 'sync_ref_average_recordings']:
                 if getattr(self,a) is None:
                     problems[a] = f'{a} should be set when sync_ref_recording is set'
             if self.sync_ref_average_recordings and self.sync_ref_recording in self.sync_ref_average_recordings:
-                problems['sync_ref_average_recordings'] = f'Recording {self.sync_ref_recording} is the reference recording for sync, should not be specified in sync_average_recordings'
+                problems['sync_ref_average_recordings'] = f'Recording {self.sync_ref_recording} is the reference recording for sync, cannot be specified in sync_average_recordings'
+        if self.get_cam_movement_for_et_sync_method=='function':
+            t = utils.unpack_none_union(study_parameter_types['get_cam_movement_for_et_sync_function'])[0]
+            problems['get_cam_movement_for_et_sync_function'] = {k:f'{k} should be set when get_cam_movement_for_et_sync_function is set to "function"' for k in t.__required_keys__ if not self.get_cam_movement_for_et_sync_function or k not in self.get_cam_movement_for_et_sync_function or (k!='parameters' and not self.get_cam_movement_for_et_sync_function[k])}
+
+        for e in self.planes_per_episode:
+            if e not in self.episodes_to_code:
+                problems['episodes_to_code'] = f'Plane(s) are defined in planes_per_episode for {e.value} events, but {e.value} events are not set up to be coded.'
+                if 'planes_per_episode' not in problems:
+                    problems['planes_per_episode'] = {}
+                problems['planes_per_episode'][e] = f'Plane(s) are defined in planes_per_episode for {e.value} events, but {e.value} events are not set up to be coded. Remove {e.value} from planes_per_episode.'
+        if self.auto_code_sync_points:
+            if annotation.Event.Sync_Camera not in self.episodes_to_code:
+                problems['episodes_to_code'] = f'The auto_code_sync_points option is configured, but {annotation.Event.Sync_Camera.value} points are not set to be coded in episodes_to_code.'
+                problems['auto_code_sync_points'] = f'The auto_code_sync_points option is configured, but {annotation.Event.Sync_Camera.value} points are not set to be coded in episodes_to_code. Fix episodes_to_code or remove auto_code_sync_points setup.'
+        if self.auto_code_trial_episodes:
+            if annotation.Event.Trial not in self.episodes_to_code:
+                problems['episodes_to_code'] = f'The auto_code_trial_episodes option is configured, but {annotation.Event.Trial.value} episodes are not set to be coded in episodes_to_code.'
+                problems['auto_code_trial_episodes'] = f'The auto_code_trial_episodes option is configured, but {annotation.Event.Trial.value} episodes are not set to be coded in episodes_to_code. Fix episodes_to_code or remove auto_code_sync_points setup.'
         return problems
 
     def store_as_json(self, path: str|pathlib.Path|None=None):
