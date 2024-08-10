@@ -141,8 +141,9 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
             if imgui.tree_node_ex(f,imgui.TreeNodeFlags_.framed):
                 if problems and f in problems:
                     imgui.pop_style_color()
-                    if isinstance(problems[f],str):
-                        utils.draw_hover_text(problems[f],text='', hovered_flags=imgui.HoveredFlags_.for_tooltip | imgui.HoveredFlags_.delay_normal)
+                    if isinstance(problems[f],str) or (isinstance(problems[f],dict) and 'problem_with_this_key' in problems[f]):
+                        msg = problems[f] if isinstance(problems[f],str) else problems[f]['problem_with_this_key']
+                        utils.draw_hover_text(msg, text='', hovered_flags=imgui.HoveredFlags_.for_tooltip | imgui.HoveredFlags_.delay_normal)
                 this_changed, made_obj, new_sub_obj, removed = draw_dict_editor(obj.get(f,None) if isinstance(obj,dict) else getattr(obj,f), f_type, level+1, possible_value_getters=possible_value_getters.get(f,None) if possible_value_getters else None, problems=problems.get(f,None), fixed=fixed.get(f,None), nullable=nullable, removable=has_remove)
                 if removed:
                     removed_field = f
@@ -155,8 +156,9 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
                 imgui.tree_pop()
             elif problems and f in problems:
                 imgui.pop_style_color()
-                if isinstance(problems[f],str):
-                    utils.draw_hover_text(problems[f],text='', hovered_flags=imgui.HoveredFlags_.for_tooltip | imgui.HoveredFlags_.delay_normal)
+                if isinstance(problems[f],str) or (isinstance(problems[f],dict) and 'problem_with_this_key' in problems[f]):
+                    msg = problems[f] if isinstance(problems[f],str) else problems[f]['problem_with_this_key']
+                    utils.draw_hover_text(msg, text='', hovered_flags=imgui.HoveredFlags_.for_tooltip | imgui.HoveredFlags_.delay_normal)
             continue
 
         # simple field, set up for drawing
