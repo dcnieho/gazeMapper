@@ -170,11 +170,10 @@ class Study:
         if strict_check:
             self._check_planes_per_episode(strict_check)
             self._check_episodes_to_code(strict_check)
-            self._check_recordings(self.video_make_which, 'video_make_which', strict_check)
-            self._check_recordings(self.video_recording_colors, 'video_recording_colors', strict_check)
             self._check_sync_ref(strict_check)
             self._check_sync_method(strict_check)
             self._check_auto_coding_setup(strict_check)
+            self._check_make_video(strict_check)
 
         # ensure some members are of the right class, and apply defaults
         self.auto_code_sync_points = AutoCodeSyncPoints(self.auto_code_sync_points)
@@ -305,15 +304,29 @@ class Study:
                 problems['get_cam_movement_for_et_sync_function'] = {k:f'{k} should be set when get_cam_movement_for_et_sync_function is set to "function"' for k in t.__required_keys__ if not self.get_cam_movement_for_et_sync_function or k not in self.get_cam_movement_for_et_sync_function or (k!='parameters' and not self.get_cam_movement_for_et_sync_function[k])}
         return problems
 
+    def _check_make_video(self, strict_check) -> type_utils.ProblemDict:
+        problems = self._check_recordings(self.video_make_which, 'video_make_which', strict_check)
+        type_utils.merge_problem_dicts(problems,
+                   self._check_recordings(self.video_recording_colors, 'video_recording_colors', strict_check))
+        if self.video_make_which:
+            # check have colors for all eye tracker recordings
+            all_recs = {r.name for r in self.session_def.recordings if r.type==session.RecordingType.Eye_Tracker}
+            if (missing:=list(all_recs-set(self.video_recording_colors.keys()))):
+                msg = f'Colors need to be defined for all eye tracker recordings. Missing for {missing[0] if len(missing)==1 else missing}'
+                if strict_check:
+                    raise ValueError(msg)
+                else:
+                    type_utils.merge_problem_dicts(problems,{'video_recording_colors': msg})
+        return problems
+
     def field_problems(self) -> type_utils.ProblemDict:
         problems: type_utils.ProblemDict = {}
         type_utils.merge_problem_dicts(problems, self._check_planes_per_episode(False))
         type_utils.merge_problem_dicts(problems, self._check_episodes_to_code(False))
         type_utils.merge_problem_dicts(problems, self._check_auto_coding_setup(False))
-        type_utils.merge_problem_dicts(problems, self._check_recordings(self.video_make_which, 'video_make_which', False))
-        type_utils.merge_problem_dicts(problems, self._check_recordings(self.video_recording_colors, 'video_recording_colors', False))
         type_utils.merge_problem_dicts(problems, self._check_sync_ref(False))
         type_utils.merge_problem_dicts(problems, self._check_et_sync_method(False))
+        type_utils.merge_problem_dicts(problems, self._check_make_video(False))
         return problems
 
     def store_as_json(self, path: str|pathlib.Path|None=None):
