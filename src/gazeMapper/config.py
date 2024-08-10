@@ -163,35 +163,18 @@ class Study:
         self.check_valid(strict_check=strict_check)
 
     def check_valid(self, strict_check=True):
-        self._check_planes_per_episode()
-        self._check_auto_markers()
-        self._check_recordings(self.video_make_which, 'video_make_which')
-        self._check_recordings(self.video_recording_colors, 'video_recording_colors')
-        if self.sync_ref_recording is not None:
-            self._check_recordings([self.sync_ref_recording], 'sync_ref_recording')
-            self._check_recordings(self.sync_ref_average_recordings, 'sync_average_recordings')
+        # always check this as invalid value would crash the gui
         if self.get_cam_movement_for_et_sync_method not in ['','plane','function']:
             raise ValueError('get_cam_movement_for_et_sync_method parameter should be an empty string, "plane", or "function"')
 
         if strict_check:
-            if self.sync_ref_recording is not None:
-                for a in ['sync_ref_do_time_stretch', 'sync_ref_stretch_which', 'sync_ref_average_recordings']:
-                    if getattr(self,a) is None:
-                        raise ValueError(f'{a} should be set in the study setup when sync_ref_recording is set')
-                if self.sync_ref_recording in self.sync_ref_average_recordings:
-                    raise ValueError(f'Recording {self.sync_ref_recording} is the reference recording for sync, should not be specified in sync_average_recordings')
-            if self.get_cam_movement_for_et_sync_method=='function':
-                if not self.get_cam_movement_for_et_sync_function or not all([x in self.get_cam_movement_for_et_sync_function for x in ["module_or_file","function","parameters"]]):
-                    raise ValueError('if get_cam_movement_for_et_sync_method is set to "function", get_cam_movement_for_et_sync_function should be a dict specifying "module_or_file", "function", and "parameters"')
-            for e in self.planes_per_episode:
-                if e not in self.episodes_to_code:
-                    raise ValueError(f'Plane(s) are defined in planes_per_episode for {e.name} events, but {e.name} events are not set up to be coded in episodes_to_code. Fix episodes_to_code.')
-            if self.auto_code_sync_points:
-                if annotation.Event.Sync_Camera not in self.episodes_to_code:
-                    raise ValueError(f'The auto_code_sync_points option is configured, but {annotation.Event.Sync_Camera} points are not set to be coded in episodes_to_code. Fix episodes_to_code.')
-            if self.auto_code_trial_episodes:
-                if annotation.Event.Trial not in self.episodes_to_code:
-                    raise ValueError(f'The auto_code_trial_episodes option is configured, but {annotation.Event.Trial} episodes are not set to be coded in episodes_to_code. Fix episodes_to_code.')
+            self._check_planes_per_episode(strict_check)
+            self._check_episodes_to_code(strict_check)
+            self._check_recordings(self.video_make_which, 'video_make_which', strict_check)
+            self._check_recordings(self.video_recording_colors, 'video_recording_colors', strict_check)
+            self._check_sync_ref(strict_check)
+            self._check_sync_method(strict_check)
+            self._check_auto_coding_setup(strict_check)
 
         # ensure some members are of the right class, and apply defaults
         self.auto_code_sync_points = AutoCodeSyncPoints(self.auto_code_sync_points)
@@ -201,59 +184,136 @@ class Study:
         self.validate_I2MC_settings = I2MCSettings(self.validate_I2MC_settings)
         self.validate_I2MC_settings.apply_defaults()
 
-    def _check_planes_per_episode(self):
-        for e in self.planes_per_episode:
-            for p in self.planes_per_episode[e]:
-                if not any([p==pl.name for pl in self.planes]):
-                    raise ValueError(f'Plane {p} not known')
-
-    def _check_auto_markers(self):
-        if self.auto_code_sync_points:
-            for i in self.auto_code_sync_points['markers']:
-                if not any([m.id==i for m in self.individual_markers]):
-                    raise ValueError(f'Marker "{i}" specified in auto_code_sync_points.markers, but unknown because not present in individual_markers')
-        if self.auto_code_trial_episodes:
-            for f in ['start_markers','end_markers']:
-                for i in self.auto_code_trial_episodes[f]:
-                    if not any([m.id==i for m in self.individual_markers]):
-                        raise ValueError(f'Marker "{i}" specified in auto_code_trial_episodes.{f}, but unknown because not present in individual_markers')
-
-    def _check_recordings(self, which: list[str]|None, field: str):
+    def _check_recordings(self, which: list[str]|None, field: str, strict_check) -> type_utils.ProblemDict:
+        problems: type_utils.ProblemDict = {}
         if which is None:
-            return
+            return problems
         for w in which:
             if not self._check_recording(w):
                 raise ValueError(f'Recording "{w}" not known, check {field} in the study configuration')
+        return problems
 
     def _check_recording(self, rec: str) -> bool:
         return any([r.name==rec for r in self.session_def.recordings])
 
-    def field_problems(self) -> types_utils.ProblemDict:
-        problems: types_utils.ProblemDict = {}
-        if self.sync_ref_recording is not None:
-            for a in ['sync_ref_do_time_stretch', 'sync_ref_stretch_which', 'sync_ref_average_recordings']:
-                if getattr(self,a) is None:
-                    problems[a] = f'{a} should be set when sync_ref_recording is set'
-            if self.sync_ref_average_recordings and self.sync_ref_recording in self.sync_ref_average_recordings:
-                problems['sync_ref_average_recordings'] = f'Recording {self.sync_ref_recording} is the reference recording for sync, cannot be specified in sync_average_recordings'
-        if self.get_cam_movement_for_et_sync_method=='function':
-            t = utils.unpack_none_union(study_parameter_types['get_cam_movement_for_et_sync_function'])[0]
-            problems['get_cam_movement_for_et_sync_function'] = {k:f'{k} should be set when get_cam_movement_for_et_sync_function is set to "function"' for k in t.__required_keys__ if not self.get_cam_movement_for_et_sync_function or k not in self.get_cam_movement_for_et_sync_function or (k!='parameters' and not self.get_cam_movement_for_et_sync_function[k])}
-
+    def _check_planes_per_episode(self, strict_check) -> type_utils.ProblemDict:
+        problems: type_utils.ProblemDict = {}
         for e in self.planes_per_episode:
-            if e not in self.episodes_to_code:
-                problems['episodes_to_code'] = f'Plane(s) are defined in planes_per_episode for {e.value} events, but {e.value} events are not set up to be coded.'
+            missing_planes: list[str] = []
+            for p in self.planes_per_episode[e]:
+                if not any([p==pl.name for pl in self.planes]):
+                    if strict_check:
+                        raise ValueError(f'Plane {p} not known')
+                    else:
+                        missing_planes.append(p)
+            if missing_planes:
                 if 'planes_per_episode' not in problems:
                     problems['planes_per_episode'] = {}
-                problems['planes_per_episode'][e] = f'Plane(s) are defined in planes_per_episode for {e.value} events, but {e.value} events are not set up to be coded. Remove {e.value} from planes_per_episode.'
+                problems['planes_per_episode'][e] = f'Plane(s) {missing_planes} not known.'
+        return problems
+
+    def _check_episodes_to_code(self, strict_check) -> type_utils.ProblemDict:
+        problems: type_utils.ProblemDict = {}
+        for e in self.planes_per_episode:
+            if e not in self.episodes_to_code:
+                if strict_check:
+                    raise ValueError(f'Plane(s) are defined in planes_per_episode for {e.name} events, but {e.name} events are not set up to be coded in episodes_to_code. Fix episodes_to_code.')
+                else:
+                    msg = f'Plane(s) are defined in planes_per_episode for {e.value} events, but {e.value} events are not set up to be coded.'
+                    if 'episodes_to_code' in problems:
+                        problems['episodes_to_code'] = '\n'.join([problems['episodes_to_code'], msg])
+                    else:
+                        problems['episodes_to_code'] = msg
+                    if 'planes_per_episode' not in problems:
+                        problems['planes_per_episode'] = {}
+                    problems['planes_per_episode'][e] = f'Plane(s) are defined in planes_per_episode for {e.value} events, but {e.value} events are not set up to be coded. Remove {e.value} from planes_per_episode.'
+        return problems
+
+    def _check_auto_coding_setup(self, strict_check) -> type_utils.ProblemDict:
+        problems = self._check_auto_markers(strict_check)
+        this_problems: type_utils.ProblemDict = {}
         if self.auto_code_sync_points:
             if annotation.Event.Sync_Camera not in self.episodes_to_code:
-                problems['episodes_to_code'] = f'The auto_code_sync_points option is configured, but {annotation.Event.Sync_Camera.value} points are not set to be coded in episodes_to_code.'
-                problems['auto_code_sync_points'] = f'The auto_code_sync_points option is configured, but {annotation.Event.Sync_Camera.value} points are not set to be coded in episodes_to_code. Fix episodes_to_code or remove auto_code_sync_points setup.'
+                if strict_check:
+                    raise ValueError(f'The auto_code_sync_points option is configured, but {annotation.Event.Sync_Camera} points are not set to be coded in episodes_to_code. Fix episodes_to_code.')
+                else:
+                    this_problems['episodes_to_code'] = f'The auto_code_sync_points option is configured, but {annotation.Event.Sync_Camera.value} points are not set to be coded in episodes_to_code.'
+                    this_problems['auto_code_sync_points'] = f'The auto_code_sync_points option is configured, but {annotation.Event.Sync_Camera.value} points are not set to be coded in episodes_to_code. Fix episodes_to_code or remove auto_code_sync_points setup.'
         if self.auto_code_trial_episodes:
             if annotation.Event.Trial not in self.episodes_to_code:
-                problems['episodes_to_code'] = f'The auto_code_trial_episodes option is configured, but {annotation.Event.Trial.value} episodes are not set to be coded in episodes_to_code.'
-                problems['auto_code_trial_episodes'] = f'The auto_code_trial_episodes option is configured, but {annotation.Event.Trial.value} episodes are not set to be coded in episodes_to_code. Fix episodes_to_code or remove auto_code_sync_points setup.'
+                if strict_check:
+                    raise ValueError(f'The auto_code_trial_episodes option is configured, but {annotation.Event.Trial} episodes are not set to be coded in episodes_to_code. Fix episodes_to_code.')
+                else:
+                    this_problems['episodes_to_code'] = f'The auto_code_trial_episodes option is configured, but {annotation.Event.Trial.value} episodes are not set to be coded in episodes_to_code.'
+                    this_problems['auto_code_trial_episodes'] = f'The auto_code_trial_episodes option is configured, but {annotation.Event.Trial.value} episodes are not set to be coded in episodes_to_code. Fix episodes_to_code or remove auto_code_sync_points setup.'
+        return type_utils.merge_problem_dicts(problems,this_problems)
+
+    def _check_auto_markers(self, strict_check) -> type_utils.ProblemDict:
+        problems: type_utils.ProblemDict = {}
+        if self.auto_code_sync_points:
+            missing_markers: list[int] = []
+            for i in self.auto_code_sync_points['markers']:
+                if not any([m.id==i for m in self.individual_markers]):
+                    if strict_check:
+                        raise ValueError(f'Marker "{i}" specified in auto_code_sync_points.markers, but unknown because not present in individual_markers')
+                    else:
+                        missing_markers.append(i)
+            if missing_markers:
+                problems['auto_code_sync_points'] = {}
+                problems['auto_code_sync_points']['markers'] = f'The markers {missing_markers} are not defined in individual_markers'
+        if self.auto_code_trial_episodes:
+            for f in ['start_markers','end_markers']:
+                missing_markers: list[int] = []
+                for i in self.auto_code_trial_episodes[f]:
+                    if not any([m.id==i for m in self.individual_markers]):
+                        if strict_check:
+                            raise ValueError(f'Marker "{i}" specified in auto_code_trial_episodes.{f}, but unknown because not present in individual_markers')
+                        else:
+                            missing_markers.append(i)
+                if missing_markers:
+                    if 'auto_code_trial_episodes' not in problems:
+                        problems['auto_code_trial_episodes'] = {}
+                    problems['auto_code_trial_episodes'][f] = f'The markers {missing_markers} are not defined in individual_markers'
+        return problems
+
+    def _check_sync_ref(self, strict_check):
+        problems: type_utils.ProblemDict = {}
+        if self.sync_ref_recording is not None:
+            type_utils.merge_problem_dicts(problems, self._check_recordings([self.sync_ref_recording], 'sync_ref_recording', False))
+            type_utils.merge_problem_dicts(problems, self._check_recordings(self.sync_ref_average_recordings, 'sync_average_recordings', False))
+            for a in ['sync_ref_do_time_stretch', 'sync_ref_stretch_which', 'sync_ref_average_recordings']:
+                if getattr(self,a) is None:
+                    if strict_check:
+                        raise ValueError(f'{a} should be set in the study setup when sync_ref_recording is set')
+                    else:
+                        problems[a] = f'{a} should be set when sync_ref_recording is set'
+            if self.sync_ref_average_recordings and self.sync_ref_recording in self.sync_ref_average_recordings:
+                if strict_check:
+                    raise ValueError(f'Recording {self.sync_ref_recording} is the reference recording for sync, should not be specified in sync_average_recordings')
+                else:
+                    problems['sync_ref_average_recordings'] = f'Recording {self.sync_ref_recording} is the reference recording for sync, cannot be specified in sync_average_recordings'
+        return problems
+
+    def _check_et_sync_method(self, strict_check) -> type_utils.ProblemDict:
+        problems: type_utils.ProblemDict = {}
+        if self.get_cam_movement_for_et_sync_method=='function':
+            if strict_check:
+                if not self.get_cam_movement_for_et_sync_function or not all([x in self.get_cam_movement_for_et_sync_function for x in ["module_or_file","function","parameters"]]):
+                    raise ValueError('if get_cam_movement_for_et_sync_method is set to "function", get_cam_movement_for_et_sync_function should be a dict specifying "module_or_file", "function", and "parameters"')
+            else:
+                t = utils.unpack_none_union(study_parameter_types['get_cam_movement_for_et_sync_function'])[0]
+                problems['get_cam_movement_for_et_sync_function'] = {k:f'{k} should be set when get_cam_movement_for_et_sync_function is set to "function"' for k in t.__required_keys__ if not self.get_cam_movement_for_et_sync_function or k not in self.get_cam_movement_for_et_sync_function or (k!='parameters' and not self.get_cam_movement_for_et_sync_function[k])}
+        return problems
+
+    def field_problems(self) -> type_utils.ProblemDict:
+        problems: type_utils.ProblemDict = {}
+        type_utils.merge_problem_dicts(problems, self._check_planes_per_episode(False))
+        type_utils.merge_problem_dicts(problems, self._check_episodes_to_code(False))
+        type_utils.merge_problem_dicts(problems, self._check_auto_coding_setup(False))
+        type_utils.merge_problem_dicts(problems, self._check_recordings(self.video_make_which, 'video_make_which', False))
+        type_utils.merge_problem_dicts(problems, self._check_recordings(self.video_recording_colors, 'video_recording_colors', False))
+        type_utils.merge_problem_dicts(problems, self._check_sync_ref(False))
+        type_utils.merge_problem_dicts(problems, self._check_et_sync_method(False))
         return problems
 
     def store_as_json(self, path: str|pathlib.Path|None=None):
