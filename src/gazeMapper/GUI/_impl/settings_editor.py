@@ -154,6 +154,8 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
                 imgui.tree_pop()
             elif problems and f in problems:
                 imgui.pop_style_color()
+                if isinstance(problems[f],str):
+                    utils.draw_hover_text(problems[f],text='', hovered_flags=imgui.HoveredFlags_.for_tooltip | imgui.HoveredFlags_.delay_normal)
             continue
 
         # simple field, set up for drawing
