@@ -258,7 +258,7 @@ class GUI:
     def load_project(self, path: pathlib.Path):
         self.project_dir = path
         try:
-            self.study_config = config.Study.load_from_json(config.guess_config_dir(path))
+            self.study_config = config.Study.load_from_json(config.guess_config_dir(path), strict_check=False)
             self.sessions = session.get_sessions_from_directory(path, self.study_config.session_def)
         except Exception as e:
             utils.push_popup(self, msg_box.msgbox, "Project loading error", f"Failed to load the project at {path}:\n{e}", msg_box.MsgBox.error)
