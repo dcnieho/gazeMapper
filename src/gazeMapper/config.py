@@ -259,7 +259,7 @@ class Study:
                         missing_markers.append(i)
             if missing_markers:
                 problems['auto_code_sync_points'] = {}
-                problems['auto_code_sync_points']['markers'] = f'The markers {missing_markers[0] if len(missing_markers)==1 else missing_markers} are not defined in individual_markers'
+                problems['auto_code_sync_points']['markers'] = f'The marker(s) {missing_markers[0] if len(missing_markers)==1 else missing_markers} are not defined in individual_markers'
         if self.auto_code_trial_episodes:
             for f in ['start_markers','end_markers']:
                 missing_markers: list[int] = []
@@ -272,7 +272,7 @@ class Study:
                 if missing_markers:
                     if 'auto_code_trial_episodes' not in problems:
                         problems['auto_code_trial_episodes'] = {}
-                    problems['auto_code_trial_episodes'][f] = f'The markers {missing_markers[0] if len(missing_markers)==1 else missing_markers} are not defined in individual_markers'
+                    problems['auto_code_trial_episodes'][f] = f'The marker(s) {missing_markers[0] if len(missing_markers)==1 else missing_markers} are not defined in individual_markers'
         return problems
 
     def _check_sync_ref(self, strict_check):
