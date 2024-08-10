@@ -107,7 +107,10 @@ class Study:
                  video_show_camera_in_other                     : bool                              = True,
                  video_show_gaze_vec_in_ref                     : bool                              = True,
                  video_show_gaze_vec_in_other                   : bool                              = False,
-                 video_gaze_to_plane_margin                     : float                             = 0.25
+                 video_gaze_to_plane_margin                     : float                             = 0.25,
+
+                 # not a class member
+                 strict_check                                   : bool                              = True
                  ):
         self.session_def                                    = session_def
         self.planes                                         = planes
@@ -157,36 +160,38 @@ class Study:
         self.video_show_gaze_vec_in_other                   = video_show_gaze_vec_in_other
         self.video_gaze_to_plane_margin                     = video_gaze_to_plane_margin    # fraction of plane size, added to each side of the plane
 
-        self._check_all(on_construct=True)
+        self.check_valid(strict_check=strict_check)
 
-    def _check_all(self, on_construct=False):
+    def check_valid(self, strict_check=True):
         self._check_planes_per_episode()
         self._check_auto_markers()
         self._check_recordings(self.video_make_which, 'video_make_which')
         self._check_recordings(self.video_recording_colors, 'video_recording_colors')
         if self.sync_ref_recording is not None:
             self._check_recordings([self.sync_ref_recording], 'sync_ref_recording')
-            if on_construct:
+            self._check_recordings(self.sync_ref_average_recordings, 'sync_average_recordings')
+        if self.get_cam_movement_for_et_sync_method not in ['','plane','function']:
+            raise ValueError('get_cam_movement_for_et_sync_method parameter should be an empty string, "plane", or "function"')
+
+        if strict_check:
+            if self.sync_ref_recording is not None:
                 for a in ['sync_ref_do_time_stretch', 'sync_ref_stretch_which', 'sync_ref_average_recordings']:
                     if getattr(self,a) is None:
                         raise ValueError(f'{a} should be set in the study setup when sync_ref_recording is set')
-            self._check_recordings(self.sync_ref_average_recordings, 'sync_average_recordings')
-            if on_construct and self.sync_ref_recording in self.sync_ref_average_recordings:
-                raise ValueError(f'Recording {self.sync_ref_recording} is the reference recording for sync, should not be specified in sync_average_recordings')
-        if self.get_cam_movement_for_et_sync_method not in ['','plane','function']:
-            raise ValueError('get_cam_movement_for_et_sync_method parameter should be an empty string, "plane", or "function"')
-        if on_construct and self.get_cam_movement_for_et_sync_method=='function':
-            if not self.get_cam_movement_for_et_sync_function or not all([x in self.get_cam_movement_for_et_sync_function for x in ["module_or_file","function","parameters"]]):
-                raise ValueError('if get_cam_movement_for_et_sync_method is set to "function", get_cam_movement_for_et_sync_function should be a dict specifying "module_or_file", "function", and "parameters"')
-        for e in self.planes_per_episode:
-            if e not in self.episodes_to_code:
-                raise ValueError(f'Plane(s) are defined in planes_per_episode for {e.name} events, but {e.name} events are not set up to be coded in episodes_to_code. Fix episodes_to_code.')
-        if self.auto_code_sync_points:
-            if annotation.Event.Sync_Camera not in self.episodes_to_code:
-                raise ValueError(f'The auto_code_sync_points option is configured, but {annotation.Event.Sync_Camera} points are not set to be coded in episodes_to_code. Fix episodes_to_code.')
-        if self.auto_code_trial_episodes:
-            if annotation.Event.Trial not in self.episodes_to_code:
-                raise ValueError(f'The auto_code_trials_episodes option is configured, but {annotation.Event.Trial} episodes are not set to be coded in episodes_to_code. Fix episodes_to_code.')
+                if self.sync_ref_recording in self.sync_ref_average_recordings:
+                    raise ValueError(f'Recording {self.sync_ref_recording} is the reference recording for sync, should not be specified in sync_average_recordings')
+            if self.get_cam_movement_for_et_sync_method=='function':
+                if not self.get_cam_movement_for_et_sync_function or not all([x in self.get_cam_movement_for_et_sync_function for x in ["module_or_file","function","parameters"]]):
+                    raise ValueError('if get_cam_movement_for_et_sync_method is set to "function", get_cam_movement_for_et_sync_function should be a dict specifying "module_or_file", "function", and "parameters"')
+            for e in self.planes_per_episode:
+                if e not in self.episodes_to_code:
+                    raise ValueError(f'Plane(s) are defined in planes_per_episode for {e.name} events, but {e.name} events are not set up to be coded in episodes_to_code. Fix episodes_to_code.')
+            if self.auto_code_sync_points:
+                if annotation.Event.Sync_Camera not in self.episodes_to_code:
+                    raise ValueError(f'The auto_code_sync_points option is configured, but {annotation.Event.Sync_Camera} points are not set to be coded in episodes_to_code. Fix episodes_to_code.')
+            if self.auto_code_trial_episodes:
+                if annotation.Event.Trial not in self.episodes_to_code:
+                    raise ValueError(f'The auto_code_trial_episodes option is configured, but {annotation.Event.Trial} episodes are not set to be coded in episodes_to_code. Fix episodes_to_code.')
 
         # ensure some members are of the right class, and apply defaults
         self.auto_code_sync_points = AutoCodeSyncPoints(self.auto_code_sync_points)
@@ -277,7 +282,7 @@ class Study:
         )
 
     @staticmethod
-    def load_from_json(path: str | pathlib.Path) -> 'Study':
+    def load_from_json(path: str | pathlib.Path, strict_check: bool=True) -> 'Study':
         path = pathlib.Path(path)
         if path.is_dir():
             d_path = path / Study.default_json_file_name
@@ -306,12 +311,12 @@ class Study:
                 continue
             planes.append(plane.Definition.load_from_json(p_file))
 
-        return Study(sess_def, planes, working_directory=path.parent, **kwds)
+        return Study(sess_def, planes, working_directory=path.parent, **kwds, strict_check=strict_check)
 
 # get defaults for default argument of Study constructor
 _params = inspect.signature(Study.__init__).parameters
 study_defaults = {k:d for k in _params if (d:=_params[k].default)!=inspect._empty}
-study_parameter_types = {k:_params[k].annotation for k in _params if k!='self'}
+study_parameter_types = {k:_params[k].annotation for k in _params if k not in ['self','strict_check']}
 del _params
 
 def guess_config_dir(working_dir: str|pathlib.Path, config_dir_name: str = "config", json_file_name: str = Study.default_json_file_name) -> pathlib.Path:
@@ -391,7 +396,7 @@ class StudyOverride:
                     setattr(study,p,val)
         # check resulting study is valid
         try:
-            study._check_all()
+            study.check_valid()
         except Exception as oe:
             if self.level==OverrideLevel.FunctionArgs:
                 err_text = 'when applying parameter overrides provided as extra arguments to the processing function'

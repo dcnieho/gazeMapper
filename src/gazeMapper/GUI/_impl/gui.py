@@ -407,7 +407,7 @@ class GUI:
         changed, new_config = settings_editor.draw(copy.deepcopy(self.study_config), fields, config.study_parameter_types, config.study_defaults, self._possible_value_getters, self.study_config.field_problems())
         if changed:
             try:
-                new_config._check_all()
+                new_config.check_valid(strict_check=False)
             except Exception as e:
                 # do not persist invalid config, inform user of problem
                 utils.push_popup(self, msg_box.msgbox, "Settings error", f"You cannot make this change to the project's settings:\n{e}", msg_box.MsgBox.error)
@@ -587,7 +587,7 @@ class GUI:
         changed, new_config = settings_editor.draw(copy.deepcopy(self.study_config), ['episodes_to_code', 'planes_per_episode'], config.study_parameter_types, {}, self._possible_value_getters)
         if changed:
             try:
-                new_config._check_all()
+                new_config.check_valid(strict_check=False)
             except Exception as e:
                 # do not persist invalid config, inform user of problem
                 utils.push_popup(self, msg_box.msgbox, "Settings error", f"You cannot make this change to the project's settings:\n{e}", msg_box.MsgBox.error)
