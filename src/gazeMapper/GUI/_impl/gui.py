@@ -6,6 +6,7 @@ import platform
 import webbrowser
 from typing import Callable
 import copy
+import threading
 
 import imgui_bundle
 from imgui_bundle import imgui, immapp, imgui_md, hello_imgui, glfw_utils, icons_fontawesome_6 as ifa6
@@ -18,7 +19,7 @@ import glassesValidator
 
 from ... import config, marker, plane, session, type_utils, version
 from .. import async_thread
-from . import callbacks, colors, file_picker, image_helper, msg_box, settings_editor, utils
+from . import callbacks, colors, file_picker, image_helper, msg_box, session_lister, settings_editor, utils
 
 
 class GUI:
@@ -29,7 +30,11 @@ class GUI:
 
         self.project_dir: pathlib.Path = None
         self.study_config: config.Study = None
-        self.sessions: list[session.Session] = None
+
+        self.sessions: dict[int, utils.Session] = {}
+        self.sessions_lock: threading.Lock      = threading.Lock()
+        self.selected_sessions: dict[int, bool] = {}
+        self.session_lister = session_lister.SessionList(self.sessions, self.sessions_lock, self.selected_sessions)
 
         self._possible_value_getters: dict[str] = {}
 
@@ -259,10 +264,10 @@ class GUI:
     def load_project(self, path: pathlib.Path):
         self.project_dir = path
         try:
-            self.study_config = config.Study.load_from_json(config.guess_config_dir(path), strict_check=False)
-            self.sessions = session.get_sessions_from_directory(path, self.study_config.session_def)
+            self.study_config = config.Study.load_from_json(config.guess_config_dir(self.project_dir), strict_check=False)
+            self._reload_sessions()
         except Exception as e:
-            utils.push_popup(self, msg_box.msgbox, "Project loading error", f"Failed to load the project at {path}:\n{e}", msg_box.MsgBox.error)
+            utils.push_popup(self, msg_box.msgbox, "Project loading error", f"Failed to load the project at {self.project_dir}:\n{e}", msg_box.MsgBox.error)
             self.close_project()
             return
 
@@ -288,6 +293,12 @@ class GUI:
         self._window_list = [self._sessions_pane, self._project_settings_pane]
         self._to_focus = self._sessions_pane.label  # ensure sessions pane remains focused
 
+    def _reload_sessions(self):
+        counter = -1
+        self.sessions |= {(counter:=counter+1):utils.Session(s) for s in session.get_sessions_from_directory(self.project_dir, self.study_config.session_def)}
+        self.selected_sessions |= {k:False for k in self.sessions}
+        self._session_lister_set_actions_to_show()
+
     def _check_project_setups_state(self):
         if self.study_config is not None:
             self._problems_cache = self.study_config.field_problems()
@@ -306,6 +317,9 @@ class GUI:
             not self.need_setup_plane and \
             not self.need_setup_episode
 
+    def _session_lister_set_actions_to_show(self):
+        pass # TODO
+
     def close_project(self):
         self._project_settings_pane.is_visible = False
         # trigger update so visibility change is honored, also delete other windows in the process
@@ -318,7 +332,8 @@ class GUI:
         self.project_dir = None
         self._possible_value_getters = {}
         self.study_config = None
-        self.sessions = None
+        self.sessions.clear()
+        self.selected_sessions.clear()
         self._need_set_window_title = True
 
 
@@ -341,6 +356,8 @@ class GUI:
             imgui.same_line()
             imgui.text_colored(colors.error, 'tab before you can import and process recording sessions.')
             return
+
+        self.session_lister.draw()
 
     def _unopened_interface_drawer(self):
         avail      = imgui.get_content_region_avail()
@@ -422,6 +439,7 @@ class GUI:
                 # persist changed config
                 self.study_config = new_config
                 self.study_config.store_as_json()
+                self._session_lister_set_actions_to_show()
 
 
     def _session_definition_pane_drawer(self):
@@ -444,6 +462,7 @@ class GUI:
             imgui.same_line()
             if imgui.button(ifa6.ICON_FA_TRASH_CAN+f' delete recording##{r.name}'):
                 callbacks.delete_recording(self.study_config, r)
+                self._reload_sessions()
         imgui.end_table()
         if imgui.button('+ new recording'):
             new_rec_name = ''
@@ -488,7 +507,7 @@ class GUI:
                 return 0 if imgui.is_key_released(imgui.Key.enter) else None
 
             buttons = {
-                ifa6.ICON_FA_CHECK+" Create recording": (lambda: callbacks.make_recording(self.study_config, new_rec_type, new_rec_name), lambda: not _valid_rec_name() or new_rec_type is None),
+                ifa6.ICON_FA_CHECK+" Create recording": (lambda: (callbacks.make_recording(self.study_config, new_rec_type, new_rec_name), self._reload_sessions()), lambda: not _valid_rec_name() or new_rec_type is None),
                 ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
             }
             utils.push_popup(self, lambda: utils.popup("Add recording", _add_rec_popup, buttons = buttons, outside=False))
