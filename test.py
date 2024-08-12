@@ -10,7 +10,8 @@ from gazeMapper.process.sync_to_ref import process as sync_to_ref
 from gazeMapper.process.gaze_to_plane import process as gaze_to_plane
 from gazeMapper.process.export_trials import process as export_trials
 from gazeMapper.process.run_validation import process as run_validation
-from gazeMapper.process.auto_code_sync_and_trials import process as auto_code_sync_and_trials
+from gazeMapper.process.auto_code_sync_points import process as auto_code_sync_points
+from gazeMapper.process.auto_code_trials import process as auto_code_trials
 from gazeMapper.process.make_video import process as make_video
 
 
@@ -124,12 +125,12 @@ study_config = config.Study.load_from_json(config.guess_config_dir(proj))
 #         run_validation(s.recordings[r].info.working_directory)
 
 # for s in sessions:
-#     if study_config.sync_ref_recording and not study_config.auto_code_sync_points:
-#         recs = [study_config.sync_ref_recording]
-#     else:
-#         recs = et_recs+cam_recs
-#     for r in recs:
-#         auto_code_sync_and_trials(s.recordings[r].info.working_directory)
+#     if study_config.sync_ref_recording:
+#         auto_code_trials(s.recordings[study_config.sync_ref_recording].info.working_directory)
+
+# for s in sessions:
+#     for r in et_recs+cam_recs:
+#         auto_code_sync_points(s.recordings[r].info.working_directory)
 
 for s in sessions:
     make_video(s.working_directory, show_visualization=True)
