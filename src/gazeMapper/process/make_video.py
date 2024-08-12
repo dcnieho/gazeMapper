@@ -68,7 +68,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
     all_poses       : dict[str, dict[str, dict[int, plane.Pose]]]                   = {}
     recs = {r for r in session_info.recordings}
     for rec in recs:
-        rec_def = session_info.recordings[rec].defition
+        rec_def = session_info.recordings[rec].definition
         rec_working_dir = working_dir / rec
 
         # get interval(s) coded to be analyzed, if any
@@ -208,7 +208,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
             pose_estimators[rec].add_plane(p, planes_setup[p], None if study_config.video_process_planes_for_all_frames else analyze_frames[p])
         for i in (markers:=marker.get_marker_dict_from_list(study_config.individual_markers)):
             pose_estimators[rec].add_individual_marker(i, markers[i])
-        sync_target_function = _get_sync_function(study_config, session_info.recordings[rec].defition, None if annotation.Event.Sync_ET_Data not in episodes[rec] else episodes[rec][annotation.Event.Sync_ET_Data])
+        sync_target_function = _get_sync_function(study_config, session_info.recordings[rec].definition, None if annotation.Event.Sync_ET_Data not in episodes[rec] else episodes[rec][annotation.Event.Sync_ET_Data])
         if sync_target_function is not None:
             pose_estimators[rec].register_extra_processing_fun('sync', *sync_target_function)
         if study_config.sync_ref_recording and rec!=study_config.sync_ref_recording:

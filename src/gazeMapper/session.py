@@ -26,8 +26,8 @@ utils.register_type(utils.CustomTypeEntry(RecordingDefinition,'__session.Recordi
 
 class Recording:
     @typeguard.typechecked
-    def __init__(self, defition: RecordingDefinition, info:EyeTrackerRecording|camera_recording.Recording|None=None):
-        self.defition   = defition
+    def __init__(self, definition: RecordingDefinition, info:EyeTrackerRecording|camera_recording.Recording|None=None):
+        self.definition = definition
         self.info       = info
 utils.register_type(utils.CustomTypeEntry(Recording,'__session.Recording__',lambda x: {'defition': x.defition, 'info': x.info}, lambda x: Recording(**x)))
 
