@@ -151,8 +151,14 @@ class Session:
         self.check_recording_info(which, rec_info)
         self.recordings[which] = Recording(rec_def, rec_info)
 
+    def num_recordings(self) -> int:
+        return sum((r.name in self.recordings for r in self.definition.recordings))
+
     def has_all_recordings(self) -> bool:
-        return all([r.name in self.recordings for r in self.definition.recordings])
+        return all((r.name in self.recordings for r in self.definition.recordings))
+
+    def missing_recordings(self) -> list[str]:
+        return [r.name for r in self.definition.recordings if r.name not in self.recordings]
 
     @staticmethod
     def from_definition(definition: SessionDefinition|None, path: str | pathlib.Path) -> 'Session':
