@@ -9,6 +9,8 @@ Tool for automated world-based analysis of wearable eye tracker data.
 If you use this tool or any of the code in this repository, please cite:<br>
 Niehorster, D.C., Hessels, R.S., Nyström, M., Benjamins, J.S. and Hooge, I.T.C. (in prep). gazeMapper: A tool for automated world-based analysis of wearable eye tracker data
 
+**GUI, executable and example data are work in progress, expected before end of September**
+
 # How to acquire
 GazeMapper is available from `https://github.com/dcnieho/gazeMapper`, and supports Python 3.10 and 3.11 on Windows, MacOS and Linux.
 
