@@ -20,7 +20,6 @@ class SessionList():
         self.display_actions: list[utils.ProcessAction] = []
         self._view_column_count_base = 3    # selector, name
         self._view_column_count = None
-        self.set_actions_to_show(utils.ProcessAction.IMPORT)
 
         with self.items_lock:
             self._num_items = len(self.items)
@@ -38,8 +37,8 @@ class SessionList():
             imgui.TableFlags_.highlight_hovered_column
         )
 
-    def set_actions_to_show(self, actions: utils.ProcessAction):
-        self.display_actions = [k for k in utils.ProcessAction if k in actions]
+    def set_actions_to_show(self, actions: set[utils.ProcessAction]):
+        self.display_actions = [k for k in utils.ProcessAction if k in actions] # filter out crap and fix display order
         self._view_column_count = self._view_column_count_base + len(self.display_actions)
 
     def draw(self):

@@ -318,7 +318,7 @@ class GUI:
             not self.need_setup_episode
 
     def _session_lister_set_actions_to_show(self):
-        pass # TODO
+        self.session_lister.set_actions_to_show(utils.actions_to_show(self.study_config))
 
     def close_project(self):
         self._project_settings_pane.is_visible = False

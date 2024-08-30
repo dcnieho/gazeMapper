@@ -299,9 +299,17 @@ class ProcessAction(enum.Flag):
     def displayable_name(self):
         return self.name.replace("_", " ").title()
 
-def is_process_action_session_level(action: ProcessAction):
+def is_process_action_session_level(action: ProcessAction) -> bool:
     return action in [ProcessAction.EXPORT_TRIALS, ProcessAction.MAKE_VIDEO]
 
+def actions_to_show(conf: config.Study|None) -> set[ProcessAction]:
+    actions: set[ProcessAction] = set()
+    if conf is None:
+        return actions
+
+    actions.update([ProcessAction.IMPORT, ProcessAction.CODE_EPISODES, ProcessAction.DETECT_MARKERS, ProcessAction.GAZE_TO_PLANE, ProcessAction.EXPORT_TRIALS, ProcessAction.MAKE_VIDEO])
+
+    return actions
 
 class Session(session.Session):
     def __init__(self, sess: session.Session):
