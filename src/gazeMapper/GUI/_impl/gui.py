@@ -8,6 +8,7 @@ from typing import Callable
 import copy
 import threading
 
+import glassesTools.annotation
 import imgui_bundle
 from imgui_bundle import imgui, immapp, imgui_md, hello_imgui, glfw_utils, icons_fontawesome_6 as ifa6
 import glfw
@@ -318,7 +319,22 @@ class GUI:
             not self.need_setup_episode
 
     def _session_lister_set_actions_to_show(self):
-        self.session_lister.set_actions_to_show(utils.actions_to_show(self.study_config))
+        if self.study_config is None:
+            self.session_lister.set_actions_to_show(set())
+
+        actions = {utils.ProcessAction.IMPORT, utils.ProcessAction.CODE_EPISODES, utils.ProcessAction.DETECT_MARKERS, utils.ProcessAction.GAZE_TO_PLANE, utils.ProcessAction.EXPORT_TRIALS, utils.ProcessAction.MAKE_VIDEO}
+        if self.study_config.auto_code_sync_points:
+            actions.add(utils.ProcessAction.AUTO_CODE_SYNC)
+        if self.study_config.auto_code_trial_episodes and self.study_config.sync_ref_recording:
+            actions.add(utils.ProcessAction.AUTO_CODE_TRIALS)
+        if self.study_config.get_cam_movement_for_et_sync_method in ['plane', 'function']:
+            actions.add(utils.ProcessAction.SYNC_ET_TO_CAM)
+        if self.study_config.sync_ref_recording:
+            actions.add(utils.ProcessAction.SYNC_TO_REFERENCE)
+        if glassesTools.annotation.Event.Validate in self.study_config.planes_per_episode:
+            actions.add(utils.ProcessAction.RUN_VALIDATION)
+
+        self.session_lister.set_actions_to_show(actions)
 
     def close_project(self):
         self._project_settings_pane.is_visible = False
