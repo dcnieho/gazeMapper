@@ -82,9 +82,9 @@ class SessionList():
                 if len(self.sorted_ids) < sorted_ids_len:
                     # we've just filtered out some items from view. Deselect those
                     # NB: will also be triggered when removing an item, doesn't matter
-                    for id in self.items:
-                        if id not in self.sorted_ids:
-                            self.selected_items[id] = False
+                    for iid in self.items:
+                        if iid not in self.sorted_ids:
+                            self.selected_items[iid] = False
 
                 # Headers
                 imgui.table_angled_headers_row()
@@ -122,10 +122,10 @@ class SessionList():
                 if self.sorted_ids and self._last_clicked_id not in self.sorted_ids:
                     # default to topmost if last_clicked unknown, or no longer on screen due to filter
                     self._last_clicked_id = self.sorted_ids[0]
-                for id in self.sorted_ids:
+                for iid in self.sorted_ids:
                     imgui.table_next_row()
 
-                    item = self.items[id]
+                    item = self.items[iid]
                     missing_recs = item.missing_recordings()
                     num_columns_drawn = 0
                     selectable_clicked = False
@@ -149,10 +149,10 @@ class SessionList():
                             imgui.push_style_var(imgui.StyleVar_.frame_border_size, 0.)
                             imgui.push_style_var(imgui.StyleVar_.frame_padding    , (0.,0.))
                             imgui.push_style_var(imgui.StyleVar_.item_spacing     , (0.,cell_padding_y))
-                            selectable_clicked, selectable_out = imgui.selectable(f"##{id}_hitbox", self.selected_items[id], flags=imgui.SelectableFlags_.span_all_columns|imgui.SelectableFlags_.allow_overlap|imgui.internal.SelectableFlagsPrivate_.select_on_click, size=(0,frame_height+cell_padding_y))
+                            selectable_clicked, selectable_out = imgui.selectable(f"##{iid}_hitbox", self.selected_items[iid], flags=imgui.SelectableFlags_.span_all_columns|imgui.SelectableFlags_.allow_overlap|imgui.internal.SelectableFlagsPrivate_.select_on_click, size=(0,frame_height+cell_padding_y))
                             imgui.set_cursor_pos_y(cur_pos_y)   # instead of imgui.same_line(), we just need this part of its effect
                             imgui.pop_style_var(3)
-                            selectable_right_clicked = utils.handle_item_hitbox_events(id, self.selected_items, context_menu=None)
+                            selectable_right_clicked = utils.handle_item_hitbox_events(iid, self.selected_items, context_menu=None)
                             has_drawn_hitbox = True
 
                         if num_columns_drawn==1:
@@ -170,7 +170,7 @@ class SessionList():
                         match ri:
                             case 0:
                                 # Selector
-                                checkbox_clicked, checkbox_out = utils.my_checkbox(f"##{id}_selected", self.selected_items[id], frame_size=(0,0), frame_padding_override=(imgui.get_style().frame_padding.x/2,imgui.get_style().frame_padding.y))
+                                checkbox_clicked, checkbox_out = utils.my_checkbox(f"##{iid}_selected", self.selected_items[iid], frame_size=(0,0), frame_padding_override=(imgui.get_style().frame_padding.x/2,imgui.get_style().frame_padding.y))
                                 checkbox_hovered = imgui.is_item_hovered()
                             case 1:
                                 # Name
@@ -196,7 +196,7 @@ class SessionList():
                     any_selectable_clicked = any_selectable_clicked or selectable_clicked or selectable_right_clicked
 
                     self._last_clicked_id = utils.selectable_item_logic(
-                        id, self.selected_items, self._last_clicked_id, self.sorted_ids,
+                        iid, self.selected_items, self._last_clicked_id, self.sorted_ids,
                         selectable_clicked, selectable_out, overlayed_hovered=checkbox_hovered or info_button_hovered,
                         overlayed_clicked=checkbox_clicked, new_overlayed_state=checkbox_out
                         )
@@ -204,7 +204,7 @@ class SessionList():
                     # further deal with doubleclick on item
                     if selectable_clicked and not checkbox_hovered: # don't enter this branch if interaction is with checkbox on the table row
                         if not imgui.get_io().key_ctrl and not imgui.get_io().key_shift and imgui.is_mouse_double_clicked(imgui.MouseButton_.left):
-                            self._show_item_info(id)
+                            self._show_item_info(iid)
 
             last_y = imgui.get_cursor_screen_pos().y
             imgui.end_table()
