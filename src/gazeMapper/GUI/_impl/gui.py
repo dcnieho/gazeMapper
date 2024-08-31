@@ -18,7 +18,7 @@ import OpenGL.GL as gl
 import glassesTools
 import glassesValidator
 
-from ... import config, marker, plane, session, type_utils, version
+from ... import config, marker, plane, process, session, type_utils, version
 from .. import async_thread
 from . import callbacks, colors, file_picker, image_helper, msg_box, session_lister, settings_editor, utils
 
@@ -322,17 +322,17 @@ class GUI:
         if self.study_config is None:
             self.session_lister.set_actions_to_show(set())
 
-        actions = {utils.ProcessAction.IMPORT, utils.ProcessAction.CODE_EPISODES, utils.ProcessAction.DETECT_MARKERS, utils.ProcessAction.GAZE_TO_PLANE, utils.ProcessAction.EXPORT_TRIALS, utils.ProcessAction.MAKE_VIDEO}
+        actions = {process.Action.IMPORT, process.Action.CODE_EPISODES, process.Action.DETECT_MARKERS, process.Action.GAZE_TO_PLANE, process.Action.EXPORT_TRIALS, process.Action.MAKE_VIDEO}
         if self.study_config.auto_code_sync_points:
-            actions.add(utils.ProcessAction.AUTO_CODE_SYNC)
+            actions.add(process.Action.AUTO_CODE_SYNC)
         if self.study_config.auto_code_trial_episodes and self.study_config.sync_ref_recording:
-            actions.add(utils.ProcessAction.AUTO_CODE_TRIALS)
+            actions.add(process.Action.AUTO_CODE_TRIALS)
         if self.study_config.get_cam_movement_for_et_sync_method in ['plane', 'function']:
-            actions.add(utils.ProcessAction.SYNC_ET_TO_CAM)
+            actions.add(process.Action.SYNC_ET_TO_CAM)
         if self.study_config.sync_ref_recording:
-            actions.add(utils.ProcessAction.SYNC_TO_REFERENCE)
+            actions.add(process.Action.SYNC_TO_REFERENCE)
         if glassesTools.annotation.Event.Validate in self.study_config.planes_per_episode:
-            actions.add(utils.ProcessAction.RUN_VALIDATION)
+            actions.add(process.Action.RUN_VALIDATION)
 
         self.session_lister.set_actions_to_show(actions)
 

@@ -2,6 +2,7 @@ import threading
 from imgui_bundle import imgui, icons_fontawesome_6 as ifa6
 
 from . import colors, utils
+from ... import process
 
 class SessionList():
     def __init__(self,
@@ -17,7 +18,7 @@ class SessionList():
         self._last_clicked_id: int = None
         self._require_sort: bool = True
 
-        self.display_actions: list[utils.ProcessAction] = []
+        self.display_actions: list[process.Action] = []
         self._view_column_count_base = 3    # selector, name
         self._view_column_count = None
 
@@ -37,8 +38,8 @@ class SessionList():
             imgui.TableFlags_.highlight_hovered_column
         )
 
-    def set_actions_to_show(self, actions: set[utils.ProcessAction]):
-        self.display_actions = [k for k in utils.ProcessAction if k in actions] # filter out crap and fix display order
+    def set_actions_to_show(self, actions: set[process.Action]):
+        self.display_actions = [k for k in process.Action if k in actions] # filter out crap and fix display order
         self._view_column_count = self._view_column_count_base + len(self.display_actions)
 
     def draw(self):
@@ -61,7 +62,7 @@ class SessionList():
             imgui.table_setup_column("Selector", imgui.TableColumnFlags_.no_hide | imgui.TableColumnFlags_.no_sort | imgui.TableColumnFlags_.no_resize | imgui.TableColumnFlags_.no_reorder, init_width_or_weight=checkbox_width)  # 0
             imgui.table_setup_column("Name", imgui.TableColumnFlags_.default_sort | imgui.TableColumnFlags_.no_hide | imgui.TableColumnFlags_.no_resize)  # 1
             imgui.table_setup_column("Recordings", imgui.TableColumnFlags_.no_resize | imgui.TableColumnFlags_.angled_header)  # 2
-            for k in utils.ProcessAction:   # 3+
+            for k in process.Action:   # 3+
                 if k in self.display_actions:
                     imgui.table_setup_column(k.displayable_name, imgui.TableColumnFlags_.no_resize | imgui.TableColumnFlags_.angled_header)
 
@@ -219,8 +220,8 @@ class SessionList():
             # show menu when right-clicking the empty space
             # TODO
 
-    def _draw_status_widget(self, item: utils.Session, action: utils.ProcessAction):
-        if utils.is_process_action_session_level(action):
+    def _draw_status_widget(self, item: utils.Session, action: process.Action):
+        if process.is_action_session_level(action):
             # this is TODO
             imgui.text(item.state[action].displayable_name[0])
         else:

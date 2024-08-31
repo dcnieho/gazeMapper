@@ -7,10 +7,9 @@ import pathlib
 from typing import Any, Callable
 import numpy as np
 import cv2
-import enum
 
 from . import image_helper, msg_box
-from ... import config, session
+from ... import config, process, session
 
 
 # https://gist.github.com/Willy-JL/f733c960c6b0d2284bcbee0316f88878
@@ -274,34 +273,6 @@ def get_aruco_marker_image(sz: int, id:int, dictionary_id: int, marker_border_bi
     return image_helper.ImageHelper(marker_image)
 
 
-class ProcessState(enum.IntEnum):
-    Not_Started = enum.auto()
-    Pending     = enum.auto()
-    Running     = enum.auto()
-    Completed   = enum.auto()
-    @property
-    def displayable_name(self):
-        return self.name.replace("_", " ")
-
-class ProcessAction(enum.Flag):
-    IMPORT = enum.auto()
-    CODE_EPISODES = enum.auto()
-    DETECT_MARKERS = enum.auto()
-    GAZE_TO_PLANE = enum.auto()
-    AUTO_CODE_SYNC = enum.auto()
-    AUTO_CODE_TRIALS = enum.auto()
-    SYNC_ET_TO_CAM = enum.auto()
-    SYNC_TO_REFERENCE = enum.auto()
-    RUN_VALIDATION = enum.auto()
-    EXPORT_TRIALS = enum.auto()
-    MAKE_VIDEO = enum.auto()
-    @property
-    def displayable_name(self):
-        return self.name.replace("_", " ").title()
-
-def is_process_action_session_level(action: ProcessAction) -> bool:
-    return action in [ProcessAction.EXPORT_TRIALS, ProcessAction.MAKE_VIDEO]
-
 class Session(session.Session):
     def __init__(self, sess: session.Session):
         for f in ['definition', 'name', 'working_directory']:
@@ -309,13 +280,13 @@ class Session(session.Session):
         self.recordings = {r:Recording(sess.recordings[r]) for r in sess.recordings}
 
         # state coding: session level
-        self.state = {k:ProcessState.Not_Started for k in ProcessAction if is_process_action_session_level(k)}
+        self.state = {k:process.State.Not_Started for k in process.Action if process.is_action_session_level(k)}
 
-    def not_completed_action(self, action: ProcessAction) -> list[str]:
-        if is_process_action_session_level(action):
+    def not_completed_action(self, action: process.Action) -> list[str]:
+        if process.is_action_session_level(action):
             raise ValueError('The status of session-level actions cannot be listed per recording')
 
-        return [r for r in self.recordings if self.recordings[r].state[action]!=ProcessState.Completed]
+        return [r for r in self.recordings if self.recordings[r].state[action]!=process.State.Completed]
 
 class Recording(session.Recording):
     def __init__(self, rec: session.Recording):
@@ -323,4 +294,4 @@ class Recording(session.Recording):
             setattr(self,f,getattr(rec,f))
 
         # state coding: recording level
-        self.state = {k:ProcessState.Not_Started for k in ProcessAction if not is_process_action_session_level(k)}
+        self.state = {k:process.State.Not_Started for k in process.Action if not process.is_action_session_level(k)}
