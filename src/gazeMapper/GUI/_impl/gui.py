@@ -35,7 +35,7 @@ class GUI:
         self.sessions: dict[int, utils.Session] = {}
         self.sessions_lock: threading.Lock      = threading.Lock()
         self.selected_sessions: dict[int, bool] = {}
-        self.session_lister = session_lister.SessionList(self.sessions, self.sessions_lock, self.selected_sessions)
+        self.session_lister = session_lister.SessionList(self.sessions, self.sessions_lock, self.selected_sessions, info_callback=self._open_session_detail)
 
         self._possible_value_getters: dict[str] = {}
 
@@ -729,6 +729,22 @@ class GUI:
                 ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
             }
             utils.push_popup(self, lambda: utils.popup("Add marker", _add_rec_popup, buttons = buttons, outside=False))
+
+    def _open_session_detail(self, item: session.Session):
+        win_name = f'{item.name}##session_view'
+        if win := hello_imgui.get_runner_params().docking_params.dockable_window_of_name(win_name):
+            win.focus_window_at_next_frame = True
+        else:
+            window_list = hello_imgui.get_runner_params().docking_params.dockable_windows
+            window_list.append(
+                self._make_main_space_window(win_name, lambda: self._session_detail_GUI(item), can_be_closed=True)
+            )
+            self._window_list = window_list
+            self._to_dock = [win_name]
+            self._to_focus= win_name
+
+    def _session_detail_GUI(self, item: session.Session):
+        imgui.text(item.name)
 
     def _about_popup_drawer(self):
         def popup_content():

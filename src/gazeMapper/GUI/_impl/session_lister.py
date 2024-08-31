@@ -1,5 +1,6 @@
 import threading
 from imgui_bundle import imgui, icons_fontawesome_6 as ifa6
+from typing import Callable
 
 from . import colors, utils
 from ... import process
@@ -8,11 +9,13 @@ class SessionList():
     def __init__(self,
                  items: dict[int, utils.Session],
             items_lock: threading.Lock,
-        selected_items: dict[int, bool]):
+        selected_items: dict[int, bool],
+        info_callback: Callable = None):
 
         self.items = items
         self.selected_items = selected_items
         self.items_lock     = items_lock
+        self.info_callback  = info_callback
 
         self.sorted_ids: list[int] = []
         self._last_clicked_id: int = None
@@ -231,6 +234,10 @@ class SessionList():
             imgui.text_colored(clr, f'{n_rec-len(not_completed)}/{n_rec}')
             if not_completed:
                 utils.draw_hover_text('not completed for recordings:\n'+'\n'.join(not_completed),'', hovered_flags=imgui.HoveredFlags_.for_tooltip|imgui.HoveredFlags_.delay_normal)
+
+    def _show_item_info(self, iid):
+        if self.info_callback:
+            self.info_callback(self.items[iid])
 
     def _sort_items(self, sort_specs_in: imgui.TableSortSpecs):
         if sort_specs_in.specs_dirty or self._require_sort:
