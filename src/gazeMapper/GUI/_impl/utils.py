@@ -309,11 +309,11 @@ class Session(session.Session):
         self.recordings = {r:Recording(sess.recordings[r]) for r in sess.recordings}
 
         # state coding: session level
-        self.state = {k:ProcessState.Not_Started for k in [ProcessAction.EXPORT_TRIALS, ProcessAction.MAKE_VIDEO]}
+        self.state = {k:ProcessState.Not_Started for k in ProcessAction if is_process_action_session_level(k)}
 
     def not_completed_action(self, action: ProcessAction) -> list[str]:
         if is_process_action_session_level(action):
-            raise ValueError()
+            raise ValueError('The status of session-level actions cannot be listed per recording')
 
         return [r for r in self.recordings if self.recordings[r].state[action]!=ProcessState.Completed]
 
@@ -323,4 +323,4 @@ class Recording(session.Recording):
             setattr(self,f,getattr(rec,f))
 
         # state coding: recording level
-        self.state = {k:ProcessState.Not_Started for k in ProcessAction if k not in [ProcessAction.EXPORT_TRIALS, ProcessAction.MAKE_VIDEO]}
+        self.state = {k:ProcessState.Not_Started for k in ProcessAction if not is_process_action_session_level(k)}
