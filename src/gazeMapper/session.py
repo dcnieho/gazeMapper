@@ -100,7 +100,11 @@ class Session:
         if not (f:= self.working_directory/Session.marker_file_name).is_file():
             f.touch()
 
-    def import_and_add_recording(self, which: str, rec_info: EyeTrackerRecording|camera_recording.Recording, do_copy_video: bool|None = None, source_dir_as_relative_path: bool|None = None, cam_cal_file: str|pathlib.Path=None) -> Recording:
+    def add_recording(self, which: str, rec_info: EyeTrackerRecording|camera_recording.Recording) -> Recording:
+        return self.add_recording_from_info(which, rec_info)
+
+    def import_recording(self, which: str, do_copy_video: bool|None = None, source_dir_as_relative_path: bool|None = None, cam_cal_file: str|pathlib.Path=None):
+        rec_def = self.definition.get_recording_def(which)
         if do_copy_video is None or source_dir_as_relative_path is None:
             from . import config
             config_dir = config.guess_config_dir(self.working_directory)
@@ -110,9 +114,6 @@ class Session:
             if source_dir_as_relative_path is None:
                 source_dir_as_relative_path = study_config.import_source_dir_as_relative_path
 
-        rec_def = self.definition.get_recording_def(which)
-        self.check_recording_info(which, rec_info)
-
         # do import
         rec_info.working_directory = self.working_directory / rec_def.name
         if rec_def.type==RecordingType.Eye_Tracker:
@@ -120,9 +121,10 @@ class Session:
         else:
             rec_info = camera_recording.do_import(rec_info=rec_info, copy_video=do_copy_video, source_dir_as_relative_path=source_dir_as_relative_path, cam_cal_file=cam_cal_file)
 
-        # add recording
-        self.add_recording_from_info(which, rec_info)
-        return self.recordings[which]
+    def add_recording_and_import(self, which: str, rec_info: EyeTrackerRecording|camera_recording.Recording, do_copy_video: bool|None = None, source_dir_as_relative_path: bool|None = None, cam_cal_file: str|pathlib.Path=None) -> Recording:
+        rec = self.add_recording(which, rec_info)
+        self.import_recording(which, do_copy_video, source_dir_as_relative_path, cam_cal_file)
+        return rec
 
     def load_existing_recordings(self):
         # load recordings that are present
@@ -155,10 +157,11 @@ class Session:
             if not isinstance(rec_info,camera_recording.Recording):
                 raise TypeError(f"The provided rec_info is not for a camera recording, but {which} is a camera recording")
 
-    def add_recording_from_info(self, which: str, rec_info: EyeTrackerRecording|camera_recording.Recording):
+    def add_recording_from_info(self, which: str, rec_info: EyeTrackerRecording|camera_recording.Recording) -> Recording:
         rec_def = self.definition.get_recording_def(which)
         self.check_recording_info(which, rec_info)
         self.recordings[which] = Recording(rec_def, rec_info)
+        return self.recordings[which]
 
     def num_recordings(self) -> int:
         return sum((r.name in self.recordings for r in self.definition.recordings))

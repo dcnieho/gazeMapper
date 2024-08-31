@@ -46,21 +46,21 @@ match which:
 #         sess1 = session.Session(sess_def,'J13')
 #         sess1.create_working_directory(proj)
 #         rec_info = importing.get_recording_info(base1/'J13A'/'20231019T081115Z', eyetracker.EyeTracker.Tobii_Glasses_3)
-#         rec = sess1.import_and_add_recording('et1',rec_info[0],False)
+#         rec = sess1.add_recording_and_import('et1',rec_info[0],False)
 #         rec_info = importing.get_recording_info(base1/'J13D'/'20231019T081031Z', eyetracker.EyeTracker.Tobii_Glasses_3)
-#         rec = sess1.import_and_add_recording('et2',rec_info[0],False)
+#         rec = sess1.add_recording_and_import('et2',rec_info[0],False)
 #         rec_info = camera_recording.Recording('topview','2023-10-19_17-14-59.mp4', base1)
-#         rec = sess1.import_and_add_recording('cam',rec_info,False, cam_cal_file=r"C:\dat\projects\Roy Japanese Lego\pilot 3\analysis\data\brio_calibration_J.xml")
+#         rec = sess1.add_recording_and_import('cam',rec_info,False, cam_cal_file=r"C:\dat\projects\Roy Japanese Lego\pilot 3\analysis\data\brio_calibration_J.xml")
 #         sess1.store_as_json()
 
 #         sess2 = session.Session(sess_def,'N24')
 #         sess2.create_working_directory(proj)
 #         rec_info = importing.get_recording_info(base2/'N24A'/'2023-11-30_10-10-47-d1aa2982', eyetracker.EyeTracker.Pupil_Invisible)
-#         rec = sess2.import_and_add_recording('et1',rec_info[0],False)
+#         rec = sess2.add_recording_and_import('et1',rec_info[0],False)
 #         rec_info = importing.get_recording_info(base2/'N24D'/'2023-11-30_10-10-31-cc2e58e9', eyetracker.EyeTracker.Pupil_Invisible)
-#         rec = sess2.import_and_add_recording('et2',rec_info[0],False)
+#         rec = sess2.add_recording_and_import('et2',rec_info[0],False)
 #         rec_info = camera_recording.Recording('topview','2023-11-30_10-13-09.mov', base2)
-#         rec = sess2.import_and_add_recording('cam',rec_info,False, cam_cal_file=r"C:\dat\projects\Roy Japanese Lego\pilot 3\analysis\data\brio_calibration_N.xml")
+#         rec = sess2.add_recording_and_import('cam',rec_info,False, cam_cal_file=r"C:\dat\projects\Roy Japanese Lego\pilot 3\analysis\data\brio_calibration_N.xml")
 #         sess2.store_as_json()
 
 #     case 2:
@@ -68,13 +68,13 @@ match which:
 #         sess.create_working_directory(proj)
 #         # import recordings
 #         rec_info = importing.get_recording_info(base/'PI1_scherm'/'2022-07-01_14-04-15-0bdecc9e', eyetracker.EyeTracker.Pupil_Invisible)
-#         rec = sess.import_and_add_recording('et1',rec_info[0],False)
+#         rec = sess.add_recording_and_import('et1',rec_info[0],False)
 
 #         rec_info = importing.get_recording_info(base/'PI2_deur'/'2022-07-01_14-04-01-a251b241', eyetracker.EyeTracker.Pupil_Invisible)
-#         rec = sess.import_and_add_recording('et2',rec_info[0],False)
+#         rec = sess.add_recording_and_import('et2',rec_info[0],False)
 
 #         rec_info = camera_recording.Recording('topview','topview_2022-07-01_14-05-10.mov', base)
-#         rec = sess.import_and_add_recording('cam',rec_info,False, cam_cal_file=r"C:\dat\projects\a_finished\2023 roy lego\analysis\data\brio_calibration.xml")
+#         rec = sess.add_recording_and_import('cam',rec_info,False, cam_cal_file=r"C:\dat\projects\a_finished\2023 roy lego\analysis\data\brio_calibration.xml")
 #         sess.store_as_json()
 
 #     case 3:
@@ -87,10 +87,10 @@ match which:
 #             sess.create_working_directory(proj)
 
 #             rec_info = importing.get_recording_info(base/r/(r+'A')/recs[r+'A'], eyetracker.EyeTracker.Pupil_Neon)
-#             rec = sess.import_and_add_recording('et_teacher',rec_info[0],False)
+#             rec = sess.add_recording_and_import('et_teacher',rec_info[0],False)
 
 #             rec_info = importing.get_recording_info(base/r/(r+'D')/recs[r+'D'], eyetracker.EyeTracker.Pupil_Neon)
-#             rec = sess.import_and_add_recording('et_student',rec_info[0],False)
+#             rec = sess.add_recording_and_import('et_student',rec_info[0],False)
 #             sess.store_as_json()
 
 
