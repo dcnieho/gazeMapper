@@ -68,6 +68,9 @@ class Study:
                  working_directory                              : str|pathlib.Path,
 
                  # setup with defaults
+                 import_do_copy_video                           : bool                              = True,
+                 import_source_dir_as_relative_path             : bool                              = False,
+
                  sync_ref_recording                             : str|None                          = None,
                  sync_ref_do_time_stretch                       : bool|None                         = None,
                  sync_ref_stretch_which                         : Literal['ref','other']|None       = None,
@@ -118,6 +121,9 @@ class Study:
         self.episodes_to_code                               = episodes_to_code
         self.individual_markers                             = individual_markers
         self.working_directory                              = working_directory
+
+        self.import_do_copy_video                           = import_do_copy_video
+        self.import_source_dir_as_relative_path             = import_source_dir_as_relative_path
 
         self.get_cam_movement_for_et_sync_method            = get_cam_movement_for_et_sync_method
         self.get_cam_movement_for_et_sync_function          = get_cam_movement_for_et_sync_function

@@ -100,16 +100,25 @@ class Session:
         if not (f:= self.working_directory/Session.marker_file_name).is_file():
             f.touch()
 
-    def import_and_add_recording(self, which: str, rec_info: EyeTrackerRecording|camera_recording.Recording, copy_video = True, source_dir_as_relative_path = False, cam_cal_file: str|pathlib.Path=None) -> Recording:
+    def import_and_add_recording(self, which: str, rec_info: EyeTrackerRecording|camera_recording.Recording, do_copy_video: bool|None = None, source_dir_as_relative_path: bool|None = None, cam_cal_file: str|pathlib.Path=None) -> Recording:
+        if do_copy_video is None or source_dir_as_relative_path is None:
+            from . import config
+            config_dir = config.guess_config_dir(self.working_directory)
+            study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: self.working_directory})
+            if do_copy_video is None:
+                do_copy_video = study_config.import_do_copy_video
+            if source_dir_as_relative_path is None:
+                source_dir_as_relative_path = study_config.import_source_dir_as_relative_path
+
         rec_def = self.definition.get_recording_def(which)
         self.check_recording_info(which, rec_info)
 
         # do import
         rec_info.working_directory = self.working_directory / rec_def.name
         if rec_def.type==RecordingType.Eye_Tracker:
-            rec_info = importing.do_import(rec_info=rec_info, copy_scene_video=copy_video, source_dir_as_relative_path=source_dir_as_relative_path, cam_cal_file=cam_cal_file)
+            rec_info = importing.do_import(rec_info=rec_info, copy_scene_video=do_copy_video, source_dir_as_relative_path=source_dir_as_relative_path, cam_cal_file=cam_cal_file)
         else:
-            rec_info = camera_recording.do_import(rec_info=rec_info, copy_video=copy_video, source_dir_as_relative_path=source_dir_as_relative_path, cam_cal_file=cam_cal_file)
+            rec_info = camera_recording.do_import(rec_info=rec_info, copy_video=do_copy_video, source_dir_as_relative_path=source_dir_as_relative_path, cam_cal_file=cam_cal_file)
 
         # add recording
         self.add_recording_from_info(which, rec_info)
