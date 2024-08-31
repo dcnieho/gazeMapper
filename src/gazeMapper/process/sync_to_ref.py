@@ -1,9 +1,8 @@
 import pathlib
-import numpy as np
 import pandas as pd
 import polars as pl
 
-from glassesTools import gaze_headref, timestamps, video_utils
+from glassesTools import annotation, gaze_headref, timestamps
 
 
 from . import _utils
@@ -19,6 +18,13 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
 
     # get settings for the study
     study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir}, **study_settings)
+
+    # check there is a sync setup
+    if not study_config.sync_ref_recording:
+        raise ValueError('Synchronization to a reference recording is not defined, should not run this function')
+    if annotation.Event.Sync_Camera not in study_config.episodes_to_code:
+        raise ValueError('Camera sync points are not set up to be coded, nothing to do here')
+
     # documentation for some settings in the json file:
     # 1. sync_ref_recording. Name of one of the recordings that is part of the session, the one w.r.t. which
     #    the other recordings are synced.

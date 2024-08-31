@@ -217,6 +217,12 @@ class Study:
                 if 'planes_per_episode' not in problems:
                     problems['planes_per_episode'] = {}
                 problems['planes_per_episode'][e] = f'Plane(s) {missing_planes[0] if len(missing_planes)==1 else missing_planes} not known.'
+
+        if annotation.Event.Validate not in self.planes_per_episode:
+            if strict_check:
+                raise ValueError('Validation episodes are set up to be coded for this study, but no planes are set up to be used for validation in planes_per_episode')
+            else:
+                type_utils.merge_problem_dicts(problems, {'planes_per_episode': 'Validation episodes are set up to be coded for this study, but no planes are set up to be used for validation'})
         return problems
 
     def _check_episodes_to_code(self, strict_check) -> type_utils.ProblemDict:
@@ -299,10 +305,25 @@ class Study:
                     raise ValueError(f'Recording {self.sync_ref_recording} is the reference recording for sync, should not be specified in sync_average_recordings')
                 else:
                     problems['sync_ref_average_recordings'] = f'Recording {self.sync_ref_recording} is the reference recording for sync, cannot be specified in sync_average_recordings'
+            if annotation.Event.Sync_Camera not in self.episodes_to_code:
+                if strict_check:
+                    raise ValueError('when sync_ref_recording is set, coding of camera sync points should be set up in episodes_to_code')
+                else:
+                    problems['episodes_to_code'] = f'if sync_ref_recording is set, {annotation.Event.Sync_Camera.value} events should be set up to be coded'
+                    type_utils.merge_problem_dicts(problems, {'sync_ref_recording': f'sync_ref_recording is set, but {annotation.Event.Sync_Camera.value} events are not set up to be coded in episodes_to_code'})
         return problems
 
     def _check_et_sync_method(self, strict_check) -> type_utils.ProblemDict:
         problems: type_utils.ProblemDict = {}
+        if self.get_cam_movement_for_et_sync_method not in ['plane', 'function']:
+            # nothing to do
+            return problems
+        if annotation.Event.Sync_ET_Data not in self.episodes_to_code:
+            if strict_check:
+                raise ValueError(f'if get_cam_movement_for_et_sync_method is set to "plane" or "function", {annotation.Event.Sync_ET_Data.value} events should be set up to be coded in episodes_to_code')
+            else:
+                problems['episodes_to_code'] = f'if get_cam_movement_for_et_sync_method is set to "plane" or "function", {annotation.Event.Sync_ET_Data.value} events should be set up to be coded'
+                problems['get_cam_movement_for_et_sync_method'] = f'get_cam_movement_for_et_sync_method is set to "{self.get_cam_movement_for_et_sync_method}", but {annotation.Event.Sync_ET_Data.value} events are not set up to be coded in episodes_to_code'
         if self.get_cam_movement_for_et_sync_method=='function':
             if strict_check:
                 if not self.get_cam_movement_for_et_sync_function or not all([x in self.get_cam_movement_for_et_sync_function for x in ["module_or_file","function","parameters"]]):
@@ -310,6 +331,13 @@ class Study:
             else:
                 t = utils.unpack_none_union(study_parameter_types['get_cam_movement_for_et_sync_function'])[0]
                 problems['get_cam_movement_for_et_sync_function'] = {k:f'{k} should be set when get_cam_movement_for_et_sync_function is set to "function"' for k in t.__required_keys__ if not self.get_cam_movement_for_et_sync_function or k not in self.get_cam_movement_for_et_sync_function or (k!='parameters' and not self.get_cam_movement_for_et_sync_function[k])}
+        elif self.get_cam_movement_for_et_sync_method=='plane':
+            if annotation.Event.Sync_ET_Data not in self.planes_per_episode:
+                if strict_check:
+                    raise ValueError(f'if get_cam_movement_for_et_sync_method is set to "plane", a plane should be set up to be used for processing {annotation.Event.Sync_ET_Data.value} events in planes_per_episode')
+                else:
+                    problems['planes_per_episode'] = f'if get_cam_movement_for_et_sync_method is set to "plane", a plane should be set up to be used for processing {annotation.Event.Sync_ET_Data.value} events'
+                    type_utils.merge_problem_dicts(problems, {'get_cam_movement_for_et_sync_method': f'get_cam_movement_for_et_sync_method is set to "plane", but no plane specified for syncing eye tracker data to the scene cam (i.e., for {annotation.Event.Sync_ET_Data.value} events) in planes_per_episode'})
         return problems
 
     def _check_make_video(self, strict_check) -> type_utils.ProblemDict:

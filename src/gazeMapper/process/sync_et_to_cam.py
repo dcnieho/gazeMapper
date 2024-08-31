@@ -42,6 +42,14 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     # get settings for the study
     study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent, config.OverrideLevel.Recording: working_dir}, **study_settings)
 
+    # check there is a sync setup
+    if study_config.get_cam_movement_for_et_sync_method not in ['plane', 'function']:
+        raise ValueError('There is no eye tracker data to scene camera synchronization defined, should not run this function')
+    if annotation.Event.Sync_ET_Data not in study_config.episodes_to_code:
+        raise ValueError('ET sync episodes are not set up to be coded, nothing to do here')
+    if study_config.get_cam_movement_for_et_sync_method=='plane' and annotation.Event.Sync_ET_Data not in study_config.planes_per_episode:
+        raise ValueError(f'No plane specified for syncing eye tracker data to the scene cam, cannot continue')
+
     # check this is an eye tracker recording
     rec_def = study_config.session_def.get_recording_def(working_dir.name)
     if rec_def.type!=session.RecordingType.Eye_Tracker:
@@ -61,11 +69,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     video_ts = timestamps.VideoTimestamps(working_dir / 'frameTimestamps.tsv')
 
     match study_config.get_cam_movement_for_et_sync_method:
-        case '':
-            raise ValueError('There is no eye tracker data to scene camera synchronization defined, should not run this function')
         case 'plane':
-            if annotation.Event.Sync_ET_Data not in study_config.planes_per_episode:
-                raise ValueError(f'No plane specified for syncing eye tracker data to the scene cam, cannot continue')
             planes = list(study_config.planes_per_episode[annotation.Event.Sync_ET_Data])
             if len(planes)!=1:
                 raise NotImplementedError("sync_et_to_cam only supports a single plane being used for synchronizing eye tracking data to the scene camera, contact developer if this is an issue")
