@@ -32,9 +32,9 @@ class GUI:
         self.project_dir: pathlib.Path = None
         self.study_config: config.Study = None
 
-        self.sessions: dict[int, utils.Session] = {}
+        self.sessions: dict[str, utils.Session] = {}
         self.sessions_lock: threading.Lock      = threading.Lock()
-        self.selected_sessions: dict[int, bool] = {}
+        self.selected_sessions: dict[str, bool] = {}
         self.session_lister = session_lister.SessionList(self.sessions, self.sessions_lock, self.selected_sessions, info_callback=self._open_session_detail)
 
         self._possible_value_getters: dict[str] = {}
@@ -295,8 +295,7 @@ class GUI:
         self._to_focus = self._sessions_pane.label  # ensure sessions pane remains focused
 
     def _reload_sessions(self):
-        counter = -1
-        self.sessions |= {(counter:=counter+1):utils.Session(s) for s in session.get_sessions_from_directory(self.project_dir, self.study_config.session_def)}
+        self.sessions |= {s.name:utils.Session(s) for s in session.get_sessions_from_directory(self.project_dir, self.study_config.session_def)}
         self.selected_sessions |= {k:False for k in self.sessions}
         self._session_lister_set_actions_to_show()
 

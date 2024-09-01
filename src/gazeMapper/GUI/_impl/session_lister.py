@@ -7,9 +7,9 @@ from ... import process
 
 class SessionList():
     def __init__(self,
-                 items: dict[int, utils.Session],
+                 items: dict[int|str, utils.Session],
             items_lock: threading.Lock,
-        selected_items: dict[int, bool],
+        selected_items: dict[int|str, bool],
         info_callback: Callable = None):
 
         self.items = items
@@ -17,8 +17,8 @@ class SessionList():
         self.items_lock     = items_lock
         self.info_callback  = info_callback
 
-        self.sorted_ids: list[int] = []
-        self._last_clicked_id: int = None
+        self.sorted_ids: list[int|str] = []
+        self._last_clicked_id: int|str = None
         self._require_sort: bool = True
 
         self.display_actions: list[process.Action] = []
