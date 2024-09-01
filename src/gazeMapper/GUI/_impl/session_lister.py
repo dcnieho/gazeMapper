@@ -186,7 +186,7 @@ class SessionList():
                                 # Number of recordings
                                 n_rec = len(item.definition.recordings)
                                 clr = colors.error if missing_recs else colors.ok
-                                imgui.text_colored(clr, f'{n_rec-len(missing_recs)}/{n_rec}')
+                                imgui.text_colored(clr, f'{n_rec-len(missing_recs)}/{n_rec}{" "+ifa6.ICON_FA_TRIANGLE_EXCLAMATION if missing_recs else ""}')
                                 if missing_recs:
                                     utils.draw_hover_text('missing recordings:\n'+'\n'.join(missing_recs),'', hovered_flags=imgui.HoveredFlags_.for_tooltip|imgui.HoveredFlags_.delay_normal)
                             case _:
