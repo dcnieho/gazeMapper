@@ -277,7 +277,7 @@ class Session(session.Session):
     def __init__(self, sess: session.Session):
         for f in ['definition', 'name', 'working_directory']:
             setattr(self,f,getattr(sess,f))
-        self.recordings = {r:Recording(sess.recordings[r]) for r in sess.recordings}
+        self.recordings = {r:Recording(r, sess.recordings[r]) for r in sess.recordings}
 
         # state coding: session level
         self.state = {k:process.State.Not_Started for k in process.Action if process.is_action_session_level(k)}
@@ -289,9 +289,10 @@ class Session(session.Session):
         return [r for r in self.recordings if self.recordings[r].state[action]!=process.State.Completed]
 
 class Recording(session.Recording):
-    def __init__(self, rec: session.Recording):
+    def __init__(self, name: str, rec: session.Recording):
         for f in ['definition', 'info']:
             setattr(self,f,getattr(rec,f))
+        self.name = name
 
         # state coding: recording level
         self.state = {k:process.State.Not_Started for k in process.Action if not process.is_action_session_level(k)}
