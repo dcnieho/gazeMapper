@@ -33,9 +33,9 @@ class GUI:
         self.study_config: config.Study = None
 
         self.sessions: dict[str, utils.Session] = {}
-        self.sessions_lock: threading.Lock      = threading.Lock()
-        self.selected_sessions: dict[str, bool] = {}
-        self.session_lister = session_lister.SessionList(self.sessions, self.sessions_lock, self.selected_sessions, info_callback=self._open_session_detail)
+        self._sessions_lock: threading.Lock      = threading.Lock()
+        self._selected_sessions: dict[str, bool] = {}
+        self._session_lister = session_lister.SessionList(self.sessions, self._sessions_lock, self._selected_sessions, info_callback=self._open_session_detail)
 
         self._possible_value_getters: dict[str] = {}
 
@@ -296,7 +296,7 @@ class GUI:
 
     def _reload_sessions(self):
         self.sessions |= {s.name:utils.Session(s) for s in session.get_sessions_from_directory(self.project_dir, self.study_config.session_def)}
-        self.selected_sessions |= {k:False for k in self.sessions}
+        self._selected_sessions |= {k:False for k in self.sessions}
         self._session_lister_set_actions_to_show()
 
     def _check_project_setups_state(self):
@@ -319,7 +319,7 @@ class GUI:
 
     def _session_lister_set_actions_to_show(self):
         if self.study_config is None:
-            self.session_lister.set_actions_to_show(set())
+            self._session_lister.set_actions_to_show(set())
 
         actions = {process.Action.IMPORT, process.Action.CODE_EPISODES, process.Action.DETECT_MARKERS, process.Action.GAZE_TO_PLANE, process.Action.EXPORT_TRIALS, process.Action.MAKE_VIDEO}
         if self.study_config.auto_code_sync_points:
@@ -333,7 +333,7 @@ class GUI:
         if glassesTools.annotation.Event.Validate in self.study_config.planes_per_episode:
             actions.add(process.Action.RUN_VALIDATION)
 
-        self.session_lister.set_actions_to_show(actions)
+        self._session_lister.set_actions_to_show(actions)
 
     def close_project(self):
         self._project_settings_pane.is_visible = False
@@ -348,7 +348,7 @@ class GUI:
         self._possible_value_getters = {}
         self.study_config = None
         self.sessions.clear()
-        self.selected_sessions.clear()
+        self._selected_sessions.clear()
         self._need_set_window_title = True
 
 
@@ -372,7 +372,7 @@ class GUI:
             imgui.text_colored(colors.error, 'tab before you can import and process recording sessions.')
             return
 
-        self.session_lister.draw()
+        self._session_lister.draw()
 
     def _unopened_interface_drawer(self):
         avail      = imgui.get_content_region_avail()
