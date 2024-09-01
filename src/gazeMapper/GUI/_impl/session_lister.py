@@ -133,7 +133,7 @@ class SessionList():
                     num_columns_drawn = 0
                     selectable_clicked = False
                     checkbox_clicked, checkbox_hovered = False, False
-                    info_button_hovered = False
+                    config_button_hovered = False
                     has_drawn_hitbox = False
                     for ri in range(self._view_column_count+1):
                         if not (imgui.table_get_column_flags(ri) & imgui.TableColumnFlags_.is_enabled):
@@ -177,6 +177,10 @@ class SessionList():
                                 checkbox_hovered = imgui.is_item_hovered()
                             case 1:
                                 # Name
+                                if imgui.button(f"{ifa6.ICON_FA_GEAR}##{iid}_info"):
+                                    self._show_item_info(iid)
+                                config_button_hovered = imgui.is_item_hovered()
+                                imgui.same_line()
                                 imgui.text(item.name)
                             case 2:
                                 # Number of recordings
@@ -200,7 +204,7 @@ class SessionList():
 
                     self._last_clicked_id = utils.selectable_item_logic(
                         iid, self.selected_items, self._last_clicked_id, self.sorted_ids,
-                        selectable_clicked, selectable_out, overlayed_hovered=checkbox_hovered or info_button_hovered,
+                        selectable_clicked, selectable_out, overlayed_hovered=checkbox_hovered or config_button_hovered,
                         overlayed_clicked=checkbox_clicked, new_overlayed_state=checkbox_out
                         )
 
