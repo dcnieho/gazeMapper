@@ -250,12 +250,12 @@ class SessionList():
             for sort_spec in reversed(sort_specs):
                 match sort_spec.column_index:
                     case 1:     # Name
-                        key = lambda id: self.items[id].name
+                        key = lambda iid: self.items[iid].name
                     case 2:     # Number of recordings
-                        key = lambda id: len(self.items[id].missing_recordings())
+                        key = lambda iid: len(self.items[iid].missing_recordings())
                     case _:     # status indicators
                         action = self.display_actions[sort_spec.column_index-self._view_column_count_base]
-                        key = lambda id: self.items[id].state[action]
+                        key = lambda iid: self.items[iid].state[action]
                 ids.sort(key=key, reverse=sort_spec.get_sort_direction()==imgui.SortDirection.descending)
             self.sorted_ids = ids
             sort_specs_in.specs_dirty = False
