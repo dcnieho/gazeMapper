@@ -37,6 +37,10 @@ class GUI:
         self._selected_sessions: dict[str, bool] = {}
         self._session_lister = session_lister.SessionList(self.sessions, self._sessions_lock, self._selected_sessions, info_callback=self._open_session_detail)
 
+        self._recording_listers  : dict[str, session_lister.SessionList] = {}
+        self._recordings_lock    : dict[str, threading.Lock]             = {}
+        self._selected_recordings: dict[str, dict[str, bool]]            = {}
+
         self._possible_value_getters: dict[str] = {}
 
         self.need_setup_recordings = True
@@ -297,7 +301,7 @@ class GUI:
     def _reload_sessions(self):
         self.sessions |= {s.name:utils.Session(s) for s in session.get_sessions_from_directory(self.project_dir, self.study_config.session_def)}
         self._selected_sessions |= {k:False for k in self.sessions}
-        self._session_lister_set_actions_to_show()
+        self._session_lister_set_actions_to_show(self._session_lister)
 
     def _check_project_setups_state(self):
         if self.study_config is not None:
@@ -317,9 +321,9 @@ class GUI:
             not self.need_setup_plane and \
             not self.need_setup_episode
 
-    def _session_lister_set_actions_to_show(self):
+    def _session_lister_set_actions_to_show(self, lister: session_lister.SessionList, for_recordings=False):
         if self.study_config is None:
-            self._session_lister.set_actions_to_show(set())
+            lister.set_actions_to_show(set())
 
         actions = {process.Action.IMPORT, process.Action.CODE_EPISODES, process.Action.DETECT_MARKERS, process.Action.GAZE_TO_PLANE, process.Action.EXPORT_TRIALS, process.Action.MAKE_VIDEO}
         if self.study_config.auto_code_sync_points:
@@ -333,7 +337,10 @@ class GUI:
         if glassesTools.annotation.Event.Validate in self.study_config.planes_per_episode:
             actions.add(process.Action.RUN_VALIDATION)
 
-        self._session_lister.set_actions_to_show(actions)
+        if for_recordings:
+            actions = {a for a in actions if not process.is_action_session_level(a)}
+
+        lister.set_actions_to_show(actions)
 
     def close_project(self):
         self._project_settings_pane.is_visible = False
@@ -454,7 +461,7 @@ class GUI:
                 # persist changed config
                 self.study_config = new_config
                 self.study_config.store_as_json()
-                self._session_lister_set_actions_to_show()
+                self._session_lister_set_actions_to_show(self._session_lister)
 
 
     def _session_definition_pane_drawer(self):
@@ -741,9 +748,16 @@ class GUI:
             self._window_list = window_list
             self._to_dock = [win_name]
             self._to_focus= win_name
+            self._recordings_lock[item.name] = threading.Lock()
+            self._selected_recordings[item.name] = {k:False for k in item.recordings}
+            self._recording_listers[item.name] = session_lister.SessionList(item.recordings, self._recordings_lock[item.name], self._selected_recordings[item.name], for_recordings=True)
+            self._session_lister_set_actions_to_show(self._recording_listers[item.name], for_recordings=True)
 
     def _session_detail_GUI(self, item: session.Session):
-        imgui.text(item.name)
+        missing_recs = item.missing_recordings()
+        if missing_recs:
+            imgui.text_colored(colors.error,'*The following recordings are missing for this session:\n'+'\n'.join(missing_recs))
+        self._recording_listers[item.name].draw()
 
     def _about_popup_drawer(self):
         def popup_content():

@@ -7,9 +7,10 @@ from ... import process
 
 class SessionList():
     def __init__(self,
-                 items: dict[int|str, utils.Session],
+                 items: dict[int|str, utils.Session|utils.Recording],
             items_lock: threading.Lock,
         selected_items: dict[int|str, bool],
+        for_recordings: bool = False,
         info_callback: Callable = None):
 
         self.items = items
@@ -22,7 +23,9 @@ class SessionList():
         self._require_sort: bool = True
 
         self.display_actions: list[process.Action] = []
-        self._view_column_count_base = 3    # selector, name
+        self.for_recordings = for_recordings
+        self._has_recordings_col = not for_recordings
+        self._view_column_count_base = 2+self._has_recordings_col    # selector, name, recordings
         self._view_column_count = None
 
         with self.items_lock:
@@ -64,8 +67,9 @@ class SessionList():
             checkbox_width = frame_height-2*imgui.get_style().frame_padding.y
             imgui.table_setup_column("Selector", imgui.TableColumnFlags_.no_hide | imgui.TableColumnFlags_.no_sort | imgui.TableColumnFlags_.no_resize | imgui.TableColumnFlags_.no_reorder, init_width_or_weight=checkbox_width)  # 0
             imgui.table_setup_column("Name", imgui.TableColumnFlags_.default_sort | imgui.TableColumnFlags_.no_hide | imgui.TableColumnFlags_.no_resize)  # 1
-            imgui.table_setup_column("Recordings", imgui.TableColumnFlags_.no_resize | imgui.TableColumnFlags_.angled_header)  # 2
-            for k in process.Action:   # 3+
+            if self._has_recordings_col:
+                imgui.table_setup_column("Recordings", imgui.TableColumnFlags_.no_resize | imgui.TableColumnFlags_.angled_header)  # 2
+            for k in process.Action:   # 2+ or 3+
                 if k in self.display_actions:
                     imgui.table_setup_column(k.displayable_name, imgui.TableColumnFlags_.no_resize | imgui.TableColumnFlags_.angled_header)
 
@@ -129,7 +133,7 @@ class SessionList():
                     imgui.table_next_row()
 
                     item = self.items[iid]
-                    missing_recs = item.missing_recordings()
+                    missing_recs = item.missing_recordings() if self._has_recordings_col else []
                     num_columns_drawn = 0
                     selectable_clicked = False
                     checkbox_clicked, checkbox_hovered = False, False
@@ -177,12 +181,13 @@ class SessionList():
                                 checkbox_hovered = imgui.is_item_hovered()
                             case 1:
                                 # Name
-                                if imgui.button(f"{ifa6.ICON_FA_GEAR}##{iid}_info"):
-                                    self._show_item_info(iid)
-                                config_button_hovered = imgui.is_item_hovered()
-                                imgui.same_line()
+                                if self.info_callback:
+                                    if imgui.button(f"{ifa6.ICON_FA_GEAR}##{iid}_info"):
+                                        self._show_item_info(iid)
+                                    config_button_hovered = imgui.is_item_hovered()
+                                    imgui.same_line()
                                 imgui.text(item.name)
-                            case 2:
+                            case 2 if self._has_recordings_col:
                                 # Number of recordings
                                 n_rec = len(item.definition.recordings)
                                 clr = colors.error if missing_recs else colors.ok
@@ -228,16 +233,20 @@ class SessionList():
             # TODO
 
     def _draw_status_widget(self, item: utils.Session, action: process.Action):
-        if process.is_action_session_level(action):
-            # this is TODO
+        if self.for_recordings:
+            # TODO
             imgui.text(item.state[action].displayable_name[0])
         else:
-            not_completed = item.not_completed_action(action)
-            n_rec = len(item.definition.recordings)
-            clr = colors.error if not_completed else colors.ok
-            imgui.text_colored(clr, f'{n_rec-len(not_completed)}/{n_rec}')
-            if not_completed:
-                utils.draw_hover_text('not completed for recordings:\n'+'\n'.join(not_completed),'', hovered_flags=imgui.HoveredFlags_.for_tooltip|imgui.HoveredFlags_.delay_normal)
+            if process.is_action_session_level(action):
+                # this is TODO
+                imgui.text(item.state[action].displayable_name[0])
+            else:
+                not_completed = item.not_completed_action(action)
+                n_rec = len(item.definition.recordings)
+                clr = colors.error if not_completed else colors.ok
+                imgui.text_colored(clr, f'{n_rec-len(not_completed)}/{n_rec}')
+                if not_completed:
+                    utils.draw_hover_text('not completed for recordings:\n'+'\n'.join(not_completed),'', hovered_flags=imgui.HoveredFlags_.for_tooltip|imgui.HoveredFlags_.delay_normal)
 
     def _show_item_info(self, iid):
         if self.info_callback:
@@ -251,7 +260,7 @@ class SessionList():
                 match sort_spec.column_index:
                     case 1:     # Name
                         key = lambda iid: self.items[iid].name
-                    case 2:     # Number of recordings
+                    case 2 if self._has_recordings_col:     # Number of recordings
                         key = lambda iid: len(self.items[iid].missing_recordings())
                     case _:     # status indicators
                         action = self.display_actions[sort_spec.column_index-self._view_column_count_base]
