@@ -42,7 +42,7 @@ class Action(enum.Flag):
 utils.register_type(utils.CustomTypeEntry(Action,'__enum.process.Action__',str, lambda x: getattr(Action, x.split('.')[1])))
 
 def is_action_session_level(action: Action) -> bool:
-    return action in [Action.EXPORT_TRIALS, Action.MAKE_VIDEO]
+    return action in [Action.SYNC_TO_REFERENCE, Action.EXPORT_TRIALS, Action.MAKE_VIDEO]
 
 def action_update_and_invalidate(action_states: dict[Action, State], action: Action, state: State, for_recording: bool) -> dict[Action, State]:
     # set status of indicated task
