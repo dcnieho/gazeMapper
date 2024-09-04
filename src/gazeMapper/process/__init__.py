@@ -58,4 +58,9 @@ def action_update_and_invalidate(action_states: dict[Action, State], action: Act
     except StopIteration:
         pass    # we're done
 
+    # some special cases
+    if action in [Action.AUTO_CODE_SYNC, Action.AUTO_CODE_TRIALS]:
+        # need to manually check coding when auto sync is run
+        action_states = action_update_and_invalidate(action_states, Action.CODE_EPISODES, State.Not_Started, for_recording)
+
     return action_states
