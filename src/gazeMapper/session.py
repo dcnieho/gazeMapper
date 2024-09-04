@@ -6,7 +6,7 @@ import typeguard
 from glassesTools import importing, utils
 from glassesTools.recording import Recording as EyeTrackerRecording
 
-from . import camera_recording
+from . import camera_recording, process
 
 
 class RecordingType(utils.AutoName):
@@ -29,6 +29,9 @@ class Recording:
     def __init__(self, definition: RecordingDefinition, info:EyeTrackerRecording|camera_recording.Recording|None=None):
         self.definition = definition
         self.info       = info
+        self.name       = self.definition.name  # for easy access
+
+        self.state      = {k:process.State.Not_Started for k in process.Action if not process.is_action_session_level(k)}
 utils.register_type(utils.CustomTypeEntry(Recording,'__session.Recording__',lambda x: {'defition': x.defition, 'info': x.info}, lambda x: Recording(**x)))
 
 def read_recording_info(working_dir: pathlib.Path, rec_type: RecordingType) -> tuple[EyeTrackerRecording|camera_recording.Recording, pathlib.Path]:
@@ -85,13 +88,17 @@ class Session:
     marker_file_name = 'session.gazeMapper'
 
     @typeguard.typechecked
-    def __init__(self, definition: SessionDefinition, name: str, working_directory: str|pathlib.Path|None = None, recordings: dict[str,Recording]|None = None):
+    def __init__(self, definition: SessionDefinition, name: str, working_directory: str|pathlib.Path|None = None, recordings: dict[str,Recording]|None = None, action_state: dict[process.Action,process.State]|None = None):
         self.definition = definition
         self.name = name
         self.working_directory: pathlib.Path = pathlib.Path(working_directory) if working_directory else None
         if not recordings:
             recordings = {}
         self.recordings = recordings
+
+        if action_state is None:
+            action_state = {k:process.State.Not_Started for k in process.Action if process.is_action_session_level(k)}
+        self.state = action_state
 
     def create_working_directory(self, parent_directory: str|pathlib.Path):
         self.working_directory = pathlib.Path(parent_directory) / self.name
@@ -171,6 +178,25 @@ class Session:
 
     def missing_recordings(self) -> list[str]:
         return [r.name for r in self.definition.recordings if r.name not in self.recordings]
+
+    # state of processing actions on recordings in a session
+    def is_action_completed(self, action: process.Action) -> bool:
+        if process.is_action_session_level(action):
+            return self.state[action]==process.State.Completed
+        else:
+            return all((self.recordings[r].state[action]==process.State.Completed for r in self.recordings))
+
+    def action_completed_num_recordings(self, action: process.Action) -> list[str]:
+        if process.is_action_session_level(action):
+            raise ValueError('The status of session-level actions cannot be listed per recording')
+
+        return sum([self.recordings[r].state[action]==process.State.Completed for r in self.recordings])
+
+    def action_not_completed_recordings(self, action: process.Action) -> list[str]:
+        if process.is_action_session_level(action):
+            raise ValueError('The status of session-level actions cannot be listed per recording')
+
+        return [r for r in self.recordings if self.recordings[r].state[action]!=process.State.Completed]
 
     @staticmethod
     def from_definition(definition: SessionDefinition|None, path: str | pathlib.Path) -> 'Session':

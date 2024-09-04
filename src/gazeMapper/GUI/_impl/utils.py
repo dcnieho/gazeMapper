@@ -271,28 +271,3 @@ def get_aruco_marker_image(sz: int, id:int, dictionary_id: int, marker_border_bi
     marker_image = np.zeros((sz, sz), dtype=np.uint8)
     marker_image = cv2.aruco.generateImageMarker(cv2.aruco.getPredefinedDictionary(dictionary_id), id, sz, marker_image, marker_border_bits)
     return image_helper.ImageHelper(marker_image)
-
-
-class Session(session.Session):
-    def __init__(self, sess: session.Session):
-        for f in ['definition', 'name', 'working_directory']:
-            setattr(self,f,getattr(sess,f))
-        self.recordings = {r:Recording(r, sess.recordings[r]) for r in sess.recordings}
-
-        # state coding: session level
-        self.state = {k:process.State.Not_Started for k in process.Action if process.is_action_session_level(k)}
-
-    def not_completed_action(self, action: process.Action) -> list[str]:
-        if process.is_action_session_level(action):
-            raise ValueError('The status of session-level actions cannot be listed per recording')
-
-        return [r for r in self.recordings if self.recordings[r].state[action]!=process.State.Completed]
-
-class Recording(session.Recording):
-    def __init__(self, name: str, rec: session.Recording):
-        for f in ['definition', 'info']:
-            setattr(self,f,getattr(rec,f))
-        self.name = name
-
-        # state coding: recording level
-        self.state = {k:process.State.Not_Started for k in process.Action if not process.is_action_session_level(k)}

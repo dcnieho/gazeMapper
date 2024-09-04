@@ -18,7 +18,7 @@ import OpenGL.GL as gl
 import glassesTools
 import glassesValidator
 
-from ... import config, marker, plane, process, session, type_utils, version
+from ... import config, marker, plane, session, type_utils, version
 from .. import async_thread
 from . import callbacks, colors, file_picker, image_helper, msg_box, session_lister, settings_editor, utils
 
@@ -32,7 +32,7 @@ class GUI:
         self.project_dir: pathlib.Path = None
         self.study_config: config.Study = None
 
-        self.sessions: dict[str, utils.Session] = {}
+        self.sessions: dict[str, session.Session] = {}
         self._sessions_lock: threading.Lock      = threading.Lock()
         self._selected_sessions: dict[str, bool] = {}
         self._session_lister = session_lister.SessionList(self.sessions, self._sessions_lock, self._selected_sessions, info_callback=self._open_session_detail)
@@ -299,7 +299,8 @@ class GUI:
         self._to_focus = self._sessions_pane.label  # ensure sessions pane remains focused
 
     def _reload_sessions(self):
-        self.sessions |= {s.name:utils.Session(s) for s in session.get_sessions_from_directory(self.project_dir, self.study_config.session_def)}
+        sessions = session.get_sessions_from_directory(self.project_dir, self.study_config.session_def)
+        self.sessions |= {s.name:s for s in sessions}
         self._selected_sessions |= {k:False for k in self.sessions}
         self._session_lister_set_actions_to_show(self._session_lister)
 

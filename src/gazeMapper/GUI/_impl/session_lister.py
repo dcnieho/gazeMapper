@@ -3,11 +3,11 @@ from imgui_bundle import imgui, icons_fontawesome_6 as ifa6
 from typing import Callable
 
 from . import colors, utils
-from ... import process
+from ... import process, session
 
 class SessionList():
     def __init__(self,
-                 items: dict[int|str, utils.Session|utils.Recording],
+                 items: dict[int|str, session.Session|session.Recording],
             items_lock: threading.Lock,
         selected_items: dict[int|str, bool],
         for_recordings: bool = False,
@@ -224,7 +224,7 @@ class SessionList():
             # show menu when right-clicking the empty space
             # TODO
 
-    def _draw_status_widget(self, item: utils.Session, action: process.Action):
+    def _draw_status_widget(self, item: session.Session, action: process.Action):
         if self.for_recordings:
             _draw_process_state(item.state[action])
         else:
@@ -233,7 +233,7 @@ class SessionList():
             elif process.is_action_session_level(action):
                 _draw_process_state(item.state[action])
             else:
-                not_completed = item.not_completed_action(action)
+                not_completed = item.action_not_completed_recordings(action)
                 n_rec = len(item.definition.recordings)
                 clr = colors.error if not_completed else colors.ok
                 imgui.text_colored(clr, f'{n_rec-len(not_completed)}/{n_rec}')
@@ -262,7 +262,7 @@ class SessionList():
                             if process.is_action_session_level(action):
                                 key = lambda iid: 999 if not self.items[iid].has_all_recordings() else self.items[iid].state[action]
                             else:
-                                key = lambda iid: 999 if not self.items[iid].has_all_recordings() else len(self.items[iid].not_completed_action(action))-self.items[iid].num_recordings()
+                                key = lambda iid: 999 if not self.items[iid].has_all_recordings() else self.items[iid].action_completed_num_recordings(action)
                 ids.sort(key=key, reverse=sort_spec.get_sort_direction()==imgui.SortDirection.descending)
             self.sorted_ids = ids
             sort_specs_in.specs_dirty = False
