@@ -103,7 +103,7 @@ class SessionList():
                     imgui.push_id(i)
                     if i==0:  # checkbox column: reflects whether all, some or none of visible items are selected, and allows selecting all or none
                         # get state
-                        num_selected = sum([self.selected_items[id] for id in self.sorted_ids])
+                        num_selected = sum([self.selected_items[iid] for iid in self.sorted_ids])
                         if num_selected==0:
                             # none selected
                             multi_selected_state = -1
