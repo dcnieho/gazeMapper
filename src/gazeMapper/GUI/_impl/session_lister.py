@@ -236,12 +236,10 @@ class SessionList():
 
     def _draw_status_widget(self, item: utils.Session, action: process.Action):
         if self.for_recordings:
-            # TODO
-            imgui.text(item.state[action].displayable_name[0])
+            _draw_process_state(item.state[action])
         else:
             if process.is_action_session_level(action):
-                # this is TODO
-                imgui.text(item.state[action].displayable_name[0])
+                _draw_process_state(item.state[action])
             else:
                 not_completed = item.not_completed_action(action)
                 n_rec = len(item.definition.recordings)
@@ -277,3 +275,22 @@ class SessionList():
             self.sorted_ids = ids
             sort_specs_in.specs_dirty = False
             self._require_sort = False
+
+def _draw_process_state(state: process.State):
+    match state:
+        case process.State.Not_Started:
+            imgui.text_colored(colors.gray, ifa6.ICON_FA_CIRCLE)
+        case process.State.Pending:
+            pass
+            # radius    = symbol_size.x / 2
+            # thickness = symbol_size.x / 3 / 2.5 # 3 is number of dots, 2.5 is nextItemKoeff in imspinner.spinner_bounce_dots()
+            # imspinner.spinner_bounce_dots(f'waitBounceDots_{recording.id}', radius, thickness, color=globals.settings.style_text)
+            # hover_text = f'Pending: {get_task_name_friendly(job.task)}'
+        case process.State.Running:
+            pass
+            # spinner_radii = [x/22/2*symbol_size.x for x in [22, 16, 10]]
+            # lw = 3.5/22/2*symbol_size.x
+            # imspinner.spinner_ang_triple(f'runSpinner_{recording.id}', *spinner_radii, lw, c1=globals.settings.style_text, c2=globals.settings.style_accent, c3=globals.settings.style_text)
+            # hover_text = f'Running: {get_task_name_friendly(job.task)}'
+        case process.State.Completed:
+            imgui.text_colored(colors.ok, ifa6.ICON_FA_CIRCLE_CHECK)
