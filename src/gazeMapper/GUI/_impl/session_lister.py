@@ -100,6 +100,7 @@ class SessionList():
                     if not imgui.table_set_column_index(i):
                         continue
                     column_name = '' if imgui.table_get_column_flags(i) & imgui.TableColumnFlags_.no_header_label else imgui.table_get_column_name(i)
+                    imgui.push_id(i)
                     if i==0:  # checkbox column: reflects whether all, some or none of visible items are selected, and allows selecting all or none
                         # get state
                         num_selected = sum([self.selected_items[id] for id in self.sorted_ids])
@@ -123,6 +124,7 @@ class SessionList():
                             utils.set_all(self.selected_items, new_state, subset = self.sorted_ids)
                     else:
                         imgui.table_header(column_name)
+                    imgui.pop_id()
 
                 # Loop rows
                 any_selectable_clicked = False
