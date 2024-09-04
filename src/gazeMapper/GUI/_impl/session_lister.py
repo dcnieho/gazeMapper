@@ -266,7 +266,13 @@ class SessionList():
                         key = lambda iid: len(self.items[iid].missing_recordings())
                     case _:     # status indicators
                         action = self.display_actions[sort_spec.column_index-self._view_column_count_base]
-                        key = lambda iid: self.items[iid].state[action]
+                        if self.for_recordings:
+                            key = lambda iid: self.items[iid].state[action]
+                        else:
+                            if process.is_action_session_level(action):
+                                key = lambda iid: self.items[iid].state[action]
+                            else:
+                                key = lambda iid: len(self.items[iid].definition.recordings)-len(self.items[iid].not_completed_action(action))
                 ids.sort(key=key, reverse=sort_spec.get_sort_direction()==imgui.SortDirection.descending)
             self.sorted_ids = ids
             sort_specs_in.specs_dirty = False
