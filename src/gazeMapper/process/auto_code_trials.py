@@ -37,56 +37,54 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
     else:
         episodes = episode.get_empty_marker_dict(study_config.episodes_to_code)
 
-    # automatic trial episode coding
-    if study_config.auto_code_trial_episodes and (not study_config.sync_ref_recording or rec_def.name==study_config.sync_ref_recording):
-        # get marker files
-        markers = {m.id: marker.load_file(m, working_dir) for m in study_config.individual_markers if m.id in study_config.auto_code_trial_episodes['start_markers']+study_config.auto_code_trial_episodes['end_markers']}
-        # recode so we have a boolean with when markers are present
-        markers = {i: marker.code_marker_for_presence(markers[i]) for i in markers}
-        # fill gaps in marker detection
-        for i in markers:
-            markers[i] = marker.fill_gaps_in_marker_detection(markers[i], fill_value=False)
-        # see where stretches of marker presence start and end
-        marker_starts: dict[int,list[int]] = {}
-        marker_ends  : dict[int,list[int]] = {}
-        for i in markers:
-            marker_starts[i], marker_ends[i] = _utils.get_marker_starts_ends(markers[i], study_config.auto_code_trial_episodes['max_gap_duration'], study_config.auto_code_trial_episodes['min_duration'])
-        # find potential trial starts and ends
-        if len(study_config.auto_code_trial_episodes['start_markers'])>1:
-            starts = _utils.get_trial_from_markers(marker_starts, marker_ends, study_config.auto_code_trial_episodes['start_markers'], study_config.auto_code_trial_episodes['max_intermarker_gap_duration'], side='end')
-        else:
-            starts = marker_ends  [study_config.auto_code_trial_episodes['start_markers'][0]]
-        if len(study_config.auto_code_trial_episodes[ 'end_markers' ])>1:
-            ends   = _utils.get_trial_from_markers(marker_starts, marker_ends, study_config.auto_code_trial_episodes[ 'end_markers' ], study_config.auto_code_trial_episodes['max_intermarker_gap_duration'], side='start')
-        else:
-            ends   = marker_starts[study_config.auto_code_trial_episodes[ 'end_markers' ][0]]
-        # now match trial starts and ends
-        # strategy: run through starts and find latest start that is before first end (discard ends that are before the start)
-        # keep pointer into array keeping track of ends and start already discarded or consumed
-        # NB: this assumes starts and ends are sorted, which the above procedures should indeed deliver
-        trials: list[tuple[int,int]] = []
-        s_idx = 0
-        e_idx = 0
-        while s_idx<len(starts):
-            # remove ends before the current start
-            e_skip = np.nonzero(ends[e_idx:]<starts[s_idx])[0]
-            if e_skip.size:
-                e_idx += e_skip[-1]+1
-            if e_idx > len(ends)-1:
-                # we're out of ends, done
-                break
-            # for all starts in contention, find the last one that is before the next end
-            gaps = ends[e_idx]-starts[s_idx:]
-            # NB: it cannot occur that ther are no starts before this end, since we move e_idx above in that case
-            # and bail out if there are no ends left
-            gaps[gaps<=0] = np.iinfo(gaps.dtype).max
-            mini = np.argmin(gaps)
-            trials.append((starts[s_idx+mini], ends[e_idx]))
-            # these are consumed
-            s_idx+=mini+1
-            e_idx+=1
-        # now insert into coding file. This just overwrites whatever is there
-        episodes[annotation.Event.Trial] = [y for x in trials for y in x]
+    # get marker files
+    markers = {m.id: marker.load_file(m, working_dir) for m in study_config.individual_markers if m.id in study_config.auto_code_trial_episodes['start_markers']+study_config.auto_code_trial_episodes['end_markers']}
+    # recode so we have a boolean with when markers are present
+    markers = {i: marker.code_marker_for_presence(markers[i]) for i in markers}
+    # fill gaps in marker detection
+    for i in markers:
+        markers[i] = marker.fill_gaps_in_marker_detection(markers[i], fill_value=False)
+    # see where stretches of marker presence start and end
+    marker_starts: dict[int,list[int]] = {}
+    marker_ends  : dict[int,list[int]] = {}
+    for i in markers:
+        marker_starts[i], marker_ends[i] = _utils.get_marker_starts_ends(markers[i], study_config.auto_code_trial_episodes['max_gap_duration'], study_config.auto_code_trial_episodes['min_duration'])
+    # find potential trial starts and ends
+    if len(study_config.auto_code_trial_episodes['start_markers'])>1:
+        starts = _utils.get_trial_from_markers(marker_starts, marker_ends, study_config.auto_code_trial_episodes['start_markers'], study_config.auto_code_trial_episodes['max_intermarker_gap_duration'], side='end')
+    else:
+        starts = marker_ends  [study_config.auto_code_trial_episodes['start_markers'][0]]
+    if len(study_config.auto_code_trial_episodes[ 'end_markers' ])>1:
+        ends   = _utils.get_trial_from_markers(marker_starts, marker_ends, study_config.auto_code_trial_episodes[ 'end_markers' ], study_config.auto_code_trial_episodes['max_intermarker_gap_duration'], side='start')
+    else:
+        ends   = marker_starts[study_config.auto_code_trial_episodes[ 'end_markers' ][0]]
+    # now match trial starts and ends
+    # strategy: run through starts and find latest start that is before first end (discard ends that are before the start)
+    # keep pointer into array keeping track of ends and start already discarded or consumed
+    # NB: this assumes starts and ends are sorted, which the above procedures should indeed deliver
+    trials: list[tuple[int,int]] = []
+    s_idx = 0
+    e_idx = 0
+    while s_idx<len(starts):
+        # remove ends before the current start
+        e_skip = np.nonzero(ends[e_idx:]<starts[s_idx])[0]
+        if e_skip.size:
+            e_idx += e_skip[-1]+1
+        if e_idx > len(ends)-1:
+            # we're out of ends, done
+            break
+        # for all starts in contention, find the last one that is before the next end
+        gaps = ends[e_idx]-starts[s_idx:]
+        # NB: it cannot occur that ther are no starts before this end, since we move e_idx above in that case
+        # and bail out if there are no ends left
+        gaps[gaps<=0] = np.iinfo(gaps.dtype).max
+        mini = np.argmin(gaps)
+        trials.append((starts[s_idx+mini], ends[e_idx]))
+        # these are consumed
+        s_idx+=mini+1
+        e_idx+=1
+    # now insert into coding file. This just overwrites whatever is there
+    episodes[annotation.Event.Trial] = [y for x in trials for y in x]
 
     # back up coding file if it exists
     if coding_file.is_file():

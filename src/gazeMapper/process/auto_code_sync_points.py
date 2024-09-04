@@ -31,22 +31,20 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
     else:
         episodes = episode.get_empty_marker_dict(study_config.episodes_to_code)
 
-    # automatic sync point detection
-    if study_config.auto_code_sync_points:
-        # get marker files
-        markers = [marker.load_file(m, working_dir) for m in study_config.individual_markers if m.id in study_config.auto_code_sync_points['markers']]
-        # recode so we have a boolean with when markers are present
-        markers = [marker.code_marker_for_presence(m) for m in markers]
-        # fill gaps in marker detection
-        for i in range(len(markers)):
-            markers[i] = marker.fill_gaps_in_marker_detection(markers[i], fill_value=False)
-        # see where stretches of True (marker presence) start
-        marker_starts = []
-        for i in range(len(markers)):
-            start_frames,_ = _utils.get_marker_starts_ends(markers[i], study_config.auto_code_sync_points['max_gap_duration'], study_config.auto_code_sync_points['min_duration'])
-            marker_starts.extend(start_frames)
-        # insert in episodes
-        [episodes[annotation.Event.Sync_Camera].append(i) for i in marker_starts if i not in episodes[annotation.Event.Sync_Camera]]
+    # get marker files
+    markers = [marker.load_file(m, working_dir) for m in study_config.individual_markers if m.id in study_config.auto_code_sync_points['markers']]
+    # recode so we have a boolean with when markers are present
+    markers = [marker.code_marker_for_presence(m) for m in markers]
+    # fill gaps in marker detection
+    for i in range(len(markers)):
+        markers[i] = marker.fill_gaps_in_marker_detection(markers[i], fill_value=False)
+    # see where stretches of True (marker presence) start
+    marker_starts = []
+    for i in range(len(markers)):
+        start_frames,_ = _utils.get_marker_starts_ends(markers[i], study_config.auto_code_sync_points['max_gap_duration'], study_config.auto_code_sync_points['min_duration'])
+        marker_starts.extend(start_frames)
+    # insert in episodes
+    [episodes[annotation.Event.Sync_Camera].append(i) for i in marker_starts if i not in episodes[annotation.Event.Sync_Camera]]
 
     # back up coding file if it exists
     if coding_file.is_file():
