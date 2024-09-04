@@ -16,7 +16,7 @@ from glassesTools import annotation, drawing, gaze_headref, gaze_worldref, ocv, 
 from glassesTools.video_gui import GUI
 
 
-from .. import config, episode, naming, session
+from .. import config, episode, naming, process, session
 
 # This script shows a video player that is used to indicate the interval(s)
 # during which the poster should be found in the video and in later
@@ -35,7 +35,7 @@ _event_type_to_key_map = {
     annotation.Event.Trial          : imgui.Key.t,
 }
 
-def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **study_settings):
+def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **study_settings):
     # if show_poster, also draw poster with gaze overlaid on it (if available)
     working_dir = pathlib.Path(working_dir)
     if config_dir is None:
@@ -57,6 +57,9 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
 def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, main_win_id: int, **study_settings):
     # get settings for the study
     study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent, config.OverrideLevel.Recording: working_dir}, **study_settings)
+
+    # update state
+    session.update_action_states(working_dir, process.Action.CODE_EPISODES, process.State.Running, skip_if_missing=True)
 
     # get info about recording
     rec_def  = study_config.session_def.get_recording_def(working_dir.name)
@@ -205,3 +208,6 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
 
     # store coded intervals to file
     episode.write_list_to_file(episode.marker_dict_to_list(episodes), coding_file)
+
+    # update state
+    session.update_action_states(working_dir, process.Action.CODE_EPISODES, process.State.Completed, skip_if_missing=True)

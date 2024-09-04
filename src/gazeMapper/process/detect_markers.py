@@ -8,10 +8,10 @@ from glassesTools import annotation, aruco, drawing, marker as gt_marker, plane 
 from glassesTools.video_gui import GUI
 
 
-from .. import config, episode, marker, naming, plane, session, synchronization
+from .. import config, episode, marker, naming, plane, process, session, synchronization
 
 
-def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show_visualization=False, visualization_show_rejected_markers=False, **study_settings):
+def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show_visualization=False, visualization_show_rejected_markers=False, **study_settings):
     # if show_visualization, each frame is shown in a viewer, overlaid with info about detected markers and planes
     # if show_rejected_markers, rejected ArUco marker candidates are also shown in the viewer. Possibly useful for debug
     working_dir = pathlib.Path(working_dir)
@@ -39,6 +39,9 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
 def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, visualization_show_rejected_markers: bool, **study_settings):
     # get settings for the study
     study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent, config.OverrideLevel.Recording: working_dir}, **study_settings)
+
+    # update state
+    session.update_action_states(working_dir, process.Action.DETECT_MARKERS, process.State.Running, skip_if_missing=True)
 
     # get info about recording
     rec_def = study_config.session_def.get_recording_def(working_dir.name)
@@ -77,6 +80,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
     if sync_target_signal:
         df = pd.DataFrame(sync_target_signal['sync'],columns=['frame_idx','target_x','target_y'])
         df.to_csv(working_dir/naming.target_sync_file, sep='\t', index=False, na_rep='nan', float_format="%.8f")
+
+    # update state
+    session.update_action_states(working_dir, process.Action.DETECT_MARKERS, process.State.Completed, skip_if_missing=True)
 
 
 def _get_sync_function(study_config: config.Study,

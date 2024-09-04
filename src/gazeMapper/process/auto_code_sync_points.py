@@ -5,11 +5,11 @@ import shutil
 
 from glassesTools import annotation
 
-from .. import config, episode, marker, naming
+from .. import config, episode, marker, naming, process, session
 from . import _utils
 
 
-def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **study_settings):
+def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **study_settings):
     working_dir = pathlib.Path(working_dir) # working directory of a session, not of a recording
     if config_dir is None:
         config_dir = config.guess_config_dir(working_dir)
@@ -20,6 +20,9 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
     study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent, config.OverrideLevel.Recording: working_dir}, **study_settings)
     if not study_config.auto_code_sync_points:
         raise ValueError(f'No automatic sync point detection is defined for this study, nothing to do')
+
+    # update state
+    session.update_action_states(working_dir, process.Action.AUTO_CODE_SYNC, process.State.Running, skip_if_missing=True)
 
     # get already coded interval(s), if any
     coding_file = working_dir / naming.coding_file
@@ -51,3 +54,6 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
         shutil.move(coding_file, coding_file.with_stem(f'{naming.coding_file.split(".")[0]}_backup_before_sync_points_auto_code'))
     # store coded intervals to file
     episode.write_list_to_file(episode.marker_dict_to_list(episodes), coding_file)
+
+    # update state
+    session.update_action_states(working_dir, process.Action.AUTO_CODE_SYNC, process.State.Completed, skip_if_missing=True)

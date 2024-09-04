@@ -15,11 +15,11 @@ from glassesTools.signal_gui import GUI, TargetPos
 
 
 from . import _utils
-from .. import config, episode, naming, session
+from .. import config, episode, naming, process, session
 
 
 
-def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **study_settings):
+def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **study_settings):
     # apply_average: if True: the average offset for all VOR sync episodes will be applied to the timestamps
     # if False, the VOR offset for the first episode will be applied, the rest are taken as checks
     working_dir = pathlib.Path(working_dir)
@@ -62,6 +62,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     episodes = episode.list_to_marker_dict(episode.read_list_from_file(coding_file))[annotation.Event.Sync_ET_Data]
     if not episodes:
         raise RuntimeError(f'No {annotation.Event.Sync_ET_Data.value} episodes found for this recording. Run code_episodes and code at least one {annotation.Event.Sync_ET_Data.value} episode.')
+
+    # update state
+    session.update_action_states(working_dir, process.Action.SYNC_ET_TO_CAM, process.State.Running, skip_if_missing=True)
 
     # Read gaze data
     gazes = gaze_headref.read_dict_from_file(working_dir / 'gazeData.tsv', episodes)[0]
@@ -169,3 +172,6 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     df = _utils.insert_ts_fridx_in_df(df, gaze_headref.Gaze, 'VOR', ts_VOR, fr_VOR)
     df = pl.from_pandas(df)
     df.write_csv(working_dir / 'gazeData.tsv', separator='\t', null_value='nan', float_precision=8)
+
+    # update state
+    session.update_action_states(working_dir, process.Action.SYNC_ET_TO_CAM, process.State.Completed, skip_if_missing=True)

@@ -11,7 +11,7 @@ from typing import Any
 from glassesTools import annotation, aruco, drawing, intervals, gaze_headref, gaze_worldref, ocv, plane, timestamps, transforms, utils
 from glassesTools.video_gui import GUI
 
-from .. import config, episode, marker, naming, session, synchronization
+from .. import config, episode, marker, naming, process, session, synchronization
 from .detect_markers import _get_plane_setup, _get_sync_function
 
 from ffpyplayer.writer import MediaWriter
@@ -20,7 +20,7 @@ import ffpyplayer.tools
 from fractions import Fraction
 
 
-def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show_visualization=False, **study_settings):
+def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show_visualization=False, **study_settings):
     # if show_visualization, the generated video is shown as it is created in a viewer
     working_dir  = pathlib.Path(working_dir) # working directory of a session, not of a recording
     if config_dir is None:
@@ -194,6 +194,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                 all_poses[r] = {}
                 for p in plane_names:
                     all_poses[r][p] = plane.read_dict_from_file(working_dir/r/f'{naming.plane_pose_prefix}{p}.tsv')
+
+    # update state
+    session.update_action_states(working_dir, process.Action.MAKE_VIDEO, process.State.Running, skip_if_missing=True)
 
     # build pose estimator
     for rec in recs:
@@ -460,6 +463,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
     # done with all videos, clean up
     if has_gui:
         gui.stop()
+
+    # update state
+    session.update_action_states(working_dir, process.Action.MAKE_VIDEO, process.State.Completed, skip_if_missing=True)
 
 def draw_gaze_on_other_video(frame_other, pose_this, pose_other, plane_gaze, camera_params_other, clr, do_draw_camera, do_draw_gaze_vec, sub_pixel_fac):
     gaze_point = np.append(plane_gaze.gazePosPlane2D_vidPos_ray,0.).reshape(1,3)

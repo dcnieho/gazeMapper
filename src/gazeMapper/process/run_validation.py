@@ -4,11 +4,11 @@ from glassesValidator import process as gv_process, utils as gv_utils
 from glassesTools import annotation
 
 
-from .. import config, episode, naming, plane, session
+from .. import config, episode, naming, plane, process, session
 
 
 stopAllProcessing = False
-def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **study_settings):
+def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **study_settings):
     working_dir = pathlib.Path(working_dir)
     if config_dir is None:
         config_dir = config.guess_config_dir(working_dir)
@@ -24,6 +24,9 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
     rec_def = study_config.session_def.get_recording_def(working_dir.name)
     if rec_def.type!=session.RecordingType.Eye_Tracker:
         raise ValueError(f'You can only run run_validation on eye tracker recordings, not on a {str(rec_def.type).split(".")[1]} recording')
+
+    # update state
+    session.update_action_states(working_dir, process.Action.RUN_VALIDATION, process.State.Running, skip_if_missing=True)
 
     # get interval(s) coded to be analyzed, if any
     episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / 'coding.tsv'))[annotation.Event.Validate]
@@ -60,3 +63,6 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
                                           analysis_interval_file_name=output_analysis_interval_file_name,
                                           gaze_offset_file_name=output_gaze_offset_file_name,
                                           output_data_quality_file_name=f'{naming.validation_prefix}{p}_data_quality.tsv')
+
+    # update state
+    session.update_action_states(working_dir, process.Action.RUN_VALIDATION, process.State.Completed, skip_if_missing=True)

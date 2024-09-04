@@ -6,10 +6,10 @@ from glassesTools import annotation, gaze_headref, timestamps
 
 
 from . import _utils
-from .. import config, session, synchronization
+from .. import config, process, session, synchronization
 
 
-def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **study_settings):
+def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **study_settings):
     working_dir = pathlib.Path(working_dir) # working directory of a session, not of a recording
     if config_dir is None:
         config_dir = config.guess_config_dir(working_dir)
@@ -61,6 +61,9 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
                 if r==study_config.sync_ref_recording:
                     raise ValueError(f'Recording {r} is the reference recording for sync, should not be specified in study_config.sync_average_recordings')
 
+    # update state
+    session.update_action_states(working_dir, process.Action.SYNC_TO_REFERENCE, process.State.Running, skip_if_missing=True)
+
     # prep for sync info
     recs = [r for r in session_info.recordings if r!=study_config.sync_ref_recording]
     sync = synchronization.get_sync_for_recs(working_dir, recs, study_config.sync_ref_recording, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings)
@@ -97,3 +100,5 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
         df = pl.from_pandas(df)
         df.write_csv(working_dir / r / 'gazeData.tsv', separator='\t', null_value='nan', float_precision=8)
 
+    # update state
+    session.update_action_states(working_dir, process.Action.SYNC_TO_REFERENCE, process.State.Completed, skip_if_missing=True)

@@ -6,10 +6,10 @@ from collections import defaultdict
 
 from glassesTools import annotation, gaze_worldref
 
-from .. import config, episode, marker, naming, session
+from .. import config, episode, marker, naming, process, session
 
 
-def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **study_settings):
+def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **study_settings):
     working_dir = pathlib.Path(working_dir) # working directory of a session, not of a recording
     if config_dir is None:
         config_dir = config.guess_config_dir(working_dir)
@@ -20,6 +20,10 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
     study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir}, **study_settings)
     if annotation.Event.Trial not in study_config.planes_per_episode:
         raise ValueError('No planes are specified for mapping gaze to during trials, nothing to export')
+
+    # update state
+    session.update_action_states(working_dir, process.Action.EXPORT_TRIALS, process.State.Running, skip_if_missing=True)
+
     planes = list(study_config.planes_per_episode[annotation.Event.Trial])
 
     # get session info
@@ -112,3 +116,6 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
         # write into df (use polars as that library saves to file waaay faster)
         plane_gazes = pl.from_pandas(plane_gazes)
         plane_gazes.write_csv(working_dir / f'{naming.plane_pose_prefix}{r}.tsv', separator='\t', null_value='nan', float_precision=8)
+
+    # update state
+    session.update_action_states(working_dir, process.Action.EXPORT_TRIALS, process.State.Completed, skip_if_missing=True)

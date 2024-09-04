@@ -5,10 +5,10 @@ from glassesTools import annotation, gaze_headref, gaze_worldref, ocv, plane as 
 from glassesTools.video_gui import GUI
 
 
-from .. import config, episode, naming, plane, session, synchronization
+from .. import config, episode, naming, plane, process, session, synchronization
 
 
-def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show_visualization=False, show_planes=True, show_only_intervals=True, **study_settings):
+def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show_visualization=False, show_planes=True, show_only_intervals=True, **study_settings):
     # if show_visualization, each frame is shown in a viewer, overlaid with info about detected planes and projected gaze
     # if show_poster, gaze in space od each plane is also drawn in a separate windows
     # if show_only_intervals, only the coded mapping episodes (if available) are shown in the viewer while the rest of the scene video is skipped past
@@ -42,6 +42,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, f
     rec_def = study_config.session_def.get_recording_def(working_dir.name)
     if rec_def.type!=session.RecordingType.Eye_Tracker:
         raise ValueError(f'You can only run gaze_to_plane on eye tracker recordings, not on a {str(rec_def.type).split(".")[1]} recording')
+
+    # update state
+    session.update_action_states(working_dir, process.Action.GAZE_TO_PLANE, process.State.Running, skip_if_missing=True)
 
     # get episodes for which to transform gaze
     episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / naming.coding_file), study_config.episodes_to_code)
@@ -81,6 +84,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, f
     for p in planes:
         plane_gazes[p] = gaze_worldref.from_head(poses[p], head_gazes, camera_params)
         gaze_worldref.write_dict_to_file(plane_gazes[p], working_dir/f'{naming.world_gaze_prefix}{p}.tsv', skip_missing=True)
+
+    # update state
+    session.update_action_states(working_dir, process.Action.GAZE_TO_PLANE, process.State.Completed, skip_if_missing=True)
 
     # done if no visualization wanted
     if gui is None:

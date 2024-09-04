@@ -5,11 +5,11 @@ import shutil
 
 from glassesTools import annotation
 
-from .. import config, episode, marker, naming
+from .. import config, episode, marker, naming, process, session
 from . import _utils
 
 
-def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **study_settings):
+def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **study_settings):
     working_dir = pathlib.Path(working_dir) # working directory of a session, not of a recording
     if config_dir is None:
         config_dir = config.guess_config_dir(working_dir)
@@ -26,6 +26,9 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
         raise RuntimeError(f'Nothing to do, auto_code_trials_episodes is defined, but you do not have a sync_ref_recording')
     if rec_def.name==study_config.sync_ref_recording:
         raise RuntimeError(f'Nothing to do, auto_code_trials_episodes is defined and you have a sync_ref_recording ({study_config.sync_ref_recording}), but this recording ({rec_def.name}) is another one')
+
+    # update state
+    session.update_action_states(working_dir, process.Action.AUTO_CODE_TRIALS, process.State.Running, skip_if_missing=True)
 
     # get already coded interval(s), if any
     coding_file = working_dir / naming.coding_file
@@ -91,3 +94,6 @@ def process(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, 
         shutil.move(coding_file, coding_file.with_stem(f'{naming.coding_file.split(".")[0]}_backup_before_trial_auto_code'))
     # store coded intervals to file
     episode.write_list_to_file(episode.marker_dict_to_list(episodes), coding_file)
+
+    # update state
+    session.update_action_states(working_dir, process.Action.AUTO_CODE_TRIALS, process.State.Completed, skip_if_missing=True)
