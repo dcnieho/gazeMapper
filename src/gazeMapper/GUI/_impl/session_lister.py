@@ -65,7 +65,7 @@ class SessionList():
 
             # Setup
             checkbox_width = frame_height-2*imgui.get_style().frame_padding.y
-            imgui.table_setup_column("Selector", imgui.TableColumnFlags_.no_hide | imgui.TableColumnFlags_.no_sort | imgui.TableColumnFlags_.no_resize | imgui.TableColumnFlags_.no_reorder, init_width_or_weight=checkbox_width)  # 0
+            imgui.table_setup_column("Selector", imgui.TableColumnFlags_.no_hide | imgui.TableColumnFlags_.no_sort | imgui.TableColumnFlags_.no_resize | imgui.TableColumnFlags_.no_reorder | imgui.TableColumnFlags_.no_header_label, init_width_or_weight=checkbox_width)  # 0
             imgui.table_setup_column("Name", imgui.TableColumnFlags_.default_sort | imgui.TableColumnFlags_.no_hide | imgui.TableColumnFlags_.no_resize)  # 1
             if self._has_recordings_col:
                 imgui.table_setup_column("Recordings", imgui.TableColumnFlags_.no_resize | imgui.TableColumnFlags_.angled_header)  # 2
@@ -95,36 +95,29 @@ class SessionList():
 
                 # Headers
                 imgui.table_angled_headers_row()
-                imgui.table_next_row(imgui.TableRowFlags_.headers)
-                for i in range(imgui.table_get_column_count()):
-                    if not imgui.table_set_column_index(i):
-                        continue
-                    column_name = '' if imgui.table_get_column_flags(i) & imgui.TableColumnFlags_.no_header_label else imgui.table_get_column_name(i)
-                    imgui.push_id(i)
-                    if i==0:  # checkbox column: reflects whether all, some or none of visible items are selected, and allows selecting all or none
-                        # get state
-                        num_selected = sum([self.selected_items[iid] for iid in self.sorted_ids])
-                        if num_selected==0:
-                            # none selected
-                            multi_selected_state = -1
-                        elif num_selected==len(self.sorted_ids):
-                            # all selected
-                            multi_selected_state = 1
-                        else:
-                            # some selected
-                            multi_selected_state = 0
+                imgui.table_headers_row()
+                # set up checkbox column: reflects whether all, some or none of visible items are selected, and allows selecting all or none
+                imgui.table_set_column_index(0)
+                # get state
+                num_selected = sum([self.selected_items[iid] for iid in self.sorted_ids])
+                if num_selected==0:
+                    # none selected
+                    multi_selected_state = -1
+                elif num_selected==len(self.sorted_ids):
+                    # all selected
+                    multi_selected_state = 1
+                else:
+                    # some selected
+                    multi_selected_state = 0
 
-                        if multi_selected_state==0:
-                            imgui.internal.push_item_flag(imgui.internal.ItemFlags_.mixed_value, True)
-                        clicked, new_state = utils.my_checkbox(f"##header_checkbox", multi_selected_state==1, frame_size=(0,0), frame_padding_override=(imgui.get_style().frame_padding.x/2,0), do_vertical_align=False)
-                        if multi_selected_state==0:
-                            imgui.internal.pop_item_flag()
+                if multi_selected_state==0:
+                    imgui.internal.push_item_flag(imgui.internal.ItemFlags_.mixed_value, True)
+                clicked, new_state = utils.my_checkbox(f"##header_checkbox", multi_selected_state==1, frame_size=(0,0), frame_padding_override=(imgui.get_style().frame_padding.x/2,0), do_vertical_align=False)
+                if multi_selected_state==0:
+                    imgui.internal.pop_item_flag()
 
-                        if clicked:
-                            utils.set_all(self.selected_items, new_state, subset = self.sorted_ids)
-                    else:
-                        imgui.table_header(column_name)
-                    imgui.pop_id()
+                if clicked:
+                    utils.set_all(self.selected_items, new_state, subset = self.sorted_ids)
 
                 # Loop rows
                 any_selectable_clicked = False
