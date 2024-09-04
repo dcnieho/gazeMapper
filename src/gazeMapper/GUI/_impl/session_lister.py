@@ -128,7 +128,6 @@ class SessionList():
                     imgui.table_next_row()
 
                     item = self.items[iid]
-                    missing_recs = item.missing_recordings() if self._has_recordings_col else []
                     num_columns_drawn = 0
                     selectable_clicked = False
                     checkbox_clicked, checkbox_hovered = False, False
@@ -185,16 +184,14 @@ class SessionList():
                             case 2 if self._has_recordings_col:
                                 # Number of recordings
                                 n_rec = len(item.definition.recordings)
+                                missing_recs = item.missing_recordings()
                                 clr = colors.error if missing_recs else colors.ok
                                 imgui.text_colored(clr, f'{n_rec-len(missing_recs)}/{n_rec}{" "+ifa6.ICON_FA_TRIANGLE_EXCLAMATION if missing_recs else ""}')
                                 if missing_recs:
                                     utils.draw_hover_text('missing recordings:\n'+'\n'.join(missing_recs),'', hovered_flags=imgui.HoveredFlags_.for_tooltip|imgui.HoveredFlags_.delay_normal)
                             case _:
                                 # task status columns
-                                if missing_recs:
-                                    imgui.text_colored(colors.error, '-')
-                                else:
-                                    self._draw_status_widget(item,self.display_actions[ri-self._view_column_count_base])
+                                self._draw_status_widget(item,self.display_actions[ri-self._view_column_count_base])
                         num_columns_drawn+=1
 
                     # handle selection logic
@@ -231,7 +228,9 @@ class SessionList():
         if self.for_recordings:
             _draw_process_state(item.state[action])
         else:
-            if process.is_action_session_level(action):
+            if not item.has_all_recordings():
+                imgui.text_colored(colors.error, '-')
+            elif process.is_action_session_level(action):
                 _draw_process_state(item.state[action])
             else:
                 not_completed = item.not_completed_action(action)
