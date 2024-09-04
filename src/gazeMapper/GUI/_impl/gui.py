@@ -300,6 +300,10 @@ class GUI:
 
     def _reload_sessions(self):
         sessions = session.get_sessions_from_directory(self.project_dir, self.study_config.session_def)
+        for s in sessions:
+            s.load_action_states(True)
+            for r in s.recordings:
+                s.recordings[r].load_action_states(True)
         self.sessions |= {s.name:s for s in sessions}
         self._selected_sessions |= {k:False for k in self.sessions}
         self._session_lister_set_actions_to_show(self._session_lister)
