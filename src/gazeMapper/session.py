@@ -281,12 +281,13 @@ def get_action_states(working_dir: str|pathlib.Path, for_recording: bool, create
         action_states = json.load(f, object_hook=utils.json_reconstitute)
         return {getattr(process.Action, k.split('.')[1]): action_states[k] for k in action_states}  # turn key from string back into enum instance
 
-def update_action_states(working_dir: str|pathlib.Path, for_recording: bool, action: process.Action, state: process.State, skip_if_missing=False) -> dict[process.Action, process.State]:
+def update_action_states(working_dir: str|pathlib.Path, action: process.Action, state: process.State, skip_if_missing=False) -> dict[process.Action, process.State]:
+    for_recording = not process.is_action_session_level(action)
     action_states = get_action_states(working_dir, for_recording, skip_if_missing=skip_if_missing)
     if action_states is None and skip_if_missing:
         return None
 
-    action_states = process.action_update_and_invalidate(action_states, action, state, for_recording)
+    action_states = process.action_update_and_invalidate(action_states, action, state)
 
     file = working_dir / _get_action_status_fname(for_recording)
     _write_action_states_to_file(file, action_states)
