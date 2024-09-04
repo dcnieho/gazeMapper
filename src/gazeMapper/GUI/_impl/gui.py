@@ -325,21 +325,7 @@ class GUI:
         if self.study_config is None:
             lister.set_actions_to_show(set())
 
-        actions = {process.Action.IMPORT, process.Action.CODE_EPISODES, process.Action.DETECT_MARKERS, process.Action.GAZE_TO_PLANE, process.Action.EXPORT_TRIALS, process.Action.MAKE_VIDEO}
-        if self.study_config.auto_code_sync_points:
-            actions.add(process.Action.AUTO_CODE_SYNC)
-        if self.study_config.auto_code_trial_episodes and self.study_config.sync_ref_recording:
-            actions.add(process.Action.AUTO_CODE_TRIALS)
-        if self.study_config.get_cam_movement_for_et_sync_method in ['plane', 'function']:
-            actions.add(process.Action.SYNC_ET_TO_CAM)
-        if self.study_config.sync_ref_recording:
-            actions.add(process.Action.SYNC_TO_REFERENCE)
-        if glassesTools.annotation.Event.Validate in self.study_config.planes_per_episode:
-            actions.add(process.Action.RUN_VALIDATION)
-
-        if for_recordings:
-            actions = {a for a in actions if not process.is_action_session_level(a)}
-
+        actions = self.study_config.get_process_actions(exclude_session_level=for_recordings)
         lister.set_actions_to_show(actions)
 
     def close_project(self):
