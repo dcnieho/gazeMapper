@@ -1,5 +1,5 @@
 import threading
-from imgui_bundle import imgui, icons_fontawesome_6 as ifa6
+from imgui_bundle import imgui, icons_fontawesome_6 as ifa6, imspinner
 from typing import Callable
 
 from . import colors, utils
@@ -224,14 +224,14 @@ class SessionList():
             # show menu when right-clicking the empty space
             # TODO
 
-    def _draw_status_widget(self, item: session.Session, action: process.Action):
+    def _draw_status_widget(self, item: session.Session|session.Recording, action: process.Action):
         if self.for_recordings:
-            _draw_process_state(item.state[action])
+            _draw_process_state(item.state[action], item.name)
         else:
             if not item.has_all_recordings():
                 imgui.text_colored(colors.error, '-')
             elif process.is_action_session_level(action):
-                _draw_process_state(item.state[action])
+                _draw_process_state(item.state[action], item.name)
             else:
                 not_completed = item.action_not_completed_recordings(action)
                 n_rec = len(item.definition.recordings)
@@ -268,21 +268,18 @@ class SessionList():
             sort_specs_in.specs_dirty = False
             self._require_sort = False
 
-def _draw_process_state(state: process.State):
+def _draw_process_state(state: process.State, iid: int|str):
+    symbol_size = imgui.calc_text_size(ifa6.ICON_FA_CIRCLE)
     match state:
         case process.State.Not_Started:
             imgui.text_colored(colors.gray, ifa6.ICON_FA_CIRCLE)
         case process.State.Pending:
-            pass
-            # radius    = symbol_size.x / 2
-            # thickness = symbol_size.x / 3 / 2.5 # 3 is number of dots, 2.5 is nextItemKoeff in imspinner.spinner_bounce_dots()
-            # imspinner.spinner_bounce_dots(f'waitBounceDots_{recording.id}', radius, thickness, color=globals.settings.style_text)
-            # hover_text = f'Pending: {get_task_name_friendly(job.task)}'
+            radius    = symbol_size.x / 2
+            thickness = symbol_size.x / 3 / 2.5 # 3 is number of dots, 2.5 is nextItemKoeff in imspinner.spinner_bounce_dots()
+            imspinner.spinner_bounce_dots(f'waitBounceDots_{iid}', radius, thickness, color=imgui.get_style_color_vec4(imgui.Col_.text))
         case process.State.Running:
-            pass
-            # spinner_radii = [x/22/2*symbol_size.x for x in [22, 16, 10]]
-            # lw = 3.5/22/2*symbol_size.x
-            # imspinner.spinner_ang_triple(f'runSpinner_{recording.id}', *spinner_radii, lw, c1=globals.settings.style_text, c2=globals.settings.style_accent, c3=globals.settings.style_text)
-            # hover_text = f'Running: {get_task_name_friendly(job.task)}'
+            spinner_radii = [x/22/2*symbol_size.x for x in [22, 16, 10]]
+            lw = 3.5/22/2*symbol_size.x
+            imspinner.spinner_ang_triple(f'runSpinner_{iid}', *spinner_radii, lw, c1=imgui.get_style_color_vec4(imgui.Col_.text), c2=colors.warning, c3=imgui.get_style_color_vec4(imgui.Col_.text))
         case process.State.Completed:
             imgui.text_colored(colors.ok, ifa6.ICON_FA_CIRCLE_CHECK)
