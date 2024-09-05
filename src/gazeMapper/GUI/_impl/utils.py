@@ -96,26 +96,26 @@ def selectable_item_logic(iid: int|str, selected: dict[int,Any], last_clicked_id
     return last_clicked_id
 
 def handle_item_hitbox_events(iid: int, selected: dict[int,bool], context_menu: Callable[[int],None]):
-        right_clicked = False
-        # Right click = context menu
-        if context_menu and imgui.begin_popup_context_item(f"##{iid}_context"):
-            right_clicked = True
-            context_menu(iid)
-            imgui.end_popup()
-        else:
-            right_clicked = imgui.is_item_clicked(imgui.MouseButton_.right)
+    right_clicked = False
+    # Right click = context menu
+    if context_menu and imgui.begin_popup_context_item(f"##{iid}_context"):
+        right_clicked = True
+        context_menu(iid)
+        imgui.end_popup()
+    else:
+        right_clicked = imgui.is_item_clicked(imgui.MouseButton_.right)
 
-        if right_clicked:
-            # update selected items. same logic as windows explorer:
-            # 1. if right-clicked on one of the selected items, regardless of what modifier is pressed, keep selection as is
-            # 2. if right-clicked elsewhere than on one of the selected items:
-            # 2a. if control is down pop up right-click menu for the selected items.
-            # 2b. if control not down, deselect everything except clicked item (if any)
-            # NB: popup not shown when shift or control are down, do not know why...
-            if not selected[iid] and not imgui.get_io().key_ctrl:
-                set_all(selected, False)
-                selected[iid] = True
-        return right_clicked
+    if right_clicked:
+        # update selected items. same logic as windows explorer:
+        # 1. if right-clicked on one of the selected items, regardless of what modifier is pressed, keep selection as is
+        # 2. if right-clicked elsewhere than on one of the selected items:
+        # 2a. if control is down pop up right-click menu for the selected items.
+        # 2b. if control not down, deselect everything except clicked item (if any)
+        # NB: popup not shown when shift or control are down, do not know why...
+        if not selected[iid] and not imgui.get_io().key_ctrl:
+            set_all(selected, False)
+            selected[iid] = True
+    return right_clicked
 
 
 def draw_tooltip(hover_text):
