@@ -451,6 +451,8 @@ class GUI:
                 self.study_config = new_config
                 self.study_config.store_as_json()
                 self._session_lister_set_actions_to_show(self._session_lister)
+                for iid in self._recording_listers:
+                    self._session_lister_set_actions_to_show(self._recording_listers[iid], for_recordings=True)
 
 
     def _session_definition_pane_drawer(self):
