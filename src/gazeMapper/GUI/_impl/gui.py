@@ -314,7 +314,7 @@ class GUI:
         # 2. one plane set up
         # 3. one episode to code
         # 4. one plane linked to one episode
-        self.need_setup_recordings = not self.study_config or not self.study_config.session_def.recordings
+        self.need_setup_recordings = not self.study_config or not self.study_config.session_def.recordings or 'session_def' in self._problems_cache
         self.need_setup_plane = not self.study_config or not self.study_config.planes or any((not p.has_complete_setup() for p in self.study_config.planes))
         self.need_setup_episode = not self.study_config or not self.study_config.episodes_to_code or not self.study_config.planes_per_episode or any((x in self._problems_cache for x in ['episodes_to_code', 'planes_per_episode']))
 
@@ -435,7 +435,7 @@ class GUI:
             self._to_focus = new_win_params[0]
 
         # rest of settings handled here in a settings tree
-        if any((k not in ['episodes_to_code', 'planes_per_episode'] for k in self._problems_cache)):
+        if any((k not in ['session_def', 'episodes_to_code', 'planes_per_episode'] for k in self._problems_cache)):
             imgui.text_colored(colors.error,'*There are problems in the below setup that need to be resolved')
 
         fields = [k for k in config.study_parameter_types.keys() if k in config.study_defaults]
@@ -456,6 +456,8 @@ class GUI:
     def _session_definition_pane_drawer(self):
         if not self.study_config.session_def.recordings:
             imgui.text_colored(colors.error,'*At minimum one recording should be defined')
+        if 'session_def' in self._problems_cache:
+            imgui.text_colored(colors.error,f"*{self._problems_cache['session_def']}")
         table_is_started = imgui.begin_table(f"##session_def_list", 2)
         if not table_is_started:
             return
