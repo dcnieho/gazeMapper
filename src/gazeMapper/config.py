@@ -297,26 +297,29 @@ class Study:
 
     def _check_sync_ref(self, strict_check):
         problems: type_utils.ProblemDict = {}
-        if self.sync_ref_recording is not None:
-            type_utils.merge_problem_dicts(problems, self._check_recordings([self.sync_ref_recording], 'sync_ref_recording', False))
-            type_utils.merge_problem_dicts(problems, self._check_recordings(self.sync_ref_average_recordings, 'sync_average_recordings', False))
-            for a in ['sync_ref_do_time_stretch', 'sync_ref_stretch_which', 'sync_ref_average_recordings']:
-                if getattr(self,a) is None:
-                    if strict_check:
-                        raise ValueError(f'{a} should be set in the study setup when sync_ref_recording is set')
-                    else:
-                        problems[a] = f'{a} should be set when sync_ref_recording is set'
-            if self.sync_ref_average_recordings and self.sync_ref_recording in self.sync_ref_average_recordings:
+        if self.sync_ref_recording is None:
+            # nothing to do
+            return problems
+
+        type_utils.merge_problem_dicts(problems, self._check_recordings([self.sync_ref_recording], 'sync_ref_recording', False))
+        type_utils.merge_problem_dicts(problems, self._check_recordings(self.sync_ref_average_recordings, 'sync_average_recordings', False))
+        for a in ['sync_ref_do_time_stretch', 'sync_ref_stretch_which', 'sync_ref_average_recordings']:
+            if getattr(self,a) is None:
                 if strict_check:
-                    raise ValueError(f'Recording {self.sync_ref_recording} is the reference recording for sync, should not be specified in sync_average_recordings')
+                    raise ValueError(f'{a} should be set in the study setup when sync_ref_recording is set')
                 else:
-                    problems['sync_ref_average_recordings'] = f'Recording {self.sync_ref_recording} is the reference recording for sync, cannot be specified in sync_average_recordings'
-            if annotation.Event.Sync_Camera not in self.episodes_to_code:
-                if strict_check:
-                    raise ValueError('when sync_ref_recording is set, coding of camera sync points should be set up in episodes_to_code')
-                else:
-                    problems['episodes_to_code'] = f'if sync_ref_recording is set, {annotation.Event.Sync_Camera.value} events should be set up to be coded'
-                    type_utils.merge_problem_dicts(problems, {'sync_ref_recording': f'sync_ref_recording is set, but {annotation.Event.Sync_Camera.value} events are not set up to be coded in episodes_to_code'})
+                    problems[a] = f'{a} should be set when sync_ref_recording is set'
+        if self.sync_ref_average_recordings and self.sync_ref_recording in self.sync_ref_average_recordings:
+            if strict_check:
+                raise ValueError(f'Recording {self.sync_ref_recording} is the reference recording for sync, should not be specified in sync_average_recordings')
+            else:
+                problems['sync_ref_average_recordings'] = f'Recording {self.sync_ref_recording} is the reference recording for sync, cannot be specified in sync_average_recordings'
+        if annotation.Event.Sync_Camera not in self.episodes_to_code:
+            if strict_check:
+                raise ValueError('when sync_ref_recording is set, coding of camera sync points should be set up in episodes_to_code')
+            else:
+                problems['episodes_to_code'] = f'if sync_ref_recording is set, {annotation.Event.Sync_Camera.value} events should be set up to be coded'
+                type_utils.merge_problem_dicts(problems, {'sync_ref_recording': f'sync_ref_recording is set, but {annotation.Event.Sync_Camera.value} events are not set up to be coded in episodes_to_code'})
         return problems
 
     def _check_et_sync_method(self, strict_check) -> type_utils.ProblemDict:
