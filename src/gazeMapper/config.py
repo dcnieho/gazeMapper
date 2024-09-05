@@ -78,7 +78,7 @@ class Study:
 
                  sync_et_to_cam_use_average                     : bool                              = True,
 
-                 get_cam_movement_for_et_sync_method            : Literal['','plane','function']    = 'plane',
+                 get_cam_movement_for_et_sync_method            : Literal['','plane','function']    = '',
                  get_cam_movement_for_et_sync_function          : CamMovementForEtSyncFunction|None = None,
 
                  auto_code_sync_points                          : AutoCodeSyncPoints                = AutoCodeSyncPoints(),
