@@ -174,6 +174,7 @@ class Study:
             raise ValueError('get_cam_movement_for_et_sync_method parameter should be an empty string, "plane", or "function"')
 
         if strict_check:
+            self._check_session_def(strict_check)
             self._check_planes_per_episode(strict_check)
             self._check_episodes_to_code(strict_check)
             self._check_sync_ref(strict_check)
@@ -210,6 +211,14 @@ class Study:
 
     def _check_recording(self, rec: str) -> bool:
         return any([r.name==rec for r in self.session_def.recordings])
+
+    def _check_session_def(self, strict_check) -> type_utils.ProblemDict:
+        # require at least one eye tracker recording
+        if not any(r.type==session.RecordingType.Eye_Tracker for r in self.session_def.recordings):
+            if strict_check:
+                raise ValueError('At least one recording should be an eye tracker recording')
+            else:
+                return {'session_def': 'At least one recording should be an eye tracker recording'}
 
     def _check_planes_per_episode(self, strict_check) -> type_utils.ProblemDict:
         problems: type_utils.ProblemDict = {}
@@ -383,6 +392,7 @@ class Study:
 
     def field_problems(self) -> type_utils.ProblemDict:
         problems: type_utils.ProblemDict = {}
+        type_utils.merge_problem_dicts(problems, self._check_session_def(False))
         type_utils.merge_problem_dicts(problems, self._check_planes_per_episode(False))
         type_utils.merge_problem_dicts(problems, self._check_episodes_to_code(False))
         type_utils.merge_problem_dicts(problems, self._check_auto_coding_setup(False))
