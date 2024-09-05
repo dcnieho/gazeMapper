@@ -63,14 +63,13 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
 
     # get info about recording
     rec_def  = study_config.session_def.get_recording_def(working_dir.name)
-    rec_type = rec_def.type
-    in_video = session.read_recording_info(working_dir, rec_type)[1]
-    if rec_type==session.RecordingType.Camera:
+    in_video = session.read_recording_info(working_dir, rec_def.type)[1]
+    if rec_def.type==session.RecordingType.Camera:
         has_gaze, has_plane_gaze, has_plane_pose = False, False, False
         # no episode.Event.Sync_ET_Data for camera recordings, remove
         if annotation.Event.Sync_ET_Data in study_config.episodes_to_code:
             study_config.episodes_to_code.remove(annotation.Event.Sync_ET_Data)
-    elif rec_type==session.RecordingType.Eye_Tracker:
+    elif rec_def.type==session.RecordingType.Eye_Tracker:
         # Read gaze data
         has_gaze = True
         gazes = gaze_headref.read_dict_from_file(working_dir / 'gazeData.tsv', ts_column_suffixes=['VOR',''])[0]
@@ -90,7 +89,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
         poses = {p:plane.read_dict_from_file(f) for p,f in zip(planes,plane_files) if f.is_file()}
         has_plane_pose = not not poses
     else:
-        raise ValueError(f'recording type "{rec_type}" is not understood')
+        raise ValueError(f'recording type "{rec_def.type}" is not understood')
 
     # get camera calibration info
     cam_params = ocv.CameraParams.read_from_file(working_dir / "calibration.xml")
