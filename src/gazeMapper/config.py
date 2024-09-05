@@ -272,29 +272,44 @@ class Study:
     def _check_auto_markers(self, strict_check) -> type_utils.ProblemDict:
         problems: type_utils.ProblemDict = {}
         if self.auto_code_sync_points:
-            missing_markers: list[int] = []
-            for i in self.auto_code_sync_points['markers']:
-                if not any([m.id==i for m in self.individual_markers]):
-                    if strict_check:
-                        raise ValueError(f'Marker "{i}" specified in auto_code_sync_points.markers, but unknown because not present in individual_markers')
-                    else:
-                        missing_markers.append(i)
-            if missing_markers:
-                problems['auto_code_sync_points'] = {}
-                problems['auto_code_sync_points']['markers'] = f'The marker(s) {missing_markers[0] if len(missing_markers)==1 else missing_markers} are not defined in individual_markers'
-        if self.auto_code_trial_episodes:
-            for f in ['start_markers','end_markers']:
+            if 'markers' not in self.auto_code_sync_points:
+                if strict_check:
+                    raise ValueError('auto_code_sync_points.markers cannot be empty or unspecified')
+                else:
+                    problems['auto_code_sync_points'] = {}
+                    problems['auto_code_sync_points']['markers'] = 'auto_code_sync_points.markers cannot be empty or unspecified'
+            else:
                 missing_markers: list[int] = []
-                for i in self.auto_code_trial_episodes[f]:
+                for i in self.auto_code_sync_points['markers']:
                     if not any([m.id==i for m in self.individual_markers]):
                         if strict_check:
-                            raise ValueError(f'Marker "{i}" specified in auto_code_trial_episodes.{f}, but unknown because not present in individual_markers')
+                            raise ValueError(f'Marker "{i}" specified in auto_code_sync_points.markers, but unknown because not present in individual_markers')
                         else:
                             missing_markers.append(i)
                 if missing_markers:
-                    if 'auto_code_trial_episodes' not in problems:
-                        problems['auto_code_trial_episodes'] = {}
-                    problems['auto_code_trial_episodes'][f] = f'The marker(s) {missing_markers[0] if len(missing_markers)==1 else missing_markers} are not defined in individual_markers'
+                    problems['auto_code_sync_points'] = {}
+                    problems['auto_code_sync_points']['markers'] = f'The marker(s) {missing_markers[0] if len(missing_markers)==1 else missing_markers} are not defined in individual_markers'
+        if self.auto_code_trial_episodes:
+            for f in ['start_markers','end_markers']:
+                if f not in self.auto_code_trial_episodes:
+                    if strict_check:
+                        raise ValueError(f'auto_code_trial_episodes.{f} cannot be empty or unspecified')
+                    else:
+                        if 'auto_code_trial_episodes' not in problems:
+                            problems['auto_code_trial_episodes'] = {}
+                        problems['auto_code_trial_episodes'][f] = f'auto_code_trial_episodes.{f} cannot be empty or unspecified'
+                else:
+                    missing_markers: list[int] = []
+                    for i in self.auto_code_trial_episodes[f]:
+                        if not any([m.id==i for m in self.individual_markers]):
+                            if strict_check:
+                                raise ValueError(f'Marker "{i}" specified in auto_code_trial_episodes.{f}, but unknown because not present in individual_markers')
+                            else:
+                                missing_markers.append(i)
+                    if missing_markers:
+                        if 'auto_code_trial_episodes' not in problems:
+                            problems['auto_code_trial_episodes'] = {}
+                        problems['auto_code_trial_episodes'][f] = f'The marker(s) {missing_markers[0] if len(missing_markers)==1 else missing_markers} are not defined in individual_markers'
         return problems
 
     def _check_sync_ref(self, strict_check):
