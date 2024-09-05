@@ -36,7 +36,7 @@ class GUI:
         self.sessions: dict[str, session.Session] = {}
         self._sessions_lock: threading.Lock      = threading.Lock()
         self._selected_sessions: dict[str, bool] = {}
-        self._session_lister = session_lister.SessionList(self.sessions, self._sessions_lock, self._selected_sessions, info_callback=self._open_session_detail)
+        self._session_lister = session_lister.SessionList(self.sessions, self._sessions_lock, self._selected_sessions, info_callback=self._open_session_detail, item_context_callback=self._session_context_menu, item_action_context_callback=self._session_action_context_menu)
 
         self._recording_listers  : dict[str, session_lister.SessionList] = {}
         self._recordings_lock    : dict[str, threading.Lock]             = {}
@@ -744,6 +744,14 @@ class GUI:
                 ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
             }
             utils.push_popup(self, lambda: utils.popup("Add marker", _add_rec_popup, buttons = buttons, outside=False))
+
+    def _session_context_menu(self, item: session.Session):
+        pass
+    def _session_action_context_menu(self, item: session.Session, action: process.Action):
+        if process.is_session_level_action(action):
+            state = item.state[action]
+        else:
+            states = {r:item.recordings[r].state[action] for r in item.recordings}
 
     def _open_session_detail(self, item: session.Session):
         win_name = f'{item.name}##session_view'
