@@ -11,12 +11,17 @@ class SessionList():
             items_lock: threading.Lock,
         selected_items: dict[int|str, bool],
         for_recordings: bool = False,
-        info_callback: Callable = None):
+        info_callback: Callable = None,
+        item_context_callback: Callable = None,
+        item_action_context_callback: Callable = None):
 
         self.items = items
         self.selected_items = selected_items
         self.items_lock     = items_lock
+
         self.info_callback  = info_callback
+        self.item_context_callback  = item_context_callback
+        self.item_action_context_callback  = item_action_context_callback
 
         self.sorted_ids: list[int|str] = []
         self._last_clicked_id: int|str = None
@@ -153,7 +158,7 @@ class SessionList():
                             selectable_clicked, selectable_out = imgui.selectable(f"##{iid}_hitbox", self.selected_items[iid], flags=imgui.SelectableFlags_.span_all_columns|imgui.SelectableFlags_.allow_overlap|imgui.internal.SelectableFlagsPrivate_.select_on_click, size=(0,frame_height+cell_padding_y))
                             imgui.set_cursor_pos_y(cur_pos_y)   # instead of imgui.same_line(), we just need this part of its effect
                             imgui.pop_style_var(3)
-                            selectable_right_clicked = utils.handle_item_hitbox_events(iid, self.selected_items, context_menu=None)
+                            selectable_right_clicked = utils.handle_item_hitbox_events(iid, self.selected_items, context_menu=self.item_context_callback)
                             has_drawn_hitbox = True
 
                         if num_columns_drawn==1:
@@ -228,21 +233,28 @@ class SessionList():
         if self.for_recordings:
             if process.is_action_possible_for_recording_type(action, item.definition.type):
                 _draw_process_state(item.state[action], item.name)
+                if self.item_action_context_callback and imgui.begin_popup_context_item(f"##{item.name}_{action}_context"):
+                    self.item_action_context_callback(item, action)
+                    imgui.end_popup()
             else:
                 imgui.text('-')
                 utils.draw_hover_text(f'Not applicable to a {item.definition.type.value} recording','')
         else:
             if not item.has_all_recordings():
                 imgui.text_colored(colors.error, '-')
-            elif process.is_session_level_action(action):
-                _draw_process_state(item.state[action], item.name)
             else:
-                not_completed = item.action_not_completed_recordings(action)
-                n_rec = len(item.definition.recordings)
-                clr = colors.error if not_completed else colors.ok
-                imgui.text_colored(clr, f'{n_rec-len(not_completed)}/{n_rec}')
-                if not_completed:
-                    utils.draw_hover_text('not completed for recordings:\n'+'\n'.join(not_completed),'')
+                if process.is_session_level_action(action):
+                    _draw_process_state(item.state[action], item.name)
+                else:
+                    not_completed = item.action_not_completed_recordings(action)
+                    n_rec = len(item.definition.recordings)
+                    clr = colors.error if not_completed else colors.ok
+                    imgui.text_colored(clr, f'{n_rec-len(not_completed)}/{n_rec}')
+                    if not_completed:
+                        utils.draw_hover_text('not completed for recordings:\n'+'\n'.join(not_completed),'')
+                if self.item_action_context_callback and imgui.begin_popup_context_item(f"##{item.name}_{action}_context"):
+                    self.item_action_context_callback(item, action)
+                    imgui.end_popup()
 
     def _show_item_info(self, iid):
         if self.info_callback:
