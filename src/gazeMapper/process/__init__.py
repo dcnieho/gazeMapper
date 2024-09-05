@@ -54,22 +54,29 @@ utils.register_type(utils.CustomTypeEntry(Action,'__enum.process.Action__',str, 
 def is_session_level_action(action: Action) -> bool:
     return action in [Action.SYNC_TO_REFERENCE, Action.EXPORT_TRIALS, Action.MAKE_VIDEO]
 
-def get_actions_for_config(study_config: 'config.Study', exclude_session_level: bool=False) -> set[Action]:
-    actions = {Action.IMPORT, Action.CODE_EPISODES, Action.DETECT_MARKERS, Action.GAZE_TO_PLANE, Action.EXPORT_TRIALS, Action.MAKE_VIDEO}
-    if study_config.auto_code_sync_points:
-        actions.add(Action.AUTO_CODE_SYNC)
-    if study_config.auto_code_trial_episodes and study_config.sync_ref_recording:
-        actions.add(Action.AUTO_CODE_TRIALS)
-    if study_config.get_cam_movement_for_et_sync_method in ['plane', 'function']:
-        actions.add(Action.SYNC_ET_TO_CAM)
-    if study_config.sync_ref_recording:
-        actions.add(Action.SYNC_TO_REFERENCE)
-    if annotation.Event.Validate in study_config.planes_per_episode:
-        actions.add(Action.RUN_VALIDATION)
+def is_action_possible_given_config(action: Action, study_config: 'config.Study') -> bool:
+    match action:
+        case Action.AUTO_CODE_SYNC:
+            return not not study_config.auto_code_sync_points
+        case Action.AUTO_CODE_TRIALS:
+            return study_config.auto_code_trial_episodes and study_config.sync_ref_recording
+        case Action.SYNC_ET_TO_CAM:
+            return study_config.get_cam_movement_for_et_sync_method in ['plane', 'function']
+        case Action.SYNC_TO_REFERENCE:
+            return not not study_config.sync_ref_recording
+        case Action.RUN_VALIDATION:
+            return annotation.Event.Validate in study_config.planes_per_episode
+        case Action.MAKE_VIDEO:
+            return not not study_config.video_make_which
 
+        case _:
+            # no config preconditions for the other actions
+            return True
+
+def get_actions_for_config(study_config: 'config.Study', exclude_session_level: bool=False) -> set[Action]:
+    actions = {a for a in Action if is_action_possible_given_config(a, study_config)}
     if exclude_session_level:
         actions = {a for a in actions if not is_session_level_action(a)}
-
     return actions
 
 def _determine_to_invalidate(action: Action, study_config: 'config.Study') -> set[Action]:
