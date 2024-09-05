@@ -226,7 +226,7 @@ class Study:
                     problems['planes_per_episode'] = {}
                 problems['planes_per_episode'][e] = f'Plane(s) {missing_planes[0] if len(missing_planes)==1 else missing_planes} not known.'
 
-        if annotation.Event.Validate not in self.planes_per_episode:
+        if annotation.Event.Validate in self.episodes_to_code and annotation.Event.Validate not in self.planes_per_episode:
             if strict_check:
                 raise ValueError('Validation episodes are set up to be coded for this study, but no planes are set up to be used for validation in planes_per_episode')
             else:
