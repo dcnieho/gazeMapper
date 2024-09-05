@@ -271,7 +271,7 @@ class SessionList():
 def _draw_process_state(state: process.State, iid: int|str):
     symbol_size = imgui.calc_text_size(ifa6.ICON_FA_CIRCLE)
     match state:
-        case process.State.Not_Started:
+        case process.State.Not_Run:
             imgui.text_colored(colors.gray, ifa6.ICON_FA_CIRCLE)
         case process.State.Pending:
             radius    = symbol_size.x / 2

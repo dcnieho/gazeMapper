@@ -3,7 +3,7 @@ import enum
 from glassesTools import annotation, utils
 
 class State(enum.IntEnum):
-    Not_Started = enum.auto()
+    Not_Run     = enum.auto()
     Pending     = enum.auto()
     Running     = enum.auto()
     Completed   = enum.auto()
@@ -120,7 +120,7 @@ def action_update_and_invalidate(action: Action, state: State, study_config: 'co
     # being performed. There may be a better way of doing this, but i prefer to actively, per case, think this through
     # and explicitly write it out
     for a in _determine_to_invalidate(action, study_config):
-        action_state_mutations[a] = State.Not_Started
+        action_state_mutations[a] = State.Not_Run
 
     return action_state_mutations
 
@@ -128,7 +128,7 @@ def _is_recording_action_possible(action_states: dict[Action, State], study_conf
     preconditions: set[Action] = set(Action.IMPORT) # IMPORT is a precondition for all actions except IMPORT itself
     match action:
         case Action.IMPORT:
-            return action_states[Action.IMPORT]==State.Not_Started      # possible if not already imported
+            return action_states[Action.IMPORT]==State.Not_Run      # possible if not already imported
         case Action.CODE_EPISODES:
             pass    # nothing besides import
         case Action.DETECT_MARKERS:

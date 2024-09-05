@@ -274,7 +274,7 @@ def _create_action_states_file(file: pathlib.Path, for_recording: bool):
         filt = lambda x: not process.is_session_level_action(x)
     else:
         filt = lambda x:     process.is_session_level_action(x)
-    action_states = {k:process.State.Not_Started for k in process.Action if filt(k)}
+    action_states = {k:process.State.Not_Run for k in process.Action if filt(k)}
     _write_action_states_to_file(file, action_states)
 
 def _write_action_states_to_file(file: pathlib.Path, action_states: dict[process.Action, process.State]):
