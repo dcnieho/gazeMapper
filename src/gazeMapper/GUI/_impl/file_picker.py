@@ -455,8 +455,7 @@ class FilePicker:
             self.history_loc -= 1
             self.goto(self.history[self.history_loc], add_history=False)
         if self.history_loc>0: # don't just use disabled var as we may have just changed self.history_loc
-            if imgui.is_item_hovered():
-                utils.draw_tooltip(self._get_path_display_name(self.history[self.history_loc-1]))
+            utils.draw_hover_text(self._get_path_display_name(self.history[self.history_loc-1]), '')
             if imgui.begin_popup_context_item(f"##history_back_context"):
                 for i in range(self.history_loc-1,-1,-1):
                     p = self.history[i]
@@ -475,8 +474,7 @@ class FilePicker:
             self.history_loc += 1
             self.goto(self.history[self.history_loc], add_history=False)
         if self.history_loc+1<len(self.history): # don't just use disabled var as we may have just changed self.history_loc
-            if imgui.is_item_hovered():
-                utils.draw_tooltip(self._get_path_display_name(self.history[self.history_loc+1]))
+            utils.draw_hover_text(self._get_path_display_name(self.history[self.history_loc+1]), '')
             if imgui.begin_popup_context_item(f"##history_forward_context"):
                 for i in range(self.history_loc+1,len(self.history)):
                     p = self.history[i]
@@ -494,8 +492,8 @@ class FilePicker:
             imgui.begin_disabled()
         if imgui.button(ifa6.ICON_FA_ARROW_UP):
             self.goto(parent)
-        if not disabled and imgui.is_item_hovered():
-            utils.draw_tooltip(self._get_path_display_name(parent))
+        if not disabled:
+            utils.draw_hover_text(self._get_path_display_name(parent), '')
         if disabled:
             imgui.end_disabled()
         # Refresh button
@@ -634,8 +632,8 @@ class FilePicker:
                     else:
                         self.goto(b[0])
                 path_element_hc = path_element_hc or imgui.is_item_hovered() or imgui.is_item_clicked()
-                if hover and imgui.is_item_hovered():
-                    utils.draw_tooltip(hover)
+                if hover:
+                    utils.draw_hover_text(hover, '')
                 imgui.same_line()
             imgui.pop_style_var(2)
             imgui.pop_clip_rect()
@@ -908,7 +906,7 @@ class FilePicker:
                                         if self.items[iid].mime_type:
                                             disp_str = utils.trim_str(self.items[iid].mime_type,20)
                                             imgui.text(disp_str)
-                                            if disp_str!=self.items[iid].mime_type and imgui.is_item_hovered():
+                                            if disp_str!=self.items[iid].mime_type:
                                                 utils.draw_hover_text(self.items[iid].mime_type, text='')
                                     case 5:
                                         # Size
