@@ -188,7 +188,7 @@ class SessionList():
                                 clr = colors.error if missing_recs else colors.ok
                                 imgui.text_colored(clr, f'{n_rec-len(missing_recs)}/{n_rec}{" "+ifa6.ICON_FA_TRIANGLE_EXCLAMATION if missing_recs else ""}')
                                 if missing_recs:
-                                    utils.draw_hover_text('missing recordings:\n'+'\n'.join(missing_recs),'', hovered_flags=imgui.HoveredFlags_.for_tooltip|imgui.HoveredFlags_.delay_normal)
+                                    utils.draw_hover_text('missing recordings:\n'+'\n'.join(missing_recs), '')
                             case _:
                                 # task status columns
                                 self._draw_status_widget(item,self.display_actions[ri-self._view_column_count_base])
@@ -238,7 +238,7 @@ class SessionList():
                 clr = colors.error if not_completed else colors.ok
                 imgui.text_colored(clr, f'{n_rec-len(not_completed)}/{n_rec}')
                 if not_completed:
-                    utils.draw_hover_text('not completed for recordings:\n'+'\n'.join(not_completed),'', hovered_flags=imgui.HoveredFlags_.for_tooltip|imgui.HoveredFlags_.delay_normal)
+                    utils.draw_hover_text('not completed for recordings:\n'+'\n'.join(not_completed),'')
 
     def _show_item_info(self, iid):
         if self.info_callback:
@@ -273,13 +273,18 @@ def _draw_process_state(state: process.State, iid: int|str):
     match state:
         case process.State.Not_Run:
             imgui.text_colored(colors.gray, ifa6.ICON_FA_CIRCLE)
+            hover_text = 'Not run'
         case process.State.Pending:
             radius    = symbol_size.x / 2
             thickness = symbol_size.x / 3 / 2.5 # 3 is number of dots, 2.5 is nextItemKoeff in imspinner.spinner_bounce_dots()
             imspinner.spinner_bounce_dots(f'waitBounceDots_{iid}', radius, thickness, color=imgui.get_style_color_vec4(imgui.Col_.text))
+            hover_text = 'Pending'
         case process.State.Running:
             spinner_radii = [x/22/2*symbol_size.x for x in [22, 16, 10]]
             lw = 3.5/22/2*symbol_size.x
             imspinner.spinner_ang_triple(f'runSpinner_{iid}', *spinner_radii, lw, c1=imgui.get_style_color_vec4(imgui.Col_.text), c2=colors.warning, c3=imgui.get_style_color_vec4(imgui.Col_.text))
+            hover_text = 'Running'
         case process.State.Completed:
             imgui.text_colored(colors.ok, ifa6.ICON_FA_CIRCLE_CHECK)
+            hover_text = 'Completed'
+    utils.draw_hover_text(hover_text, text='')
