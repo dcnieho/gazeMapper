@@ -73,6 +73,12 @@ def is_action_possible_given_config(action: Action, study_config: 'config.Study'
             # no config preconditions for the other actions
             return True
 
+def is_action_possible_for_recording_type(action: Action, rec_type: 'session.RecordingType') -> bool:
+    from .. import session
+    if rec_type==session.RecordingType.Camera and action in [Action.GAZE_TO_PLANE, Action.SYNC_ET_TO_CAM, Action.RUN_VALIDATION]:
+        return False
+    return True
+
 def get_actions_for_config(study_config: 'config.Study', exclude_session_level: bool=False) -> set[Action]:
     actions = {a for a in Action if is_action_possible_given_config(a, study_config)}
     if exclude_session_level:
@@ -135,7 +141,7 @@ def _is_recording_action_possible(action_states: dict[Action, State], study_conf
     from .. import session
     if not is_action_possible_given_config(action, study_config):
         return False
-    elif rec_type==session.RecordingType.Camera and action in [Action.GAZE_TO_PLANE, Action.SYNC_ET_TO_CAM, Action.RUN_VALIDATION]:
+    elif not is_action_possible_for_recording_type(action, rec_type):
         return False
 
     preconditions: set[Action] = set(Action.IMPORT) # IMPORT is a precondition for all actions except IMPORT itself
