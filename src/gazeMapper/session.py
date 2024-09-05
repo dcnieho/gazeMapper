@@ -179,7 +179,7 @@ class Session:
         self.recordings[which] = Recording(rec_def, rec_info)
         return self.recordings[which]
 
-    def num_recordings(self) -> int:
+    def num_present_recordings(self) -> int:
         return sum((r.name in self.recordings for r in self.definition.recordings))
 
     def has_all_recordings(self) -> bool:

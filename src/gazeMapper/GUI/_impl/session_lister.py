@@ -253,7 +253,7 @@ class SessionList():
                     case 1:     # Name
                         key = lambda iid: self.items[iid].name
                     case 2 if self._has_recordings_col:     # Number of recordings
-                        key = lambda iid: self.items[iid].num_recordings()
+                        key = lambda iid: self.items[iid].num_present_recordings()
                     case _:     # status indicators
                         action = self.display_actions[sort_spec.column_index-self._view_column_count_base]
                         if self.for_recordings:
