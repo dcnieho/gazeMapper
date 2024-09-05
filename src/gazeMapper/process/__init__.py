@@ -124,9 +124,86 @@ def action_update_and_invalidate(action: Action, state: State, study_config: 'co
 
     return action_state_mutations
 
-def get_possible_actions(action_states: dict[Action, State], actions_to_check: set[Action]) -> set[Action]:
+def _is_recording_action_possible(action_states: dict[Action, State], study_config: 'config.Study', action: Action):
+    preconditions: set[Action] = set(Action.IMPORT) # IMPORT is a precondition for all actions except IMPORT itself
+    match action:
+        case Action.IMPORT:
+            return action_states[Action.IMPORT]==State.Not_Started      # possible if not already imported
+        case Action.CODE_EPISODES:
+            pass    # nothing besides import
+        case Action.DETECT_MARKERS:
+            if not (study_config.auto_code_sync_points or study_config.auto_code_trial_episodes):
+                preconditions.add(Action.CODE_EPISODES)
+        case Action.GAZE_TO_PLANE:
+            preconditions.update([Action.CODE_EPISODES, Action.DETECT_MARKERS])
+        case Action.AUTO_CODE_SYNC:
+            preconditions.update([Action.DETECT_MARKERS])
+        case Action.AUTO_CODE_TRIALS:
+            preconditions.update([Action.DETECT_MARKERS])
+        case Action.SYNC_ET_TO_CAM:
+            preconditions.update([Action.CODE_EPISODES, Action.DETECT_MARKERS])
+        case Action.RUN_VALIDATION:
+            preconditions.update([Action.CODE_EPISODES, Action.GAZE_TO_PLANE])
+        case _:
+            raise NotImplementedError(f'Logic is not implemented for {action}, major developer oversight! Let him know.')
+
+    # check that preconditions are met
+    return all((action_states[p]==State.Completed for p in preconditions))
+
+def _is_session_action_possible(session_action_states: dict[Action, State], recording_action_states: dict[str,dict[Action, State]], study_config: 'config.Study', action: Action):
+    preconditions: set[Action] = set(Action.IMPORT) # IMPORT is a precondition for all actions
+    match action:
+        case Action.SYNC_TO_REFERENCE:
+            preconditions.update([Action.CODE_EPISODES])
+            if study_config.auto_code_sync_points:
+                preconditions.add(Action.AUTO_CODE_SYNC)
+            if study_config.get_cam_movement_for_et_sync_method in ['plane', 'function']:
+                preconditions.add(Action.SYNC_ET_TO_CAM)
+        case Action.EXPORT_TRIALS:
+            preconditions.update([Action.CODE_EPISODES, Action.GAZE_TO_PLANE])
+            if study_config.auto_code_trial_episodes:
+                preconditions.add(Action.AUTO_CODE_TRIALS)
+            if study_config.sync_ref_recording:
+                preconditions.add(Action.SYNC_TO_REFERENCE)
+            elif study_config.get_cam_movement_for_et_sync_method in ['plane', 'function']:
+                preconditions.add(Action.SYNC_ET_TO_CAM)
+        case Action.MAKE_VIDEO:
+            preconditions.update([Action.CODE_EPISODES])
+            if study_config.auto_code_sync_points:
+                preconditions.add(Action.AUTO_CODE_SYNC)
+            if study_config.auto_code_trial_episodes:
+                preconditions.add(Action.AUTO_CODE_TRIALS)
+            if study_config.sync_ref_recording:
+                preconditions.add(Action.SYNC_TO_REFERENCE)
+            elif study_config.get_cam_movement_for_et_sync_method in ['plane', 'function']:
+                preconditions.add(Action.SYNC_ET_TO_CAM)
+        case _:
+            raise NotImplementedError(f'Logic is not implemented for {action}, major developer oversight! Let him know.')
+
+    precond_met = []
+    for p in preconditions:
+        if is_session_level_action(p):
+            precond_met.append(session_action_states[p]==State.Completed)
+        else:
+            precond_met.append(all((recording_action_states[r][p]==State.Completed for r in recording_action_states)))
+
+    return all(precond_met.values())
+
+def get_possible_actions(session_action_states: dict[Action, State], recording_action_states: dict[str,dict[Action, State]], actions_to_check: set[Action], study_config: 'config.Study') -> dict[Action,bool|list[str]]:
     # determine based on actions_states which actions have all their preconditions met. Return a set containing just
     # those possible actions
     # actions_to_check can be a subset of all actions, if user e.g. knows some actions aren't possible or wanted due to settings
     # this function doesn't check that
-    pass
+    merged_states = {r:session_action_states|recording_action_states[r] for r in recording_action_states}
+
+    possible_actions: dict[Action,bool|list[str]] = {}
+    for a in actions_to_check:
+        if is_session_level_action(a):
+            if _is_session_action_possible(session_action_states, recording_action_states, study_config, a):
+                possible_actions[a] = True
+        else:
+            possible_recs = [r for r in merged_states if _is_recording_action_possible(merged_states[r], study_config, a)]
+            if possible_recs:
+                possible_actions[a] = possible_recs
+
+    return possible_actions
