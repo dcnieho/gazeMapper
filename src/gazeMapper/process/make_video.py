@@ -187,8 +187,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
             # NB: allow one frame leeway to allow for small offsets due to conversion, or cameras not running completely in sync
             if not all([abs(i_ref-i_rec)<=1 for i_ref,i_rec in zip(ref_sync_points,rec_sync_points)]):
                 raise RuntimeError(f'Camera sync points found for recording {r} ({episodes_as_ref_flat[r][annotation.Event.Sync_Camera]}) that do not occur among the reference recordings sync points ({study_config.sync_ref_recording}, {episodes_as_ref_flat[study_config.sync_ref_recording][annotation.Event.Sync_Camera]}). That means the sync logic must have failed')
-        # load plane gazes
-        if not (study_config.video_process_planes_for_all_frames or study_config.video_process_individual_markers_for_all_frames):
+        # load plane poses
+        if not (study_config.video_process_planes_for_all_frames or study_config.video_process_individual_markers_for_all_frames or study_config.video_show_detected_markers or study_config.video_show_rejected_markers):
             to_load = [r for r in recs if r not in study_config.video_make_which]
             for r in to_load:
                 all_poses[r] = {}
