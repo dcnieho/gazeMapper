@@ -105,8 +105,8 @@ class Session:
         self.working_directory = pathlib.Path(parent_directory) / self.name
         if not self.working_directory.is_dir():
             self.working_directory.mkdir()
-        if not (f:= self.working_directory/Session.status_file_name).is_file():
-            f.touch()
+        if not (self.working_directory/Session.status_file_name).is_file():
+            _create_action_states_file(self.working_directory, False)
 
     def add_recording(self, which: str, rec_info: EyeTrackerRecording|camera_recording.Recording) -> Recording:
         return self.add_recording_from_info(which, rec_info)
