@@ -219,6 +219,7 @@ class Study:
                 raise ValueError('At least one recording should be an eye tracker recording')
             else:
                 return {'session_def': 'At least one recording should be an eye tracker recording'}
+        return {}
 
     def _check_planes_per_episode(self, strict_check) -> type_utils.ProblemDict:
         problems: type_utils.ProblemDict = {}
