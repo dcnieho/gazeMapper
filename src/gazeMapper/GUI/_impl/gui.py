@@ -18,7 +18,7 @@ import OpenGL.GL as gl
 import glassesTools
 import glassesValidator
 
-from ... import config, marker, plane, session, type_utils, version
+from ... import config, marker, plane, process, session, type_utils, version
 from .. import async_thread
 from . import callbacks, colors, file_picker, image_helper, msg_box, session_lister, settings_editor, utils
 
@@ -299,7 +299,7 @@ class GUI:
         self._to_focus = self._sessions_pane.label  # ensure sessions pane remains focused
 
     def _reload_sessions(self):
-        sessions = session.get_sessions_from_directory(self.project_dir, self.study_config.session_def)
+        sessions = session.get_sessions_from_project_directory(self.project_dir, self.study_config.session_def)
         for s in sessions:
             s.load_action_states(True)
             for r in s.recordings:
@@ -330,7 +330,7 @@ class GUI:
         if self.study_config is None:
             lister.set_actions_to_show(set())
 
-        actions = self.study_config.get_process_actions(exclude_session_level=for_recordings)
+        actions = process.get_actions_for_config(self.study_config, exclude_session_level=for_recordings)
         lister.set_actions_to_show(actions)
 
     def close_project(self):

@@ -196,7 +196,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                     all_poses[r][p] = plane.read_dict_from_file(working_dir/r/f'{naming.plane_pose_prefix}{p}.tsv')
 
     # update state
-    session.update_action_states(working_dir, process.Action.MAKE_VIDEO, process.State.Running, skip_if_missing=True)
+    session.update_action_states(working_dir, process.Action.MAKE_VIDEO, process.State.Running, study_config, skip_if_missing=True)
 
     # build pose estimator
     for rec in recs:
@@ -465,7 +465,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
         gui.stop()
 
     # update state
-    session.update_action_states(working_dir, process.Action.MAKE_VIDEO, process.State.Completed, skip_if_missing=True)
+    session.update_action_states(working_dir, process.Action.MAKE_VIDEO, process.State.Completed, study_config, skip_if_missing=True)
 
 def draw_gaze_on_other_video(frame_other, pose_this, pose_other, plane_gaze, camera_params_other, clr, do_draw_camera, do_draw_gaze_vec, sub_pixel_fac):
     gaze_point = np.append(plane_gaze.gazePosPlane2D_vidPos_ray,0.).reshape(1,3)

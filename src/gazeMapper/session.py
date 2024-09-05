@@ -32,8 +32,7 @@ class Recording:
         self.definition = definition
         self.info       = info
         self.name       = self.definition.name  # for easy access
-
-        self.state      = None
+        self.state: dict[process.Action, process.State] = None
 
     def load_action_states(self, create_if_missing: bool):
         self.state = get_action_states(self.info.working_directory, for_recording=True, create_if_missing=create_if_missing)
@@ -100,7 +99,7 @@ class Session:
         if not recordings:
             recordings = {}
         self.recordings = recordings
-        self.state = None
+        self.state: dict[process.Action, process.State] = None
 
     def create_working_directory(self, parent_directory: str|pathlib.Path):
         self.working_directory = pathlib.Path(parent_directory) / self.name
@@ -141,7 +140,7 @@ class Session:
             if (self.working_directory / r.name).is_dir():
                 self.add_existing_recording(r.name)
                 if load_action_states:
-                    pass # TODO
+                    pass#self.recordings[r.name].load_action_states()
 
     def add_existing_recording(self, which: str) -> Recording:
         r_fold = self.working_directory / which
@@ -218,7 +217,23 @@ class Session:
         return sess
 
 
-def get_sessions_from_directory(path: str|pathlib.Path, session_def: SessionDefinition|None=None) -> list[Session]:
+def get_session_from_directory(path: str|pathlib.Path, session_def: SessionDefinition|None=None) -> Session:
+    # try to get config, we'll need that to load recording sessions
+    if session_def is None:
+        from . import config
+        config_dir = config.guess_config_dir(path)
+        session_def = config.Study.load_from_json(config_dir).session_def
+
+    if not path.is_dir():
+        raise RuntimeError()
+
+    f = path / Session.status_file_name
+    if not f.is_file():
+        raise RuntimeError()
+
+    return Session.from_definition(session_def, path)
+
+def get_sessions_from_project_directory(path: str|pathlib.Path, session_def: SessionDefinition|None=None) -> list[Session]:
     path = pathlib.Path(path)
 
     # try to get config, we'll need that to load recording sessions
@@ -231,15 +246,8 @@ def get_sessions_from_directory(path: str|pathlib.Path, session_def: SessionDefi
     # a session marker file. If so, try to to load the folder as a session, ignoring errors
     sessions: list[Session] = []
     for d in path.iterdir():
-        if not d.is_dir():
-            continue
-
-        f = d / Session.status_file_name
-        if not f.is_file():
-            continue
-
         try:
-            sess = Session.from_definition(session_def, d)
+            sess = get_session_from_directory(d, session_def)
         except:
             pass
         else:
@@ -267,29 +275,61 @@ def _write_action_states_to_file(file: pathlib.Path, action_states: dict[process
     with open(file, 'w') as f:
         json.dump(action_states, f, cls=utils.CustomTypeEncoder, indent=2)
 
-def get_action_states(working_dir: str|pathlib.Path, for_recording: bool, create_if_missing = False, skip_if_missing=False) -> dict[process.Action, process.State]:
-    working_dir = pathlib.Path(working_dir)
-
-    file = working_dir / _get_action_status_fname(for_recording)
+def _read_action_states(file: pathlib.Path) -> dict[process.Action, process.State]:
     if not file.is_file():
-        if create_if_missing:
-            _create_action_states_file(file, for_recording)
-        elif skip_if_missing:
-            return None
+        return None
 
     with open(file, 'r') as f:
         action_states = json.load(f, object_hook=utils.json_reconstitute)
         return {getattr(process.Action, k.split('.')[1]): action_states[k] for k in action_states}  # turn key from string back into enum instance
 
-def update_action_states(working_dir: str|pathlib.Path, action: process.Action, state: process.State, skip_if_missing=False) -> dict[process.Action, process.State]:
-    for_recording = not process.is_action_session_level(action)
-    action_states = get_action_states(working_dir, for_recording, skip_if_missing=skip_if_missing)
-    if action_states is None and skip_if_missing:
-        return None
-
-    action_states = process.action_update_and_invalidate(action_states, action, state)
-
+def get_action_states(working_dir: str|pathlib.Path, for_recording: bool, create_if_missing = False, skip_if_missing=False) -> dict[process.Action, process.State]:
+    working_dir = pathlib.Path(working_dir)
     file = working_dir / _get_action_status_fname(for_recording)
+    action_states = _read_action_states(file)
+
+    if action_states is None:
+        if create_if_missing:
+            _create_action_states_file(file, for_recording)
+            return _read_action_states(file, False)
+        elif not skip_if_missing:
+            raise FileNotFoundError(f'Action states file {file} was not found')
+    return action_states
+
+def _apply_mutations_and_store(file, action_state_mutations, skip_if_missing=False):
+    action_states = _read_action_states(file)
+    if action_states is None and not skip_if_missing:
+        raise FileNotFoundError(f'Action states file {file} was not found')
+
+    # apply mutations
+    for a in action_state_mutations:
+        action_states[a] = action_state_mutations[a]
+
     _write_action_states_to_file(file, action_states)
 
-    return action_states
+def update_action_states(working_dir: str|pathlib.Path, action: process.Action, state: process.State, study_config: 'config.Study', skip_if_missing=False) -> dict[process.Action, process.State]:
+    for_recording = not process.is_action_session_level(action)
+
+    action_state_mutations  = process.action_update_and_invalidate(action_state_mutations, action, state, study_config)
+    # split in session-level and recording-level actions, report them separately
+    session_state_mutations   = {a:action_state_mutations[a] for a in action_state_mutations if     process.is_action_session_level(a)}
+    recording_state_mutations = {a:action_state_mutations[a] for a in action_state_mutations if not process.is_action_session_level(a)}
+
+    # apply to current level
+    if for_recording:
+        file = working_dir / _get_action_status_fname(True)
+        _apply_mutations_and_store(file, recording_state_mutations, skip_if_missing=skip_if_missing)
+        # also apply and store session-level mutations, if any
+        if session_state_mutations:
+            file = working_dir.parent / _get_action_status_fname(False)
+            _apply_mutations_and_store(file, session_state_mutations, skip_if_missing=skip_if_missing)
+    else:
+        file = working_dir / _get_action_status_fname(False)
+        _apply_mutations_and_store(file, session_state_mutations, skip_if_missing=skip_if_missing)
+        # also apply and store recording-level mutations, if any
+        sess = get_session_from_directory(working_dir)
+        for r in sess.recordings:
+            f = working_dir / r / _get_action_status_fname(True)
+            _apply_mutations_and_store(f, recording_state_mutations, skip_if_missing=skip_if_missing)
+
+    return session_state_mutations, recording_state_mutations

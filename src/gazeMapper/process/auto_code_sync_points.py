@@ -22,7 +22,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
         raise ValueError(f'No automatic sync point detection is defined for this study, nothing to do')
 
     # update state
-    session.update_action_states(working_dir, process.Action.AUTO_CODE_SYNC, process.State.Running, skip_if_missing=True)
+    session.update_action_states(working_dir, process.Action.AUTO_CODE_SYNC, process.State.Running, study_config, skip_if_missing=True)
 
     # get already coded interval(s), if any
     coding_file = working_dir / naming.coding_file
@@ -56,4 +56,4 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
     episode.write_list_to_file(episode.marker_dict_to_list(episodes), coding_file)
 
     # update state
-    session.update_action_states(working_dir, process.Action.AUTO_CODE_SYNC, process.State.Completed, skip_if_missing=True)
+    session.update_action_states(working_dir, process.Action.AUTO_CODE_SYNC, process.State.Completed, study_config, skip_if_missing=True)

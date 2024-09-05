@@ -10,7 +10,7 @@ from typing import Any, Literal, TypedDict
 from glassesTools import annotation, utils
 from glassesValidator import process as gv_process
 
-from . import marker, plane, process, session, type_utils
+from . import marker, plane, session, type_utils
 from .typed_dict_defaults import TypedDictDefault
 
 
@@ -370,24 +370,6 @@ class Study:
         type_utils.merge_problem_dicts(problems, self._check_et_sync_method(False))
         type_utils.merge_problem_dicts(problems, self._check_make_video(False))
         return problems
-
-    def get_process_actions(self, exclude_session_level: bool=False) -> set[process.Action]:
-        actions = {process.Action.IMPORT, process.Action.CODE_EPISODES, process.Action.DETECT_MARKERS, process.Action.GAZE_TO_PLANE, process.Action.EXPORT_TRIALS, process.Action.MAKE_VIDEO}
-        if self.auto_code_sync_points:
-            actions.add(process.Action.AUTO_CODE_SYNC)
-        if self.auto_code_trial_episodes and self.sync_ref_recording:
-            actions.add(process.Action.AUTO_CODE_TRIALS)
-        if self.get_cam_movement_for_et_sync_method in ['plane', 'function']:
-            actions.add(process.Action.SYNC_ET_TO_CAM)
-        if self.sync_ref_recording:
-            actions.add(process.Action.SYNC_TO_REFERENCE)
-        if annotation.Event.Validate in self.planes_per_episode:
-            actions.add(process.Action.RUN_VALIDATION)
-
-        if exclude_session_level:
-            actions = {a for a in actions if not process.is_action_session_level(a)}
-
-        return actions
 
     def store_as_json(self, path: str|pathlib.Path|None=None):
         if not path:

@@ -44,7 +44,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, f
         raise ValueError(f'You can only run gaze_to_plane on eye tracker recordings, not on a {str(rec_def.type).split(".")[1]} recording')
 
     # update state
-    session.update_action_states(working_dir, process.Action.GAZE_TO_PLANE, process.State.Running, skip_if_missing=True)
+    session.update_action_states(working_dir, process.Action.GAZE_TO_PLANE, process.State.Running, study_config, skip_if_missing=True)
 
     # get episodes for which to transform gaze
     episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / naming.coding_file), study_config.episodes_to_code)
@@ -86,7 +86,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, f
         gaze_worldref.write_dict_to_file(plane_gazes[p], working_dir/f'{naming.world_gaze_prefix}{p}.tsv', skip_missing=True)
 
     # update state
-    session.update_action_states(working_dir, process.Action.GAZE_TO_PLANE, process.State.Completed, skip_if_missing=True)
+    session.update_action_states(working_dir, process.Action.GAZE_TO_PLANE, process.State.Completed, study_config, skip_if_missing=True)
 
     # done if no visualization wanted
     if gui is None:

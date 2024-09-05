@@ -96,7 +96,7 @@ match which:
 
 
 
-sessions = session.get_sessions_from_directory(proj)
+sessions = session.get_sessions_from_project_directory(proj)
 sessions = [sessions[0]]
 study_config = config.Study.load_from_json(config.guess_config_dir(proj))
 

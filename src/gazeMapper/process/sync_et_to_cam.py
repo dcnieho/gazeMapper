@@ -64,7 +64,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
         raise RuntimeError(f'No {annotation.Event.Sync_ET_Data.value} episodes found for this recording. Run code_episodes and code at least one {annotation.Event.Sync_ET_Data.value} episode.')
 
     # update state
-    session.update_action_states(working_dir, process.Action.SYNC_ET_TO_CAM, process.State.Running, skip_if_missing=True)
+    session.update_action_states(working_dir, process.Action.SYNC_ET_TO_CAM, process.State.Running, study_config, skip_if_missing=True)
 
     # Read gaze data
     gazes = gaze_headref.read_dict_from_file(working_dir / 'gazeData.tsv', episodes)[0]
@@ -174,4 +174,4 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     df.write_csv(working_dir / 'gazeData.tsv', separator='\t', null_value='nan', float_precision=8)
 
     # update state
-    session.update_action_states(working_dir, process.Action.SYNC_ET_TO_CAM, process.State.Completed, skip_if_missing=True)
+    session.update_action_states(working_dir, process.Action.SYNC_ET_TO_CAM, process.State.Completed, study_config, skip_if_missing=True)

@@ -26,7 +26,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
         raise ValueError(f'You can only run run_validation on eye tracker recordings, not on a {str(rec_def.type).split(".")[1]} recording')
 
     # update state
-    session.update_action_states(working_dir, process.Action.RUN_VALIDATION, process.State.Running, skip_if_missing=True)
+    session.update_action_states(working_dir, process.Action.RUN_VALIDATION, process.State.Running, study_config, skip_if_missing=True)
 
     # get interval(s) coded to be analyzed, if any
     episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / 'coding.tsv'))[annotation.Event.Validate]
@@ -65,4 +65,4 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
                                           output_data_quality_file_name=f'{naming.validation_prefix}{p}_data_quality.tsv')
 
     # update state
-    session.update_action_states(working_dir, process.Action.RUN_VALIDATION, process.State.Completed, skip_if_missing=True)
+    session.update_action_states(working_dir, process.Action.RUN_VALIDATION, process.State.Completed, study_config, skip_if_missing=True)

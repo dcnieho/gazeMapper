@@ -22,7 +22,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
         raise ValueError('No planes are specified for mapping gaze to during trials, nothing to export')
 
     # update state
-    session.update_action_states(working_dir, process.Action.EXPORT_TRIALS, process.State.Running, skip_if_missing=True)
+    session.update_action_states(working_dir, process.Action.EXPORT_TRIALS, process.State.Running, study_config, skip_if_missing=True)
 
     planes = list(study_config.planes_per_episode[annotation.Event.Trial])
 
@@ -118,4 +118,4 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
         plane_gazes.write_csv(working_dir / f'{naming.plane_pose_prefix}{r}.tsv', separator='\t', null_value='nan', float_precision=8)
 
     # update state
-    session.update_action_states(working_dir, process.Action.EXPORT_TRIALS, process.State.Completed, skip_if_missing=True)
+    session.update_action_states(working_dir, process.Action.EXPORT_TRIALS, process.State.Completed, study_config, skip_if_missing=True)

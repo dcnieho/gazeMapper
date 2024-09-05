@@ -1,8 +1,6 @@
 import enum
-import json
-import pathlib
 
-from glassesTools import utils
+from glassesTools import annotation, utils
 
 class State(enum.IntEnum):
     Not_Started = enum.auto()
@@ -39,30 +37,96 @@ class Action(enum.IntEnum):
         if v<Action.IMPORT.value:
             raise StopIteration('Enumeration ended')
         return Action(v)
+    def next_values(self, inclusive=False) -> set['Action']:
+        vals: set[Action] = set()
+        a = self
+        if inclusive:
+            vals.add(a)
+        try:
+            while True:
+                a = a.succ()
+                vals.add(a)
+        except StopIteration:
+            pass    # we're done
+        return vals
 utils.register_type(utils.CustomTypeEntry(Action,'__enum.process.Action__',str, lambda x: getattr(Action, x.split('.')[1])))
 
 def is_action_session_level(action: Action) -> bool:
     return action in [Action.SYNC_TO_REFERENCE, Action.EXPORT_TRIALS, Action.MAKE_VIDEO]
 
-def action_update_and_invalidate(action_states: dict[Action, State], action: Action, state: State) -> dict[Action, State]:
-    for_recording = not is_action_session_level(action)
+def get_actions_for_config(study_config: 'config.Study', exclude_session_level: bool=False) -> set[Action]:
+    actions = {Action.IMPORT, Action.CODE_EPISODES, Action.DETECT_MARKERS, Action.GAZE_TO_PLANE, Action.EXPORT_TRIALS, Action.MAKE_VIDEO}
+    if study_config.auto_code_sync_points:
+        actions.add(Action.AUTO_CODE_SYNC)
+    if study_config.auto_code_trial_episodes and study_config.sync_ref_recording:
+        actions.add(Action.AUTO_CODE_TRIALS)
+    if study_config.get_cam_movement_for_et_sync_method in ['plane', 'function']:
+        actions.add(Action.SYNC_ET_TO_CAM)
+    if study_config.sync_ref_recording:
+        actions.add(Action.SYNC_TO_REFERENCE)
+    if annotation.Event.Validate in study_config.planes_per_episode:
+        actions.add(Action.RUN_VALIDATION)
 
+    if exclude_session_level:
+        actions = {a for a in actions if not is_action_session_level(a)}
+
+    return actions
+
+def _determine_to_invalidate(action: Action, study_config: 'config.Study') -> set[Action]:
+    match action:
+        case Action.IMPORT:
+            return action.next_values()
+        case Action.CODE_EPISODES:
+            actions = {a for a in action.next_values() if a not in [Action.AUTO_CODE_SYNC, Action.AUTO_CODE_TRIALS]}
+            if study_config.auto_code_sync_points or study_config.auto_code_trial_episodes:
+                # if there is some form of automatic coding configured, then the whole video will be processed for each recording in a session, and thus coding doesn't invalidate the processed video
+                actions.discard(Action.DETECT_MARKERS)
+            return actions
+        case Action.DETECT_MARKERS:
+            actions = {a for a in action.next_values() if a not in [Action.SYNC_TO_REFERENCE]}
+            if study_config.video_process_planes_for_all_frames or study_config.video_process_individual_markers_for_all_frames or study_config.video_show_detected_markers or study_config.video_show_rejected_markers:
+                # in this case MAKE_VIDEO processes each frame itself, so output of DETECT_MARKERS is not used
+                actions.discard(Action.MAKE_VIDEO)
+            return actions
+        case Action.GAZE_TO_PLANE:
+            # NB: SYNC_ET_TO_CAM and SYNC_TO_REFERENCE operate on gazeData not gaze on plane data, and MAKE_VIDEO does the job itself/doesn't use this file
+            return {a for a in action.next_values() if a not in [Action.AUTO_CODE_SYNC, Action.AUTO_CODE_TRIALS, Action.SYNC_ET_TO_CAM, Action.SYNC_TO_REFERENCE, Action.MAKE_VIDEO]}
+        case Action.AUTO_CODE_SYNC:
+            return {Action.CODE_EPISODES, Action.GAZE_TO_PLANE, Action.EXPORT_TRIALS, Action.MAKE_VIDEO}
+        case Action.AUTO_CODE_TRIALS:
+            actions = {a for a in Action.CODE_EPISODES.next_values(inclusive=True) if a not in [Action.AUTO_CODE_TRIALS, Action.AUTO_CODE_SYNC, Action.SYNC_ET_TO_CAM, Action.SYNC_TO_REFERENCE, Action.RUN_VALIDATION]}
+            if study_config.auto_code_sync_points or study_config.auto_code_trial_episodes:
+                # if there is some form of automatic coding configured, then the whole video will be processed for each recording in a session, and thus coding doesn't invalidate the processed video
+                actions.discard(Action.DETECT_MARKERS)
+            return actions
+        case Action.SYNC_ET_TO_CAM:
+            return {a for a in Action.GAZE_TO_PLANE.next_values(inclusive=True) if a not in [Action.AUTO_CODE_TRIALS, Action.AUTO_CODE_SYNC, Action.SYNC_ET_TO_CAM]}
+        case Action.SYNC_TO_REFERENCE:
+            return {a for a in Action.GAZE_TO_PLANE.next_values(inclusive=True) if a not in [Action.AUTO_CODE_TRIALS, Action.AUTO_CODE_SYNC, Action.SYNC_ET_TO_CAM, Action.SYNC_TO_REFERENCE]}
+        case Action.RUN_VALIDATION:
+            return set()
+        case Action.EXPORT_TRIALS:
+            return set()
+        case Action.MAKE_VIDEO:
+            return set()
+        case _:
+            raise NotImplementedError(f'Logic is not implemented for {action}, major developer oversight! Let him know.')
+
+def action_update_and_invalidate(action: Action, state: State, study_config: 'config.Study') -> tuple[dict[Action, State], dict[Action, State]]:
     # set status of indicated task
-    action_states[action] = state
-    # set all later tasks to not started as they would have to be rerun when an earlier tasks is rerun
-    next_action = action
-    try:
-        while True:
-            next_action = next_action.succ()
-            if (for_recording and is_action_session_level(next_action)) or (not for_recording and not is_action_session_level(next_action)):
-                continue
-            action_states[str(next_action)] = State.Not_Started
-    except StopIteration:
-        pass    # we're done
+    action_state_mutations = {action: state}
 
-    # some special cases
-    if action in [Action.AUTO_CODE_SYNC, Action.AUTO_CODE_TRIALS]:
-        # need to manually check coding when auto sync is run
-        action_states = action_update_and_invalidate(action_states, Action.CODE_EPISODES, State.Not_Started)
+    # determine what other (later) actions are invalidated (and should thus be reset to not started state) by this action
+    # being performed. There may be a better way of doing this, but i prefer to actively, per case, think this through
+    # and explicitly write it out
+    for a in _determine_to_invalidate(action, study_config):
+        action_state_mutations[a] = State.Not_Started
 
-    return action_states
+    return action_state_mutations
+
+def get_possible_actions(action_states: dict[Action, State], actions_to_check: set[Action]) -> set[Action]:
+    # determine based on actions_states which actions have all their preconditions met. Return a set containing just
+    # those possible actions
+    # actions_to_check can be a subset of all actions, if user e.g. knows some actions aren't possible or wanted due to settings
+    # this function doesn't check that
+    pass
