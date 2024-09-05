@@ -226,7 +226,11 @@ class SessionList():
 
     def _draw_status_widget(self, item: session.Session|session.Recording, action: process.Action):
         if self.for_recordings:
-            _draw_process_state(item.state[action], item.name)
+            if process.is_action_possible_for_recording_type(action, item.definition.type):
+                _draw_process_state(item.state[action], item.name)
+            else:
+                imgui.text('-')
+                utils.draw_hover_text(f'Not applicable to a {item.definition.type.value} recording','')
         else:
             if not item.has_all_recordings():
                 imgui.text_colored(colors.error, '-')
