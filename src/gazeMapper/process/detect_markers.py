@@ -41,7 +41,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
     study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent, config.OverrideLevel.Recording: working_dir}, **study_settings)
 
     # update state
-    session.update_action_states(working_dir, process.Action.DETECT_MARKERS, process.State.Running, study_config, skip_if_missing=True)
+    session.update_action_states(working_dir, process.Action.DETECT_MARKERS, process.State.Running, study_config)
 
     # get info about recording
     rec_def = study_config.session_def.get_recording_def(working_dir.name)
@@ -82,7 +82,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
         df.to_csv(working_dir/naming.target_sync_file, sep='\t', index=False, na_rep='nan', float_format="%.8f")
 
     # update state
-    session.update_action_states(working_dir, process.Action.DETECT_MARKERS, process.State.Completed, study_config, skip_if_missing=True)
+    session.update_action_states(working_dir, process.Action.DETECT_MARKERS, process.State.Completed, study_config)
 
 
 def _get_sync_function(study_config: config.Study,

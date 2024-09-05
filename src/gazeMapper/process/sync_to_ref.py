@@ -62,7 +62,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
                     raise ValueError(f'Recording {r} is the reference recording for sync, should not be specified in study_config.sync_average_recordings')
 
     # update state
-    session.update_action_states(working_dir, process.Action.SYNC_TO_REFERENCE, process.State.Running, study_config, skip_if_missing=True)
+    session.update_action_states(working_dir, process.Action.SYNC_TO_REFERENCE, process.State.Running, study_config)
 
     # prep for sync info
     recs = [r for r in session_info.recordings if r!=study_config.sync_ref_recording]
@@ -101,4 +101,4 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
         df.write_csv(working_dir / r / 'gazeData.tsv', separator='\t', null_value='nan', float_precision=8)
 
     # update state
-    session.update_action_states(working_dir, process.Action.SYNC_TO_REFERENCE, process.State.Completed, study_config, skip_if_missing=True)
+    session.update_action_states(working_dir, process.Action.SYNC_TO_REFERENCE, process.State.Completed, study_config)
