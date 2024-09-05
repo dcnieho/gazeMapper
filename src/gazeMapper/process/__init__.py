@@ -14,7 +14,7 @@ class State(enum.IntEnum):
         return self.name.replace("_", " ")
 utils.register_type(utils.CustomTypeEntry(State,'__enum.process.State__',str, lambda x: getattr(State, x.split('.')[1])))
 
-class Action(enum.Flag):
+class Action(enum.IntEnum):
     IMPORT = enum.auto()
     CODE_EPISODES = enum.auto()
     DETECT_MARKERS = enum.auto()
