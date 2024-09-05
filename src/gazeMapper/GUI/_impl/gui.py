@@ -461,7 +461,7 @@ class GUI:
         table_is_started = imgui.begin_table(f"##session_def_list", 2)
         if not table_is_started:
             return
-        imgui.table_setup_column("recording", imgui.TableColumnFlags_.width_fixed, init_width_or_weight=settings_editor.get_fields_text_width([r.name for r in self.study_config.session_def.recordings]))
+        imgui.table_setup_column("recording", imgui.TableColumnFlags_.width_fixed, init_width_or_weight=settings_editor.get_fields_text_width([r.name for r in self.study_config.session_def.recordings],'recording'))
         imgui.table_setup_column("type", imgui.TableColumnFlags_.width_stretch)
         imgui.table_headers_row()
         for r in self.study_config.session_def.recordings:
