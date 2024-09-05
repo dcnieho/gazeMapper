@@ -272,7 +272,7 @@ class GUI:
             self.study_config = config.Study.load_from_json(config.guess_config_dir(self.project_dir), strict_check=False)
             self._reload_sessions()
         except Exception as e:
-            utils.push_popup(self, msg_box.msgbox, "Project loading error", f"Failed to load the project at {self.project_dir}:\n{e}", msg_box.MsgBox.error)
+            utils.push_popup(self, msg_box.msgbox, "Project loading error", f"Failed to load the project at {self.project_dir}:\n{e}\n\n{utils.get_traceback(e)}", msg_box.MsgBox.error)
             self.close_project()
             return
 
