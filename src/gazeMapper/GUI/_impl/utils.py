@@ -125,7 +125,7 @@ def draw_tooltip(hover_text):
     imgui.pop_text_wrap_pos()
     imgui.end_tooltip()
 
-def draw_hover_text(hover_text: str, text="(?)", force=False, hovered_flags=0, *args, **kwargs):
+def draw_hover_text(hover_text: str, text="(?)", force=False, hovered_flags=imgui.HoveredFlags_.for_tooltip|imgui.HoveredFlags_.delay_normal, *args, **kwargs):
     if text:
         imgui.text_disabled(text, *args, **kwargs)
     if force or imgui.is_item_hovered(hovered_flags):

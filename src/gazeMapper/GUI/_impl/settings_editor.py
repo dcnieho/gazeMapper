@@ -143,7 +143,7 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
                     imgui.pop_style_color()
                     if isinstance(problems[f],str) or (isinstance(problems[f],dict) and 'problem_with_this_key' in problems[f]):
                         msg = problems[f] if isinstance(problems[f],str) else problems[f]['problem_with_this_key']
-                        utils.draw_hover_text(msg, text='', hovered_flags=imgui.HoveredFlags_.for_tooltip | imgui.HoveredFlags_.delay_normal)
+                        utils.draw_hover_text(msg, text='')
                 this_changed, made_obj, new_sub_obj, removed = draw_dict_editor(obj.get(f,None) if isinstance(obj,dict) else getattr(obj,f), f_type, level+1, possible_value_getters=possible_value_getters.get(f,None) if possible_value_getters else None, problems=problems.get(f,None) if isinstance(problems, dict) else {}, fixed=fixed.get(f,None), nullable=nullable, removable=has_remove)
                 if removed:
                     removed_field = f
@@ -158,7 +158,7 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
                 imgui.pop_style_color()
                 if isinstance(problems[f],str) or (isinstance(problems[f],dict) and 'problem_with_this_key' in problems[f]):
                     msg = problems[f] if isinstance(problems[f],str) else problems[f]['problem_with_this_key']
-                    utils.draw_hover_text(msg, text='', hovered_flags=imgui.HoveredFlags_.for_tooltip | imgui.HoveredFlags_.delay_normal)
+                    utils.draw_hover_text(msg, text='')
             continue
 
         # simple field, set up for drawing
@@ -388,7 +388,7 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
         imgui.align_text_to_frame_padding()
         imgui.text_colored(colors.error, field_lbl)
         if isinstance(problem,str):
-            utils.draw_hover_text(problem,text='', hovered_flags=imgui.HoveredFlags_.for_tooltip | imgui.HoveredFlags_.delay_normal)
+            utils.draw_hover_text(problem,text='')
     elif is_default or is_none or fixed:
         imgui.align_text_to_frame_padding()
         imgui.text_colored(imgui.ImVec4(*color_darken(imgui.ImColor(imgui.get_style_color_vec4(imgui.Col_.text)), .75)), field_lbl)
