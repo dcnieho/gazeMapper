@@ -81,8 +81,8 @@ class Study:
                  get_cam_movement_for_et_sync_method            : Literal['','plane','function']    = '',
                  get_cam_movement_for_et_sync_function          : CamMovementForEtSyncFunction|None = None,
 
-                 auto_code_sync_points                          : AutoCodeSyncPoints                = AutoCodeSyncPoints(),
-                 auto_code_trial_episodes                       : AutoCodeTrialEpisodes             = AutoCodeTrialEpisodes(),
+                 auto_code_sync_points                          : AutoCodeSyncPoints|None           = None,
+                 auto_code_trial_episodes                       : AutoCodeTrialEpisodes|None        = None,
 
                  export_output3D                                : bool                              = False,
                  export_output2D                                : bool                              = True,
@@ -182,10 +182,12 @@ class Study:
             self._check_make_video(strict_check)
 
         # ensure some members are of the right class, and apply defaults
-        self.auto_code_sync_points = AutoCodeSyncPoints(self.auto_code_sync_points)
-        self.auto_code_sync_points.apply_defaults()
-        self.auto_code_trial_episodes = AutoCodeTrialEpisodes(self.auto_code_trial_episodes)
-        self.auto_code_trial_episodes.apply_defaults()
+        if self.auto_code_sync_points:
+            self.auto_code_sync_points = AutoCodeSyncPoints(self.auto_code_sync_points)
+            self.auto_code_sync_points.apply_defaults()
+        if self.auto_code_trial_episodes:
+            self.auto_code_trial_episodes = AutoCodeTrialEpisodes(self.auto_code_trial_episodes)
+            self.auto_code_trial_episodes.apply_defaults()
         self.validate_I2MC_settings = I2MCSettings(self.validate_I2MC_settings)
         self.validate_I2MC_settings.apply_defaults()
 
