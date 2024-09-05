@@ -428,7 +428,8 @@ class Study:
         # returns a minimally set up config, with every required argument set empty, and the rest default-initialized
         return Study(
             session.SessionDefinition(),
-            [],{},[],[],path
+            [],{},set(),[],path,
+            strict_check=False
         )
 
     @staticmethod
