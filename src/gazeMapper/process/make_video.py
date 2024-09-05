@@ -6,7 +6,6 @@ import cv2
 import numpy as np
 import threading
 import copy
-from typing import Any
 
 from glassesTools import annotation, aruco, drawing, intervals, gaze_headref, gaze_worldref, ocv, plane, timestamps, transforms, utils
 from glassesTools.video_gui import GUI
