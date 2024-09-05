@@ -177,7 +177,7 @@ class Study:
             self._check_planes_per_episode(strict_check)
             self._check_episodes_to_code(strict_check)
             self._check_sync_ref(strict_check)
-            self._check_sync_method(strict_check)
+            self._check_et_sync_method(strict_check)
             self._check_auto_coding_setup(strict_check)
             self._check_make_video(strict_check)
 
