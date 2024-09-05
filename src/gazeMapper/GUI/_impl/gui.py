@@ -1,3 +1,4 @@
+import concurrent.futures
 import pathlib
 import asyncio
 import concurrent
@@ -18,7 +19,7 @@ import OpenGL.GL as gl
 import glassesTools
 import glassesValidator
 
-from ... import config, marker, plane, process, session, type_utils, version
+from ... import config, config_watcher, marker, plane, process, session, type_utils, version
 from .. import async_thread
 from . import callbacks, colors, file_picker, image_helper, msg_box, session_lister, settings_editor, utils
 
@@ -48,6 +49,8 @@ class GUI:
         self.need_setup_episode = True
         self.can_accept_sessions = False
 
+        self.config_watcher: concurrent.futures.Future = None
+        self.config_watcher_stop_event: asyncio.Event  = None
 
         self._window_list: list[hello_imgui.DockableWindow] = []
         self._to_dock         = []
@@ -170,6 +173,7 @@ class GUI:
         immapp.run(runner_params, addons_params)
 
     def _exiting(self):
+        self.close_project()
         self.running = False
 
     def _make_main_space_window(self, name: str, gui_func: Callable[[],None], can_be_closed=False, is_visible=True):
@@ -265,16 +269,22 @@ class GUI:
         glfw.set_window_title(win, new_title)
         self._need_set_window_title = False
 
+    def _config_change_callback(self, change_path: str, change_type: str):
+        print(f'{change_type}: {change_path}')
 
     def load_project(self, path: pathlib.Path):
         self.project_dir = path
         try:
-            self.study_config = config.Study.load_from_json(config.guess_config_dir(self.project_dir), strict_check=False)
+            config_dir = config.guess_config_dir(self.project_dir)
+            self.study_config = config.Study.load_from_json(config_dir, strict_check=False)
             self._reload_sessions()
         except Exception as e:
             utils.push_popup(self, msg_box.msgbox, "Project loading error", f"Failed to load the project at {self.project_dir}:\n{e}\n\n{utils.get_traceback(e)}", msg_box.MsgBox.error)
             self.close_project()
             return
+
+        self.config_watcher_stop_event = asyncio.Event()
+        self.config_watcher = async_thread.run(config_watcher.watch_and_report_changes(self.project_dir, self._config_change_callback, self.config_watcher_stop_event, watch_filter=config_watcher.ConfigFilter(('.gazeMapper',), True, {config_dir})))
 
         def _get_known_recordings() -> set[str]:
             return {r.name for r in self.study_config.session_def.recordings}
@@ -335,6 +345,12 @@ class GUI:
         self._project_settings_pane.is_visible = False
         # trigger update so visibility change is honored, also delete other windows in the process
         self._window_list = [self._sessions_pane, self._project_settings_pane]
+
+        # stop watching for config changes
+        self.config_watcher_stop_event.set()
+        self.config_watcher.result()
+        self.config_watcher = None
+        self.config_watcher_stop_event = None
 
         # defer rest of unloading until windows deleted, as some of these variables will be accessed during this draw loop
         self._after_window_update_callback = self._finish_unload_project
