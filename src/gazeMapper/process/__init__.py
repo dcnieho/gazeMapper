@@ -51,7 +51,7 @@ class Action(enum.IntEnum):
         return vals
 utils.register_type(utils.CustomTypeEntry(Action,'__enum.process.Action__',str, lambda x: getattr(Action, x.split('.')[1])))
 
-def is_action_session_level(action: Action) -> bool:
+def is_session_level_action(action: Action) -> bool:
     return action in [Action.SYNC_TO_REFERENCE, Action.EXPORT_TRIALS, Action.MAKE_VIDEO]
 
 def get_actions_for_config(study_config: 'config.Study', exclude_session_level: bool=False) -> set[Action]:
@@ -68,7 +68,7 @@ def get_actions_for_config(study_config: 'config.Study', exclude_session_level: 
         actions.add(Action.RUN_VALIDATION)
 
     if exclude_session_level:
-        actions = {a for a in actions if not is_action_session_level(a)}
+        actions = {a for a in actions if not is_session_level_action(a)}
 
     return actions
 

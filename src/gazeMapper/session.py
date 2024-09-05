@@ -187,19 +187,19 @@ class Session:
         self.state = get_action_states(self.working_directory, for_recording=False, create_if_missing=create_if_missing)
 
     def is_action_completed(self, action: process.Action) -> bool:
-        if process.is_action_session_level(action):
+        if process.is_session_level_action(action):
             return self.state[action]==process.State.Completed
         else:
             return all((self.recordings[r].state[action]==process.State.Completed for r in self.recordings))
 
     def action_completed_num_recordings(self, action: process.Action) -> list[str]:
-        if process.is_action_session_level(action):
+        if process.is_session_level_action(action):
             raise ValueError('The status of session-level actions cannot be listed per recording')
 
         return sum([self.recordings[r].state[action]==process.State.Completed for r in self.recordings])
 
     def action_not_completed_recordings(self, action: process.Action) -> list[str]:
-        if process.is_action_session_level(action):
+        if process.is_session_level_action(action):
             raise ValueError('The status of session-level actions cannot be listed per recording')
 
         return [r for r in self.recordings if self.recordings[r].state[action]!=process.State.Completed]
@@ -264,9 +264,9 @@ def _get_action_status_fname(for_recording: bool) -> str:
 
 def _create_action_states_file(file: pathlib.Path, for_recording: bool):
     if for_recording:
-        filt = lambda x: not process.is_action_session_level(x)
+        filt = lambda x: not process.is_session_level_action(x)
     else:
-        filt = lambda x:     process.is_action_session_level(x)
+        filt = lambda x:     process.is_session_level_action(x)
     action_states = {k:process.State.Not_Started for k in process.Action if filt(k)}
     _write_action_states_to_file(file, action_states)
 
@@ -308,12 +308,12 @@ def _apply_mutations_and_store(file, action_state_mutations, skip_if_missing=Fal
     _write_action_states_to_file(file, action_states)
 
 def update_action_states(working_dir: str|pathlib.Path, action: process.Action, state: process.State, study_config: 'config.Study', skip_if_missing=False) -> dict[process.Action, process.State]:
-    for_recording = not process.is_action_session_level(action)
+    for_recording = not process.is_session_level_action(action)
 
     action_state_mutations  = process.action_update_and_invalidate(action, state, study_config)
     # split in session-level and recording-level actions, report them separately
-    session_state_mutations   = {a:action_state_mutations[a] for a in action_state_mutations if     process.is_action_session_level(a)}
-    recording_state_mutations = {a:action_state_mutations[a] for a in action_state_mutations if not process.is_action_session_level(a)}
+    session_state_mutations   = {a:action_state_mutations[a] for a in action_state_mutations if     process.is_session_level_action(a)}
+    recording_state_mutations = {a:action_state_mutations[a] for a in action_state_mutations if not process.is_session_level_action(a)}
 
     # apply to current level
     if for_recording:

@@ -230,7 +230,7 @@ class SessionList():
         else:
             if not item.has_all_recordings():
                 imgui.text_colored(colors.error, '-')
-            elif process.is_action_session_level(action):
+            elif process.is_session_level_action(action):
                 _draw_process_state(item.state[action], item.name)
             else:
                 not_completed = item.action_not_completed_recordings(action)
@@ -259,7 +259,7 @@ class SessionList():
                         if self.for_recordings:
                             key = lambda iid: self.items[iid].state[action]
                         else:
-                            if process.is_action_session_level(action):
+                            if process.is_session_level_action(action):
                                 key = lambda iid: 999 if not self.items[iid].has_all_recordings() else self.items[iid].state[action]
                             else:
                                 key = lambda iid: 999 if not self.items[iid].has_all_recordings() else self.items[iid].action_completed_num_recordings(action)
