@@ -310,7 +310,7 @@ def _apply_mutations_and_store(file, action_state_mutations, skip_if_missing=Fal
 def update_action_states(working_dir: str|pathlib.Path, action: process.Action, state: process.State, study_config: 'config.Study', skip_if_missing=False) -> dict[process.Action, process.State]:
     for_recording = not process.is_action_session_level(action)
 
-    action_state_mutations  = process.action_update_and_invalidate(action_state_mutations, action, state, study_config)
+    action_state_mutations  = process.action_update_and_invalidate(action, state, study_config)
     # split in session-level and recording-level actions, report them separately
     session_state_mutations   = {a:action_state_mutations[a] for a in action_state_mutations if     process.is_action_session_level(a)}
     recording_state_mutations = {a:action_state_mutations[a] for a in action_state_mutations if not process.is_action_session_level(a)}
