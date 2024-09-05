@@ -31,8 +31,10 @@ class Recording:
     def __init__(self, definition: RecordingDefinition, info:EyeTrackerRecording|camera_recording.Recording|None=None):
         self.definition = definition
         self.info       = info
-        self.name       = self.definition.name  # for easy access
+        self.name       = self.definition.name  # for easy access and consistency with Session object
+
         self.state: dict[process.Action, process.State] = None
+        self.load_action_states(True)
 
     def load_action_states(self, create_if_missing: bool):
         self.state = get_action_states(self.info.working_directory, for_recording=True, create_if_missing=create_if_missing)
@@ -99,7 +101,9 @@ class Session:
         if not recordings:
             recordings = {}
         self.recordings = recordings
+
         self.state: dict[process.Action, process.State] = None
+        self.load_action_states(True)
 
     def create_working_directory(self, parent_directory: str|pathlib.Path):
         self.working_directory = pathlib.Path(parent_directory) / self.name
@@ -128,19 +132,21 @@ class Session:
             rec_info = importing.do_import(rec_info=rec_info, copy_scene_video=do_copy_video, source_dir_as_relative_path=source_dir_as_relative_path, cam_cal_file=cam_cal_file)
         else:
             rec_info = camera_recording.do_import(rec_info=rec_info, copy_video=do_copy_video, source_dir_as_relative_path=source_dir_as_relative_path, cam_cal_file=cam_cal_file)
+        # denote import finished
+        _create_action_states_file(rec_info.working_directory, True)
+        update_action_states(rec_info.working_directory, process.Action.IMPORT, process.State.Completed)
+        self.recordings[which].load_action_states()
 
     def add_recording_and_import(self, which: str, rec_info: EyeTrackerRecording|camera_recording.Recording, do_copy_video: bool|None = None, source_dir_as_relative_path: bool|None = None, cam_cal_file: str|pathlib.Path=None) -> Recording:
         rec = self.add_recording(which, rec_info)
         self.import_recording(which, do_copy_video, source_dir_as_relative_path, cam_cal_file)
         return rec
 
-    def load_existing_recordings(self, load_action_states: bool=False):
+    def load_existing_recordings(self):
         # load recordings that are present
         for r in self.definition.recordings:
             if (self.working_directory / r.name).is_dir():
                 self.add_existing_recording(r.name)
-                if load_action_states:
-                    pass#self.recordings[r.name].load_action_states()
 
     def add_existing_recording(self, which: str) -> Recording:
         r_fold = self.working_directory / which
@@ -184,7 +190,8 @@ class Session:
 
     # state of processing actions on recordings in a session
     def load_action_states(self, create_if_missing: bool):
-        self.state = get_action_states(self.working_directory, for_recording=False, create_if_missing=create_if_missing)
+        if self.working_directory.is_dir():
+            self.state = get_action_states(self.working_directory, for_recording=False, create_if_missing=create_if_missing)
 
     def is_action_completed(self, action: process.Action) -> bool:
         if process.is_session_level_action(action):
