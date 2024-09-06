@@ -238,11 +238,11 @@ def get_session_from_directory(path: str|pathlib.Path, session_def: SessionDefin
         session_def = config.Study.load_from_json(config_dir).session_def
 
     if not path.is_dir():
-        raise RuntimeError()
+        raise RuntimeError('The provided path should be a directory')
 
     f = path / Session.status_file_name
     if not f.is_file():
-        raise RuntimeError()
+        raise RuntimeError('The provided path is not a session, cannot load')
 
     return Session.from_definition(session_def, path)
 
