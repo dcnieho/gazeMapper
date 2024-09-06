@@ -388,7 +388,7 @@ class GUI:
             if state in [process_pool.ProcessState.Canceled, process_pool.ProcessState.Failed]:
                 if job.action==process.Action.IMPORT:
                     # remove working directory if this was an import task
-                    async_thread.run(callbacks.remove_recording_working_dir(job.recording))
+                    async_thread.run(callbacks.remove_recording_working_dir(self.project_dir, job.session, job.recording))
                 else:
                     # reset status of this aborted/failed task
                     if session_level:
@@ -623,7 +623,7 @@ class GUI:
             imgui.text(r.type.value)
             imgui.same_line()
             if imgui.button(ifa6.ICON_FA_TRASH_CAN+f' delete recording##{r.name}'):
-                callbacks.delete_recording(self.study_config, r)
+                callbacks.delete_recording_definition(self.study_config, r)
                 self._reload_sessions()
         imgui.end_table()
         if imgui.button('+ new recording'):
@@ -669,7 +669,7 @@ class GUI:
                 return 0 if imgui.is_key_released(imgui.Key.enter) else None
 
             buttons = {
-                ifa6.ICON_FA_CHECK+" Create recording": (lambda: (callbacks.make_recording(self.study_config, new_rec_type, new_rec_name), self._reload_sessions()), lambda: not _valid_rec_name() or new_rec_type is None),
+                ifa6.ICON_FA_CHECK+" Create recording": (lambda: (callbacks.make_recording_definition(self.study_config, new_rec_type, new_rec_name), self._reload_sessions()), lambda: not _valid_rec_name() or new_rec_type is None),
                 ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
             }
             utils.push_popup(self, lambda: utils.popup("Add recording", _add_rec_popup, buttons = buttons, outside=False))

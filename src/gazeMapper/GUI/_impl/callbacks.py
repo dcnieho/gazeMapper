@@ -105,19 +105,24 @@ def glasses_validator_plane_check_config(study_config: config.Study, pl: plane.D
         # already exists, nothing to do
         pass
 
-def make_recording(study_config: config.Study, r_type: session.RecordingType, name: str):
+def make_recording_definition(study_config: config.Study, r_type: session.RecordingType, name: str):
     # append to defined recordings
     study_config.session_def.recordings.append(session.RecordingDefinition(name,r_type))
     # store config
     path = config.guess_config_dir(study_config.working_directory)
     study_config.session_def.store_as_json(path)
 
-def delete_recording(study_config: config.Study, recording: session.RecordingDefinition):
+def delete_recording_definition(study_config: config.Study, recording: session.RecordingDefinition):
     # remove from defined recordings
     study_config.session_def.recordings = [r for r in study_config.session_def.recordings if r.name!=recording.name]
     # store config
     path = config.guess_config_dir(study_config.working_directory)
     study_config.session_def.store_as_json(path)
+
+async def remove_recording_working_dir(project_dir: pathlib.Path, session: str, recording: str):
+    rec_dir = project_dir / session / recording
+    if rec_dir.is_dir():
+        shutil.rmtree(rec_dir)
 
 def make_individual_marker(study_config: config.Study, mark_id: int, mark_size: float):
     # append to defined recordings
