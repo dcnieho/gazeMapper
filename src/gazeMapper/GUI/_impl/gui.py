@@ -270,7 +270,60 @@ class GUI:
         self._need_set_window_title = False
 
     def _config_change_callback(self, change_path: str, change_type: str):
-        print(f'{change_type}: {change_path}')
+        change_path = pathlib.Path(change_path)
+        # NB watcher filter is configured such that all adds and deletes are folder and all modifies are files of interest
+        if change_type=='modified':
+            # file: deal with status changes
+            # TODO: not so simple, this would wipe out all pending and processing states?
+            change_path = change_path.relative_to(self.project_dir)
+            match len(change_path.parents):
+                case 2:
+                    # session-level states
+                    session = change_path.parent.name
+                    with self._sessions_lock:
+                        if session not in self.sessions:
+                            # some other folder apparently
+                            return
+                        self.sessions[session].load_action_states(False)
+                case 3:
+                    # recording-level states
+                    session = change_path.parent.parent.name
+                    rec = change_path.parent.name
+                    with self._sessions_lock:
+                        if session not in self.sessions:
+                            # some other folder apparently
+                            return
+                        if rec not in self.sessions[session].recordings:
+                            # some other folder apparently
+                            return
+                        self.sessions[session].recordings[rec].load_action_states(False)
+                case _:
+                    pass    # ignore, not of interest
+        else:
+            # folder
+            change_path = change_path.relative_to(self.project_dir)
+            match len(change_path.parents):
+                case 1:
+                    # added or deleted session
+                    self._reload_sessions()
+                    # TODO: not so simple, this would wipe out all pending and processing states?
+                case 2:
+                    # added or deleted recording
+                    session = change_path.parent.name
+                    with self._sessions_lock:
+                        if session not in self.sessions:
+                            # some other folder apparently
+                            return
+                        rec = change_path.name
+                        if not self.sessions[session].definition.is_known_recording(rec):
+                            # some other folder apparently
+                            return
+                        if change_type=='deleted':
+                            self.sessions[session].recordings.pop(rec)
+                        else:
+                            self.sessions[session].add_existing_recording(rec)
+                case _:
+                    pass    # ignore, not of interest
 
     def load_project(self, path: pathlib.Path):
         self.project_dir = path
@@ -284,7 +337,7 @@ class GUI:
             return
 
         self.config_watcher_stop_event = asyncio.Event()
-        self.config_watcher = async_thread.run(config_watcher.watch_and_report_changes(self.project_dir, self._config_change_callback, self.config_watcher_stop_event, watch_filter=config_watcher.ConfigFilter(('.gazeMapper',), True, {config_dir})))
+        self.config_watcher = async_thread.run(config_watcher.watch_and_report_changes(self.project_dir, self._config_change_callback, self.config_watcher_stop_event, watch_filter=config_watcher.ConfigFilter(('.gazeMapper',), True, {config_dir}, True, True)))
 
         def _get_known_recordings() -> set[str]:
             return {r.name for r in self.study_config.session_def.recordings}
@@ -312,8 +365,12 @@ class GUI:
 
     def _reload_sessions(self):
         sessions = session.get_sessions_from_project_directory(self.project_dir, self.study_config.session_def)
-        self.sessions |= {s.name:s for s in sessions}
-        self._selected_sessions |= {k:False for k in self.sessions}
+        with self._sessions_lock:
+            self.sessions.clear()
+            self.sessions |= {s.name:s for s in sessions}
+            selected = self._selected_sessions.copy()
+            self._selected_sessions.clear()
+            self._selected_sessions |= {k:(selected[k] if k in selected else False) for k in self.sessions}
         self._session_lister_set_actions_to_show(self._session_lister)
 
     def _check_project_setups_state(self):

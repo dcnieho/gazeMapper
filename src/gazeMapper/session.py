@@ -71,6 +71,12 @@ class SessionDefinition:
                 return r
         raise ValueError(f'recording "{which}" not found')
 
+    def is_known_recording(self, which: str) -> bool:
+        for r in self.recordings:
+            if r.name==which:
+                return True
+        return False
+
     def store_as_json(self, path: str | pathlib.Path):
         path = pathlib.Path(path)
         if path.is_dir():
