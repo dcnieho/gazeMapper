@@ -279,24 +279,24 @@ class GUI:
             match len(change_path.parents):
                 case 2:
                     # session-level states
-                    session = change_path.parent.name
+                    sess = change_path.parent.name
                     with self._sessions_lock:
-                        if session not in self.sessions:
+                        if sess not in self.sessions:
                             # some other folder apparently
                             return
-                        self.sessions[session].load_action_states(False)
+                        self.sessions[sess].load_action_states(False)
                 case 3:
                     # recording-level states
-                    session = change_path.parent.parent.name
+                    sess = change_path.parent.parent.name
                     rec = change_path.parent.name
                     with self._sessions_lock:
-                        if session not in self.sessions:
+                        if sess not in self.sessions:
                             # some other folder apparently
                             return
-                        if rec not in self.sessions[session].recordings:
+                        if rec not in self.sessions[sess].recordings:
                             # some other folder apparently
                             return
-                        self.sessions[session].recordings[rec].load_action_states(False)
+                        self.sessions[sess].recordings[rec].load_action_states(False)
                 case _:
                     pass    # ignore, not of interest
         else:
@@ -309,19 +309,19 @@ class GUI:
                     # TODO: not so simple, this would wipe out all pending and processing states?
                 case 2:
                     # added or deleted recording
-                    session = change_path.parent.name
+                    sess = change_path.parent.name
                     with self._sessions_lock:
-                        if session not in self.sessions:
+                        if sess not in self.sessions:
                             # some other folder apparently
                             return
                         rec = change_path.name
-                        if not self.sessions[session].definition.is_known_recording(rec):
+                        if not self.sessions[sess].definition.is_known_recording(rec):
                             # some other folder apparently
                             return
                         if change_type=='deleted':
-                            self.sessions[session].recordings.pop(rec)
+                            self.sessions[sess].recordings.pop(rec)
                         else:
-                            self.sessions[session].add_existing_recording(rec)
+                            self.sessions[sess].add_existing_recording(rec)
                 case _:
                     pass    # ignore, not of interest
 
