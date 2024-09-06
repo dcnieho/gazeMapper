@@ -9,7 +9,7 @@ import numpy as np
 import cv2
 
 from . import image_helper, msg_box
-from ... import config, process, session
+from ... import config, session
 
 
 # https://gist.github.com/Willy-JL/f733c960c6b0d2284bcbee0316f88878
