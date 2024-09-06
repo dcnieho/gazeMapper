@@ -305,8 +305,20 @@ class GUI:
             match len(change_path.parents):
                 case 1:
                     # added or deleted session
-                    self._reload_sessions()
-                    # TODO: not so simple, this would wipe out all pending and processing states?
+                    with self._sessions_lock:
+                        if change_type=='deleted':
+                            if (sess:=change_path.name) in self.sessions:
+                                self.sessions.pop(sess)
+                                self._selected_sessions.pop(sess)
+                        else:
+                            # get new session
+                            try:
+                                sess = session.get_session_from_directory(self.project_dir/change_path, self.study_config.session_def)
+                            except:
+                                pass
+                            else:
+                                self.sessions |= {sess.name: sess}
+                                self._selected_sessions |= {sess.name: False}
                 case 2:
                     # added or deleted recording
                     sess = change_path.parent.name
