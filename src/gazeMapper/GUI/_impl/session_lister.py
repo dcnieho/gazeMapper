@@ -45,7 +45,8 @@ class SessionList():
             imgui.TableFlags_.sizing_fixed_fit |
             imgui.TableFlags_.no_host_extend_y |
             imgui.TableFlags_.no_borders_in_body_until_resize |
-            imgui.TableFlags_.highlight_hovered_column
+            imgui.TableFlags_.highlight_hovered_column #|
+            #imgui.TableFlags_.borders_inner_v
         )
 
     def set_actions_to_show(self, actions: set[process.Action]):
