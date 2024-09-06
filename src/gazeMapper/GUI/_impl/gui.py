@@ -274,7 +274,7 @@ class GUI:
         # NB watcher filter is configured such that all adds and deletes are folder and all modifies are files of interest
         if change_type=='modified':
             # file: deal with status changes
-            # TODO: not so simple, this would wipe out all pending and processing states?
+            need_state_sync = False
             change_path = change_path.relative_to(self.project_dir)
             match len(change_path.parents):
                 case 2:
@@ -285,6 +285,7 @@ class GUI:
                             # some other folder apparently
                             return
                         self.sessions[sess].load_action_states(False)
+                        need_state_sync = True
                 case 3:
                     # recording-level states
                     sess = change_path.parent.parent.name
@@ -297,8 +298,13 @@ class GUI:
                             # some other folder apparently
                             return
                         self.sessions[sess].recordings[rec].load_action_states(False)
+                        need_state_sync = True
                 case _:
                     pass    # ignore, not of interest
+            # reapply pending and running state if needed
+            if need_state_sync:
+                # TODO: not so simple, this would wipe out all pending and processing states?
+                pass
         else:
             # folder
             change_path = change_path.relative_to(self.project_dir)
