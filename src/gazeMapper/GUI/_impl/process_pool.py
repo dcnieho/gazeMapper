@@ -27,10 +27,10 @@ class ProcessState(enum.Enum):
 
 class ProcessWaiter(object):
     """Routes completion through to user callback."""
-    def __init__(self, work_id: int, user_data: _UserDataT, done_callback: typing.Callable[[ProcessFuture, _UserDataT, int, ProcessState], None]):
-        self.done_callback = done_callback
-        self.work_id = work_id
-        self.user_data = user_data
+    def __init__(self, job_id: int, user_data: _UserDataT, done_callback: typing.Callable[[ProcessFuture, _UserDataT, int, ProcessState], None]):
+        self.done_callback  = done_callback
+        self.job_id         = job_id
+        self.user_data      = user_data
 
     def add_result(self, future: ProcessFuture):
         self._notify(future, ProcessState.Completed)
@@ -42,7 +42,7 @@ class ProcessWaiter(object):
         self._notify(future, ProcessState.Canceled)
 
     def _notify(self, future: ProcessFuture, state: ProcessState):
-        self.done_callback(future, self.work_id, self.user_data, state)
+        self.done_callback(future, self.job_id, self.user_data, state)
 
 
 class ProcessPool:
@@ -53,8 +53,8 @@ class ProcessPool:
 
         # NB: pool is only started in run() once needed
         self._pool              : pebble.pool.ProcessPool                   = None
-        self._work_items        : dict[int,tuple[ProcessFuture, _UserDataT]]= None
-        self._work_id_provider  : CounterContext                            = CounterContext()
+        self._jobs              : dict[int,tuple[ProcessFuture, _UserDataT]]= None
+        self._job_id_provider   : CounterContext                            = CounterContext()
         self._lock              : threading.Lock                            = threading.Lock()
 
     def _cleanup(self):
@@ -66,19 +66,19 @@ class ProcessPool:
             self._pool.stop()
             self._pool.join()
         self._pool = None
-        self._work_items = None
+        self._jobs = None
 
     def cleanup(self):
         with self._lock:
             self._cleanup()
 
-    def cleanup_if_no_work(self):
+    def cleanup_if_no_jobs(self):
         with self._lock:
-            self._cleanup_if_no_work()
+            self._cleanup_if_no_jobs()
 
-    def _cleanup_if_no_work(self):
+    def _cleanup_if_no_jobs(self):
         # NB: lock must be acquired when calling this
-        if self._pool and not self._work_items:
+        if self._pool and not self._jobs:
             self._cleanup()
 
     def set_num_workers(self, num_workers: int):
@@ -91,63 +91,63 @@ class ProcessPool:
                 context = multiprocessing.get_context("spawn")  # ensure consistent behavior on Windows (where this is default) and Unix (where fork is default, but that may bring complications)
                 self._pool = pebble.ProcessPool(max_workers=self.num_workers, context=context)
 
-            if self._work_items is None:
-                self._work_items = {}
+            if self._jobs is None:
+                self._jobs = {}
 
-            with self._work_id_provider:
-                work_id = self._work_id_provider.get_count()
-                self._work_items[work_id] = (self._pool.schedule(fn, None, args=args, kwargs=kwargs), user_data)
-                self._work_items[work_id][0]._waiters.append(ProcessWaiter(work_id, user_data, self._work_done_callback))
+            with self._job_id_provider:
+                job_id = self._job_id_provider.get_count()
+                self._jobs[job_id] = (self._pool.schedule(fn, None, args=args, kwargs=kwargs), user_data)
+                self._jobs[job_id][0]._waiters.append(ProcessWaiter(job_id, user_data, self._job_done_callback))
                 if self.done_callback:
-                    self._work_items[work_id][0]._waiters.append(ProcessWaiter(work_id, user_data, self.done_callback))
-                return work_id
+                    self._jobs[job_id][0]._waiters.append(ProcessWaiter(job_id, user_data, self.done_callback))
+                return job_id
 
-    def _work_done_callback(self, future: ProcessFuture, work_id: int, user_data: _UserDataT, state: ProcessState):
+    def _job_done_callback(self, future: ProcessFuture, job_id: int, user_data: _UserDataT, state: ProcessState):
         with self._lock:
-            if self._work_items is not None and work_id in self._work_items:
+            if self._jobs is not None and job_id in self._jobs:
                 # clean up the work item since we're done with it
-                del self._work_items[work_id]
+                del self._jobs[job_id]
 
             if self.auto_cleanup_if_no_work:
                 # close pool if no work left
-                self._cleanup_if_no_work()
+                self._cleanup_if_no_jobs()
 
-    def get_job_state(self, wid: int) -> ProcessState:
-        if not self._work_items:
+    def get_job_state(self, job_id: int) -> ProcessState:
+        if not self._jobs:
             return None
-        work_item = self._work_items.get(wid, None)
-        if work_item is None:
+        job = self._jobs.get(job_id, None)
+        if job is None:
             return None
         else:
-            return _get_status_from_future(work_item[0])
+            return _get_status_from_future(job[0])
 
-    def get_job_user_data(self, wid: int) -> _UserDataT:
-        if not self._work_items:
+    def get_job_user_data(self, job_id: int) -> _UserDataT:
+        if not self._jobs:
             return None
-        work_item = self._work_items.get(wid, None)
-        if work_item is None:
+        job = self._jobs.get(job_id, None)
+        if job is None:
             return None
         else:
-            return work_item[1]
+            return job[1]
 
     def invoke_on_each_job(self, callback: typing.Callable[[ProcessFuture, _UserDataT], None]):
         with self._lock:
-            for wid in self._work_items:
-                callback(*self._work_items[wid])
+            for job_id in self._jobs:
+                callback(*self._jobs[job_id])
 
     def cancel_job(self, wid: int) -> bool:
-        if not self._work_items:
+        if not self._jobs:
             return False
-        if (future := self._work_items.get(wid, None)) is None:
+        if (future := self._jobs.get(wid, None)) is None:
             return False
         return future.cancel()
 
     def cancel_all_jobs(self):
-        if not self._work_items:
+        if not self._jobs:
             return
-        for wid in reversed(self._work_items):    # reversed so that later pending jobs don't start executing when earlier gets cancelled, only to be canceled directly after
-            if not self._work_items[wid].done():
-                self._work_items[wid].cancel()
+        for job_id in reversed(self._jobs): # reversed so that later pending jobs don't start executing when earlier gets cancelled, only to be canceled directly after
+            if not self._jobs[job_id].done():
+                self._jobs[job_id].cancel()
 
 
 def _get_status_from_future(fut: ProcessFuture) -> ProcessState:

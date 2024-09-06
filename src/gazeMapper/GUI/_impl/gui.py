@@ -397,7 +397,7 @@ class GUI:
                         session.update_action_states(self.sessions[job.session].recordings[job.recording].info.working_directory, job.action, process.State.Not_Run, self.study_config)
 
             # if there are no jobs left, clean up process pool
-            self.proces_pool.cleanup_if_no_work()
+            self.proces_pool.cleanup_if_no_jobs()
 
     def load_project(self, path: pathlib.Path):
         self.project_dir = path
