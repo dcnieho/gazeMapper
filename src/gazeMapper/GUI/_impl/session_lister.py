@@ -40,7 +40,6 @@ class SessionList():
             imgui.TableFlags_.scroll_y |
             imgui.TableFlags_.hideable |
             imgui.TableFlags_.sortable |
-            imgui.TableFlags_.resizable |
             imgui.TableFlags_.sort_multi |
             imgui.TableFlags_.reorderable |
             imgui.TableFlags_.sizing_fixed_fit |
@@ -70,13 +69,13 @@ class SessionList():
 
             # Setup
             checkbox_width = frame_height-2*imgui.get_style().frame_padding.y
-            imgui.table_setup_column("Selector", imgui.TableColumnFlags_.no_hide | imgui.TableColumnFlags_.no_sort | imgui.TableColumnFlags_.no_resize | imgui.TableColumnFlags_.no_reorder | imgui.TableColumnFlags_.no_header_label, init_width_or_weight=checkbox_width)  # 0
+            imgui.table_setup_column("Selector", imgui.TableColumnFlags_.no_hide | imgui.TableColumnFlags_.no_sort | imgui.TableColumnFlags_.no_reorder | imgui.TableColumnFlags_.no_header_label, init_width_or_weight=checkbox_width)  # 0
             imgui.table_setup_column("Name", imgui.TableColumnFlags_.default_sort | imgui.TableColumnFlags_.no_hide | imgui.TableColumnFlags_.no_resize)  # 1
             if self._has_recordings_col:
-                imgui.table_setup_column("Recordings", imgui.TableColumnFlags_.no_resize | imgui.TableColumnFlags_.angled_header)  # 2
+                imgui.table_setup_column("Recordings", imgui.TableColumnFlags_.angled_header)  # 2
             for k in process.Action:   # 2+ or 3+
                 if k in self.display_actions:
-                    imgui.table_setup_column(k.displayable_name, imgui.TableColumnFlags_.no_resize | imgui.TableColumnFlags_.angled_header)
+                    imgui.table_setup_column(k.displayable_name, imgui.TableColumnFlags_.angled_header)
 
             # Enabled columns
             if imgui.table_get_column_flags(0) & imgui.TableColumnFlags_.is_enabled:
