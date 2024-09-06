@@ -21,7 +21,7 @@ import glassesValidator
 
 from ... import config, config_watcher, marker, plane, process, session, type_utils, version
 from .. import async_thread
-from . import callbacks, colors, file_picker, image_helper, msg_box, session_lister, settings_editor, utils
+from . import callbacks, colors, file_picker, image_helper, msg_box, process_pool, session_lister, settings_editor, utils
 
 
 class GUI:
@@ -51,6 +51,9 @@ class GUI:
 
         self.config_watcher: concurrent.futures.Future = None
         self.config_watcher_stop_event: asyncio.Event  = None
+
+        self.proces_pool = process_pool.ProcessPool(self._worker_process_done_hook)
+        self.job_list: dict[int, utils.JobDescription] = {}
 
         self._window_list: list[hello_imgui.DockableWindow] = []
         self._to_dock         = []
@@ -346,6 +349,55 @@ class GUI:
                                 self._selected_recordings[sess] |= {rec: False}
                 case _:
                     pass    # ignore, not of interest
+
+    def _worker_process_done_hook(self, future: process_pool.ProcessFuture, job_id: int, job: utils.JobDescription, state: process_pool.ProcessState):
+        with self._sessions_lock:
+            # remove from active job list
+            if job_id in self.job_list:
+                self.job_list.pop(job_id)
+
+            # check there is a corresponding session (and recording)
+            if job.session not in self.sessions:
+                # unknown session, nothing to do
+                return
+            session_level = job.recording is None
+            if not session_level and not job.recording in self.sessions[job.session].recordings:
+                # unknown recording, nothing to do
+                return
+
+            match state:
+                case process_pool.ProcessState.Canceled:
+                    # just remove job, so no-op here
+                    pass
+                case process_pool.ProcessState.Completed:
+                    # nothing to do, recording state updates are done by file system watcher
+                    pass
+                case process_pool.ProcessState.Failed:
+                    exc = future.exception()    # should not throw exception since CancelledError is already encoded in state and future is done
+                    tb = utils.get_traceback(type(exc), exc, exc.__traceback__)
+                    lbl = f'session "{job.session}"'
+                    if not session_level:
+                        lbl += f', recording "{job.recording}"'
+                    lbl += f' (work item {job_id}, action {job.action.displayable_name})'
+                    if isinstance(exc, concurrent.futures.TimeoutError):
+                        utils.push_popup(msg_box.msgbox, "Processing error", f"A worker process has failed for {lbl}:\n{type(exc).__name__}: {str(exc) or 'No further details'}\n\nPossible causes include:\n - You are running with too many workers, try lowering them in settings", msg_box.MsgBox.warn, more=tb)
+                        return
+                    utils.push_popup(msg_box.msgbox, "Processing error", f"Something went wrong in a worker process for {lbl}:\n\n{tb}", msg_box.MsgBox.error)
+
+            # clean up when a task failed or was canceled
+            if state in [process_pool.ProcessState.Canceled, process_pool.ProcessState.Failed]:
+                if job.action==process.Action.IMPORT:
+                    # remove working directory if this was an import task
+                    async_thread.run(callbacks.remove_recording_working_dir(job.recording))
+                else:
+                    # reset status of this aborted/failed task
+                    if session_level:
+                        session.update_action_states(self.sessions[job.session].working_directory, job.action, process.State.Not_Run, self.study_config)
+                    else:
+                        session.update_action_states(self.sessions[job.session].recordings[job.recording].info.working_directory, job.action, process.State.Not_Run, self.study_config)
+
+            # if there are no jobs left, clean up process pool
+            self.proces_pool.cleanup_if_no_work()
 
     def load_project(self, path: pathlib.Path):
         self.project_dir = path

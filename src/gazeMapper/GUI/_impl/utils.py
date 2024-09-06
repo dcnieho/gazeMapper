@@ -5,11 +5,12 @@ from imgui_bundle import imgui, icons_fontawesome_6 as ifa6
 import sys
 import pathlib
 from typing import Any, Callable
+import dataclasses
 import numpy as np
 import cv2
 
 from . import image_helper, msg_box
-from ... import config, session
+from ... import config, process, session
 
 
 # https://gist.github.com/Willy-JL/f733c960c6b0d2284bcbee0316f88878
@@ -271,3 +272,11 @@ def get_aruco_marker_image(sz: int, id:int, dictionary_id: int, marker_border_bi
     marker_image = np.zeros((sz, sz), dtype=np.uint8)
     marker_image = cv2.aruco.generateImageMarker(cv2.aruco.getPredefinedDictionary(dictionary_id), id, sz, marker_image, marker_border_bits)
     return image_helper.ImageHelper(marker_image)
+
+
+@dataclasses.dataclass
+class JobDescription:
+    action:             process.Action
+    session:            str
+    recording:          str|None
+    next_actions:       list[process.Action]|None
