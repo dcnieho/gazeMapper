@@ -320,8 +320,12 @@ class GUI:
                             return
                         if change_type=='deleted':
                             self.sessions[sess].recordings.pop(rec)
+                            if sess in self._selected_recordings and rec in self._selected_recordings[sess]:
+                                self._selected_recordings[sess].pop(rec)
                         else:
                             self.sessions[sess].add_existing_recording(rec)
+                            if sess in self._selected_recordings:
+                                self._selected_recordings[sess] |= {rec: False}
                 case _:
                     pass    # ignore, not of interest
 
