@@ -136,6 +136,7 @@ class Session:
             rec_info = importing.do_import(rec_info=rec_info, copy_scene_video=do_copy_video, source_dir_as_relative_path=source_dir_as_relative_path, cam_cal_file=cam_cal_file)
         else:
             rec_info = camera_recording.do_import(rec_info=rec_info, copy_video=do_copy_video, source_dir_as_relative_path=source_dir_as_relative_path, cam_cal_file=cam_cal_file)
+        self._update_recording_info(which, rec_info)    # the import call may have updated the info (e.g. filled in recording length that wasn't known from metadata). Update what we hold in memory
         # denote import finished
         _create_action_states_file(rec_info.working_directory, True)
         update_action_states(rec_info.working_directory, process.Action.IMPORT, process.State.Completed)
@@ -178,6 +179,12 @@ class Session:
         elif rec_def.type==RecordingType.Camera:
             if not isinstance(rec_info,camera_recording.Recording):
                 raise TypeError(f"The provided rec_info is not for a camera recording, but {which} is a camera recording")
+
+    def _update_recording_info(self, which: str, rec_info: EyeTrackerRecording|camera_recording.Recording):
+        if which not in self.recordings:
+            return
+        self.check_recording_info(which, rec_info)
+        self.recordings[which].info = rec_info
 
     def add_recording_from_info(self, which: str, rec_info: EyeTrackerRecording|camera_recording.Recording) -> Recording:
         rec_def = self.definition.get_recording_def(which)
