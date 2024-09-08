@@ -182,13 +182,12 @@ def action_update_and_invalidate(action: Action, state: State, study_config: 'co
     return action_state_mutations
 
 def _is_recording_action_possible(action_states: dict[Action, State], study_config: 'config.Study', rec_type: 'session.RecordingType', action: Action):
-    from .. import session
     if not is_action_possible_given_config(action, study_config):
         return False
     elif not is_action_possible_for_recording_type(action, rec_type):
         return False
 
-    preconditions: set[Action] = set(Action.IMPORT) # IMPORT is a precondition for all actions except IMPORT itself
+    preconditions = {Action.IMPORT} # IMPORT is a precondition for all actions except IMPORT itself
     match action:
         case Action.IMPORT:
             return action_states[Action.IMPORT]==State.Not_Run  # possible if not already imported
@@ -217,7 +216,7 @@ def _is_session_action_possible(session_action_states: dict[Action, State], reco
     if not is_action_possible_given_config(action, study_config):
         return False
 
-    preconditions: set[Action] = set(Action.IMPORT) # IMPORT is a precondition for all actions
+    preconditions = {Action.IMPORT} # IMPORT is a precondition for all actions
     match action:
         case Action.SYNC_TO_REFERENCE:
             preconditions.update([Action.CODE_EPISODES])
@@ -253,14 +252,15 @@ def _is_session_action_possible(session_action_states: dict[Action, State], reco
         else:
             precond_met.append(all((recording_action_states[r][p]==State.Completed for r in recording_action_states)))
 
-    return all(precond_met.values())
+    return all(precond_met)
 
-def get_possible_actions(session_action_states: dict[Action, State], recording_action_states: dict[str,dict[Action, State]], actions_to_check: set[Action], study_config: 'config.Study', rec_type: 'session.RecordingType') -> dict[Action,bool|list[str]]:
+def get_possible_actions(session_action_states: dict[Action, State], recording_action_states: dict[str,dict[Action, State]], actions_to_check: set[Action], study_config: 'config.Study') -> dict[Action,bool|list[str]]:
     # determine based on actions_states which actions have all their preconditions met. Return a set containing just
     # those possible actions
     # actions_to_check can be a subset of all actions, if user e.g. knows some actions aren't possible or wanted due to settings
     # this function doesn't check that
     merged_states = {r:session_action_states|recording_action_states[r] for r in recording_action_states}
+    rec_types = {r.name:r.type for r in study_config.session_def.recordings}
 
     possible_actions: dict[Action,bool|list[str]] = {}
     for a in actions_to_check:
@@ -268,7 +268,7 @@ def get_possible_actions(session_action_states: dict[Action, State], recording_a
             if _is_session_action_possible(session_action_states, recording_action_states, study_config, a):
                 possible_actions[a] = True
         else:
-            possible_recs = [r for r in merged_states if _is_recording_action_possible(merged_states[r], study_config, rec_type, a)]
+            possible_recs = [r for r in merged_states if _is_recording_action_possible(merged_states[r], study_config, rec_types[r], a)]
             if possible_recs:
                 possible_actions[a] = possible_recs
 
