@@ -52,9 +52,9 @@ class GUI:
         self.config_watcher: concurrent.futures.Future  = None
         self.config_watcher_stop_event: asyncio.Event   = None
 
-        self.process_pool                               = process_pool.ProcessPool(self._worker_process_done_hook)
-        self.job_list: dict[int, utils.JobDescription]  = {}
-        self._job_list_lock: threading.Lock             = threading.Lock()
+        self.process_pool                                           = process_pool.ProcessPool(self._worker_process_done_hook)
+        self.job_list: dict[utils.JobHandle, utils.JobDescription]  = {}
+        self._job_list_lock: threading.Lock                         = threading.Lock()
 
         self._window_list: list[hello_imgui.DockableWindow] = []
         self._to_dock         = []
@@ -247,6 +247,9 @@ class GUI:
         # this is always called, so we handle popups and other state here
         self._check_project_setups_state()
         utils.handle_popup_stack(self.popup_stack)
+        self._update_job_states()
+        # if there are no jobs left, clean up process pool
+        self.process_pool.cleanup_if_no_jobs()
         # also handle showing of debug windows
         if self._show_demo_window:
             self._show_demo_window = imgui.show_demo_window(self._show_demo_window)
@@ -315,16 +318,10 @@ class GUI:
                     if rec and rec not in self.sessions[sess].recordings:
                         return
                     with self._job_list_lock:
-                        for jid in self.job_list:
+                        for job in self.job_list:
                             # reset pending and processing states as those are not encoded in the file
-                            job = self.job_list[jid]
                             if job.session==sess and (not rec or job.recording==rec):
-                                job_state = self.process_pool.get_job_state(jid)
-                                if job_state in [process_pool.ProcessState.Pending, process_pool.ProcessState.Running]:
-                                    if rec:
-                                        self.sessions[sess].recordings[rec].state[job.action] = job_state
-                                    else:
-                                        self.sessions[sess].state[job.action] = job_state
+                                self._update_job_states_impl(job)
         else:
             # folder
             change_path = change_path.relative_to(self.project_dir)
@@ -368,7 +365,7 @@ class GUI:
                     pass    # ignore, not of interest
 
     def _launch_task(self, sess: str, recording: str|None, action: process.Action):
-        job = utils.JobDescription(action, session, recording)
+        job = utils.JobHandle(action, sess, recording)
         if action==process.Action.IMPORT:
             # NB: when adding recording, immediately do
             # rec_info = glassesTools.importing.get_recording_info(bla, bla)
@@ -382,17 +379,17 @@ class GUI:
             args = tuple()
 
         # launch task
-        job_id = self.process_pool.run(func, *args)
+        job_id = self.process_pool.run(func, job, *args)
 
         # store to job queue
         with self._job_list_lock:
-            self.job_list[job_id] = job
+            self.job_list[job] = utils.JobDescription(job_id, action, sess, recording)
 
-    def _worker_process_done_hook(self, future: process_pool.ProcessFuture, job_id: int, job: utils.JobDescription, state: process_pool.ProcessState):
+    def _worker_process_done_hook(self, future: process_pool.ProcessFuture, job_id: int, job: utils.JobDescription, state: process.State):
         with self._sessions_lock:
             # remove from active job list
             with self._job_list_lock:
-                self.job_list.pop(job_id, None)
+                self.job_list.pop(utils.JobHandle(job.action, job.session, job.recording), None)
 
             # check there is a corresponding session (and recording)
             if job.session not in self.sessions:
@@ -404,13 +401,13 @@ class GUI:
                 return
 
             match state:
-                case process_pool.ProcessState.Canceled:
+                case process.State.Canceled:
                     # just remove job, so no-op here
                     pass
-                case process_pool.ProcessState.Completed:
+                case process.State.Completed:
                     # nothing to do, recording state updates are done by file system watcher
                     pass
-                case process_pool.ProcessState.Failed:
+                case process.State.Failed:
                     exc = future.exception()    # should not throw exception since CancelledError is already encoded in state and future is done
                     tb = utils.get_traceback(type(exc), exc, exc.__traceback__)
                     lbl = f'session "{job.session}"'
@@ -418,12 +415,12 @@ class GUI:
                         lbl += f', recording "{job.recording}"'
                     lbl += f' (work item {job_id}, action {job.action.displayable_name})'
                     if isinstance(exc, concurrent.futures.TimeoutError):
-                        utils.push_popup(msg_box.msgbox, "Processing error", f"A worker process has failed for {lbl}:\n{type(exc).__name__}: {str(exc) or 'No further details'}\n\nPossible causes include:\n - You are running with too many workers, try lowering them in settings", msg_box.MsgBox.warn, more=tb)
+                        utils.push_popup(self, msg_box.msgbox, "Processing error", f"A worker process has failed for {lbl}:\n{type(exc).__name__}: {str(exc) or 'No further details'}\n\nPossible causes include:\n - You are running with too many workers, try lowering them in settings", msg_box.MsgBox.warn, more=tb)
                         return
-                    utils.push_popup(msg_box.msgbox, "Processing error", f"Something went wrong in a worker process for {lbl}:\n\n{tb}", msg_box.MsgBox.error)
+                    utils.push_popup(self, msg_box.msgbox, "Processing error", f"Something went wrong in a worker process for {lbl}:\n\n{tb}", msg_box.MsgBox.error)
 
             # clean up when a task failed or was canceled
-            if state in [process_pool.ProcessState.Canceled, process_pool.ProcessState.Failed]:
+            if state in [process.State.Canceled, process.State.Failed]:
                 if job.action==process.Action.IMPORT:
                     # remove working directory if this was an import task
                     async_thread.run(callbacks.remove_recording_working_dir(self.project_dir, job.session, job.recording))
@@ -434,8 +431,24 @@ class GUI:
                     else:
                         session.update_action_states(self.sessions[job.session].recordings[job.recording].info.working_directory, job.action, process.State.Not_Run, self.study_config)
 
-            # if there are no jobs left, clean up process pool
-            self.process_pool.cleanup_if_no_jobs()
+    def _update_job_states(self):
+        with self._sessions_lock:
+            with self._job_list_lock:
+                for job in self.job_list:
+                    if job.session not in self.sessions:
+                        continue
+                    if job.recording and job.recording not in self.sessions[job.session].recordings:
+                        continue
+                    self._update_job_states_impl(job)
+    def _update_job_states_impl(self, job: utils.JobHandle):
+        # NB: self._sessions_lock and self._job_list_lock should be acquired, and
+        # check should have been performed that job.session and job.recording exist
+        job_state = self.process_pool.get_job_state(self.job_list[job].job_id)
+        if job_state in [process.State.Pending, process.State.Running]:
+            if job.recording:
+                self.sessions[job.session].recordings[job.recording].state[job.action] = job_state
+            else:
+                self.sessions[job.session].state[job.action] = job_state
 
     def load_project(self, path: pathlib.Path):
         self.project_dir = path

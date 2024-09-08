@@ -6,6 +6,7 @@ import sys
 import pathlib
 from typing import Any, Callable
 import dataclasses
+import typing
 import numpy as np
 import cv2
 
@@ -274,8 +275,14 @@ def get_aruco_marker_image(sz: int, id:int, dictionary_id: int, marker_border_bi
     return image_helper.ImageHelper(marker_image)
 
 
+class JobHandle(typing.NamedTuple):
+    action:             process.Action
+    session:            str
+    recording:          typing.Optional[str] = None
+
 @dataclasses.dataclass
 class JobDescription:
+    job_id:             int
     action:             process.Action
     session:            str
     recording:          str|None

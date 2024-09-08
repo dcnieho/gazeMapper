@@ -8,6 +8,9 @@ class State(enum.IntEnum):
     Pending     = enum.auto()
     Running     = enum.auto()
     Completed   = enum.auto()
+    # two more states needed by process_pool
+    Canceled    = enum.auto()
+    Failed      = enum.auto()
     @property
     def displayable_name(self):
         return self.name.replace("_", " ")

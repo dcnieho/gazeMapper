@@ -7,6 +7,8 @@ import enum
 import pebble.pool
 ProcessFuture = pebble.ProcessFuture
 
+from ... import process
+
 _UserDataT = typing.TypeVar("_UserDataT")
 
 class CounterContext:
@@ -18,35 +20,28 @@ class CounterContext:
     def get_count(self):
         return self._count
 
-class ProcessState(enum.Enum):
-    Pending     = enum.auto()
-    Running     = enum.auto()
-    Canceled    = enum.auto()
-    Failed      = enum.auto()
-    Completed   = enum.auto()
-
 class ProcessWaiter(object):
     """Routes completion through to user callback."""
-    def __init__(self, job_id: int, user_data: _UserDataT, done_callback: typing.Callable[[ProcessFuture, _UserDataT, int, ProcessState], None]):
+    def __init__(self, job_id: int, user_data: _UserDataT, done_callback: typing.Callable[[ProcessFuture, _UserDataT, int, process.State], None]):
         self.done_callback  = done_callback
         self.job_id         = job_id
         self.user_data      = user_data
 
     def add_result(self, future: ProcessFuture):
-        self._notify(future, ProcessState.Completed)
+        self._notify(future, process.State.Completed)
 
     def add_exception(self, future: ProcessFuture):
-        self._notify(future, ProcessState.Failed)
+        self._notify(future, process.State.Failed)
 
     def add_cancelled(self, future: ProcessFuture):
-        self._notify(future, ProcessState.Canceled)
+        self._notify(future, process.State.Canceled)
 
-    def _notify(self, future: ProcessFuture, state: ProcessState):
+    def _notify(self, future: ProcessFuture, state: process.State):
         self.done_callback(future, self.job_id, self.user_data, state)
 
 
 class ProcessPool:
-    def __init__(self, done_callback: typing.Callable[[ProcessFuture, _UserDataT, int, ProcessState], None] = None, num_workers = 2):
+    def __init__(self, done_callback: typing.Callable[[ProcessFuture, _UserDataT, int, process.State], None] = None, num_workers = 2):
         self.done_callback          = done_callback
         self.num_workers            = num_workers
         self.auto_cleanup_if_no_work= False
@@ -96,13 +91,13 @@ class ProcessPool:
 
             with self._job_id_provider:
                 job_id = self._job_id_provider.get_count()
-                self._jobs[job_id] = (self._pool.schedule(fn, None, args=args, kwargs=kwargs), user_data)
+                self._jobs[job_id] = (self._pool.schedule(fn, args=args, kwargs=kwargs), user_data)
                 self._jobs[job_id][0]._waiters.append(ProcessWaiter(job_id, user_data, self._job_done_callback))
                 if self.done_callback:
                     self._jobs[job_id][0]._waiters.append(ProcessWaiter(job_id, user_data, self.done_callback))
                 return job_id
 
-    def _job_done_callback(self, future: ProcessFuture, job_id: int, user_data: _UserDataT, state: ProcessState):
+    def _job_done_callback(self, future: ProcessFuture, job_id: int, user_data: _UserDataT, state: process.State):
         with self._lock:
             if self._jobs is not None and job_id in self._jobs:
                 # clean up the work item since we're done with it
@@ -112,7 +107,7 @@ class ProcessPool:
                 # close pool if no work left
                 self._cleanup_if_no_jobs()
 
-    def get_job_state(self, job_id: int) -> ProcessState:
+    def get_job_state(self, job_id: int) -> process.State:
         if not self._jobs:
             return None
         job = self._jobs.get(job_id, None)
@@ -150,15 +145,15 @@ class ProcessPool:
                 self._jobs[job_id].cancel()
 
 
-def _get_status_from_future(fut: ProcessFuture) -> ProcessState:
+def _get_status_from_future(fut: ProcessFuture) -> process.State:
     if fut.running():
-        return ProcessState.Running
+        return process.State.Running
     elif fut.done():
         if fut.cancelled():
-            return ProcessState.Canceled
+            return process.State.Canceled
         elif fut.exception() is not None:
-            return ProcessState.Failed
+            return process.State.Failed
         else:
-            return ProcessState.Completed
+            return process.State.Completed
     else:
-        return ProcessState.Pending
+        return process.State.Pending
