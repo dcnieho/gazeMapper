@@ -152,6 +152,8 @@ class Session:
                 self.add_existing_recording(r.name)
 
     def add_existing_recording(self, which: str) -> Recording:
+        if which in self.recordings:
+            return  # nothing to do
         r_fold = self.working_directory / which
         if not r_fold.is_dir():
             return
