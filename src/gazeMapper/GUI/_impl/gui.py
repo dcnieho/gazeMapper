@@ -44,16 +44,17 @@ class GUI:
 
         self._possible_value_getters: dict[str] = {}
 
-        self.need_setup_recordings = True
-        self.need_setup_plane = True
-        self.need_setup_episode = True
-        self.can_accept_sessions = False
+        self.need_setup_recordings  = True
+        self.need_setup_plane       = True
+        self.need_setup_episode     = True
+        self.can_accept_sessions    = False
 
-        self.config_watcher: concurrent.futures.Future = None
-        self.config_watcher_stop_event: asyncio.Event  = None
+        self.config_watcher: concurrent.futures.Future  = None
+        self.config_watcher_stop_event: asyncio.Event   = None
 
-        self.process_pool = process_pool.ProcessPool(self._worker_process_done_hook)
-        self.job_list: dict[int, utils.JobDescription] = {}
+        self.process_pool                               = process_pool.ProcessPool(self._worker_process_done_hook)
+        self.job_list: dict[int, utils.JobDescription]  = {}
+        self._job_list_lock: threading.Lock             = threading.Lock()
 
         self._window_list: list[hello_imgui.DockableWindow] = []
         self._to_dock         = []
@@ -313,16 +314,17 @@ class GUI:
                         return
                     if rec and rec not in self.sessions[sess].recordings:
                         return
-                    for jid in self.job_list:
-                        # reset pending and processing states as those are not encoded in the file
-                        job = self.job_list[jid]
-                        if job.session==sess and (not rec or job.recording==rec):
-                            job_state = self.process_pool.get_job_state(jid)
-                            if job_state in [process_pool.ProcessState.Pending, process_pool.ProcessState.Running]:
-                                if rec:
-                                    self.sessions[sess].recordings[rec].state[job.action] = job_state
-                                else:
-                                    self.sessions[sess].state[job.action] = job_state
+                    with self._job_list_lock:
+                        for jid in self.job_list:
+                            # reset pending and processing states as those are not encoded in the file
+                            job = self.job_list[jid]
+                            if job.session==sess and (not rec or job.recording==rec):
+                                job_state = self.process_pool.get_job_state(jid)
+                                if job_state in [process_pool.ProcessState.Pending, process_pool.ProcessState.Running]:
+                                    if rec:
+                                        self.sessions[sess].recordings[rec].state[job.action] = job_state
+                                    else:
+                                        self.sessions[sess].state[job.action] = job_state
         else:
             # folder
             change_path = change_path.relative_to(self.project_dir)
@@ -383,13 +385,15 @@ class GUI:
         job_id = self.process_pool.run(func, *args)
 
         # store to job queue
-        self.job_list[job_id] = job
+        with self._job_list_lock:
+            self.job_list[job_id] = job
 
     def _worker_process_done_hook(self, future: process_pool.ProcessFuture, job_id: int, job: utils.JobDescription, state: process_pool.ProcessState):
         with self._sessions_lock:
             # remove from active job list
-            if job_id in self.job_list:
-                self.job_list.pop(job_id)
+            with self._job_list_lock:
+                if job_id in self.job_list:
+                    self.job_list.pop(job_id)
 
             # check there is a corresponding session (and recording)
             if job.session not in self.sessions:
