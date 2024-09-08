@@ -1,4 +1,5 @@
 import enum
+import typing
 
 from glassesTools import annotation, utils
 
@@ -50,6 +51,46 @@ class Action(enum.IntEnum):
             pass    # we're done
         return vals
 utils.register_type(utils.CustomTypeEntry(Action,'__enum.process.Action__',str, lambda x: getattr(Action, x.split('.')[1])))
+
+def action_to_func(action: Action) -> typing.Callable[..., None]:
+    # Returns function to perform the provided action. NB: not for Action.IMPORT,
+    # needs its own special handling by caller instead
+    from .code_episodes import run as do_coding
+    from .detect_markers import run as detect_markers
+    from .sync_et_to_cam import run as sync_et_to_cam
+    from .sync_to_ref import run as sync_to_ref
+    from .gaze_to_plane import run as gaze_to_plane
+    from .export_trials import run as export_trials
+    from .run_validation import run as run_validation
+    from .auto_code_sync_points import run as auto_code_sync_points
+    from .auto_code_trials import run as auto_code_trials
+    from .make_video import run as make_video
+
+    match action:
+        case Action.IMPORT:
+            return None # Needs a special case handled by the caller
+        case Action.CODE_EPISODES:
+            return do_coding
+        case Action.DETECT_MARKERS:
+            return detect_markers
+        case Action.GAZE_TO_PLANE:
+            return gaze_to_plane
+        case Action.AUTO_CODE_SYNC:
+            return auto_code_sync_points
+        case Action.AUTO_CODE_TRIALS:
+            return auto_code_trials
+        case Action.SYNC_ET_TO_CAM:
+            return sync_et_to_cam
+        case Action.SYNC_TO_REFERENCE:
+            return sync_to_ref
+        case Action.RUN_VALIDATION:
+            return run_validation
+        case Action.EXPORT_TRIALS:
+            return export_trials
+        case Action.MAKE_VIDEO:
+            return make_video
+        case _:
+            raise NotImplementedError(f'Logic is not implemented for {action}, major developer oversight! Let him know.')
 
 def is_session_level_action(action: Action) -> bool:
     return action in [Action.SYNC_TO_REFERENCE, Action.EXPORT_TRIALS, Action.MAKE_VIDEO]

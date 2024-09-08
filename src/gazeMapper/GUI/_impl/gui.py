@@ -350,6 +350,26 @@ class GUI:
                 case _:
                     pass    # ignore, not of interest
 
+    def _launch_task(self, sess: str, recording: str|None, action: process.Action):
+        job = utils.JobDescription(action, session, recording)
+        if action==process.Action.IMPORT:
+            # NB: when adding recording, immediately do
+            # rec_info = glassesTools.importing.get_recording_info(bla, bla)
+            # self.sessions[sess].add_recording_from_info()
+            # that creates it only in memory. Then immediate call launch_task for import
+            # if import fails, remove directory, which removes recording (automatically thanks to watcher)
+            func = self.sessions[sess].import_recording
+            args = (recording,)
+        else:
+            func = process.action_to_func(action)
+            args = tuple()
+
+        # launch task
+        job_id = process_pool.run(func, *args)
+
+        # store to job queue
+        self.job_list[job_id] = job
+
     def _worker_process_done_hook(self, future: process_pool.ProcessFuture, job_id: int, job: utils.JobDescription, state: process_pool.ProcessState):
         with self._sessions_lock:
             # remove from active job list
