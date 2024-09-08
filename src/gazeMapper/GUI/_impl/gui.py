@@ -927,8 +927,28 @@ class GUI:
             }
             utils.push_popup(self, lambda: utils.popup("Add marker", _add_rec_popup, buttons = buttons, outside=False))
 
-    def _session_context_menu(self, item: session.Session):
-        pass
+    def _session_context_menu(self, session_name: session.Session):
+        sess = self.sessions[session_name]  # NB: no lock, as callback is invoked under lock by session_lister
+        actions = process.get_possible_actions(sess.state, {r:sess.recordings[r].state for r in sess.recordings}, {a for a in process.Action if a!=process.Action.IMPORT}, self.study_config)
+        # filter out actions already pending or processing
+        actions_filt: dict[process.Action,bool|list[str]] = {}
+        for a in actions:
+            if process.is_session_level_action(a):
+                if utils.JobHandle(a, session_name) not in self.job_list:
+                    actions_filt[a] = actions[a]
+            else:
+                # check each recording
+                recs = [r for r in actions[a] if utils.JobHandle(a, session_name, r) not in self.job_list]
+                if recs:
+                    actions_filt[a] = recs
+        # draw menu
+        for a in actions_filt:
+            if imgui.selectable(f"{a.displayable_name}##{session_name}", False)[0]:
+                if process.is_session_level_action(a):
+                    self._launch_task(session_name, None, a)
+                else:
+                    for r in recs:
+                        self._launch_task(session_name, r, a)
     def _session_action_context_menu(self, item: session.Session, action: process.Action):
         if process.is_session_level_action(action):
             state = item.state[action]
