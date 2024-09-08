@@ -52,7 +52,7 @@ class GUI:
         self.config_watcher: concurrent.futures.Future = None
         self.config_watcher_stop_event: asyncio.Event  = None
 
-        self.proces_pool = process_pool.ProcessPool(self._worker_process_done_hook)
+        self.process_pool = process_pool.ProcessPool(self._worker_process_done_hook)
         self.job_list: dict[int, utils.JobDescription] = {}
 
         self._window_list: list[hello_imgui.DockableWindow] = []
@@ -365,7 +365,7 @@ class GUI:
             args = tuple()
 
         # launch task
-        job_id = process_pool.run(func, *args)
+        job_id = self.process_pool.run(func, *args)
 
         # store to job queue
         self.job_list[job_id] = job
@@ -417,7 +417,7 @@ class GUI:
                         session.update_action_states(self.sessions[job.session].recordings[job.recording].info.working_directory, job.action, process.State.Not_Run, self.study_config)
 
             # if there are no jobs left, clean up process pool
-            self.proces_pool.cleanup_if_no_jobs()
+            self.process_pool.cleanup_if_no_jobs()
 
     def load_project(self, path: pathlib.Path):
         self.project_dir = path
