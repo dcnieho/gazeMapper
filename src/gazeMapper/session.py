@@ -118,9 +118,6 @@ class Session:
         if not (self.working_directory/Session.status_file_name).is_file():
             _create_action_states_file(self.working_directory, False)
 
-    def add_recording(self, which: str, rec_info: EyeTrackerRecording|camera_recording.Recording) -> Recording:
-        return self.add_recording_from_info(which, rec_info)
-
     def import_recording(self, which: str, do_copy_video: bool|None = None, source_dir_as_relative_path: bool|None = None, cam_cal_file: str|pathlib.Path=None):
         rec_def = self.definition.get_recording_def(which)
         if do_copy_video is None or source_dir_as_relative_path is None:
@@ -144,7 +141,7 @@ class Session:
         self.recordings[which].load_action_states()
 
     def add_recording_and_import(self, which: str, rec_info: EyeTrackerRecording|camera_recording.Recording, do_copy_video: bool|None = None, source_dir_as_relative_path: bool|None = None, cam_cal_file: str|pathlib.Path=None) -> Recording:
-        rec = self.add_recording(which, rec_info)
+        rec = self.add_recording_from_info(which, rec_info)
         self.import_recording(which, do_copy_video, source_dir_as_relative_path, cam_cal_file)
         return rec
 
