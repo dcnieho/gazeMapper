@@ -130,6 +130,7 @@ class Session:
                 source_dir_as_relative_path = study_config.import_source_dir_as_relative_path
 
         # do import
+        rec_info = self.recordings[which].info
         rec_info.working_directory = self.working_directory / rec_def.name
         if rec_def.type==RecordingType.Eye_Tracker:
             rec_info = importing.do_import(rec_info=rec_info, copy_scene_video=do_copy_video, source_dir_as_relative_path=source_dir_as_relative_path, cam_cal_file=cam_cal_file)
