@@ -279,4 +279,4 @@ class JobDescription:
     action:             process.Action
     session:            str
     recording:          str|None
-    next_actions:       list[process.Action]|None
+    next_actions:       list[process.Action]|None = None
