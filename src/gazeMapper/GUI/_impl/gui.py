@@ -277,7 +277,7 @@ class GUI:
         # NB watcher filter is configured such that all adds and deletes are folder and all modifies are files of interest
         if change_type=='modified':
             # file: deal with status changes
-            need_state_sync = False
+            need_state_sync = None
             change_path = change_path.relative_to(self.project_dir)
             match len(change_path.parents):
                 case 2:
@@ -288,7 +288,7 @@ class GUI:
                             # some other folder apparently
                             return
                         self.sessions[sess].load_action_states(False)
-                        need_state_sync = True
+                        need_state_sync = (sess,)
                 case 3:
                     # recording-level states
                     sess = change_path.parent.parent.name
@@ -301,13 +301,28 @@ class GUI:
                             # some other folder apparently
                             return
                         self.sessions[sess].recordings[rec].load_action_states(False)
-                        need_state_sync = True
+                        need_state_sync = (sess, rec)
                 case _:
                     pass    # ignore, not of interest
             # reapply pending and running state if needed
             if need_state_sync:
-                # TODO: not so simple, this would wipe out all pending and processing states?
-                pass
+                with self._sessions_lock:
+                    sess = need_state_sync[0]
+                    rec = need_state_sync[1] if len(need_state_sync)>1 else None
+                    if sess not in self.sessions:
+                        return
+                    if rec and rec not in self.sessions[sess].recordings:
+                        return
+                    for jid in self.job_list:
+                        # reset pending and processing states as those are not encoded in the file
+                        job = self.job_list[jid]
+                        if job.session==sess and (not rec or job.recording==rec):
+                            job_state = self.process_pool.get_job_state(jid)
+                            if job_state in [process_pool.ProcessState.Pending, process_pool.ProcessState.Running]:
+                                if rec:
+                                    self.sessions[sess].recordings[rec].state[job.action] = job_state
+                                else:
+                                    self.sessions[sess].state[job.action] = job_state
         else:
             # folder
             change_path = change_path.relative_to(self.project_dir)
