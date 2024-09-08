@@ -358,8 +358,8 @@ class GUI:
                             return
                         if change_type=='deleted':
                             self.sessions[sess].recordings.pop(rec)
-                            if sess in self._selected_recordings and rec in self._selected_recordings[sess]:
-                                self._selected_recordings[sess].pop(rec)
+                            if sess in self._selected_recordings:
+                                self._selected_recordings[sess].pop(rec, None)
                         else:
                             self.sessions[sess].add_existing_recording(rec)
                             if sess in self._selected_recordings:
@@ -392,8 +392,7 @@ class GUI:
         with self._sessions_lock:
             # remove from active job list
             with self._job_list_lock:
-                if job_id in self.job_list:
-                    self.job_list.pop(job_id)
+                self.job_list.pop(job_id, None)
 
             # check there is a corresponding session (and recording)
             if job.session not in self.sessions:
