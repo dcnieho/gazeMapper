@@ -318,6 +318,7 @@ class GUI:
                             if (sess:=change_path.name) in self.sessions:
                                 self.sessions.pop(sess)
                                 self._selected_sessions.pop(sess)
+                                self._window_list = [w for w in hello_imgui.get_runner_params().docking_params.dockable_windows if w.label!=f'{sess}##session_view']
                         else:
                             # get new session
                             try:
