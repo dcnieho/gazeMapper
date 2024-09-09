@@ -197,10 +197,9 @@ class JobScheduler(typing.Generic[_UserDataT]):
         return job_id
 
     def cancel_job(self, job_id: int):
-        if job_id in self.jobs:
-            self._cancel_job_impl(job_id)
+        if job_id not in self.jobs:
+            return
 
-    def _cancel_job_impl(self, job_id: int):
         if self.jobs[job_id]._pool_job_id is not None:
             self._pool.cancel_job(self.jobs[job_id]._pool_job_id)
         else:
@@ -216,7 +215,10 @@ class JobScheduler(typing.Generic[_UserDataT]):
             # check job still valid or should be canceled
             if self._job_is_valid_checker is not None:
                 if not self._job_is_valid_checker(job.user_data):
-                    self._cancel_job_impl(job_id)
+                    self.cancel_job(job_id)
+            # remove finished job from pending jobs if its still there
+            if job._final_state is not None and job_id in self._pending_jobs:
+                self._pending_jobs.remove(job_id)
             # check how many scheduled jobs we have
             if job.is_scheduled():
                 num_scheduled_to_pool += 1
