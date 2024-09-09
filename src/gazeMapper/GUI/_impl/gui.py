@@ -989,11 +989,11 @@ class GUI:
                 active_jobs.add(self.job_scheduler.jobs[job_id].user_data)
         return active_jobs
 
-    def _session_context_menu(self, session_name: session.Session):
+    def _session_context_menu(self, session_name: str):
         sess = self.sessions[session_name]  # NB: no lock, as callback is invoked under lock by session_lister
         actions = process.get_possible_actions(sess.state, {r:sess.recordings[r].state for r in sess.recordings}, {a for a in process.Action if a!=process.Action.IMPORT}, self.study_config)
         self._draw_session_context_menu(session_name, self._filter_session_context_menu_actions(session_name, actions))
-    def _session_action_context_menu(self, item: session.Session, action: process.Action):
+    def _session_action_context_menu(self, item: session_name: str, action: process.Action):
         if process.is_session_level_action(action):
             state = item.state[action]
         else:
