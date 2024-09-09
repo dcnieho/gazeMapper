@@ -434,6 +434,7 @@ class GUI:
         if job.action==process.Action.IMPORT and state in [process.State.Canceled, process.State.Failed]:
             # remove working directory if this was an import task
             async_thread.run(callbacks.remove_recording_working_dir(self.project_dir, job.session, job.recording))
+            return
         # get final task state when completed, load from file. Need to do this because change listener may fire before task
         # completes, and its output is then overwritten in _update_jobs_and_process_pool()
         with self._sessions_lock:
