@@ -14,8 +14,7 @@ class List(typing.Generic[_ItemType]):
         selected_items: dict[int|str, bool],
         for_recordings: bool = False,
         info_callback: typing.Callable = None,
-        item_context_callback: typing.Callable = None,
-        item_action_context_callback: typing.Callable = None):
+        item_context_callback: typing.Callable = None):
 
         self.items = items
         self.selected_items = selected_items
@@ -23,7 +22,6 @@ class List(typing.Generic[_ItemType]):
 
         self.info_callback  = info_callback
         self.item_context_callback  = item_context_callback
-        self.item_action_context_callback  = item_action_context_callback
 
         self.sorted_ids: list[int|str] = []
         self._last_clicked_id: int|str = None
@@ -236,9 +234,6 @@ class List(typing.Generic[_ItemType]):
         if self.for_recordings:
             if process.is_action_possible_for_recording_type(action, item.definition.type):
                 draw_process_state(item.state[action], item.name)
-                if self.item_action_context_callback and imgui.begin_popup_context_item(f"##{item.name}_{action}_context"):
-                    self.item_action_context_callback(item, action)
-                    imgui.end_popup()
             else:
                 imgui.text('-')
                 utils.draw_hover_text(f'Not applicable to a {item.definition.type.value} recording','')
@@ -255,9 +250,9 @@ class List(typing.Generic[_ItemType]):
                     imgui.text_colored(clr, f'{n_rec-len(not_completed)}/{n_rec}')
                     if not_completed:
                         utils.draw_hover_text('not completed for recordings:\n'+'\n'.join(not_completed),'')
-                if self.item_action_context_callback and imgui.begin_popup_context_item(f"##{item.name}_{action}_context"):
-                    self.item_action_context_callback(item, action)
-                    imgui.end_popup()
+        if self.item_context_callback and imgui.begin_popup_context_item(f"##{item.name}_{action}_context"):
+            self.item_context_callback(item.name)
+            imgui.end_popup()
 
     def _show_item_info(self, iid):
         if self.info_callback:

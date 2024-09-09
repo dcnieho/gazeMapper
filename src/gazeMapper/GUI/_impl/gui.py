@@ -36,7 +36,7 @@ class GUI:
         self.sessions: dict[str, session.Session] = {}
         self._sessions_lock: threading.Lock      = threading.Lock()
         self._selected_sessions: dict[str, bool] = {}
-        self._session_lister = session_lister.List(self.sessions, self._sessions_lock, self._selected_sessions, info_callback=self._open_session_detail, item_context_callback=self._session_context_menu, item_action_context_callback=self._session_action_context_menu)
+        self._session_lister = session_lister.List(self.sessions, self._sessions_lock, self._selected_sessions, info_callback=self._open_session_detail, item_context_callback=self._session_context_menu)
 
         self._recording_listers  : dict[str, session_lister.List[session.Recording]]= {}
         self._recordings_lock    : dict[str, threading.Lock]                        = {}
@@ -993,11 +993,6 @@ class GUI:
         sess = self.sessions[session_name]  # NB: no lock, as callback is invoked under lock by session_lister
         actions = process.get_possible_actions(sess.state, {r:sess.recordings[r].state for r in sess.recordings}, {a for a in process.Action if a!=process.Action.IMPORT}, self.study_config)
         self._draw_session_context_menu(session_name, self._filter_session_context_menu_actions(session_name, actions))
-    def _session_action_context_menu(self, item: session_name: str, action: process.Action):
-        if process.is_session_level_action(action):
-            state = item.state[action]
-        else:
-            states = {r:item.recordings[r].state[action] for r in item.recordings}
     def _filter_session_context_menu_actions(self, session_name: str, actions: dict[process.Action,bool|list[str]]) -> dict[process.Action,bool|list[str]]:
         if not actions:
             return {}
