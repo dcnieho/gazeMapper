@@ -351,6 +351,7 @@ class GUI:
                     pass    # ignore, not of interest
 
     def _launch_task(self, sess: str, recording: str|None, action: process.Action):
+        # NB: this is run under lock, so sess and recording are valid
         job = utils.JobInfo(action, sess, recording)
         if action==process.Action.IMPORT:
             # NB: when adding recording, immediately do
@@ -362,7 +363,11 @@ class GUI:
             args = (recording,)
         else:
             func = process.action_to_func(action)
-            args = tuple()
+            if recording:
+                working_dir = self.sessions[sess].recordings[recording].info.working_directory
+            else:
+                working_dir = self.sessions[sess].working_directory
+            args = (working_dir,)
 
         # add to scheduler
         payload = process_pool.JobPayload(func, args, {})
