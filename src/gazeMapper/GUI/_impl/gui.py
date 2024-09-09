@@ -992,7 +992,16 @@ class GUI:
     def _session_context_menu(self, session_name: session.Session):
         sess = self.sessions[session_name]  # NB: no lock, as callback is invoked under lock by session_lister
         actions = process.get_possible_actions(sess.state, {r:sess.recordings[r].state for r in sess.recordings}, {a for a in process.Action if a!=process.Action.IMPORT}, self.study_config)
-        # filter out actions already pending or processing
+        self._draw_session_context_menu(session_name, self._filter_session_context_menu_actions(session_name, actions))
+    def _session_action_context_menu(self, item: session.Session, action: process.Action):
+        if process.is_session_level_action(action):
+            state = item.state[action]
+        else:
+            states = {r:item.recordings[r].state[action] for r in item.recordings}
+    def _filter_session_context_menu_actions(self, session_name: str, actions: dict[process.Action,bool|list[str]]) -> dict[process.Action,bool|list[str]]:
+        if not actions:
+            return {}
+
         actions_filt: dict[process.Action,bool|list[str]] = {}
         active_jobs = self._get_pending_running_job_list()
         for a in actions:
@@ -1004,24 +1013,23 @@ class GUI:
                 recs = [r for r in actions[a] if utils.JobInfo(a, session_name, r) not in active_jobs]
                 if recs:
                     actions_filt[a] = recs
+        return actions_filt
+    def _draw_session_context_menu(self, session_name: str, actions: dict[process.Action,bool|list[str]]):
         # draw menu
-        for a in actions_filt:
+        if not actions:
+            imgui.text_colored(colors.gray, '* No actions possible')
+        for a in actions:
             if process.is_session_level_action(a):
                 hover_text = f'Run {a.displayable_name} for session: {session_name}'
             else:
-                hover_text = f'Run {a.displayable_name} for recordings:\n'+'\n'.join(recs)
+                hover_text = f'Run {a.displayable_name} for recordings:\n'+'\n'.join(actions[a])
             if imgui.selectable(f"{a.displayable_name}##{session_name}", False)[0]:
                 if process.is_session_level_action(a):
                     self._launch_task(session_name, None, a)
                 else:
-                    for r in recs:
+                    for r in actions[a]:
                         self._launch_task(session_name, r, a)
             utils.draw_hover_text(hover_text, '')
-    def _session_action_context_menu(self, item: session.Session, action: process.Action):
-        if process.is_session_level_action(action):
-            state = item.state[action]
-        else:
-            states = {r:item.recordings[r].state[action] for r in item.recordings}
 
     def _open_session_detail(self, item: session.Session):
         win_name = f'{item.name}##session_view'
