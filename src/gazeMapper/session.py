@@ -33,11 +33,11 @@ class Recording:
         self.info       = info
         self.name       = self.definition.name  # for easy access and consistency with Session object
 
-        self.state: dict[process.Action, process.State] = None
+        self.state: dict[process.Action, process.State] = {}
         self.load_action_states(True)
 
     def load_action_states(self, create_if_missing: bool):
-        self.state = get_action_states(self.info.working_directory, for_recording=True, create_if_missing=create_if_missing)
+        self.state |= get_action_states(self.info.working_directory, for_recording=True, create_if_missing=create_if_missing)
 utils.register_type(utils.CustomTypeEntry(Recording,'__session.Recording__',lambda x: {'defition': x.defition, 'info': x.info}, lambda x: Recording(**x)))
 
 def read_recording_info(working_dir: pathlib.Path, rec_type: RecordingType) -> tuple[EyeTrackerRecording|camera_recording.Recording, pathlib.Path]:
@@ -108,7 +108,7 @@ class Session:
             recordings = {}
         self.recordings = recordings
 
-        self.state: dict[process.Action, process.State] = None
+        self.state: dict[process.Action, process.State] = {}
         self.load_action_states(True)
 
     def create_working_directory(self, parent_directory: str|pathlib.Path):
@@ -204,7 +204,7 @@ class Session:
     # state of processing actions on recordings in a session
     def load_action_states(self, create_if_missing: bool):
         if self.working_directory.is_dir():
-            self.state = get_action_states(self.working_directory, for_recording=False, create_if_missing=create_if_missing)
+            self.state |= get_action_states(self.working_directory, for_recording=False, create_if_missing=create_if_missing)
 
     def is_action_completed(self, action: process.Action) -> bool:
         if process.is_session_level_action(action):
