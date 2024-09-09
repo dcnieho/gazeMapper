@@ -368,10 +368,11 @@ class GUI:
             else:
                 working_dir = self.sessions[sess].working_directory
             args = (working_dir,)
+        exclusive_id = 1 if action.needs_GUI else None
 
         # add to scheduler
         payload = process_pool.JobPayload(func, args, {})
-        self.job_scheduler.add_job(job, payload, self._action_done_callback)
+        self.job_scheduler.add_job(job, payload, self._action_done_callback, exclusive_id=exclusive_id)
 
     def _update_jobs_and_process_pool(self):
         with self._sessions_lock:

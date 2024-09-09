@@ -31,6 +31,9 @@ class Action(enum.IntEnum):
     @property
     def displayable_name(self):
         return self.name.replace("_", " ").title()
+    @property
+    def needs_GUI(self):
+        return self in [Action.CODE_EPISODES, Action.SYNC_ET_TO_CAM]
     def succ(self):
         v = self.value+1
         if v > Action.MAKE_VIDEO.value:
