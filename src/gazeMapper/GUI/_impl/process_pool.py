@@ -210,7 +210,7 @@ class JobScheduler(typing.Generic[_UserDataT]):
     def update(self):
         # first count how many are scheduled to the pool and whether all tasks are still valid
         num_scheduled_to_pool = 0
-        exclusive_ids: list[int|None] = []
+        exclusive_ids: set[int] = set()
         for job_id in self.jobs:
             job = self.jobs[job_id]
             # check job still valid or should be canceled
@@ -220,20 +220,24 @@ class JobScheduler(typing.Generic[_UserDataT]):
             # check how many scheduled jobs we have
             if job.is_scheduled():
                 num_scheduled_to_pool += 1
-                exclusive_ids.append(job.exclusive_id)
+                if job.exclusive_id is not None:
+                    exclusive_ids.add(job.exclusive_id)
 
         # if we have less than max number of tasks scheduled to the pool, see if anything new to schedule to the pool
         while num_scheduled_to_pool < self._pool.num_workers:
             # find suitable next task to schedule
-            job_id = self._pending_jobs[0] if self._pending_jobs else None
-
-            if job_id is None:
+            # order tasks by priority, filtering out those who have a colliding exclusive_id
+            job_ids = [i for i in sorted(self._pending_jobs, key=lambda ii: 999 if self.jobs[ii].priority is None else self.jobs[ii].priority) if self.jobs[i].exclusive_id not in exclusive_ids]
+            if not job_ids:
                 break
+            job_id = job_ids[0]
             to_schedule = self.jobs[job_id]
 
             to_schedule._pool_job_id, to_schedule._future = \
                 self._pool.run(to_schedule.payload.fn, to_schedule.user_data, to_schedule.done_callback, *to_schedule.payload.args, **to_schedule.payload.kwargs)
             self._pending_jobs.remove(job_id)
+            if to_schedule.exclusive_id is not None:
+                exclusive_ids.add(to_schedule.exclusive_id)
             num_scheduled_to_pool += 1
 
 
