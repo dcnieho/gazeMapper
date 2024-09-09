@@ -295,9 +295,9 @@ def draw_process_state(state: process.State, iid: int|str):
             imgui.text_colored(colors.ok, ifa6.ICON_FA_CIRCLE_CHECK)
             hover_text = 'Completed'
         case process.State.Canceled:
-            imgui.text_colored(colors.warning,ifa6.ICON_FA_BAN)
+            imgui.text_colored(colors.warning, ifa6.ICON_FA_HAND)
             hover_text = 'Canceled'
         case process.State.Failed:
-            imgui.text_colored(colors.error_bright,ifa6.ICON_FA_TRIANGLE_EXCLAMATION)
+            imgui.text_colored(colors.error_bright, ifa6.ICON_FA_TRIANGLE_EXCLAMATION)
             hover_text = 'Failed'
     utils.draw_hover_text(hover_text, text='')

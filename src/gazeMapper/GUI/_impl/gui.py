@@ -714,7 +714,7 @@ class GUI:
                             session_lister.draw_process_state((job_state:=jobs[job_id].get_state()), job_id)
                             if job_state in [process.State.Pending, process.State.Running]:
                                 imgui.same_line()
-                                if imgui.button(ifa6.ICON_FA_BAN+f' Cancel##{job_id}'):
+                                if imgui.button(ifa6.ICON_FA_HAND+f' Cancel##{job_id}'):
                                     self.job_scheduler.cancel_job(job_id)
                         case 2:
                             # Session
