@@ -27,9 +27,6 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
     if rec_def.name==study_config.sync_ref_recording:
         raise RuntimeError(f'Nothing to do, auto_code_trials_episodes is defined and you have a sync_ref_recording ({study_config.sync_ref_recording}), but this recording ({rec_def.name}) is another one')
 
-    # update state
-    session.update_action_states(working_dir, process.Action.AUTO_CODE_TRIALS, process.State.Running, study_config)
-
     # get already coded interval(s), if any
     coding_file = working_dir / naming.coding_file
     if coding_file.is_file():

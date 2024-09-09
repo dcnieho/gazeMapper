@@ -21,9 +21,6 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
     if not study_config.auto_code_sync_points:
         raise ValueError(f'No automatic sync point detection is defined for this study, nothing to do')
 
-    # update state
-    session.update_action_states(working_dir, process.Action.AUTO_CODE_SYNC, process.State.Running, study_config)
-
     # get already coded interval(s), if any
     coding_file = working_dir / naming.coding_file
     if coding_file.is_file():

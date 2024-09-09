@@ -21,9 +21,6 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
     if annotation.Event.Trial not in study_config.planes_per_episode:
         raise ValueError('No planes are specified for mapping gaze to during trials, nothing to export')
 
-    # update state
-    session.update_action_states(working_dir, process.Action.EXPORT_TRIALS, process.State.Running, study_config)
-
     planes = list(study_config.planes_per_episode[annotation.Event.Trial])
 
     # get session info

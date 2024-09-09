@@ -61,9 +61,6 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
                 if r==study_config.sync_ref_recording:
                     raise ValueError(f'Recording {r} is the reference recording for sync, should not be specified in study_config.sync_average_recordings')
 
-    # update state
-    session.update_action_states(working_dir, process.Action.SYNC_TO_REFERENCE, process.State.Running, study_config)
-
     # prep for sync info
     recs = [r for r in session_info.recordings if r!=study_config.sync_ref_recording]
     sync = synchronization.get_sync_for_recs(working_dir, recs, study_config.sync_ref_recording, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings)

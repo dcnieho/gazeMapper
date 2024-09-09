@@ -63,9 +63,6 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     if not episodes:
         raise RuntimeError(f'No {annotation.Event.Sync_ET_Data.value} episodes found for this recording. Run code_episodes and code at least one {annotation.Event.Sync_ET_Data.value} episode.')
 
-    # update state
-    session.update_action_states(working_dir, process.Action.SYNC_ET_TO_CAM, process.State.Running, study_config)
-
     # Read gaze data
     gazes = gaze_headref.read_dict_from_file(working_dir / 'gazeData.tsv', episodes)[0]
     # time info

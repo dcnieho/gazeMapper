@@ -194,9 +194,6 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                 for p in plane_names:
                     all_poses[r][p] = plane.read_dict_from_file(working_dir/r/f'{naming.plane_pose_prefix}{p}.tsv')
 
-    # update state
-    session.update_action_states(working_dir, process.Action.MAKE_VIDEO, process.State.Running, study_config)
-
     # build pose estimator
     for rec in recs:
         if rec not in study_config.video_make_which and not (study_config.video_process_planes_for_all_frames or study_config.video_process_individual_markers_for_all_frames):
@@ -288,6 +285,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
             # scene video
             out_opts = {'pix_fmt_in':'bgr24', 'pix_fmt_out':pix_fmt, 'width_in':vid_info[v][0], 'height_in':vid_info[v][1], 'frame_rate':fpsFrac}
             vid_writer[v] = MediaWriter(str(working_dir / v / naming.process_video), [out_opts], overwrite=True)
+
+        # update state: set to not run so that if we crash or cancel below the task is correctly marked as not run (video files are corrupt)
+        session.update_action_states(working_dir, process.Action.MAKE_VIDEO, process.State.Not_Run, study_config)
 
         # now make the video
         def n_digit(value):

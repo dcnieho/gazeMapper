@@ -25,9 +25,6 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
     if rec_def.type!=session.RecordingType.Eye_Tracker:
         raise ValueError(f'You can only run run_validation on eye tracker recordings, not on a {str(rec_def.type).split(".")[1]} recording')
 
-    # update state
-    session.update_action_states(working_dir, process.Action.RUN_VALIDATION, process.State.Running, study_config)
-
     # get interval(s) coded to be analyzed, if any
     episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / 'coding.tsv'))[annotation.Event.Validate]
 
