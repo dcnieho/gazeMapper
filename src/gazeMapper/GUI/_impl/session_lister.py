@@ -91,12 +91,6 @@ class List(typing.Generic[_ItemType]):
                 if sorted_ids_len != len(self.items):
                     self._require_sort = True
                 self._sort_items(sort_specs)
-                if len(self.sorted_ids) < sorted_ids_len:
-                    # we've just filtered out some items from view. Deselect those
-                    # NB: will also be triggered when removing an item, doesn't matter
-                    for iid in self.items:
-                        if iid not in self.sorted_ids:
-                            self.selected_items[iid] = False
 
                 # Headers
                 imgui.table_angled_headers_row()
