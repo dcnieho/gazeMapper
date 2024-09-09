@@ -52,9 +52,8 @@ class GUI:
         self.config_watcher: concurrent.futures.Future  = None
         self.config_watcher_stop_event: asyncio.Event   = None
 
-        self.process_pool                                           = process_pool.ProcessPool(self._worker_process_done_hook)
-        self.job_list: dict[utils.JobHandle, utils.JobDescription]  = {}
-        self._job_list_lock: threading.Lock                         = threading.Lock()
+        self.process_pool                                           = process_pool.ProcessPool()
+        self.job_scheduler                                          = process_pool.JobScheduler[utils.JobInfo](self.process_pool)
 
         self._window_list: list[hello_imgui.DockableWindow] = []
         self._to_dock         = []
@@ -247,9 +246,7 @@ class GUI:
         # this is always called, so we handle popups and other state here
         self._check_project_setups_state()
         utils.handle_popup_stack(self.popup_stack)
-        self._update_job_states()
-        # if there are no jobs left, clean up process pool
-        self.process_pool.cleanup_if_no_jobs()
+        self._update_jobs_and_process_pool()
         # also handle showing of debug windows
         if self._show_demo_window:
             self._show_demo_window = imgui.show_demo_window(self._show_demo_window)
@@ -281,7 +278,6 @@ class GUI:
         # NB watcher filter is configured such that all adds and deletes are folder and all modifies are files of interest
         if change_type=='modified':
             # file: deal with status changes
-            need_state_sync = None
             change_path = change_path.relative_to(self.project_dir)
             match len(change_path.parents):
                 case 2:
@@ -292,7 +288,7 @@ class GUI:
                             # some other folder apparently
                             return
                         self.sessions[sess].load_action_states(False)
-                        need_state_sync = (sess,)
+                        # NB: reapplying pending and running state (not stored in file) is done on next frame as part of _update_jobs_and_process_pool()
                 case 3:
                     # recording-level states
                     sess = change_path.parent.parent.name
@@ -305,23 +301,9 @@ class GUI:
                             # some other folder apparently
                             return
                         self.sessions[sess].recordings[rec].load_action_states(False)
-                        need_state_sync = (sess, rec)
+                        # NB: reapplying pending and running state (not stored in file) is done on next frame as part of _update_jobs_and_process_pool()
                 case _:
                     pass    # ignore, not of interest
-            # reapply pending and running state if needed
-            if need_state_sync:
-                with self._sessions_lock:
-                    sess = need_state_sync[0]
-                    rec = need_state_sync[1] if len(need_state_sync)>1 else None
-                    if sess not in self.sessions:
-                        return
-                    if rec and rec not in self.sessions[sess].recordings:
-                        return
-                    with self._job_list_lock:
-                        for job in self.job_list:
-                            # reset pending and processing states as those are not encoded in the file
-                            if job.session==sess and (not rec or job.recording==rec):
-                                self._update_job_states_impl(job)
         else:
             # folder
             change_path = change_path.relative_to(self.project_dir)
@@ -365,7 +347,7 @@ class GUI:
                     pass    # ignore, not of interest
 
     def _launch_task(self, sess: str, recording: str|None, action: process.Action):
-        job = utils.JobHandle(action, sess, recording)
+        job = utils.JobInfo(action, sess, recording)
         if action==process.Action.IMPORT:
             # NB: when adding recording, immediately do
             # rec_info = glassesTools.importing.get_recording_info(bla, bla)
@@ -378,71 +360,60 @@ class GUI:
             func = process.action_to_func(action)
             args = tuple()
 
-        # launch task
-        job_id = self.process_pool.run(func, job, *args)
+        # add to scheduler
+        payload = process_pool.JobPayload(func, args, {})
+        self.job_scheduler.add_job(job, payload, self._action_done_callback)
 
-        # store to job queue
-        with self._job_list_lock:
-            self.job_list[job] = utils.JobDescription(job_id, action, sess, recording)
-
-    def _worker_process_done_hook(self, future: process_pool.ProcessFuture, job_id: int, job: utils.JobDescription, state: process.State):
+    def _update_jobs_and_process_pool(self):
         with self._sessions_lock:
-            # remove from active job list
-            with self._job_list_lock:
-                self.job_list.pop(utils.JobHandle(job.action, job.session, job.recording), None)
+            # tick job scheduler (under lock as checking job validity needs session lock)
+            self.job_scheduler.update()
 
-            # check there is a corresponding session (and recording)
-            if job.session not in self.sessions:
-                # unknown session, nothing to do
+            # set pending and running states since these are not stored in the states file
+            with self.job_scheduler.jobs_lock:
+                for job_id in self.job_scheduler.jobs:
+                    job_state = self.job_scheduler.jobs[job_id].get_state()
+                    if job_state in [process.State.Pending, process.State.Running]:
+                        self._update_job_states_impl(self.job_scheduler.jobs[job_id].user_data, job_state)
+
+        # if there are no jobs left, clean up process pool
+        self.process_pool.cleanup_if_no_jobs()
+
+    def _update_job_states_impl(self, job: utils.JobInfo, job_state: process.State):
+        # NB: self._sessions_lock should be acquired, and check should have been
+        # performed that job.session and job.recording exist
+        if job.recording:
+            self.sessions[job.session].recordings[job.recording].state[job.action] = job_state
+        else:
+            self.sessions[job.session].state[job.action] = job_state
+
+    def _action_done_callback(self, future: process_pool.ProcessFuture, job_id: int, job: utils.JobInfo, state: process.State):
+        # if process failed, notify error
+        session_level = job.recording is None
+        if state==process.State.Failed:
+            exc = future.exception()    # should not throw exception since CancelledError is already encoded in state and future is done
+            tb = utils.get_traceback(type(exc), exc, exc.__traceback__)
+            lbl = f'session "{job.session}"'
+            if not session_level:
+                lbl += f', recording "{job.recording}"'
+            lbl += f' (work item {job_id}, action {job.action.displayable_name})'
+            if isinstance(exc, concurrent.futures.TimeoutError):
+                utils.push_popup(self, msg_box.msgbox, "Processing error", f"A worker process has failed for {lbl}:\n{type(exc).__name__}: {str(exc) or 'No further details'}\n\nPossible causes include:\n - You are running with too many workers, try lowering them in settings", msg_box.MsgBox.warn, more=tb)
                 return
-            session_level = job.recording is None
-            if not session_level and not job.recording in self.sessions[job.session].recordings:
-                # unknown recording, nothing to do
-                return
+            utils.push_popup(self, msg_box.msgbox, "Processing error", f"Something went wrong in a worker process for {lbl}:\n\n{tb}", msg_box.MsgBox.error)
 
-            match state:
-                case process.State.Canceled:
-                    # just remove job, so no-op here
-                    pass
-                case process.State.Completed:
-                    # nothing to do, recording state updates are done by file system watcher
-                    pass
-                case process.State.Failed:
-                    exc = future.exception()    # should not throw exception since CancelledError is already encoded in state and future is done
-                    tb = utils.get_traceback(type(exc), exc, exc.__traceback__)
-                    lbl = f'session "{job.session}"'
-                    if not session_level:
-                        lbl += f', recording "{job.recording}"'
-                    lbl += f' (work item {job_id}, action {job.action.displayable_name})'
-                    if isinstance(exc, concurrent.futures.TimeoutError):
-                        utils.push_popup(self, msg_box.msgbox, "Processing error", f"A worker process has failed for {lbl}:\n{type(exc).__name__}: {str(exc) or 'No further details'}\n\nPossible causes include:\n - You are running with too many workers, try lowering them in settings", msg_box.MsgBox.warn, more=tb)
-                        return
-                    utils.push_popup(self, msg_box.msgbox, "Processing error", f"Something went wrong in a worker process for {lbl}:\n\n{tb}", msg_box.MsgBox.error)
-
-            # clean up when a task failed or was canceled
-            if state in [process.State.Canceled, process.State.Failed]:
-                if job.action==process.Action.IMPORT:
-                    # remove working directory if this was an import task
-                    async_thread.run(callbacks.remove_recording_working_dir(self.project_dir, job.session, job.recording))
-
-    def _update_job_states(self):
-        with self._sessions_lock:
-            with self._job_list_lock:
-                for job in self.job_list:
-                    if job.session not in self.sessions:
-                        continue
-                    if job.recording and job.recording not in self.sessions[job.session].recordings:
-                        continue
-                    self._update_job_states_impl(job)
-    def _update_job_states_impl(self, job: utils.JobHandle):
-        # NB: self._sessions_lock and self._job_list_lock should be acquired, and
-        # check should have been performed that job.session and job.recording exist
-        job_state = self.process_pool.get_job_state(self.job_list[job].job_id)
-        if job_state in [process.State.Pending, process.State.Running]:
-            if job.recording:
-                self.sessions[job.session].recordings[job.recording].state[job.action] = job_state
-            else:
-                self.sessions[job.session].state[job.action] = job_state
+        # clean up, if needed, when a task failed or was canceled
+        if job.action==process.Action.IMPORT and state in [process.State.Canceled, process.State.Failed]:
+            # remove working directory if this was an import task
+            async_thread.run(callbacks.remove_recording_working_dir(self.project_dir, job.session, job.recording))
+        else:
+            # reset status (in GUI) of this aborted/failed task
+            with self._sessions_lock:
+                if job.session not in self.sessions:
+                    return
+                if job.recording and job.recording not in self.sessions[job.session].recordings:
+                    return
+                self._update_job_states_impl(job, process.State.Not_Run)
 
     def load_project(self, path: pathlib.Path):
         self.project_dir = path
@@ -921,18 +892,27 @@ class GUI:
             }
             utils.push_popup(self, lambda: utils.popup("Add marker", _add_rec_popup, buttons = buttons, outside=False))
 
+    def _get_pending_running_job_list(self) -> set[utils.JobInfo]:
+        active_jobs: set[utils.JobInfo] = set()
+        with self.job_scheduler.jobs_lock:
+            for job_id in self.job_scheduler.jobs:
+                if self.job_scheduler.jobs[job_id].get_state() in [process.State.Pending, process.State.Running]:
+                    active_jobs.add(self.job_scheduler.jobs[job_id].user_data)
+        return active_jobs
+
     def _session_context_menu(self, session_name: session.Session):
         sess = self.sessions[session_name]  # NB: no lock, as callback is invoked under lock by session_lister
         actions = process.get_possible_actions(sess.state, {r:sess.recordings[r].state for r in sess.recordings}, {a for a in process.Action if a!=process.Action.IMPORT}, self.study_config)
         # filter out actions already pending or processing
         actions_filt: dict[process.Action,bool|list[str]] = {}
+        active_jobs = self._get_pending_running_job_list()
         for a in actions:
             if process.is_session_level_action(a):
-                if utils.JobHandle(a, session_name) not in self.job_list:
+                if utils.JobInfo(a, session_name) not in active_jobs:
                     actions_filt[a] = actions[a]
             else:
                 # check each recording
-                recs = [r for r in actions[a] if utils.JobHandle(a, session_name, r) not in self.job_list]
+                recs = [r for r in actions[a] if utils.JobInfo(a, session_name, r) not in active_jobs]
                 if recs:
                     actions_filt[a] = recs
         # draw menu

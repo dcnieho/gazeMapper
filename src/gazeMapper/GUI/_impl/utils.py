@@ -275,15 +275,7 @@ def get_aruco_marker_image(sz: int, id:int, dictionary_id: int, marker_border_bi
     return image_helper.ImageHelper(marker_image)
 
 
-class JobHandle(typing.NamedTuple):
-    action:             process.Action
-    session:            str
-    recording:          typing.Optional[str] = None
-
-@dataclasses.dataclass
-class JobDescription:
-    job_id:             int
-    action:             process.Action
-    session:            str
-    recording:          str|None
-    next_actions:       list[process.Action]|None = None
+class JobInfo(typing.NamedTuple):
+    action:     process.Action
+    session:    str
+    recording:  typing.Optional[str] = None
