@@ -128,7 +128,6 @@ class ProcessPool:
             return job.user_data
 
     def cancel_job(self, job_id: int) -> bool:
-        # TODO: locking
         if not self._jobs:
             return False
         if (job := self._jobs.get(job_id, None)) is None:
@@ -136,7 +135,6 @@ class ProcessPool:
         return job.future.cancel()
 
     def cancel_all_jobs(self):
-        # TODO: locking
         if not self._jobs:
             return
         for job_id in reversed(self._jobs): # reversed so that later pending jobs don't start executing when earlier gets cancelled, only to be canceled directly after
@@ -173,6 +171,7 @@ class JobDescription(typing.Generic[_UserDataT]):
                 self._final_state = job_state
                 # can also dump the future
                 self._future = None
+            return job_state
         return process.State.Pending
 
     def is_scheduled(self):
@@ -182,28 +181,24 @@ class JobDescription(typing.Generic[_UserDataT]):
 class JobScheduler(typing.Generic[_UserDataT]):
     def __init__(self, pool: ProcessPool, job_valid_checker : typing.Callable[[_UserDataT], bool]|None = None):
         self.jobs               : dict[int, JobDescription[_UserDataT]] = {}
-        self.jobs_lock          : threading.Lock                        = threading.Lock()
         self._job_id_provider   : CounterContext                        = CounterContext()
         self._pending_jobs      : list[int]                             = []    # jobs not scheduled or finished
 
         self._job_valid_checker         = job_valid_checker
-
         self._pool                      = pool
 
     def add_job(self,
                 user_data: _UserDataT, payload: JobPayload, done_callback: typing.Callable[[ProcessFuture, _UserDataT, int, process.State], None],
                 exclusive_id: typing.Optional[int] = None, priority: int = None, depends_on: typing.Optional[set[int]] = None) -> int:
-        with self.jobs_lock:
-            with self._job_id_provider:
-                job_id = self._job_id_provider.get_count()
-            self.jobs[job_id] = JobDescription(user_data, payload, done_callback, exclusive_id, priority, depends_on)
-            self._pending_jobs.append(job_id)
+        with self._job_id_provider:
+            job_id = self._job_id_provider.get_count()
+        self.jobs[job_id] = JobDescription(user_data, payload, done_callback, exclusive_id, priority, depends_on)
+        self._pending_jobs.append(job_id)
         return job_id
 
     def cancel_job(self, job_id: int):
         if job_id in self.jobs:
-            with self.jobs_lock:
-                self._cancel_job_impl(job_id)
+            self._cancel_job_impl(job_id)
 
     def _cancel_job_impl(self, job_id: int):
         if self.jobs[job_id]._pool_job_id is not None:
@@ -213,35 +208,34 @@ class JobScheduler(typing.Generic[_UserDataT]):
         # TODO: also cancel all jobs that depend on this job
 
     def update(self):
-        with self.jobs_lock:
-            # first count how many are scheduled to the pool and whether all tasks are still valid
-            num_scheduled_to_pool = 0
-            exclusive_ids: list[int|None] = []
-            for job_id in self.jobs:
-                job = self.jobs[job_id]
-                # check job still valid or should be canceled
-                if self._job_valid_checker is not None:
-                    valid = self._job_valid_checker(job.user_data)
-                    if not valid:
-                        self._cancel_job_impl(job_id)
-                # check how many scheduled jobs we have
-                if job.is_scheduled():
-                    num_scheduled_to_pool += 1
-                    exclusive_ids.append(job.exclusive_id)
+        # first count how many are scheduled to the pool and whether all tasks are still valid
+        num_scheduled_to_pool = 0
+        exclusive_ids: list[int|None] = []
+        for job_id in self.jobs:
+            job = self.jobs[job_id]
+            # check job still valid or should be canceled
+            if self._job_valid_checker is not None:
+                valid = self._job_valid_checker(job.user_data)
+                if not valid:
+                    self._cancel_job_impl(job_id)
+            # check how many scheduled jobs we have
+            if job.is_scheduled():
+                num_scheduled_to_pool += 1
+                exclusive_ids.append(job.exclusive_id)
 
-            # if we have less than max number of tasks scheduled to the pool, see if anything new to schedule to the pool
-            to_schedule: JobDescription|None = None
-            job_id: int|None = None
-            if num_scheduled_to_pool < self._pool.num_workers:
-                # find suitable next task to schedule
-                job_id = self._pending_jobs[0] if self._pending_jobs else None
-                if job_id is not None:
-                    to_schedule = self.jobs[job_id]
+        # if we have less than max number of tasks scheduled to the pool, see if anything new to schedule to the pool
+        while num_scheduled_to_pool < self._pool.num_workers:
+            # find suitable next task to schedule
+            job_id = self._pending_jobs[0] if self._pending_jobs else None
 
-            if to_schedule is not None:
-                to_schedule._pool_job_id, to_schedule._future = \
-                    self._pool.run(to_schedule.payload.fn, to_schedule.user_data, to_schedule.done_callback, *to_schedule.payload.args, **to_schedule.payload.kwargs)
-                self._pending_jobs.remove(job_id)
+            if job_id is None:
+                break
+            to_schedule = self.jobs[job_id]
+
+            to_schedule._pool_job_id, to_schedule._future = \
+                self._pool.run(to_schedule.payload.fn, to_schedule.user_data, to_schedule.done_callback, *to_schedule.payload.args, **to_schedule.payload.kwargs)
+            self._pending_jobs.remove(job_id)
+            num_scheduled_to_pool += 1
 
 
 def _get_status_from_future(fut: ProcessFuture) -> process.State:

@@ -370,11 +370,10 @@ class GUI:
             self.job_scheduler.update()
 
             # set pending and running states since these are not stored in the states file
-            with self.job_scheduler.jobs_lock:
-                for job_id in self.job_scheduler.jobs:
-                    job_state = self.job_scheduler.jobs[job_id].get_state()
-                    if job_state in [process.State.Pending, process.State.Running]:
-                        self._update_job_states_impl(self.job_scheduler.jobs[job_id].user_data, job_state)
+            for job_id in self.job_scheduler.jobs:
+                job_state = self.job_scheduler.jobs[job_id].get_state()
+                if job_state in [process.State.Pending, process.State.Running]:
+                    self._update_job_states_impl(self.job_scheduler.jobs[job_id].user_data, job_state)
 
         # if there are no jobs left, clean up process pool
         self.process_pool.cleanup_if_no_jobs()
@@ -894,10 +893,9 @@ class GUI:
 
     def _get_pending_running_job_list(self) -> set[utils.JobInfo]:
         active_jobs: set[utils.JobInfo] = set()
-        with self.job_scheduler.jobs_lock:
-            for job_id in self.job_scheduler.jobs:
-                if self.job_scheduler.jobs[job_id].get_state() in [process.State.Pending, process.State.Running]:
-                    active_jobs.add(self.job_scheduler.jobs[job_id].user_data)
+        for job_id in self.job_scheduler.jobs:
+            if self.job_scheduler.jobs[job_id].get_state() in [process.State.Pending, process.State.Running]:
+                active_jobs.add(self.job_scheduler.jobs[job_id].user_data)
         return active_jobs
 
     def _session_context_menu(self, session_name: session.Session):
