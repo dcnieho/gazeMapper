@@ -1006,12 +1006,17 @@ class GUI:
                     actions_filt[a] = recs
         # draw menu
         for a in actions_filt:
+            if process.is_session_level_action(a):
+                hover_text = f'Run {a.displayable_name} for session: {session_name}'
+            else:
+                hover_text = f'Run {a.displayable_name} for recordings:\n'+'\n'.join(recs)
             if imgui.selectable(f"{a.displayable_name}##{session_name}", False)[0]:
                 if process.is_session_level_action(a):
                     self._launch_task(session_name, None, a)
                 else:
                     for r in recs:
                         self._launch_task(session_name, r, a)
+            utils.draw_hover_text(hover_text, '')
     def _session_action_context_menu(self, item: session.Session, action: process.Action):
         if process.is_session_level_action(action):
             state = item.state[action]
