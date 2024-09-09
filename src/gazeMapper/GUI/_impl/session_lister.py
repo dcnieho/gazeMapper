@@ -87,8 +87,7 @@ class List(typing.Generic[_ItemType]):
             # Sorting
             with self.items_lock:
                 sort_specs = imgui.table_get_sort_specs()
-                sorted_ids_len = len(self.sorted_ids)
-                if sorted_ids_len != len(self.items):
+                if set(self.sorted_ids) != set(self.selected_items.keys()):
                     self._require_sort = True
                 self._sort_items(sort_specs)
 
