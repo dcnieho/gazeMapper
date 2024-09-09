@@ -181,8 +181,9 @@ class SessionList():
                             case 1:
                                 # Name
                                 if self.info_callback:
-                                    if imgui.button(f"{ifa6.ICON_FA_GEAR}##{iid}_info"):
+                                    if imgui.button(f"{ifa6.ICON_FA_CIRCLE_INFO}##{iid}_info"):
                                         self._show_item_info(iid)
+                                    utils.draw_hover_text('More info about this session, and access session-specific configuration', '')
                                     config_button_hovered = imgui.is_item_hovered()
                                     imgui.same_line()
                                 imgui.text(item.name)
