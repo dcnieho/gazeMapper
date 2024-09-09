@@ -1,19 +1,21 @@
 import threading
 from imgui_bundle import imgui, icons_fontawesome_6 as ifa6, imspinner
-from typing import Callable
+import typing
 
 from . import colors, utils
 from ... import process, session
 
-class SessionList():
+_ItemType = typing.TypeVar('_ItemType', session.Session, session.Recording)
+
+class List(typing.Generic[_ItemType]):
     def __init__(self,
-                 items: dict[int|str, session.Session|session.Recording],
+                 items: dict[int|str, _ItemType],
             items_lock: threading.Lock,
         selected_items: dict[int|str, bool],
         for_recordings: bool = False,
-        info_callback: Callable = None,
-        item_context_callback: Callable = None,
-        item_action_context_callback: Callable = None):
+        info_callback: typing.Callable = None,
+        item_context_callback: typing.Callable = None,
+        item_action_context_callback: typing.Callable = None):
 
         self.items = items
         self.selected_items = selected_items
@@ -230,10 +232,10 @@ class SessionList():
             # show menu when right-clicking the empty space
             # TODO
 
-    def _draw_status_widget(self, item: session.Session|session.Recording, action: process.Action):
+    def _draw_status_widget(self, item: _ItemType, action: process.Action):
         if self.for_recordings:
             if process.is_action_possible_for_recording_type(action, item.definition.type):
-                _draw_process_state(item.state[action], item.name)
+                draw_process_state(item.state[action], item.name)
                 if self.item_action_context_callback and imgui.begin_popup_context_item(f"##{item.name}_{action}_context"):
                     self.item_action_context_callback(item, action)
                     imgui.end_popup()
@@ -245,7 +247,7 @@ class SessionList():
                 imgui.text_colored(colors.error, '-')
             else:
                 if process.is_session_level_action(action):
-                    _draw_process_state(item.state[action], item.name)
+                    draw_process_state(item.state[action], item.name)
                 else:
                     not_completed = item.action_not_completed_recordings(action)
                     n_rec = len(item.definition.recordings)
@@ -285,7 +287,7 @@ class SessionList():
             sort_specs_in.specs_dirty = False
             self._require_sort = False
 
-def _draw_process_state(state: process.State, iid: int|str):
+def draw_process_state(state: process.State, iid: int|str):
     symbol_size = imgui.calc_text_size(ifa6.ICON_FA_CIRCLE)
     match state:
         case process.State.Not_Run:
@@ -304,4 +306,10 @@ def _draw_process_state(state: process.State, iid: int|str):
         case process.State.Completed:
             imgui.text_colored(colors.ok, ifa6.ICON_FA_CIRCLE_CHECK)
             hover_text = 'Completed'
+        case process.State.Canceled:
+            imgui.text_colored(colors.warning,ifa6.ICON_FA_BAN)
+            hover_text = 'Canceled'
+        case process.State.Failed:
+            imgui.text_colored(colors.error_bright,ifa6.ICON_FA_TRIANGLE_EXCLAMATION)
+            hover_text = 'Failed'
     utils.draw_hover_text(hover_text, text='')

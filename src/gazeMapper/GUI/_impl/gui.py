@@ -36,11 +36,11 @@ class GUI:
         self.sessions: dict[str, session.Session] = {}
         self._sessions_lock: threading.Lock      = threading.Lock()
         self._selected_sessions: dict[str, bool] = {}
-        self._session_lister = session_lister.SessionList(self.sessions, self._sessions_lock, self._selected_sessions, info_callback=self._open_session_detail, item_context_callback=self._session_context_menu, item_action_context_callback=self._session_action_context_menu)
+        self._session_lister = session_lister.List(self.sessions, self._sessions_lock, self._selected_sessions, info_callback=self._open_session_detail, item_context_callback=self._session_context_menu, item_action_context_callback=self._session_action_context_menu)
 
-        self._recording_listers  : dict[str, session_lister.SessionList] = {}
-        self._recordings_lock    : dict[str, threading.Lock]             = {}
-        self._selected_recordings: dict[str, dict[str, bool]]            = {}
+        self._recording_listers  : dict[str, session_lister.List[session.Recording]]= {}
+        self._recordings_lock    : dict[str, threading.Lock]                        = {}
+        self._selected_recordings: dict[str, dict[str, bool]]                       = {}
 
         self._possible_value_getters: dict[str] = {}
 
@@ -484,7 +484,7 @@ class GUI:
             not self.need_setup_plane and \
             not self.need_setup_episode
 
-    def _session_lister_set_actions_to_show(self, lister: session_lister.SessionList, for_recordings=False):
+    def _session_lister_set_actions_to_show(self, lister: session_lister.List[session.Session|session.Recording], for_recordings=False):
         if self.study_config is None:
             lister.set_actions_to_show(set())
 
@@ -1023,7 +1023,7 @@ class GUI:
             self._to_focus= win_name
             self._recordings_lock[item.name] = threading.Lock()
             self._selected_recordings[item.name] = {k:False for k in item.recordings}
-            self._recording_listers[item.name] = session_lister.SessionList(item.recordings, self._recordings_lock[item.name], self._selected_recordings[item.name], for_recordings=True)
+            self._recording_listers[item.name] = session_lister.List(item.recordings, self._recordings_lock[item.name], self._selected_recordings[item.name], for_recordings=True)
             self._session_lister_set_actions_to_show(self._recording_listers[item.name], for_recordings=True)
 
     def _session_detail_GUI(self, item: session.Session):
