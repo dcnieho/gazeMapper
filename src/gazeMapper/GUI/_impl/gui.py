@@ -53,7 +53,7 @@ class GUI:
         self.config_watcher_stop_event: asyncio.Event   = None
 
         self.process_pool                                           = process_pool.ProcessPool()
-        self.job_scheduler                                          = process_pool.JobScheduler[utils.JobInfo](self.process_pool)
+        self.job_scheduler                                          = process_pool.JobScheduler[utils.JobInfo](self.process_pool, self._check_job_valid)
 
         self._window_list: list[hello_imgui.DockableWindow] = []
         self._to_dock         = []
@@ -380,6 +380,15 @@ class GUI:
 
         # if there are no jobs left, clean up process pool
         self.process_pool.cleanup_if_no_jobs()
+
+    def _check_job_valid(self, job: utils.JobInfo) -> bool:
+        # NB: triggered for each job by _update_jobs_and_process_pool() above
+        # _update_jobs_and_process_pool() already holds the lock, so not needed here
+        if job.session not in self.sessions:
+            return False
+        if job.recording and job.recording not in self.sessions[job.session].recordings:
+            return False
+        return True
 
     def _update_job_states_impl(self, job: utils.JobInfo, job_state: process.State):
         # NB: self._sessions_lock should be acquired, and check should have been

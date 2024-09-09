@@ -179,13 +179,13 @@ class JobDescription(typing.Generic[_UserDataT]):
         return self._pool_job_id is not None and self.get_state() in [process.State.Pending, process.State.Running]
 
 class JobScheduler(typing.Generic[_UserDataT]):
-    def __init__(self, pool: ProcessPool, job_valid_checker : typing.Callable[[_UserDataT], bool]|None = None):
+    def __init__(self, pool: ProcessPool, job_is_valid_checker : typing.Callable[[_UserDataT], bool]|None = None):
         self.jobs               : dict[int, JobDescription[_UserDataT]] = {}
         self._job_id_provider   : CounterContext                        = CounterContext()
         self._pending_jobs      : list[int]                             = []    # jobs not scheduled or finished
 
-        self._job_valid_checker         = job_valid_checker
-        self._pool                      = pool
+        self._job_is_valid_checker  = job_is_valid_checker
+        self._pool                  = pool
 
     def add_job(self,
                 user_data: _UserDataT, payload: JobPayload, done_callback: typing.Callable[[ProcessFuture, _UserDataT, int, process.State], None],
@@ -214,9 +214,8 @@ class JobScheduler(typing.Generic[_UserDataT]):
         for job_id in self.jobs:
             job = self.jobs[job_id]
             # check job still valid or should be canceled
-            if self._job_valid_checker is not None:
-                valid = self._job_valid_checker(job.user_data)
-                if not valid:
+            if self._job_is_valid_checker is not None:
+                if not self._job_is_valid_checker(job.user_data):
                     self._cancel_job_impl(job_id)
             # check how many scheduled jobs we have
             if job.is_scheduled():
