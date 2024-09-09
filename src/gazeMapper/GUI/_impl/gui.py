@@ -434,14 +434,15 @@ class GUI:
         if job.action==process.Action.IMPORT and state in [process.State.Canceled, process.State.Failed]:
             # remove working directory if this was an import task
             async_thread.run(callbacks.remove_recording_working_dir(self.project_dir, job.session, job.recording))
-        else:
+        # update task state when completed
+        if state in [process.State.Canceled, process.State.Failed, process.State.Completed]:
             # reset status (in GUI) of this aborted/failed task
             with self._sessions_lock:
                 if job.session not in self.sessions:
                     return
                 if job.recording and job.recording not in self.sessions[job.session].recordings:
                     return
-                self._update_job_states_impl(job, process.State.Not_Run)
+                self._update_job_states_impl(job, process.State.Completed if state==process.State.Completed else process.State.Not_Run)
 
     def load_project(self, path: pathlib.Path):
         self.project_dir = path
