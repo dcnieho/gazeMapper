@@ -8,6 +8,7 @@ import webbrowser
 from typing import Callable
 import copy
 import threading
+import time
 
 import glassesTools.annotation
 import imgui_bundle
@@ -281,6 +282,17 @@ class GUI:
         # NB watcher filter is configured such that all adds and deletes are folder and all modifies are files of interest
         if change_type=='modified':
             # file: deal with status changes
+            def status_file_reloader(loader: Callable[[bool], None]):
+                n_try=0
+                while n_try<3:
+                    try:
+                        n_try+=1
+                        loader(False)
+                    except:
+                        time.sleep(.1)  # file possibly not fully written yet
+                    else:
+                        break
+                # NB: reapplying pending and running state (not stored in file) is done on next frame as part of _update_jobs_and_process_pool()
             change_path = change_path.relative_to(self.project_dir)
             match len(change_path.parents):
                 case 2:
@@ -290,8 +302,7 @@ class GUI:
                         if sess not in self.sessions:
                             # some other folder apparently
                             return
-                        self.sessions[sess].load_action_states(False)
-                        # NB: reapplying pending and running state (not stored in file) is done on next frame as part of _update_jobs_and_process_pool()
+                        status_file_reloader(self.sessions[sess].load_action_states)
                 case 3:
                     # recording-level states
                     sess = change_path.parent.parent.name
@@ -303,8 +314,7 @@ class GUI:
                         if rec not in self.sessions[sess].recordings:
                             # some other folder apparently
                             return
-                        self.sessions[sess].recordings[rec].load_action_states(False)
-                        # NB: reapplying pending and running state (not stored in file) is done on next frame as part of _update_jobs_and_process_pool()
+                        status_file_reloader(self.sessions[sess].recordings[rec].load_action_states)
                 case _:
                     pass    # ignore, not of interest
         else:
