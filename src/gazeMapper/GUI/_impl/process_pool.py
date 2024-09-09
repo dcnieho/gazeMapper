@@ -204,6 +204,8 @@ class JobScheduler(typing.Generic[_UserDataT]):
             self._pool.cancel_job(self.jobs[job_id]._pool_job_id)
         else:
             self.jobs[job_id]._final_state = process.State.Canceled
+            if self.jobs[job_id].done_callback:
+                self.jobs[job_id].done_callback(None, None, self.jobs[job_id].user_data, process.State.Canceled)
         # TODO: also cancel all jobs that depend on this job
 
     def update(self):
