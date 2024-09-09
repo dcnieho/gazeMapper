@@ -990,9 +990,13 @@ class GUI:
         return active_jobs
 
     def _session_context_menu(self, session_name: str):
-        sess = self.sessions[session_name]  # NB: no lock, as callback is invoked under lock by session_lister
+        sess = self.sessions[session_name]
         actions = process.get_possible_actions(sess.state, {r:sess.recordings[r].state for r in sess.recordings}, {a for a in process.Action if a!=process.Action.IMPORT}, self.study_config)
         self._draw_session_context_menu(session_name, self._filter_session_context_menu_actions(session_name, actions))
+    def _recording_context_menu(self, session_name: str, rec_name: str):
+        sess = self.sessions[session_name]
+        actions = process.get_possible_actions(sess.state, {rec_name:sess.recordings[rec_name].state}, {a for a in process.Action if a!=process.Action.IMPORT and not process.is_session_level_action(a)}, self.study_config)
+        self._draw_session_context_menu(session_name, actions)
     def _filter_session_context_menu_actions(self, session_name: str, actions: dict[process.Action,bool|list[str]]) -> dict[process.Action,bool|list[str]]:
         if not actions:
             return {}
@@ -1026,22 +1030,22 @@ class GUI:
                         self._launch_task(session_name, r, a)
             utils.draw_hover_text(hover_text, '')
 
-    def _open_session_detail(self, item: session.Session):
-        win_name = f'{item.name}##session_view'
+    def _open_session_detail(self, sess: session.Session):
+        win_name = f'{sess.name}##session_view'
         if win := hello_imgui.get_runner_params().docking_params.dockable_window_of_name(win_name):
             win.focus_window_at_next_frame = True
         else:
             window_list = hello_imgui.get_runner_params().docking_params.dockable_windows
             window_list.append(
-                self._make_main_space_window(win_name, lambda: self._session_detail_GUI(item), can_be_closed=True)
+                self._make_main_space_window(win_name, lambda: self._session_detail_GUI(sess), can_be_closed=True)
             )
             self._window_list = window_list
             self._to_dock = [win_name]
             self._to_focus= win_name
-            self._recordings_lock[item.name] = threading.Lock()
-            self._selected_recordings[item.name] = {k:False for k in item.recordings}
-            self._recording_listers[item.name] = session_lister.List(item.recordings, self._recordings_lock[item.name], self._selected_recordings[item.name], for_recordings=True)
-            self._session_lister_set_actions_to_show(self._recording_listers[item.name], for_recordings=True)
+            self._recordings_lock[sess.name] = threading.Lock()
+            self._selected_recordings[sess.name] = {k:False for k in sess.recordings}
+            self._recording_listers[sess.name] = session_lister.List(sess.recordings, self._recordings_lock[sess.name], self._selected_recordings[sess.name], for_recordings=True, item_context_callback=lambda rec_name: self._recording_context_menu(sess.name, rec_name))
+            self._session_lister_set_actions_to_show(self._recording_listers[sess.name], for_recordings=True)
 
     def _session_detail_GUI(self, item: session.Session):
         missing_recs = item.missing_recordings()
