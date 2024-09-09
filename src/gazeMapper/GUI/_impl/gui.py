@@ -653,6 +653,16 @@ class GUI:
             imgui.text('No actions have been performed')
             return
 
+        # gather all file actions
+        jobs = self.job_scheduler.jobs.copy()
+        job_ids = sorted(jobs.keys())
+        job_states ={job_id:jobs[job_id].get_state() for job_id in job_ids}
+        if any((job_states[i] in [process.State.Pending, process.State.Running] for i in job_states)):
+            if imgui.button(ifa6.ICON_FA_HAND+' Cancel all'):
+                for job_id in job_ids:
+                    if job_states[job_id] in [process.State.Pending, process.State.Running]:
+                        self.job_scheduler.cancel_job(job_id)
+
         table_flags = (
                 imgui.TableFlags_.scroll_x |
                 imgui.TableFlags_.scroll_y |
@@ -673,10 +683,6 @@ class GUI:
 
             # Headers
             imgui.table_headers_row()
-
-            # gather all file actions
-            jobs = self.job_scheduler.jobs.copy()
-            job_ids = sorted(jobs.keys())
 
             # sort
             sort_specs = imgui.table_get_sort_specs()
