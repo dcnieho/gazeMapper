@@ -64,6 +64,7 @@ class GUI:
 
         self._sessions_pane: hello_imgui.DockableWindow = None
         self._project_settings_pane: hello_imgui.DockableWindow = None
+        self._action_list_pane: hello_imgui.DockableWindow = None
         self._show_demo_window = False
 
         self._icon_font: imgui.ImFont = None
@@ -165,10 +166,12 @@ class GUI:
         # define first windows
         self._sessions_pane = self._make_main_space_window("Sessions", self._sessions_pane_drawer)
         self._project_settings_pane = self._make_main_space_window("Project settings", self._project_settings_pane_drawer, is_visible=False)
+        self._action_list_pane = self._make_main_space_window("Processing Queue", self._action_list_pane_drawer, is_visible=False)
         # transmit them to HelloImGui
         runner_params.docking_params.dockable_windows = [
             self._sessions_pane,
             self._project_settings_pane,
+            self._action_list_pane
         ]
 
         addons_params = immapp.AddOnsParams()
@@ -207,7 +210,7 @@ class GUI:
         else:
             # check if any computer detail windows were closed. Those should be removed from the list
             hello_imgui.get_runner_params().docking_params.dockable_windows = \
-                [w for w in hello_imgui.get_runner_params().docking_params.dockable_windows if w.is_visible or w.label in ['Project settings']]
+                [w for w in hello_imgui.get_runner_params().docking_params.dockable_windows if w.is_visible or w.label in ['Project settings', 'Processing Queue']]
 
         # we also handle docking requests here
         if self._to_dock and self._main_dock_node_id:
@@ -448,8 +451,9 @@ class GUI:
 
         self._need_set_window_title = True
         self._project_settings_pane.is_visible = True
+        self._action_list_pane.is_visible = True
         # trigger update so visibility change is honored
-        self._window_list = [self._sessions_pane, self._project_settings_pane]
+        self._window_list = [self._sessions_pane, self._project_settings_pane, self._action_list_pane]
         self._to_focus = self._sessions_pane.label  # ensure sessions pane remains focused
 
     def _reload_sessions(self):
@@ -489,8 +493,9 @@ class GUI:
 
     def close_project(self):
         self._project_settings_pane.is_visible = False
+        self._action_list_pane.is_visible = False
         # trigger update so visibility change is honored, also delete other windows in the process
-        self._window_list = [self._sessions_pane, self._project_settings_pane]
+        self._window_list = [self._sessions_pane, self._project_settings_pane, self._action_list_pane]
 
         # stop watching for config changes
         self.config_watcher_stop_event.set()
@@ -615,6 +620,83 @@ class GUI:
                 self._session_lister_set_actions_to_show(self._session_lister)
                 for iid in self._recording_listers:
                     self._session_lister_set_actions_to_show(self._recording_listers[iid], for_recordings=True)
+
+    def _action_list_pane_drawer(self):
+        if not self.job_scheduler.jobs:
+            imgui.text('No actions have been performed')
+            return
+
+        table_flags = (
+                imgui.TableFlags_.scroll_x |
+                imgui.TableFlags_.scroll_y |
+                imgui.TableFlags_.hideable |
+                imgui.TableFlags_.sortable |
+                imgui.TableFlags_.sort_multi |
+                imgui.TableFlags_.reorderable |
+                imgui.TableFlags_.sizing_fixed_fit |
+                imgui.TableFlags_.no_host_extend_y
+            )
+        if imgui.begin_table(f"##processing_queue",columns=5,flags=table_flags):
+            imgui.table_setup_column("ID", imgui.TableColumnFlags_.default_sort | imgui.TableColumnFlags_.no_hide)  # 0
+            imgui.table_setup_column("Status", imgui.TableColumnFlags_.no_hide)  # 1
+            imgui.table_setup_column("Session", imgui.TableColumnFlags_.no_hide)  # 2
+            imgui.table_setup_column("Recording", imgui.TableColumnFlags_.no_hide)  # 3
+            imgui.table_setup_column("Action", imgui.TableColumnFlags_.width_stretch | imgui.TableColumnFlags_.no_hide)  # 4
+            imgui.table_setup_scroll_freeze(0, 1)  # Sticky column headers
+
+            # Headers
+            imgui.table_headers_row()
+
+            # gather all file actions
+            jobs = self.job_scheduler.jobs.copy()
+            job_ids = sorted(jobs.keys())
+
+            # sort
+            sort_specs = imgui.table_get_sort_specs()
+            sort_specs = [sort_specs.get_specs(i) for i in range(sort_specs.specs_count)]
+            for sort_spec in reversed(sort_specs):
+                match sort_spec.column_index:
+                    case 0:     # job ID
+                        key = lambda idx: idx
+                    case 1:     # status
+                        key = lambda idx: jobs[idx].get_state()
+                    case 2:     # session
+                        key = lambda idx: jobs[idx].user_data.session
+                    case 3:     # recording
+                        key = lambda idx: (jobs[idx].user_data.recording is None, jobs[idx].user_data.recording)
+                    case 4:     # action
+                        key = lambda idx: jobs[idx].user_data.action
+
+                job_ids.sort(key=key, reverse=sort_spec.get_sort_direction()==imgui.SortDirection.descending)
+
+            # render actions
+            for job_id in job_ids:
+                imgui.table_next_row()
+
+                for ci in range(5):
+                    if not (imgui.table_get_column_flags(ci) & imgui.TableColumnFlags_.is_enabled):
+                        continue
+                    imgui.table_set_column_index(ci)
+
+                    match ci:
+                        case 0:
+                            # ID
+                            imgui.text(f'{job_id}')
+                        case 1:
+                            # Status
+                            session_lister.draw_process_state(jobs[job_id].get_state(), job_id)
+                        case 2:
+                            # Session
+                            imgui.text(jobs[job_id].user_data.session)
+                        case 3:
+                            # Recording
+                            if jobs[job_id].user_data.recording:
+                                imgui.text(jobs[job_id].user_data.recording)
+                        case 4:
+                            # action
+                            imgui.text(jobs[job_id].user_data.action.displayable_name)
+
+            imgui.end_table()
 
 
     def _session_definition_pane_drawer(self):
