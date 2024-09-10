@@ -205,13 +205,24 @@ class GUI:
             self._set_window_title()
 
         # update windows to be shown
+        old_window_labels = {w.label for w in hello_imgui.get_runner_params().docking_params.dockable_windows}
         if self._window_list:
             hello_imgui.get_runner_params().docking_params.dockable_windows = self._window_list
             self._window_list = []
         else:
-            # check if any computer detail windows were closed. Those should be removed from the list
+            # check if any session detail windows were closed. Those should be removed from the list
             hello_imgui.get_runner_params().docking_params.dockable_windows = \
                 [w for w in hello_imgui.get_runner_params().docking_params.dockable_windows if w.is_visible or w.label in ['Project settings', 'Processing Queue']]
+        current_windows = {w.label for w in hello_imgui.get_runner_params().docking_params.dockable_windows}
+        # some cleanup may be needed for some of the closed windows
+        if (removed:=old_window_labels-current_windows):
+            for r in removed:
+                if r.endswith('##session_view'):
+                    sess_name = r.removesuffix('##session_view')
+                    # cleanup
+                    self._recordings_lock.pop(sess_name)
+                    self._selected_recordings.pop(sess_name)
+                    self._recording_listers.pop(sess_name)
 
         # we also handle docking requests here
         if self._to_dock and self._main_dock_node_id:
