@@ -1089,11 +1089,11 @@ class GUI:
             self._recording_listers[sess.name] = session_lister.List(sess.recordings, self._recordings_lock[sess.name], self._selected_recordings[sess.name], for_recordings=True, item_context_callback=lambda rec_name: self._recording_context_menu(sess.name, rec_name))
             self._session_lister_set_actions_to_show(self._recording_listers[sess.name], for_recordings=True)
 
-    def _session_detail_GUI(self, item: session.Session):
-        missing_recs = item.missing_recordings()
+    def _session_detail_GUI(self, sess: session.Session):
+        missing_recs = sess.missing_recordings()
         if missing_recs:
             imgui.text_colored(colors.error,'*The following recordings are missing for this session:\n'+'\n'.join(missing_recs))
-        self._recording_listers[item.name].draw()
+        self._recording_listers[sess.name].draw(True)
 
     def _about_popup_drawer(self):
         def popup_content():

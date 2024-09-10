@@ -33,6 +33,8 @@ class List(typing.Generic[_ItemType]):
         self._view_column_count_base = 2+self._has_recordings_col    # selector, name, recordings
         self._view_column_count = None
 
+        self._last_y = None
+
         with self.items_lock:
             self._num_items = len(self.items)
         self.table_flags: int = (
@@ -43,7 +45,6 @@ class List(typing.Generic[_ItemType]):
             imgui.TableFlags_.sort_multi |
             imgui.TableFlags_.reorderable |
             imgui.TableFlags_.sizing_fixed_fit |
-            imgui.TableFlags_.no_host_extend_y |
             imgui.TableFlags_.highlight_hovered_column #|
             #imgui.TableFlags_.borders_inner_v
         )
@@ -52,7 +53,7 @@ class List(typing.Generic[_ItemType]):
         self.display_actions = [k for k in process.Action if k in actions] # filter out crap and fix display order
         self._view_column_count = self._view_column_count_base + len(self.display_actions)
 
-    def draw(self):
+    def draw(self, limit_outer_size=False):
         with self.items_lock:
             num_items = len(self.items)
         if num_items != self._num_items:
@@ -60,10 +61,14 @@ class List(typing.Generic[_ItemType]):
         if self._num_items==0:
             imgui.text_wrapped('There are no sessions')
             return
+        outer_size = imgui.ImVec2(0,0)
+        if limit_outer_size and self._last_y is not None:
+            outer_size.y = self._last_y+imgui.get_style().item_spacing.y
         if imgui.begin_table(
             f"##session_list",
             columns=self._view_column_count,
             flags=self.table_flags,
+            outer_size=outer_size
         ):
             frame_height = imgui.get_frame_height()
 
@@ -208,14 +213,15 @@ class List(typing.Generic[_ItemType]):
                         if not imgui.get_io().key_ctrl and not imgui.get_io().key_shift and imgui.is_mouse_double_clicked(imgui.MouseButton_.left):
                             self._show_item_info(iid)
 
-            last_y = imgui.get_cursor_screen_pos().y
+            self._last_y = imgui.get_cursor_pos().y
+            last_cursor_y = imgui.get_cursor_screen_pos().y
             imgui.end_table()
 
             # handle click in table area outside header+contents:
             # deselect all, and if right click, show popup
             # check mouse is below bottom of last drawn row so that clicking on the one pixel empty space between selectables
             # does not cause everything to unselect or popup to open
-            if imgui.is_item_clicked(imgui.MouseButton_.left) and not any_selectable_clicked and imgui.get_io().mouse_pos.y>last_y:  # NB: table header is not signalled by is_item_clicked(), so this works correctly
+            if imgui.is_item_clicked(imgui.MouseButton_.left) and not any_selectable_clicked and imgui.get_io().mouse_pos.y>last_cursor_y:  # NB: table header is not signalled by is_item_clicked(), so this works correctly
                 with self.items_lock:
                     utils.set_all(self.selected_items, False)
 
