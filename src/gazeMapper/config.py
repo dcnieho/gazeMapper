@@ -509,8 +509,8 @@ class OverrideLevel(enum.Enum):
 class StudyOverride:
     default_json_file_name = 'study_def_override.json'
 
-    def __init__(self, level: OverrideLevel, **kwargs):
-        self.level = level
+    @staticmethod
+    def get_allowed_parameters(level: OverrideLevel) -> tuple[set[str],set[str]]:
         all_params = set(study_parameter_types.keys())
         exclude = {'self', 'session_def', 'planes', 'individual_markers', 'working_directory', 'planes_per_episode'}
         # above is Session-level disallowed parameters. Depending on level, disallow more
@@ -524,7 +524,12 @@ class StudyOverride:
                        'auto_code_sync_points', 'auto_code_trial_episodes',
                        'validate_do_global_shift', 'validate_max_dist_fac', 'validate_dq_types', 'validate_allow_dq_fallback', 'validate_include_data_loss', 'validate_I2MC_settings'}
             exclude = all_params-include
-        self._params = all_params-exclude
+        allowed_params = all_params-exclude
+        return allowed_params, exclude
+
+    def __init__(self, level: OverrideLevel, **kwargs):
+        self.level = level
+        self._params, exclude = self.get_allowed_parameters(level)
         for p in self._params:
             setattr(self,p,None)
         def typecheck_exception_handler(exc: typeguard.TypeCheckError, key: str):
