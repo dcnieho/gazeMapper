@@ -569,8 +569,6 @@ class StudyOverride:
 
     def store_as_json(self, path: str | pathlib.Path):
         path = pathlib.Path(path)
-        # this stores only the planes_per_episode variable to json, rest is read from other files
-        # instead to remain flexible and make it easy for users to rename, etc
         if path.is_dir():
             path = path / self.default_json_file_name
         with open(path, 'w') as f:
@@ -582,7 +580,6 @@ class StudyOverride:
         path = pathlib.Path(path)
         if path.is_dir():
             path = path / StudyOverride.default_json_file_name
-        # get kwds
         with open(path, 'r') as f:
             kwds = json.load(f, object_hook=utils.json_reconstitute)
         return StudyOverride(level, **kwds)
