@@ -44,7 +44,6 @@ class List(typing.Generic[_ItemType]):
             imgui.TableFlags_.reorderable |
             imgui.TableFlags_.sizing_fixed_fit |
             imgui.TableFlags_.no_host_extend_y |
-            imgui.TableFlags_.no_borders_in_body_until_resize |
             imgui.TableFlags_.highlight_hovered_column #|
             #imgui.TableFlags_.borders_inner_v
         )
@@ -71,7 +70,7 @@ class List(typing.Generic[_ItemType]):
             # Setup
             checkbox_width = frame_height-2*imgui.get_style().frame_padding.y
             imgui.table_setup_column("Selector", imgui.TableColumnFlags_.no_hide | imgui.TableColumnFlags_.no_sort | imgui.TableColumnFlags_.no_reorder | imgui.TableColumnFlags_.no_header_label, init_width_or_weight=checkbox_width)  # 0
-            imgui.table_setup_column("Name", imgui.TableColumnFlags_.default_sort | imgui.TableColumnFlags_.no_hide | imgui.TableColumnFlags_.no_resize)  # 1
+            imgui.table_setup_column("Name", imgui.TableColumnFlags_.default_sort | imgui.TableColumnFlags_.no_hide)  # 1
             if self._has_recordings_col:
                 imgui.table_setup_column("Recordings", imgui.TableColumnFlags_.angled_header)  # 2
             for k in process.Action:   # 2+ or 3+
