@@ -527,7 +527,7 @@ class StudyOverride:
         self._params = all_params-exclude
         for p in self._params:
             setattr(self,p,None)
-        def typecheck_exception_handler(exc: typeguard.TypeCheckError, key: str, level: OverrideLevel):
+        def typecheck_exception_handler(exc: typeguard.TypeCheckError, key: str):
             e = typeguard.TypeCheckError(*exc.args)
             if self.level==OverrideLevel.FunctionArgs:
                 err_text = 'in the parameter overrides provided as extra arguments to the processing function'
@@ -544,7 +544,7 @@ class StudyOverride:
                 raise TypeError(f"{StudyOverride.__name__}.__init__(): you are not allowed to override the '{p}' parameter of a {Study.__name__} class {err_text}")
             if p not in self._params:
                 raise TypeError(f"{StudyOverride.__name__}.__init__(): got an unknown parameter '{p}'")
-            typeguard.check_type(kwargs[p], study_parameter_types[p], typecheck_fail_callback=lambda x,_: typecheck_exception_handler(x,p,level), collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
+            typeguard.check_type(kwargs[p], study_parameter_types[p], typecheck_fail_callback=lambda x,_: typecheck_exception_handler(x,p), collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
             setattr(self,p,kwargs[p])
 
     def apply(self, study: Study) -> Study:
