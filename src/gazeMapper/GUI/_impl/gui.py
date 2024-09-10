@@ -664,7 +664,7 @@ class GUI:
 
     def _action_list_pane_drawer(self):
         if not self.job_scheduler.jobs:
-            imgui.text('No actions have been performed')
+            imgui.text('No actions have been enqueued or performed')
             return
 
         # gather all file actions
