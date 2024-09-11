@@ -589,6 +589,24 @@ class StudyOverride:
             kwds = json.load(f, object_hook=utils.json_reconstitute)
         return StudyOverride(level, **kwds)
 
+    @staticmethod
+    def from_study_diff(config: Study, parent_config: Study, level: OverrideLevel) -> 'StudyOverride':
+        fields = StudyOverride.get_allowed_parameters(level)[0]
+        kwds = _study_diff_impl(config, parent_config, fields)
+        return StudyOverride(level, **kwds)
+
+def _study_diff_impl(config: Study, parent_config: Study, fields: list[str]) -> dict[str,Any]:
+    kwds: dict[str,Any] = {}
+    for f in fields:
+        val        =        config.get(f) if isinstance(       config,dict) else getattr(       config,f)
+        parent_val = parent_config.get(f) if isinstance(parent_config,dict) else getattr(parent_config,f)
+        if val!=parent_val:
+            if isinstance(val,dict) or typing.is_typeddict(val) or typed_dict_defaults.is_typeddictdefault(val) or type_utils.is_NamedTuple_type(val):
+                # need to recurse into object
+                val = _study_diff_impl(val, parent_val, type_utils.get_fields(val))
+            kwds[f] = val
+    return kwds
+
 def load_override_and_apply(study: Study, level: OverrideLevel, override_path: str|pathlib.Path, strict_check=True) -> Study:
     override_path = pathlib.Path(override_path)
     if override_path.is_dir():
