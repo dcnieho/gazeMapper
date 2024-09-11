@@ -509,8 +509,9 @@ class StudyOverride:
     default_json_file_name = 'study_def_override.json'
 
     @staticmethod
-    def get_allowed_parameters(level: OverrideLevel) -> tuple[set[str],set[str]]:
-        all_params = set(study_parameter_types.keys())
+    def get_allowed_parameters(level: OverrideLevel) -> tuple[list[str],set[str]]:
+        # NB: list instead of set as want to keep ordering
+        all_params = list(study_parameter_types.keys())
         exclude = {'self', 'session_def', 'planes', 'individual_markers', 'working_directory', 'planes_per_episode'}
         # above is Session-level disallowed parameters. Depending on level, disallow more
         if level in [OverrideLevel.Recording, OverrideLevel.FunctionArgs]:
@@ -522,8 +523,8 @@ class StudyOverride:
             include = {'get_cam_movement_for_et_sync_method','get_cam_movement_for_et_sync_function',
                        'auto_code_sync_points', 'auto_code_trial_episodes',
                        'validate_do_global_shift', 'validate_max_dist_fac', 'validate_dq_types', 'validate_allow_dq_fallback', 'validate_include_data_loss', 'validate_I2MC_settings'}
-            exclude = all_params-include
-        allowed_params = all_params-exclude
+            exclude = set(all_params)-include
+        allowed_params = [a for a in all_params if a not in exclude]
         return allowed_params, exclude
 
     def __init__(self, level: OverrideLevel, **kwargs):
