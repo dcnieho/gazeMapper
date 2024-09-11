@@ -528,24 +528,24 @@ class StudyOverride:
         return allowed_params, exclude
 
     def __init__(self, level: OverrideLevel, **kwargs):
-        self.level = level
+        self.override_level = level
         self._params, exclude = self.get_allowed_parameters(level)
         for p in self._params:
             setattr(self,p,None)
         def typecheck_exception_handler(exc: typeguard.TypeCheckError, key: str):
             e = typeguard.TypeCheckError(*exc.args)
-            if self.level==OverrideLevel.FunctionArgs:
+            if self.override_level==OverrideLevel.FunctionArgs:
                 err_text = 'in the parameter overrides provided as extra arguments to the processing function'
             else:
-                err_text = f'in the {self.level.name}-level parameter overrides'
+                err_text = f'in the {self.override_level.name}-level parameter overrides'
             e.append_path_element(f'argument "{key}" {err_text} ({exc._path[0]})')
             raise e from None
         for p in kwargs:
             if p in exclude:
-                if self.level==OverrideLevel.FunctionArgs:
+                if self.override_level==OverrideLevel.FunctionArgs:
                     err_text = 'with parameter overrides provided as extra arguments to the processing function'
                 else:
-                    err_text = f'with {self.level.name}-level parameter overrides'
+                    err_text = f'with {self.override_level.name}-level parameter overrides'
                 raise TypeError(f"{StudyOverride.__name__}.__init__(): you are not allowed to override the '{p}' parameter of a {Study.__name__} class {err_text}")
             if p not in self._params:
                 raise TypeError(f"{StudyOverride.__name__}.__init__(): got an unknown parameter '{p}'")
@@ -565,10 +565,10 @@ class StudyOverride:
         try:
             study.check_valid()
         except Exception as oe:
-            if self.level==OverrideLevel.FunctionArgs:
+            if self.override_level==OverrideLevel.FunctionArgs:
                 err_text = 'when applying parameter overrides provided as extra arguments to the processing function'
             else:
-                err_text = f'when applying {self.level.name}-level parameter overrides'
+                err_text = f'when applying {self.override_level.name}-level parameter overrides'
             raise ValueError(f'Study setup became invalid {err_text}: {str(oe)}').with_traceback(oe.__traceback__) from None
         return study
 
