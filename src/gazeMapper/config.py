@@ -529,8 +529,9 @@ class StudyOverride:
 
     def __init__(self, level: OverrideLevel, **kwargs):
         self.override_level = level
-        self._params, exclude = self.get_allowed_parameters(level)
-        for p in self._params:
+        self._allowed_params, exclude = self.get_allowed_parameters(level)
+        self._overridden_params: list[str] = []
+        for p in self._allowed_params:
             setattr(self,p,None)
         def typecheck_exception_handler(exc: typeguard.TypeCheckError, key: str):
             e = typeguard.TypeCheckError(*exc.args)
@@ -547,20 +548,21 @@ class StudyOverride:
                 else:
                     err_text = f'with {self.override_level.name}-level parameter overrides'
                 raise TypeError(f"{StudyOverride.__name__}.__init__(): you are not allowed to override the '{p}' parameter of a {Study.__name__} class {err_text}")
-            if p not in self._params:
+            if p not in self._allowed_params:
                 raise TypeError(f"{StudyOverride.__name__}.__init__(): got an unknown parameter '{p}'")
             typeguard.check_type(kwargs[p], study_parameter_types[p], typecheck_fail_callback=lambda x,_: typecheck_exception_handler(x,p), collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
             setattr(self,p,kwargs[p])
+            self._overridden_params.append(p)
 
     def apply(self, study: Study, strict_check=True) -> Study:
         study = copy.copy(study)
-        for p in self._params:
-            if (val:=getattr(self,p)) is not None:
-                if isinstance(val,dict):
-                    # overwrite existing and add new dict keys
-                    setattr(study,p,current|val if (current:=getattr(study,p)) is not None else val)
-                else:
-                    setattr(study,p,val)
+        for p in self._overridden_params:
+            val = getattr(self,p)
+            if isinstance(val,dict):
+                # overwrite existing and add new dict keys
+                setattr(study,p,current|val if (current:=getattr(study,p)) is not None else val)
+            else:
+                setattr(study,p,val)
         # check resulting study is valid
         try:
             study.check_valid(strict_check)
@@ -577,7 +579,7 @@ class StudyOverride:
         if path.is_dir():
             path = path / self.default_json_file_name
         with open(path, 'w') as f:
-            to_dump = {p:v for p in self._params if (v:=getattr(self,p)) is not None}
+            to_dump = {p:getattr(self,p) for p in self._overridden_params}
             json.dump(to_dump, f, cls=utils.CustomTypeEncoder, indent=2)
 
     @staticmethod
