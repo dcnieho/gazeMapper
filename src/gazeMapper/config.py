@@ -10,24 +10,23 @@ from typing import Any, Literal, TypedDict
 from glassesTools import annotation, utils
 from glassesValidator import process as gv_process
 
-from . import marker, plane, session, type_utils
-from .typed_dict_defaults import TypedDictDefault
+from . import marker, plane, session, typed_dict_defaults, type_utils
 
 
 
-class AutoCodeSyncPoints(TypedDictDefault, total=False):
+class AutoCodeSyncPoints(typed_dict_defaults.TypedDictDefault, total=False):
     markers         : list[int]
     max_gap_duration: int       = 4
     min_duration    : int       = 6
 
-class AutoCodeTrialEpisodes(TypedDictDefault, total=False):
+class AutoCodeTrialEpisodes(typed_dict_defaults.TypedDictDefault, total=False):
     start_markers               : list[int]
     end_markers                 : list[int]
     max_gap_duration            : int       = 4
     max_intermarker_gap_duration: int       = 15
     min_duration                : int       = 6
 
-class I2MCSettings(TypedDictDefault, total=False):
+class I2MCSettings(typed_dict_defaults.TypedDictDefault, total=False):
     # None where fields are set by code dynamically based on the data. When value applied here, it overrides this dynamic parameter setting
     freq            : float|None    = None
     windowtimeInterp: float         = .25       # s
