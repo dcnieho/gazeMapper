@@ -12,11 +12,6 @@ from glassesTools import utils as gt_utils
 from ... import type_utils, typed_dict_defaults
 from . import colors, utils
 
-def is_NamedTuple_type(x):
-  return (inspect.isclass(x) and issubclass(x, tuple) and
-          hasattr(x, '_asdict') and callable(x._asdict) and
-          hasattr(x, '__annotations__') and
-          getattr(x, '_fields', None) is not None)
 
 val_to_str_registry: dict[typing.Type, dict[typing.Any, str]] = {
     type_utils.ArucoDictType: type_utils.aruco_dicts_to_str
@@ -109,7 +104,7 @@ def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_get
             is_dict = True
         case _ if typed_dict_defaults.is_typeddictdefault(f_type):
             is_dict = True
-        case _ if is_NamedTuple_type(f_type):
+        case _ if type_utils.is_NamedTuple_type(f_type):
             is_dict = True
         case builtins.dict | builtins.list | builtins.set:
             is_dict = base_type==builtins.dict
@@ -197,7 +192,7 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
         defaults = o_type._field_defaults.copy()
         if not problems and not made_or_replaced_obj:   # don't mark as problem if the obj was unset (None)
             problems = {k:f'{k} is required' for k in o_type.__required_keys__ if k not in obj}
-    elif is_NamedTuple_type(o_type):
+    elif type_utils.is_NamedTuple_type(o_type):
         types = o_type.__annotations__.copy()
         fields= list(o_type._fields)
         defaults = o_type._field_defaults.copy()
@@ -401,7 +396,7 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
     if (changed := new_val!=val or new_edit):
         if isinstance(obj,dict):
             obj[field] = new_val
-        elif is_NamedTuple_type(type(obj)):
+        elif type_utils.is_NamedTuple_type(type(obj)):
             # tuples are immutable, have to return new instance
             new_obj = obj._replace(**{field:new_val})
         else:

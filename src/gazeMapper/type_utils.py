@@ -1,5 +1,8 @@
 import typing
+import inspect
 import cv2
+
+from . import typed_dict_defaults
 
 ProblemDict = dict[str,typing.Union[None,str,'ProblemDict']]
 NestedDict = dict[str,typing.Union[None,'NestedDict']]
@@ -36,3 +39,21 @@ def merge_problem_dicts(a: ProblemDict, b: ProblemDict):
         else:
             a[key] = b[key]
     return a
+
+
+def is_NamedTuple_type(x):
+  return (inspect.isclass(x) and issubclass(x, tuple) and
+          hasattr(x, '_asdict') and callable(x._asdict) and
+          hasattr(x, '__annotations__') and
+          getattr(x, '_fields', None) is not None)
+
+def get_fields(obj) -> list[str]|None:
+    if typing.is_typeddict(obj):
+        return list(obj.__annotations__.keys())
+    elif typed_dict_defaults.is_typeddictdefault(obj):
+        return list(obj.__annotations__.keys())
+    elif is_NamedTuple_type(obj):
+        return list(obj._fields)
+    elif isinstance(obj, dict):
+        return list(obj.keys())
+    return None
