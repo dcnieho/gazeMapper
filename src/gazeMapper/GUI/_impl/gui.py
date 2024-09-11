@@ -34,11 +34,13 @@ class GUI:
         self.project_dir: pathlib.Path = None
         self.study_config: config.Study = None
 
-        self.sessions: dict[str, session.Session] = {}
-        self._sessions_lock: threading.Lock      = threading.Lock()
-        self._selected_sessions: dict[str, bool] = {}
+        self.sessions: dict[str, session.Session]                       = {}
+        self.session_config_overrides: dict[str, config.StudyOverride]  = {}
+        self._sessions_lock: threading.Lock                             = threading.Lock()
+        self._selected_sessions: dict[str, bool]                        = {}
         self._session_lister = session_lister.List(self.sessions, self._sessions_lock, self._selected_sessions, info_callback=self._open_session_detail, item_context_callback=self._session_context_menu)
 
+        self.recording_config_overrides: dict[str, dict[str, config.StudyOverride]] = {}
         self._recording_listers  : dict[str, session_lister.List[session.Recording]]= {}
         self._recordings_lock    : dict[str, threading.Lock]                        = {}
         self._selected_recordings: dict[str, dict[str, bool]]                       = {}
@@ -220,6 +222,8 @@ class GUI:
                 if r.endswith('##session_view'):
                     sess_name = r.removesuffix('##session_view')
                     # cleanup
+                    self.session_config_overrides.pop(sess_name)
+                    self.recording_config_overrides.pop(sess_name)
                     self._recordings_lock.pop(sess_name)
                     self._selected_recordings.pop(sess_name)
                     self._recording_listers.pop(sess_name)
@@ -647,7 +651,7 @@ class GUI:
             imgui.text_colored(colors.error,'*There are problems in the below setup that need to be resolved')
 
         fields = [k for k in config.study_parameter_types.keys() if k in config.study_defaults]
-        changed, new_config = settings_editor.draw(copy.deepcopy(self.study_config), fields, config.study_parameter_types, config.study_defaults, self._possible_value_getters, self._problems_cache)
+        changed, new_config = settings_editor.draw(copy.deepcopy(self.study_config), fields, config.study_parameter_types, config.study_defaults, self._possible_value_getters, None, self._problems_cache)
         if changed:
             try:
                 new_config.check_valid(strict_check=False)
@@ -922,7 +926,7 @@ class GUI:
             imgui.text_colored(colors.error,'*There are problems in the below setup that need to be resolved')
 
         # episodes to be coded
-        changed, new_config = settings_editor.draw(copy.deepcopy(self.study_config), ['episodes_to_code', 'planes_per_episode'], config.study_parameter_types, {}, self._possible_value_getters, self._problems_cache)
+        changed, new_config = settings_editor.draw(copy.deepcopy(self.study_config), ['episodes_to_code', 'planes_per_episode'], config.study_parameter_types, {}, self._possible_value_getters, None, self._problems_cache)
         if changed:
             try:
                 new_config.check_valid(strict_check=False)
@@ -959,17 +963,17 @@ class GUI:
                 imgui.end_tooltip()
             imgui.table_next_column()
             imgui.set_next_item_width(imgui.calc_text_size('xxxxx.xxxxxx').x+2*imgui.get_style().frame_padding.x)
-            new_val = settings_editor.draw_value(f'size_{m.id}', m.size, marker.marker_parameter_types['size'], False, marker.marker_defaults.get('size',None), False, False)[0]
+            new_val = settings_editor.draw_value(f'size_{m.id}', m.size, marker.marker_parameter_types['size'], False, marker.marker_defaults.get('size',None), None, False, False)[0]
             if (this_changed:=m.size!=new_val):
                 m.size = new_val
                 changed |= this_changed
             imgui.table_next_column()
-            new_val = settings_editor.draw_value(f'aruco_dict_{m.id}', m.aruco_dict, marker.marker_parameter_types['aruco_dict'], False, marker.marker_defaults.get('aruco_dict',None), False, False)[0]
+            new_val = settings_editor.draw_value(f'aruco_dict_{m.id}', m.aruco_dict, marker.marker_parameter_types['aruco_dict'], False, marker.marker_defaults.get('aruco_dict',None), None, False, False)[0]
             if (this_changed:=m.aruco_dict!=new_val):
                 m.aruco_dict = new_val
                 changed |= this_changed
             imgui.table_next_column()
-            new_val = settings_editor.draw_value(f'marker_border_bits_{m.id}', m.marker_border_bits, marker.marker_parameter_types['marker_border_bits'], False, marker.marker_defaults.get('marker_border_bits',None), False, False)[0]
+            new_val = settings_editor.draw_value(f'marker_border_bits_{m.id}', m.marker_border_bits, marker.marker_parameter_types['marker_border_bits'], False, marker.marker_defaults.get('marker_border_bits',None), None, False, False)[0]
             if (this_changed:=m.marker_border_bits!=new_val):
                 m.marker_border_bits = new_val
                 changed |= this_changed
@@ -1088,12 +1092,49 @@ class GUI:
             self._selected_recordings[sess.name] = {k:False for k in sess.recordings}
             self._recording_listers[sess.name] = session_lister.List(sess.recordings, self._recordings_lock[sess.name], self._selected_recordings[sess.name], for_recordings=True, item_context_callback=lambda rec_name: self._recording_context_menu(sess.name, rec_name))
             self._session_lister_set_actions_to_show(self._recording_listers[sess.name], for_recordings=True)
+            self.session_config_overrides[sess.name] = config.load_or_create_override(config.OverrideLevel.Session, sess.working_directory)
+            self.recording_config_overrides[sess.name] = {}
 
     def _session_detail_GUI(self, sess: session.Session):
         missing_recs = sess.missing_recordings()
         if missing_recs:
             imgui.text_colored(colors.error,'*The following recordings are missing for this session:\n'+'\n'.join(missing_recs))
         self._recording_listers[sess.name].draw(True)
+        sess_changed = False
+        if imgui.tree_node_ex('Setting overrides for this session',imgui.TreeNodeFlags_.framed):
+            fields = config.StudyOverride.get_allowed_parameters(config.OverrideLevel.Session)[0]
+            effective_config = self.session_config_overrides[sess.name].apply(self.study_config, strict_check=False)
+            sess_changed, new_config = settings_editor.draw(effective_config, fields, config.study_parameter_types, config.study_defaults, self._possible_value_getters, self.study_config, effective_config.field_problems())
+            if sess_changed:
+                try:
+                    new_config.check_valid(strict_check=False)
+                    self.session_config_overrides[sess.name] = config.StudyOverride.from_study_diff(new_config, self.study_config, config.OverrideLevel.Session)
+                except Exception as e:
+                    # do not persist invalid config, inform user of problem
+                    utils.push_popup(self, msg_box.msgbox, "Settings error", f"You cannot make this change to the settings for session {sess.name}:\n{e}", msg_box.MsgBox.error)
+                else:
+                    # persist changed config
+                    self.session_config_overrides[sess.name].store_as_json(sess.working_directory)
+            imgui.tree_pop()
+        for r in sess.recordings:
+            if imgui.tree_node_ex(f'Setting overrides for {r} recording',imgui.TreeNodeFlags_.framed):
+                if r not in self.recording_config_overrides[sess.name]:
+                    self.recording_config_overrides[sess.name][r] = config.load_or_create_override(config.OverrideLevel.Recording, sess.recordings[r].info.working_directory)
+                fields = config.StudyOverride.get_allowed_parameters(config.OverrideLevel.Recording)[0]
+                effective_config_for_session = self.session_config_overrides[sess.name].apply(self.study_config, strict_check=False)
+                effective_config = self.recording_config_overrides[sess.name][r].apply(effective_config_for_session, strict_check=False)
+                changed, new_config = settings_editor.draw(effective_config, fields, config.study_parameter_types, config.study_defaults, self._possible_value_getters, effective_config_for_session, effective_config.field_problems())
+                if changed or sess_changed: # NB: also need to update file when parent has changed
+                    try:
+                        new_config.check_valid(strict_check=False)
+                        self.recording_config_overrides[sess.name][r] = config.StudyOverride.from_study_diff(new_config, effective_config_for_session, config.OverrideLevel.Recording)
+                    except Exception as e:
+                        # do not persist invalid config, inform user of problem
+                        utils.push_popup(self, msg_box.msgbox, "Settings error", f"You cannot make this change to the settings for recording {r} in session {sess.name}:\n{e}", msg_box.MsgBox.error)
+                    else:
+                        # persist changed config
+                        self.recording_config_overrides[sess.name][r].store_as_json(sess.recordings[r].info.working_directory)
+                imgui.tree_pop()
 
     def _about_popup_drawer(self):
         def popup_content():
