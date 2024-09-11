@@ -10,7 +10,6 @@ import copy
 import threading
 import time
 
-import glassesTools.annotation
 import imgui_bundle
 from imgui_bundle import imgui, immapp, imgui_md, hello_imgui, glfw_utils, icons_fontawesome_6 as ifa6
 import glfw
