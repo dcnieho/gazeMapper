@@ -552,7 +552,7 @@ class StudyOverride:
             typeguard.check_type(kwargs[p], study_parameter_types[p], typecheck_fail_callback=lambda x,_: typecheck_exception_handler(x,p), collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
             setattr(self,p,kwargs[p])
 
-    def apply(self, study: Study) -> Study:
+    def apply(self, study: Study, strict_check=True) -> Study:
         study = copy.copy(study)
         for p in self._params:
             if (val:=getattr(self,p)) is not None:
@@ -563,7 +563,7 @@ class StudyOverride:
                     setattr(study,p,val)
         # check resulting study is valid
         try:
-            study.check_valid()
+            study.check_valid(strict_check)
         except Exception as oe:
             if self.override_level==OverrideLevel.FunctionArgs:
                 err_text = 'when applying parameter overrides provided as extra arguments to the processing function'
@@ -589,7 +589,7 @@ class StudyOverride:
             kwds = json.load(f, object_hook=utils.json_reconstitute)
         return StudyOverride(level, **kwds)
 
-def load_override_and_apply(study: Study, level: OverrideLevel, override_path: str|pathlib.Path) -> Study:
+def load_override_and_apply(study: Study, level: OverrideLevel, override_path: str|pathlib.Path, strict_check=True) -> Study:
     override_path = pathlib.Path(override_path)
     if override_path.is_dir():
         override_path = override_path / StudyOverride.default_json_file_name
@@ -597,20 +597,20 @@ def load_override_and_apply(study: Study, level: OverrideLevel, override_path: s
         return study
 
     study_override = StudyOverride.load_from_json(level, override_path)
-    return study_override.apply(study)
+    return study_override.apply(study, strict_check)
 
-def apply_kwarg_overrides(study: Study, **kwargs) -> Study:
+def apply_kwarg_overrides(study: Study, strict_check=True, **kwargs) -> Study:
     if not kwargs:
         return study
     overrides = StudyOverride(OverrideLevel.FunctionArgs, **kwargs)
-    return overrides.apply(study)
+    return overrides.apply(study, strict_check)
 
-def read_study_config_with_overrides(config_path: str|pathlib.Path, overrides: dict[OverrideLevel, str|pathlib.Path] = None, **kwargs) -> Study:
+def read_study_config_with_overrides(config_path: str|pathlib.Path, overrides: dict[OverrideLevel, str|pathlib.Path]=None, strict_check=True, **kwargs) -> Study:
     study = Study.load_from_json(config_path)
     if overrides:
         for l in [OverrideLevel.Session, OverrideLevel.Recording]:
             if l in overrides:
-                study = load_override_and_apply(study, l, overrides[l])
+                study = load_override_and_apply(study, l, overrides[l], strict_check)
     if kwargs:
-        study = apply_kwarg_overrides(study, **kwargs)
+        study = apply_kwarg_overrides(study, strict_check, **kwargs)
     return study
