@@ -599,6 +599,16 @@ def load_override_and_apply(study: Study, level: OverrideLevel, override_path: s
     study_override = StudyOverride.load_from_json(level, override_path)
     return study_override.apply(study, strict_check)
 
+def load_or_create_override(level: OverrideLevel, override_path: str|pathlib.Path) -> StudyOverride:
+    override_path = pathlib.Path(override_path)
+    if override_path.is_dir():
+        override_path = override_path / StudyOverride.default_json_file_name
+
+    if not override_path.is_file():
+        return StudyOverride(level)
+    else:
+        return StudyOverride.load_from_json(level, override_path)
+
 def apply_kwarg_overrides(study: Study, strict_check=True, **kwargs) -> Study:
     if not kwargs:
         return study
