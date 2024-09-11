@@ -262,7 +262,7 @@ class GUI:
 
     def _show_menu_gui(self):
         # this is always called, so we handle popups and other state here
-        self._check_project_setups_state()
+        self._check_project_setup_state()
         utils.handle_popup_stack(self.popup_stack)
         self._update_jobs_and_process_pool()
         # also handle showing of debug windows
@@ -510,7 +510,7 @@ class GUI:
             self._selected_sessions |= {k:(selected[k] if k in selected else False) for k in self.sessions}
         self._session_lister_set_actions_to_show(self._session_lister)
 
-    def _check_project_setups_state(self):
+    def _check_project_setup_state(self):
         if self.study_config is not None:
             self._problems_cache = self.study_config.field_problems()
         # need to have:
