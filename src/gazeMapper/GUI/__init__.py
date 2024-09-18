@@ -1,8 +1,8 @@
 import enum
 import sys
 
+from glassesTools import async_thread
 
-from . import async_thread
 from ._impl.gui import GUI as _GUI
 
 
