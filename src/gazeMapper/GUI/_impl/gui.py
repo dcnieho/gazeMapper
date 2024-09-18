@@ -51,29 +51,29 @@ class GUI:
         self.need_setup_episode     = True
         self.can_accept_sessions    = False
 
-        self.config_watcher: concurrent.futures.Future  = None
-        self.config_watcher_stop_event: asyncio.Event   = None
+        self.config_watcher             : concurrent.futures.Future = None
+        self.config_watcher_stop_event  : asyncio.Event             = None
 
-        self.process_pool                                           = process_pool.ProcessPool()
-        self.job_scheduler                                          = process_pool.JobScheduler[utils.JobInfo](self.process_pool, self._check_job_valid)
+        self.process_pool   = process_pool.ProcessPool()
+        self.job_scheduler  = process_pool.JobScheduler[utils.JobInfo](self.process_pool, self._check_job_valid)
 
-        self._window_list: list[hello_imgui.DockableWindow] = []
-        self._to_dock         = []
-        self._to_focus        = None
-        self._after_window_update_callback: Callable[[],None] = None
-        self._need_set_window_title = False
-        self._main_dock_node_id = None
+        self._window_list                   : list[hello_imgui.DockableWindow]  = []
+        self._to_dock                                                           = []
+        self._to_focus                                                          = None
+        self._after_window_update_callback  : Callable[[],None]                 = None
+        self._need_set_window_title                                             = False
+        self._main_dock_node_id                                                 = None
 
-        self._sessions_pane: hello_imgui.DockableWindow = None
-        self._project_settings_pane: hello_imgui.DockableWindow = None
-        self._action_list_pane: hello_imgui.DockableWindow = None
-        self._show_demo_window = False
+        self._sessions_pane         : hello_imgui.DockableWindow = None
+        self._project_settings_pane : hello_imgui.DockableWindow = None
+        self._action_list_pane      : hello_imgui.DockableWindow = None
+        self._show_demo_window                                   = False
 
-        self._icon_font: imgui.ImFont = None
-        self._big_font: imgui.ImFont = None
+        self._icon_font: imgui.ImFont   = None
+        self._big_font: imgui.ImFont    = None
 
-        self._problems_cache: type_utils.ProblemDict = {}
-        self._marker_preview_cache: dict[tuple[int,int,int], image_helper.ImageHelper] = {}
+        self._problems_cache        : type_utils.ProblemDict                            = {}
+        self._marker_preview_cache  : dict[tuple[int,int,int], image_helper.ImageHelper]= {}
 
         # Show errors in threads
         def asyncexcepthook(future: asyncio.Future):
