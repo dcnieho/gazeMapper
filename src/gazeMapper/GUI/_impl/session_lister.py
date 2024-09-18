@@ -2,7 +2,9 @@ import threading
 from imgui_bundle import imgui, icons_fontawesome_6 as ifa6, imspinner
 import typing
 
-from . import colors, utils
+import glassesTools
+
+from . import colors
 from ... import process, session
 
 _ItemType = typing.TypeVar('_ItemType', session.Session, session.Recording)
@@ -114,12 +116,12 @@ class List(typing.Generic[_ItemType]):
 
                 if multi_selected_state==0:
                     imgui.internal.push_item_flag(imgui.internal.ItemFlags_.mixed_value, True)
-                clicked, new_state = utils.my_checkbox(f"##header_checkbox", multi_selected_state==1, frame_size=(0,0), frame_padding_override=(imgui.get_style().frame_padding.x/2,0), do_vertical_align=False)
+                clicked, new_state = glassesTools.gui.utils.my_checkbox(f"##header_checkbox", multi_selected_state==1, frame_size=(0,0), frame_padding_override=(imgui.get_style().frame_padding.x/2,0), do_vertical_align=False)
                 if multi_selected_state==0:
                     imgui.internal.pop_item_flag()
 
                 if clicked:
-                    utils.set_all(self.selected_items, new_state, subset = self.sorted_ids)
+                    glassesTools.utils.set_all(self.selected_items, new_state, subset = self.sorted_ids)
 
                 # Loop rows
                 any_selectable_clicked = False
@@ -155,7 +157,7 @@ class List(typing.Generic[_ItemType]):
                             selectable_clicked, selectable_out = imgui.selectable(f"##{iid}_hitbox", self.selected_items[iid], flags=imgui.SelectableFlags_.span_all_columns|imgui.SelectableFlags_.allow_overlap|imgui.internal.SelectableFlagsPrivate_.select_on_click, size=(0,frame_height+cell_padding_y))
                             imgui.set_cursor_pos_y(cur_pos_y)   # instead of imgui.same_line(), we just need this part of its effect
                             imgui.pop_style_var(3)
-                            selectable_right_clicked = utils.handle_item_hitbox_events(iid, self.selected_items, context_menu=self.item_context_callback)
+                            selectable_right_clicked = glassesTools.gui.utils.handle_item_hitbox_events(iid, self.selected_items, context_menu=self.item_context_callback)
                             has_drawn_hitbox = True
 
                         if num_columns_drawn==1:
@@ -173,14 +175,14 @@ class List(typing.Generic[_ItemType]):
                         match ri:
                             case 0:
                                 # Selector
-                                checkbox_clicked, checkbox_out = utils.my_checkbox(f"##{iid}_selected", self.selected_items[iid], frame_size=(0,0), frame_padding_override=(imgui.get_style().frame_padding.x/2,imgui.get_style().frame_padding.y))
+                                checkbox_clicked, checkbox_out = glassesTools.gui.utils.my_checkbox(f"##{iid}_selected", self.selected_items[iid], frame_size=(0,0), frame_padding_override=(imgui.get_style().frame_padding.x/2,imgui.get_style().frame_padding.y))
                                 checkbox_hovered = imgui.is_item_hovered()
                             case 1:
                                 # Name
                                 if self.info_callback:
                                     if imgui.button(f"{ifa6.ICON_FA_CIRCLE_INFO}##{iid}_info"):
                                         self._show_item_info(iid)
-                                    utils.draw_hover_text('More info about this session, and access session-specific configuration', '')
+                                    glassesTools.gui.utils.draw_hover_text('More info about this session, and access session-specific configuration', '')
                                     config_button_hovered = imgui.is_item_hovered()
                                     imgui.same_line()
                                 imgui.text(item.name)
@@ -191,7 +193,7 @@ class List(typing.Generic[_ItemType]):
                                 clr = colors.error if missing_recs else colors.ok
                                 imgui.text_colored(clr, f'{n_rec-len(missing_recs)}/{n_rec}{" "+ifa6.ICON_FA_TRIANGLE_EXCLAMATION if missing_recs else ""}')
                                 if missing_recs:
-                                    utils.draw_hover_text('missing recordings:\n'+'\n'.join(missing_recs), '')
+                                    glassesTools.gui.utils.draw_hover_text('missing recordings:\n'+'\n'.join(missing_recs), '')
                             case _:
                                 # task status columns
                                 self._draw_status_widget(item,self.display_actions[ri-self._view_column_count_base])
@@ -202,7 +204,7 @@ class List(typing.Generic[_ItemType]):
                     # NB: any_selectable_clicked is just for handling clicks not on any item
                     any_selectable_clicked = any_selectable_clicked or selectable_clicked or selectable_right_clicked
 
-                    self._last_clicked_id = utils.selectable_item_logic(
+                    self._last_clicked_id = glassesTools.gui.utils.selectable_item_logic(
                         iid, self.selected_items, self._last_clicked_id, self.sorted_ids,
                         selectable_clicked, selectable_out, overlayed_hovered=checkbox_hovered or config_button_hovered,
                         overlayed_clicked=checkbox_clicked, new_overlayed_state=checkbox_out
@@ -223,7 +225,7 @@ class List(typing.Generic[_ItemType]):
             # does not cause everything to unselect or popup to open
             if imgui.is_item_clicked(imgui.MouseButton_.left) and not any_selectable_clicked and imgui.get_io().mouse_pos.y>last_cursor_y:  # NB: table header is not signalled by is_item_clicked(), so this works correctly
                 with self.items_lock:
-                    utils.set_all(self.selected_items, False)
+                    glassesTools.utils.set_all(self.selected_items, False)
 
             # show menu when right-clicking the empty space
             # TODO
@@ -234,7 +236,7 @@ class List(typing.Generic[_ItemType]):
                 draw_process_state(item.state[action], item.name)
             else:
                 imgui.text('-')
-                utils.draw_hover_text(f'Not applicable to a {item.definition.type.value} recording','')
+                glassesTools.gui.utils.draw_hover_text(f'Not applicable to a {item.definition.type.value} recording','')
         else:
             if not item.has_all_recordings():
                 imgui.text_colored(colors.error, '-')
@@ -247,7 +249,7 @@ class List(typing.Generic[_ItemType]):
                     clr = colors.error if not_completed else colors.ok
                     imgui.text_colored(clr, f'{n_rec-len(not_completed)}/{n_rec}')
                     if not_completed:
-                        utils.draw_hover_text('not completed for recordings:\n'+'\n'.join(not_completed),'')
+                        glassesTools.gui.utils.draw_hover_text('not completed for recordings:\n'+'\n'.join(not_completed),'')
         if self.item_context_callback and imgui.begin_popup_context_item(f"##{item.name}_{action}_context"):
             self.item_context_callback(item.name)
             imgui.end_popup()
@@ -305,4 +307,4 @@ def draw_process_state(state: process.State, iid: int|str):
         case process.State.Failed:
             imgui.text_colored(colors.error_bright, ifa6.ICON_FA_TRIANGLE_EXCLAMATION)
             hover_text = 'Failed'
-    utils.draw_hover_text(hover_text, text='')
+    glassesTools.gui.utils.draw_hover_text(hover_text, text='')

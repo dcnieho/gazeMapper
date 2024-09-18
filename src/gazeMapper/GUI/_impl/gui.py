@@ -17,11 +17,12 @@ import OpenGL
 import OpenGL.GL as gl
 
 import glassesTools
+import glassesTools.gui
 import glassesValidator
 
 from ... import config, config_watcher, marker, plane, process, session, type_utils, version
 from .. import async_thread
-from . import callbacks, colors, file_picker, image_helper, msg_box, process_pool, session_lister, settings_editor, utils
+from . import callbacks, colors, image_helper, process_pool, session_lister, settings_editor, utils
 
 
 class GUI:
@@ -83,11 +84,11 @@ class GUI:
                 return
             if not exc:
                 return
-            tb = utils.get_traceback(type(exc), exc, exc.__traceback__)
+            tb = glassesTools.gui.utils.get_traceback(type(exc), exc, exc.__traceback__)
             if isinstance(exc, asyncio.TimeoutError):
-                utils.push_popup(self, msg_box.msgbox, "Processing error", f"A background process has failed:\n{type(exc).__name__}: {str(exc) or 'No further details'}", msg_box.MsgBox.warn, more=tb)
+                glassesTools.gui.utils.push_popup(self, glassesTools.gui.msg_box.msgbox, "Processing error", f"A background process has failed:\n{type(exc).__name__}: {str(exc) or 'No further details'}", glassesTools.gui.msg_box.MsgBox.warn, more=tb)
                 return
-            utils.push_popup(self, msg_box.msgbox, "Processing error", f"Something went wrong in an asynchronous task of a separate thread:\n\n{tb}", msg_box.MsgBox.error)
+            glassesTools.gui.utils.push_popup(self, glassesTools.gui.msg_box.msgbox, "Processing error", f"Something went wrong in an asynchronous task of a separate thread:\n\n{tb}", glassesTools.gui.msg_box.MsgBox.error)
         async_thread.done_callback = asyncexcepthook
 
     def _load_fonts(self):
@@ -107,7 +108,7 @@ class GUI:
         msg_box_size = 69.
         large_icons_params = hello_imgui.FontLoadingParams()
         large_icons_params.glyph_ranges = selected_glyphs_to_ranges([ifa6.ICON_FA_CIRCLE_QUESTION, ifa6.ICON_FA_CIRCLE_INFO, ifa6.ICON_FA_TRIANGLE_EXCLAMATION])
-        self._icon_font = msg_box.icon_font = \
+        self._icon_font = glassesTools.gui.msg_box.icon_font = \
             hello_imgui.load_font("fonts/Font_Awesome_6_Free-Solid-900.otf", msg_box_size, large_icons_params)
 
     def _setup_glfw(self):
@@ -116,7 +117,7 @@ class GUI:
 
     def _drop_callback(self, _: glfw._GLFWwindow, items: list[str]):
         paths = [pathlib.Path(item) for item in items]
-        if self.popup_stack and isinstance(picker := self.popup_stack[-1], file_picker.FilePicker):
+        if self.popup_stack and isinstance(picker := self.popup_stack[-1], glassesTools.gui.file_picker.FilePicker):
             picker.set_dir(paths)
         else:
             if self.project_dir is not None:
@@ -125,7 +126,7 @@ class GUI:
             else:
                 # load project
                 if len(paths)!=1 or not (path := paths[0]).is_dir():
-                    utils.push_popup(msg_box.msgbox, "Project opening error", "Only a single project directory should be drag-dropped on the glassesValidator GUI.", msg_box.MsgBox.error, more="Dropped paths:\n"+('\n'.join([str(p) for p in paths])))
+                    glassesTools.gui.utils.push_popup(glassesTools.gui.msg_box.msgbox, "Project opening error", "Only a single project directory should be drag-dropped on the glassesValidator GUI.", glassesTools.gui.msg_box.MsgBox.error, more="Dropped paths:\n"+('\n'.join([str(p) for p in paths])))
                 else:
                     callbacks.try_load_project(self, path, 'loading')
 
@@ -263,7 +264,7 @@ class GUI:
     def _show_menu_gui(self):
         # this is always called, so we handle popups and other state here
         self._check_project_setup_state()
-        utils.handle_popup_stack(self.popup_stack)
+        glassesTools.gui.utils.handle_popup_stack(self.popup_stack)
         self._update_jobs_and_process_pool()
         # also handle showing of debug windows
         if self._show_demo_window:
@@ -272,7 +273,7 @@ class GUI:
         # now actual menu
         if imgui.begin_menu("Help"):
             if imgui.menu_item("About", "", False)[0]:
-                utils.push_popup(self, self._about_popup_drawer)
+                glassesTools.gui.utils.push_popup(self, self._about_popup_drawer)
             self._show_demo_window = imgui.menu_item("Debug window", "", self._show_demo_window)[1]
             imgui.end_menu()
 
@@ -434,15 +435,15 @@ class GUI:
         session_level = job.recording is None
         if state==process.State.Failed:
             exc = future.exception()    # should not throw exception since CancelledError is already encoded in state and future is done
-            tb = utils.get_traceback(type(exc), exc, exc.__traceback__)
+            tb = glassesTools.gui.utils.get_traceback(type(exc), exc, exc.__traceback__)
             lbl = f'session "{job.session}"'
             if not session_level:
                 lbl += f', recording "{job.recording}"'
             lbl += f' (work item {job_id}, action {job.action.displayable_name})'
             if isinstance(exc, concurrent.futures.TimeoutError):
-                utils.push_popup(self, msg_box.msgbox, "Processing error", f"A worker process has failed for {lbl}:\n{type(exc).__name__}: {str(exc) or 'No further details'}\n\nPossible causes include:\n - You are running with too many workers, try lowering them in settings", msg_box.MsgBox.warn, more=tb)
+                glassesTools.gui.utils.push_popup(self, glassesTools.gui.msg_box.msgbox, "Processing error", f"A worker process has failed for {lbl}:\n{type(exc).__name__}: {str(exc) or 'No further details'}\n\nPossible causes include:\n - You are running with too many workers, try lowering them in settings", glassesTools.gui.msg_box.MsgBox.warn, more=tb)
                 return
-            utils.push_popup(self, msg_box.msgbox, "Processing error", f"Something went wrong in a worker process for {lbl}:\n\n{tb}", msg_box.MsgBox.error)
+            glassesTools.gui.utils.push_popup(self, glassesTools.gui.msg_box.msgbox, "Processing error", f"Something went wrong in a worker process for {lbl}:\n\n{tb}", glassesTools.gui.msg_box.MsgBox.error)
 
         # clean up, if needed, when a task failed or was canceled
         if job.action==process.Action.IMPORT and state in [process.State.Canceled, process.State.Failed]:
@@ -468,7 +469,7 @@ class GUI:
             self.study_config = config.Study.load_from_json(config_dir, strict_check=False)
             self._reload_sessions()
         except Exception as e:
-            utils.push_popup(self, msg_box.msgbox, "Project loading error", f"Failed to load the project at {self.project_dir}:\n{e}\n\n{utils.get_traceback(e)}", msg_box.MsgBox.error)
+            glassesTools.gui.utils.push_popup(self, glassesTools.gui.msg_box.msgbox, "Project loading error", f"Failed to load the project at {self.project_dir}:\n{e}\n\n{utils.glassesTools.gui.get_traceback(e)}", glassesTools.gui.msg_box.MsgBox.error)
             self.close_project()
             return
 
@@ -598,10 +599,10 @@ class GUI:
 
         imgui.set_cursor_pos((but_x, but_y))
         if imgui.button(ifa6.ICON_FA_FOLDER_PLUS+" New project", size=(but_width, but_height)):
-            utils.push_popup(self, callbacks.get_folder_picker(self, reason='creating'))
+            glassesTools.gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='creating'))
         imgui.same_line(spacing=10*imgui.get_style().item_spacing.x)
         if imgui.button(ifa6.ICON_FA_FOLDER_OPEN+" Open project", size=(but_width, but_height)):
-            utils.push_popup(self, callbacks.get_folder_picker(self, reason='loading'))
+            glassesTools.gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='loading'))
 
     def _project_settings_pane_drawer(self):
         def _indicate_needs_attention():
@@ -656,7 +657,7 @@ class GUI:
                 new_config.check_valid(strict_check=False)
             except Exception as e:
                 # do not persist invalid config, inform user of problem
-                utils.push_popup(self, msg_box.msgbox, "Settings error", f"You cannot make this change to the project's settings:\n{e}", msg_box.MsgBox.error)
+                glassesTools.gui.utils.push_popup(self, glassesTools.gui.msg_box.msgbox, "Settings error", f"You cannot make this change to the project's settings:\n{e}", glassesTools.gui.msg_box.MsgBox.error)
             else:
                 # persist changed config
                 self.study_config = new_config
@@ -823,7 +824,7 @@ class GUI:
                 ifa6.ICON_FA_CHECK+" Create recording": (lambda: (callbacks.make_recording_definition(self.study_config, new_rec_type, new_rec_name), self._reload_sessions()), lambda: not _valid_rec_name() or new_rec_type is None),
                 ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
             }
-            utils.push_popup(self, lambda: utils.popup("Add recording", _add_rec_popup, buttons = buttons, outside=False))
+            glassesTools.gui.utils.push_popup(self, lambda: glassesTools.gui.utils.popup("Add recording", _add_rec_popup, buttons = buttons, outside=False))
 
     def _plane_editor_pane_drawer(self):
         if not self.study_config.planes:
@@ -899,7 +900,7 @@ class GUI:
                 ifa6.ICON_FA_CHECK+" Create plane": (lambda: callbacks.make_plane(self.study_config, new_plane_type, new_plane_name), lambda: not _valid_plane_name() or new_plane_type is None),
                 ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
             }
-            utils.push_popup(self, lambda: utils.popup("Add plane", _add_plane_popup, buttons = buttons, outside=False))
+            glassesTools.gui.utils.push_popup(self, lambda: glassesTools.gui.utils.popup("Add plane", _add_plane_popup, buttons = buttons, outside=False))
 
     def _episode_setup_pane_drawer(self):
         if not self.study_config.episodes_to_code:
@@ -931,7 +932,7 @@ class GUI:
                 new_config.check_valid(strict_check=False)
             except Exception as e:
                 # do not persist invalid config, inform user of problem
-                utils.push_popup(self, msg_box.msgbox, "Settings error", f"You cannot make this change to the project's settings:\n{e}", msg_box.MsgBox.error)
+                glassesTools.gui.utils.push_popup(self, glassesTools.gui.msg_box.msgbox, "Settings error", f"You cannot make this change to the project's settings:\n{e}", glassesTools.gui.msg_box.MsgBox.error)
             else:
                 # persist changed config
                 self.study_config = new_config
@@ -1025,7 +1026,7 @@ class GUI:
                 ifa6.ICON_FA_CHECK+" Create marker": (lambda: callbacks.make_individual_marker(self.study_config, new_mark_id, new_mark_size), lambda: not _valid_mark_id() or new_mark_size<=0.),
                 ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
             }
-            utils.push_popup(self, lambda: utils.popup("Add marker", _add_rec_popup, buttons = buttons, outside=False))
+            glassesTools.gui.utils.push_popup(self, lambda: glassesTools.gui.utils.popup("Add marker", _add_rec_popup, buttons = buttons, outside=False))
 
     def _get_pending_running_job_list(self) -> set[utils.JobInfo]:
         active_jobs: set[utils.JobInfo] = set()
@@ -1073,7 +1074,7 @@ class GUI:
                 else:
                     for r in actions[a]:
                         self._launch_task(session_name, r, a)
-            utils.draw_hover_text(hover_text, '')
+            glassesTools.gui.utils.draw_hover_text(hover_text, '')
 
     def _open_session_detail(self, sess: session.Session):
         win_name = f'{sess.name}##session_view'
@@ -1110,7 +1111,7 @@ class GUI:
                     self.session_config_overrides[sess.name] = config.StudyOverride.from_study_diff(new_config, self.study_config, config.OverrideLevel.Session)
                 except Exception as e:
                     # do not persist invalid config, inform user of problem
-                    utils.push_popup(self, msg_box.msgbox, "Settings error", f"You cannot make this change to the settings for session {sess.name}:\n{e}", msg_box.MsgBox.error)
+                    glassesTools.gui.utils.push_popup(self, glassesTools.gui.msg_box.msgbox, "Settings error", f"You cannot make this change to the settings for session {sess.name}:\n{e}", glassesTools.gui.msg_box.MsgBox.error)
                 else:
                     # persist changed config
                     self.session_config_overrides[sess.name].store_as_json(sess.working_directory)
@@ -1129,7 +1130,7 @@ class GUI:
                         self.recording_config_overrides[sess.name][r] = config.StudyOverride.from_study_diff(new_config, effective_config_for_session, config.OverrideLevel.Recording)
                     except Exception as e:
                         # do not persist invalid config, inform user of problem
-                        utils.push_popup(self, msg_box.msgbox, "Settings error", f"You cannot make this change to the settings for recording {r} in session {sess.name}:\n{e}", msg_box.MsgBox.error)
+                        glassesTools.gui.utils.push_popup(self, glassesTools.gui.msg_box.msgbox, "Settings error", f"You cannot make this change to the settings for recording {r} in session {sess.name}:\n{e}", glassesTools.gui.msg_box.MsgBox.error)
                     else:
                         # persist changed config
                         self.recording_config_overrides[sess.name][r].store_as_json(sess.recordings[r].info.working_directory)
@@ -1224,7 +1225,7 @@ class GUI:
                 if imgui.selectable("BibTeX", False)[0]:
                     imgui.set_clipboard_text(reference_bibtex)
                 imgui.end_popup()
-            utils.draw_hover_text(text='', hover_text="Right-click to copy citation to clipboard")
+            glassesTools.gui.utils.draw_hover_text(text='', hover_text="Right-click to copy citation to clipboard")
 
             imgui.pop_text_wrap_pos()
-        return utils.popup("About gazeMapper", popup_content, closable=True, outside=True)
+        return glassesTools.gui.utils.popup("About gazeMapper", popup_content, closable=True, outside=True)

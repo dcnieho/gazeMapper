@@ -3,9 +3,11 @@ import typing
 import shutil
 from imgui_bundle import icons_fontawesome_6 as ifa6
 
+import glassesTools
+import glassesTools.gui
 from glassesValidator.config import deploy_validation_config, get_validation_setup
 
-from . import file_picker, msg_box, utils
+from . import utils
 from ... import config, marker, plane, session
 
 def get_folder_picker(g, reason: str):
@@ -22,7 +24,7 @@ def get_folder_picker(g, reason: str):
         case 'loading' | 'creating':
             header = "Select or drop project folder"
             allow_multiple = False
-    picker = file_picker.DirPicker(title=header, allow_multiple=allow_multiple, callback=select_callback)
+    picker = glassesTools.gui.file_picker.DirPicker(title=header, allow_multiple=allow_multiple, callback=select_callback)
     picker.set_show_only_dirs(False)
     return picker
 
@@ -31,10 +33,10 @@ def try_load_project(g, path: str|pathlib.Path, action='loading'):
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
     if isinstance(path,list):
         if not path:
-            utils.push_popup(g, msg_box.msgbox, "Project opening error", "A single project directory should be provided. None provided so cannot open.", msg_box.MsgBox.error, more="Dropped paths:\n"+('\n'.join([str(p) for p in path])))
+            glassesTools.gui.utils.push_popup(g, glassesTools.gui.msg_box.msgbox, "Project opening error", "A single project directory should be provided. None provided so cannot open.", glassesTools.gui.msg_box.MsgBox.error, more="Dropped paths:\n"+('\n'.join([str(p) for p in path])))
             return
         elif len(path)>1:
-            utils.push_popup(g, msg_box.msgbox, "Project opening error", f"Only a single project directory should be provided, but {len(path)} were provided. Cannot open multiple projects.", msg_box.MsgBox.error, more="Dropped paths:\n"+('\n'.join([str(p) for p in path])))
+            glassesTools.gui.utils.push_popup(g, glassesTools.gui.msg_box.msgbox, "Project opening error", f"Only a single project directory should be provided, but {len(path)} were provided. Cannot open multiple projects.", glassesTools.gui.msg_box.MsgBox.error, more="Dropped paths:\n"+('\n'.join([str(p) for p in path])))
             return
         else:
             path = path[0]
@@ -46,14 +48,14 @@ def try_load_project(g, path: str|pathlib.Path, action='loading'):
                 ifa6.ICON_FA_CHECK+" Yes": lambda: g.load_project(path),
                 ifa6.ICON_FA_CIRCLE_XMARK+" No": None
             }
-            utils.push_popup(g, msg_box.msgbox, "Create new project", "The selected folder is already a project folder.\nDo you want to open it?", msg_box.MsgBox.question, buttons)
+            glassesTools.gui.utils.push_popup(g, glassesTools.gui.msg_box.msgbox, "Create new project", "The selected folder is already a project folder.\nDo you want to open it?", glassesTools.gui.msg_box.MsgBox.question, buttons)
         else:
             g.load_project(path)
     elif any(path.iterdir()):
         if action=='creating':
-            utils.push_popup(g, msg_box.msgbox, "Project creation error", "The selected folder is not empty. Cannot be used to create a project folder.", msg_box.MsgBox.error)
+            glassesTools.gui.utils.push_popup(g, glassesTools.gui.msg_box.msgbox, "Project creation error", "The selected folder is not empty. Cannot be used to create a project folder.", glassesTools.gui.msg_box.MsgBox.error)
         else:
-            utils.push_popup(g, msg_box.msgbox, "Project opening error", "The selected folder is not a project folder. Cannot open.", msg_box.MsgBox.error)
+            glassesTools.gui.utils.push_popup(g, glassesTools.gui.msg_box.msgbox, "Project opening error", "The selected folder is not a project folder. Cannot open.", glassesTools.gui.msg_box.MsgBox.error)
     else:
         def init_project_and_ask():
             utils.init_project_folder(path)
@@ -61,7 +63,7 @@ def try_load_project(g, path: str|pathlib.Path, action='loading'):
                 ifa6.ICON_FA_CHECK+" Yes": lambda: g.load_project(path),
                 ifa6.ICON_FA_CIRCLE_XMARK+" No": None
             }
-            utils.push_popup(g, msg_box.msgbox, "Open new project", "Do you want to open the new project folder?", msg_box.MsgBox.question, buttons)
+            glassesTools.gui.utils.push_popup(g, glassesTools.gui.msg_box.msgbox, "Open new project", "Do you want to open the new project folder?", glassesTools.gui.msg_box.MsgBox.question, buttons)
         if action=='creating':
             init_project_and_ask()
         else:
@@ -69,7 +71,7 @@ def try_load_project(g, path: str|pathlib.Path, action='loading'):
                 ifa6.ICON_FA_CHECK+" Yes": lambda: init_project_and_ask(),
                 ifa6.ICON_FA_CIRCLE_XMARK+" No": None
             }
-            utils.push_popup(g, msg_box.msgbox, "Create new project", "The selected folder is empty. Do you want to use it as a new project folder?", msg_box.MsgBox.warn, buttons)
+            glassesTools.gui.utils.push_popup(g, glassesTools.gui.msg_box.msgbox, "Create new project", "The selected folder is empty. Do you want to use it as a new project folder?", glassesTools.gui.msg_box.MsgBox.warn, buttons)
 
 def make_plane(study_config: config.Study, p_type: plane.Type, name: str):
     path = config.guess_config_dir(study_config.working_directory)

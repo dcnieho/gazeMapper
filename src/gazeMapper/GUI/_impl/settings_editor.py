@@ -6,11 +6,12 @@ import enum
 
 from imgui_bundle import imgui, imgui_md, icons_fontawesome_6 as ifa6
 
-from glassesTools.timeline_gui import color_darken
-from glassesTools import utils as gt_utils
+import glassesTools
+import glassesTools.gui
+from glassesTools.gui.timeline import color_darken
 
 from ... import type_utils, typed_dict_defaults
-from . import colors, utils
+from . import colors
 
 
 val_to_str_registry: dict[typing.Type, dict[typing.Any, str]] = {
@@ -69,7 +70,7 @@ def _get_base_type(f_type: typing.Type) -> typing.Type:
 
 def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_getter: typing.Callable[[],set[_T]]|None) -> tuple[bool, typing.Type, typing.Type, bool]:
     # peel off union with None, if any
-    f_type, nullable = gt_utils.unpack_none_union(f_type)
+    f_type, nullable = glassesTools.utils.unpack_none_union(f_type)
     base_type = _get_base_type(f_type)
     if callable(possible_value_getter) or (isinstance(possible_value_getter, list) and all([callable(c) for c in possible_value_getter])):
         if not isinstance(possible_value_getter,list):
@@ -151,7 +152,7 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
                     imgui.pop_style_color()
                     if isinstance(problems[f],str) or (isinstance(problems[f],dict) and 'problem_with_this_key' in problems[f]):
                         msg = problems[f] if isinstance(problems[f],str) else problems[f]['problem_with_this_key']
-                        utils.draw_hover_text(msg, text='')
+                        glassesTools.gui.utils.draw_hover_text(msg, text='')
                 this_changed, made_obj, new_sub_obj, removed = draw_dict_editor(this_obj, f_type, level+1, possible_value_getters=possible_value_getters.get(f,None) if possible_value_getters else None, parent_obj=this_parent, problems=problems.get(f,None) if isinstance(problems, dict) else {}, fixed=fixed.get(f,None), nullable=this_nullable, removable=this_has_remove)
                 if removed:
                     removed_field = f
@@ -166,7 +167,7 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
                 imgui.pop_style_color()
                 if isinstance(problems[f],str) or (isinstance(problems[f],dict) and 'problem_with_this_key' in problems[f]):
                     msg = problems[f] if isinstance(problems[f],str) else problems[f]['problem_with_this_key']
-                    utils.draw_hover_text(msg, text='')
+                    glassesTools.gui.utils.draw_hover_text(msg, text='')
             continue
 
         # simple field, set up for drawing
@@ -339,7 +340,7 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
                 ifa6.ICON_FA_CHECK+f" {'Add' if missing_fields else 'Create'} item": (_do_add_item, lambda: not _valid_item_name() or (not missing_fields and new_item_type is None)),
                 ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
             }
-            utils.push_popup(_gui_instance, lambda: utils.popup("Add item", _add_item_popup, buttons = buttons, outside=False))
+            glassesTools.gui.utils.push_popup(_gui_instance, lambda: glassesTools.gui.utils.popup("Add item", _add_item_popup, buttons = buttons, outside=False))
     if table_is_started:
         imgui.end_table()
     if nullable and not made_or_replaced_obj:
@@ -403,7 +404,7 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
         imgui.align_text_to_frame_padding()
         imgui.text_colored(colors.error, field_lbl)
         if isinstance(problem,str):
-            utils.draw_hover_text(problem,text='')
+            glassesTools.gui.utils.draw_hover_text(problem,text='')
     elif is_default or is_parent or is_none or fixed:
         imgui.align_text_to_frame_padding()
         imgui.text_colored(imgui.ImVec4(*color_darken(imgui.ImColor(imgui.get_style_color_vec4(imgui.Col_.text)), .75)), field_lbl)
