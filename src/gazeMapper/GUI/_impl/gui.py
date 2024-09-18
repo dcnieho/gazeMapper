@@ -543,8 +543,10 @@ class GUI:
         self._window_list = [self._sessions_pane, self._project_settings_pane, self._action_list_pane]
 
         # stop watching for config changes
-        self.config_watcher_stop_event.set()
-        self.config_watcher.result()
+        if self.config_watcher_stop_event is not None:
+            self.config_watcher_stop_event.set()
+        if self.config_watcher is not None:
+            self.config_watcher.result()
         self.config_watcher = None
         self.config_watcher_stop_event = None
 
