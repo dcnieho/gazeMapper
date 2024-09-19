@@ -1040,11 +1040,11 @@ class GUI:
     def _session_context_menu(self, session_name: str):
         sess = self.sessions[session_name]
         actions = process.get_possible_actions(sess.state, {r:sess.recordings[r].state for r in sess.recordings}, {a for a in process.Action if a!=process.Action.IMPORT}, self.study_config)
-        self._draw_session_context_menu(session_name, self._filter_session_context_menu_actions(session_name, actions))
+        self._draw_session_context_menu(session_name, None, self._filter_session_context_menu_actions(session_name, actions))
     def _recording_context_menu(self, session_name: str, rec_name: str):
         sess = self.sessions[session_name]
         actions = process.get_possible_actions(sess.state, {rec_name:sess.recordings[rec_name].state}, {a for a in process.Action if a!=process.Action.IMPORT and not process.is_session_level_action(a)}, self.study_config)
-        self._draw_session_context_menu(session_name, actions)
+        self._draw_session_context_menu(session_name, rec_name, actions)
     def _filter_session_context_menu_actions(self, session_name: str, actions: dict[process.Action,bool|list[str]]) -> dict[process.Action,bool|list[str]]:
         if not actions:
             return {}
@@ -1061,10 +1061,8 @@ class GUI:
                 if recs:
                     actions_filt[a] = recs
         return actions_filt
-    def _draw_session_context_menu(self, session_name: str, actions: dict[process.Action,bool|list[str]]):
+    def _draw_session_context_menu(self, session_name: str, rec_name: str|None, actions: dict[process.Action,bool|list[str]]):
         # draw menu
-        if not actions:
-            imgui.text_colored(colors.gray, '* No actions possible')
         for a in actions:
             if process.is_session_level_action(a):
                 hover_text = f'Run {a.displayable_name} for session: {session_name}'
@@ -1077,6 +1075,15 @@ class GUI:
                     for r in actions[a]:
                         self._launch_task(session_name, r, a)
             glassesTools.gui.utils.draw_hover_text(hover_text, '')
+        lbl = session_name + rec_name if rec_name else ''
+        if rec_name:
+            working_directory = self.sessions[session_name].recordings[rec_name].info.working_directory
+        else:
+            working_directory = self.sessions[session_name].working_directory
+        if imgui.selectable(ifa6.ICON_FA_FOLDER_OPEN + f" Open working folder##{lbl}", False)[0]:
+            callbacks.open_folder(working_directory)
+        if imgui.selectable(ifa6.ICON_FA_TRASH_CAN + f" Delete working folder##{lbl}", False)[0]:
+            callbacks.remove_folder(working_directory)
 
     def _open_session_detail(self, sess: session.Session):
         win_name = f'{sess.name}##session_view'

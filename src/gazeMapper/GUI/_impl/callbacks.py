@@ -1,6 +1,9 @@
 import pathlib
 import typing
 import shutil
+import os
+import asyncio
+import subprocess
 from imgui_bundle import icons_fontawesome_6 as ifa6
 
 import glassesTools
@@ -137,3 +140,29 @@ def delete_individual_marker(study_config: config.Study, mark: marker.Marker):
     study_config.individual_markers = [m for m in study_config.individual_markers if m.id!=mark.id]
     # store config
     study_config.store_as_json()
+
+def open_url(path: str):
+    # this works for files, folders and URLs
+    if glassesTools.platform.os==glassesTools.platform.Os.Windows:
+        os.startfile(path)
+    else:
+        if glassesTools.platform.os==glassesTools.platform.Os.Linux:
+            open_util = "xdg-open"
+        elif glassesTools.platform.os==glassesTools.platform.Os.MacOS:
+            open_util = "open"
+        glassesTools.async_thread.run(asyncio.create_subprocess_exec(
+            open_util, path,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        ))
+
+def open_folder(path: pathlib.Path):
+    if not path.is_dir():
+        glassesTools.gui.utils.push_popup(globals, glassesTools.gui.msg_box.msgbox, "Folder not found", f"The folder you're trying to open\n{path}\ncould not be found.", glassesTools.gui.msg_box.MsgBox.warn)
+        return
+    open_url(str(path))
+
+def remove_folder(folder: pathlib.Path):
+    if folder.is_dir():
+        shutil.rmtree(folder)
