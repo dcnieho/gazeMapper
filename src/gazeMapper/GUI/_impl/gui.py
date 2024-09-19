@@ -1162,13 +1162,14 @@ class GUI:
             imgui.text(f"OpenGL {'.'.join(str(gl.glGetInteger(num)) for num in (gl.GL_MAJOR_VERSION, gl.GL_MINOR_VERSION))}, PyOpenGL {OpenGL.__version__}")
             imgui.text(f"GLFW {'.'.join(str(num) for num in glfw.get_version())}, pyGLFW {glfw.__version__}")
             imgui_md.render(f"ImGui {imgui.get_version()}, [imgui_bundle {imgui_bundle.__version__}](https://github.com/pthom/imgui_bundle)")
-            if sys.platform.startswith("linux"):
-                imgui.text(f"{platform.system()} {platform.release()}")
-            elif sys.platform.startswith("win"):
-                rel = 11 if sys.getwindowsversion().build>22000 else platform.release()
-                imgui.text(f"{platform.system()} {rel} {platform.win32_edition()} ({platform.version()})")
-            elif sys.platform.startswith("darwin"):
-                imgui.text(f"{platform.system()} {platform.release()}")
+            match glassesTools.platform.os:
+                case glassesTools.platform.Os.Linux:
+                    imgui.text(f"{platform.system()} {platform.release()}")
+                case glassesTools.platform.Os.Windows:
+                    rel = 11 if sys.getwindowsversion().build>22000 else platform.release()
+                    imgui.text(f"{platform.system()} {rel} {platform.win32_edition()} ({platform.version()})")
+                case glassesTools.platform.Os.MacOS:
+                    imgui.text(f"{platform.system()} {platform.release()}")
             imgui.pop_text_wrap_pos()
             imgui.end_group()
             imgui.same_line()
