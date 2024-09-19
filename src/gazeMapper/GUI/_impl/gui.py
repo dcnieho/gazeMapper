@@ -9,6 +9,7 @@ from typing import Callable
 import copy
 import threading
 import time
+import pathvalidate
 
 import imgui_bundle
 from imgui_bundle import imgui, immapp, imgui_md, hello_imgui, glfw_utils, icons_fontawesome_6 as ifa6
@@ -581,6 +582,39 @@ class GUI:
             imgui.same_line()
             imgui.text_colored(colors.error, 'tab before you can import and process recording sessions.')
             return
+
+        if imgui.button('+ new session'):
+            new_sess_name = ''
+            def _valid_sess_name():
+                nonlocal new_sess_name
+                with self._sessions_lock:
+                    return new_sess_name and pathvalidate.is_valid_filename(new_sess_name, "auto") and not any((s==new_sess_name for s in self.sessions))
+            def _add_sess_popup():
+                nonlocal new_sess_name
+                imgui.dummy((30*imgui.calc_text_size('x').x,0))
+                if imgui.begin_table("##new_sess_info",2):
+                    imgui.table_setup_column("##new_sess_infos_left", imgui.TableColumnFlags_.width_fixed)
+                    imgui.table_setup_column("##new_sess_infos_right", imgui.TableColumnFlags_.width_stretch)
+                    imgui.table_next_row()
+                    imgui.table_next_column()
+                    imgui.align_text_to_frame_padding()
+                    invalid = not _valid_sess_name()
+                    if invalid:
+                        imgui.push_style_color(imgui.Col_.text, colors.error)
+                    imgui.text("Session name")
+                    if invalid:
+                        imgui.pop_style_color()
+                    imgui.table_next_column()
+                    imgui.set_next_item_width(-1)
+                    _,new_sess_name = imgui.input_text("##new_sess_name",new_sess_name)
+                    imgui.end_table()
+                return 0 if imgui.is_key_released(imgui.Key.enter) else None
+
+            buttons = {
+                ifa6.ICON_FA_CHECK+" Create session": (lambda: callbacks.make_session(self.project_dir, new_sess_name), lambda: not _valid_sess_name()),
+                ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
+            }
+            glassesTools.gui.utils.push_popup(self, lambda: glassesTools.gui.utils.popup("Add session", _add_sess_popup, buttons = buttons, outside=False))
 
         self._session_lister.draw()
 

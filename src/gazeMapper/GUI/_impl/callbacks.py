@@ -141,6 +141,11 @@ def delete_individual_marker(study_config: config.Study, mark: marker.Marker):
     # store config
     study_config.store_as_json()
 
+def make_session(project_dir: pathlib.Path, session_name: str):
+    sess_dir = project_dir/session_name
+    sess_dir.mkdir(exist_ok=True)
+    session.get_action_states(sess_dir, for_recording=False, create_if_missing=True)
+
 def open_url(path: str):
     # this works for files, folders and URLs
     if glassesTools.platform.os==glassesTools.platform.Os.Windows:
