@@ -311,7 +311,7 @@ def get_action_states(working_dir: str|pathlib.Path, for_recording: bool, create
     if action_states is None:
         if create_if_missing:
             _create_action_states_file(file, for_recording)
-            return _read_action_states(file, False)
+            return _read_action_states(file)
         elif not skip_if_missing:
             raise FileNotFoundError(f'Action states file {file} was not found')
     return action_states
