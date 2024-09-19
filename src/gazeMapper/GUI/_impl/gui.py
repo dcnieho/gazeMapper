@@ -1112,6 +1112,9 @@ class GUI:
         lbl = session_name + rec_name if rec_name else ''
         if rec_name:
             working_directory = self.sessions[session_name].recordings[rec_name].info.working_directory
+            source_directory = self.sessions[session_name].recordings[rec_name].info.source_directory
+            if source_directory.is_dir() and imgui.selectable(ifa6.ICON_FA_FOLDER_OPEN + f" Open source folder##{lbl}", False)[0]:
+                callbacks.open_folder(source_directory)
         else:
             working_directory = self.sessions[session_name].working_directory
         if imgui.selectable(ifa6.ICON_FA_FOLDER_OPEN + f" Open working folder##{lbl}", False)[0]:
