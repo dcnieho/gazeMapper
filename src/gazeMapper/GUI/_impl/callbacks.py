@@ -4,13 +4,13 @@ import shutil
 import os
 import asyncio
 import subprocess
-from imgui_bundle import icons_fontawesome_6 as ifa6
+from imgui_bundle import imgui, imspinner, hello_imgui, icons_fontawesome_6 as ifa6
 
 import glassesTools
 import glassesTools.gui
 from glassesValidator.config import deploy_validation_config, get_validation_setup
 
-from . import utils
+from . import colors, utils
 from ... import config, marker, plane, session
 
 def get_folder_picker(g, reason: str):
@@ -171,3 +171,167 @@ def open_folder(path: pathlib.Path):
 def remove_folder(folder: pathlib.Path):
     if folder.is_dir():
         shutil.rmtree(folder)
+
+async def _show_addable_recordings(g, paths: list[pathlib.Path], eye_tracker: glassesTools.eyetracker.EyeTracker):
+    from . import gui
+    g = typing.cast(gui.GUI,g)  # indicate type to typechecker
+    # notify we're preparing the recordings to be opened
+    def prepping_recs_popup():
+        spacing = 2 * imgui.get_style().item_spacing.x
+        color = (0.45, 0.09, 1.00, 1.00)
+        imgui.push_font(g._icon_font)
+        imgui.text_colored(color, ifa6.ICON_FA_CIRCLE_INFO)
+        imgui.pop_font()
+        imgui.same_line(spacing=spacing)
+
+        imgui.begin_group()
+        imgui.dummy((0,2*imgui.get_style().item_spacing.y))
+        text = f'Searching the path(s) you provided for {eye_tracker.value} recordings.'
+        imgui.text_unformatted(text)
+        imgui.dummy((0,3*imgui.get_style().item_spacing.y))
+        text_size = imgui.calc_text_size(text)
+        size_mult = hello_imgui.dpi_window_size_factor()
+        spinner_radii = [x*size_mult for x in [22, 16, 10]]
+        imgui.set_cursor_pos_x(imgui.get_cursor_pos_x()+(text_size.x-2*spinner_radii[0])/2)
+        imspinner.spinner_ang_triple('waitSpinner', *spinner_radii, 3.5*size_mult, c1=imgui.get_style_color_vec4(imgui.Col_.text), c2=colors.warning, c3=imgui.get_style_color_vec4(imgui.Col_.text))
+        imgui.dummy((0,2*imgui.get_style().item_spacing.y))
+        imgui.end_group()
+
+        imgui.same_line(spacing=spacing)
+        imgui.dummy((0, 0))
+    glassesTools.gui.utils.push_popup(g, lambda: glassesTools.gui.utils.popup("Preparing import", prepping_recs_popup, buttons = None, closable=False, outside=False))
+
+    # step 1, find what recordings of this type of eye tracker are in the path
+    recs = glassesTools.recording.find_recordings(paths, eye_tracker)
+    all_recs = []
+    dup_recs = []
+    for rec in recs:
+        # skip duplicates
+        if rec.source_directory not in (g.sessions[s].recordings[r].info.source_directory for s in g.sessions for r in g.sessions[s].recordings if g.sessions[s].recordings[r].definition.type==session.RecordingType.Eye_Tracker):
+            all_recs.append(rec)
+        else:
+            dup_recs.append(rec)
+
+    # get ready to show result
+    # 1. remove prepping recordings popup
+    del g.popup_stack[-1]
+
+    # 2. if nothing importable found, notify
+    if not all_recs:
+        if dup_recs:
+            msg = f"{eye_tracker.value} recordings were found in the specified import paths, but could not be imported as they are already part of sessions in this gazeMapper project."
+            more= "Duplicates that were not imported:\n"+('\n'.join([str(r.source_directory) for r in dup_recs]))
+        else:
+            msg = f"No {eye_tracker.value} recordings were found among the specified import paths."
+            more = None
+
+        glassesTools.gui.utils.push_popup(g, glassesTools.gui.msg_box.msgbox, "Nothing to import", msg, glassesTools.gui.msg_box.MsgBox.warn, more=more)
+        return
+
+    # 3. if something importable found, show to user so they can select the ones they want
+    # put in dict
+    recordings_to_add: dict[int, glassesTools.recording.Recording] = {}
+    recordings_selected_to_add: dict[int, bool] = {}
+    for iid,rec in enumerate(all_recs):
+        recordings_to_add[iid] = rec
+        recordings_selected_to_add[iid] = True
+
+    def _recording_context_menu(iid: int):
+        if imgui.selectable(ifa6.ICON_FA_FOLDER_OPEN + f" Open folder##{iid}", False)[0]:
+            open_folder(recordings_to_add[iid].source_directory)
+
+    recording_list = glassesTools.gui.recording_table.RecordingTable(recordings_to_add, recordings_selected_to_add, [], _recording_context_menu)
+    recording_list.set_local_item_remover()
+    def list_recs_popup():
+        nonlocal g, recording_list
+        spacing = 2 * imgui.get_style().item_spacing.x
+        imgui.same_line(spacing=spacing)
+
+        imgui.text_unformatted("Select which recordings you would like to import.")
+        imgui.dummy((0,1*imgui.get_style().item_spacing.y))
+
+        size_mult = hello_imgui.dpi_window_size_factor()
+        imgui.begin_child("##main_frame_adder", size=(800*size_mult,min(300*size_mult,(len(recording_list.recordings)+2)*imgui.get_frame_height_with_spacing())))
+        imgui.begin_child("##recording_list_frame_adder", size=(0,-imgui.get_frame_height_with_spacing()), window_flags=imgui.WindowFlags_.horizontal_scrollbar)
+        recording_list.draw()
+        imgui.end_child()
+        imgui.begin_child("##bottombar_frame_adder")
+        recording_list.filter_box_text, recording_list.require_sort = \
+            draw_filterbar(g, recording_list.filter_box_text, recording_list.require_sort)
+        imgui.end_child()
+        imgui.end_child()
+
+        imgui.same_line(spacing=spacing)
+        imgui.dummy((0,6*imgui.get_style().item_spacing.y))
+
+    buttons = {
+        ifa6.ICON_FA_CHECK+" Continue": lambda: glassesTools.async_thread.run(_add_recordings(recordings_to_add, recordings_selected_to_add)),
+        ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
+    }
+    glassesTools.gui.utils.push_popup(g, lambda: glassesTools.gui.utils.popup("Select recordings", list_recs_popup, buttons = buttons, closable=True, outside=False))
+
+def draw_filterbar(g, filter_box_text: str, require_sort: bool):
+    from . import gui
+    g = typing.cast(gui.GUI,g)  # indicate type to typechecker
+    imgui.set_next_item_width(-imgui.FLT_MIN)
+    _, value = imgui.input_text_with_hint(f"##filterbar", "Start typing to filter the list", filter_box_text, flags=imgui.InputTextFlags_.enter_returns_true)
+    if imgui.begin_popup_context_item(f"##filterbar_context"):
+        # Right click = more options context menu
+        if imgui.selectable(ifa6.ICON_FA_CLIPBOARD+" Paste", False)[0]:
+            value += imgui.get_clipboard_text() or ""
+        imgui.separator()
+        if imgui.selectable(ifa6.ICON_FA_CIRCLE_INFO+" More info", False)[0]:
+            glassesTools.gui.utils.push_popup(g,
+                glassesTools.gui.msg_box.msgbox, "About the filter bar",
+                "This is the filter bar. By typing inside it you can search your recording list inside the eye tracker, name, participant and project properties.",
+                glassesTools.gui.msg_box.MsgBox.info
+            )
+        imgui.end_popup()
+    if value != filter_box_text:
+        filter_box_text = value
+        require_sort = True
+
+    return filter_box_text, require_sort
+
+def add_recordings(g, paths: list[pathlib.Path]):
+    from . import gui
+    g = typing.cast(gui.GUI,g)  # indicate type to typechecker
+    combo_value = 0
+    eye_tracker = glassesTools.eyetracker.EyeTracker(glassesTools.eyetracker.eye_tracker_names[combo_value])
+
+    def add_recs_popup():
+        nonlocal g, combo_value, eye_tracker
+        spacing = 2 * imgui.get_style().item_spacing.x
+        color = (0.45, 0.09, 1.00, 1.00)
+        imgui.push_font(g._icon_font)
+        imgui.text_colored(color, ifa6.ICON_FA_CIRCLE_INFO)
+        imgui.pop_font()
+        imgui.same_line(spacing=spacing)
+
+        imgui.begin_group()
+        imgui.dummy((0,2*imgui.get_style().item_spacing.y))
+        imgui.text_unformatted("For which eye tracker would you like to import recordings?")
+        imgui.dummy((0,3*imgui.get_style().item_spacing.y))
+        full_width = imgui.get_content_region_avail().x
+        imgui.push_item_width(full_width*.4)
+        imgui.set_cursor_pos_x(full_width*.3)
+        changed, combo_value = imgui.combo("##select_eye_tracker", combo_value, glassesTools.eyetracker.eye_tracker_names)
+        imgui.pop_item_width()
+        imgui.dummy((0,2*imgui.get_style().item_spacing.y))
+
+        imgui.end_group()
+        imgui.same_line(spacing=spacing)
+        imgui.dummy((0, 0))
+
+        if changed:
+            eye_tracker = glassesTools.eyetracker.EyeTracker(glassesTools.eyetracker.eye_tracker_names[combo_value])
+
+        return combo_value, eye_tracker
+
+    buttons = {
+        ifa6.ICON_FA_CHECK+" Continue": lambda: glassesTools.async_thread.run(_show_addable_recordings(g, paths, eye_tracker)),
+        ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
+    }
+
+    # ask what type of eye tracker we should be looking for
+    glassesTools.gui.utils.push_popup(g, lambda: glassesTools.gui.utils.popup("Select eye tracker", add_recs_popup, buttons = buttons, closable=True, outside=True))

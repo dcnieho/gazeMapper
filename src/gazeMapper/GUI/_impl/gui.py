@@ -123,7 +123,7 @@ class GUI:
         else:
             if self.project_dir is not None:
                 # import recordings
-                pass
+                callbacks.add_recordings(self, paths)
             else:
                 # load project
                 if len(paths)!=1 or not (path := paths[0]).is_dir():
