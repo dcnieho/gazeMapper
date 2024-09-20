@@ -231,7 +231,7 @@ class List:
             imgui.text_colored(colors.error, '-')
         else:
             if process.is_session_level_action(action):
-                draw_process_state(item.state[action], item.name)
+                draw_process_state(item.state[action])
             else:
                 not_completed = item.action_not_completed_recordings(action)
                 n_rec = len(item.definition.recordings)
@@ -268,7 +268,7 @@ class List:
             sort_specs_in.specs_dirty = False
             self._require_sort = False
 
-def draw_process_state(state: process.State, iid: int|str):
+def draw_process_state(state: process.State):
     symbol_size = imgui.calc_text_size(ifa6.ICON_FA_CIRCLE)
     match state:
         case process.State.Not_Run:
@@ -277,12 +277,12 @@ def draw_process_state(state: process.State, iid: int|str):
         case process.State.Pending:
             radius    = symbol_size.x / 2
             thickness = symbol_size.x / 3 / 2.5 # 3 is number of dots, 2.5 is nextItemKoeff in imspinner.spinner_bounce_dots()
-            imspinner.spinner_bounce_dots(f'waitBounceDots_{iid}', radius, thickness, color=imgui.get_style_color_vec4(imgui.Col_.text))
+            imspinner.spinner_bounce_dots(f'waitBounceDots', radius, thickness, color=imgui.get_style_color_vec4(imgui.Col_.text))
             hover_text = 'Pending'
         case process.State.Running:
             spinner_radii = [x/22/2*symbol_size.x for x in [22, 16, 10]]
             lw = 3.5/22/2*symbol_size.x
-            imspinner.spinner_ang_triple(f'runSpinner_{iid}', *spinner_radii, lw, c1=imgui.get_style_color_vec4(imgui.Col_.text), c2=colors.warning, c3=imgui.get_style_color_vec4(imgui.Col_.text))
+            imspinner.spinner_ang_triple(f'runSpinner', *spinner_radii, lw, c1=imgui.get_style_color_vec4(imgui.Col_.text), c2=colors.warning, c3=imgui.get_style_color_vec4(imgui.Col_.text))
             hover_text = 'Running'
         case process.State.Completed:
             imgui.text_colored(colors.ok, ifa6.ICON_FA_CIRCLE_CHECK)
