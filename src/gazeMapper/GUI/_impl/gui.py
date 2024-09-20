@@ -547,7 +547,7 @@ class GUI:
                 glassesTools.gui.utils.draw_hover_text(f'Not applicable to a {item.definition.type.value} recording','')
         # build set of column, trigger column rebuild
         columns = [
-            glassesTools.gui.recording_table.ColumnSpec(1,ifa6.ICON_FA_SIGNATURE+" Recording name",imgui.TableColumnFlags_.default_sort | imgui.TableColumnFlags_.no_hide, lambda rec: imgui.text(rec.name), lambda iid: iid, "Recording name")
+            glassesTools.gui.recording_table.ColumnSpec(1,ifa6.ICON_FA_SIGNATURE+" Recording name",imgui.TableColumnFlags_.default_sort | imgui.TableColumnFlags_.no_hide, lambda rec: imgui.text(rec.definition.name), lambda iid: iid, "Recording name")
         ]+[
             glassesTools.gui.recording_table.ColumnSpec(2+c, a.displayable_name, imgui.TableColumnFlags_.angled_header, lambda rec, a=a: _draw_status(a, rec), lambda iid, a=a: self.sessions[sess].recordings[iid].state[a]) for c,a in enumerate(actions)
         ]
