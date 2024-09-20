@@ -5,7 +5,7 @@ import numpy as np
 from typing import Any, Callable
 
 from glassesTools import annotation, aruco, drawing, marker as gt_marker, plane as gt_plane
-from glassesTools.video_gui import GUI
+from glassesTools.gui.video_player import GUI
 
 
 from .. import config, episode, marker, naming, plane, process, session, synchronization

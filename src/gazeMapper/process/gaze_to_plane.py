@@ -1,8 +1,9 @@
 import pathlib
 import threading
 
-from glassesTools import annotation, gaze_headref, gaze_worldref, ocv, plane as gt_plane, worldgaze_gui
-from glassesTools.video_gui import GUI
+from glassesTools import annotation, gaze_headref, gaze_worldref, ocv, plane as gt_plane
+from glassesTools.gui import worldgaze as worldgaze_gui
+from glassesTools.gui.video_player import GUI
 
 
 from .. import config, episode, naming, plane, process, session, synchronization

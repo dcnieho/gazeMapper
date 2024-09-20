@@ -11,7 +11,7 @@ if isMacOS:
     import AppKit
 
 from glassesTools import annotation, gaze_headref, ocv, plane, timestamps, video_utils
-from glassesTools.signal_gui import GUI, TargetPos
+from glassesTools.gui.signal_sync import GUI, TargetPos
 
 
 from . import _utils

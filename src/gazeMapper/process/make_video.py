@@ -8,7 +8,7 @@ import threading
 import copy
 
 from glassesTools import annotation, aruco, drawing, intervals, gaze_headref, gaze_worldref, ocv, plane, timestamps, transforms, utils
-from glassesTools.video_gui import GUI
+from glassesTools.gui.video_player import GUI
 
 from .. import config, episode, marker, naming, process, session, synchronization
 from .detect_markers import _get_plane_setup, _get_sync_function

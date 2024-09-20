@@ -13,7 +13,7 @@ if isMacOS:
     import AppKit
 
 from glassesTools import annotation, drawing, gaze_headref, gaze_worldref, ocv, plane, timestamps
-from glassesTools.video_gui import GUI
+from glassesTools.gui.video_player import GUI
 
 
 from .. import config, episode, naming, process, session
