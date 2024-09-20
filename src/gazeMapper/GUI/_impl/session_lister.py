@@ -7,14 +7,12 @@ import glassesTools
 from . import colors
 from ... import process, session
 
-_ItemType = typing.TypeVar('_ItemType', session.Session, session.Recording)
 
-class List(typing.Generic[_ItemType]):
+class List:
     def __init__(self,
-                 items: dict[int|str, _ItemType],
+                 items: dict[int|str, session.Session],
             items_lock: threading.Lock,
         selected_items: dict[int|str, bool],
-        for_recordings: bool = False,
         info_callback: typing.Callable = None,
         item_context_callback: typing.Callable = None):
 
@@ -30,9 +28,7 @@ class List(typing.Generic[_ItemType]):
         self._require_sort: bool = True
 
         self.display_actions: list[process.Action] = []
-        self.for_recordings = for_recordings
-        self._has_recordings_col = not for_recordings
-        self._view_column_count_base = 2+self._has_recordings_col    # selector, name, recordings
+        self._view_column_count_base = 3    # selector, name, recordings
         self._view_column_count = None
 
         self._last_y = None
@@ -78,9 +74,8 @@ class List(typing.Generic[_ItemType]):
             checkbox_width = frame_height-2*imgui.get_style().frame_padding.y
             imgui.table_setup_column("Selector", imgui.TableColumnFlags_.no_hide | imgui.TableColumnFlags_.no_sort | imgui.TableColumnFlags_.no_reorder | imgui.TableColumnFlags_.no_header_label, init_width_or_weight=checkbox_width)  # 0
             imgui.table_setup_column("Name", imgui.TableColumnFlags_.default_sort | imgui.TableColumnFlags_.no_hide)  # 1
-            if self._has_recordings_col:
-                imgui.table_setup_column("Recordings", imgui.TableColumnFlags_.angled_header)  # 2
-            for k in process.Action:   # 2+ or 3+
+            imgui.table_setup_column("Recordings", imgui.TableColumnFlags_.angled_header)  # 2
+            for k in process.Action:   # 3+
                 if k in self.display_actions:
                     imgui.table_setup_column(k.displayable_name, imgui.TableColumnFlags_.angled_header)
 
@@ -186,7 +181,7 @@ class List(typing.Generic[_ItemType]):
                                     config_button_hovered = imgui.is_item_hovered()
                                     imgui.same_line()
                                 imgui.text(item.name)
-                            case 2 if self._has_recordings_col:
+                            case 2:
                                 # Number of recordings
                                 n_rec = len(item.definition.recordings)
                                 missing_recs = item.missing_recordings()
@@ -230,26 +225,19 @@ class List(typing.Generic[_ItemType]):
             # show menu when right-clicking the empty space
             # TODO
 
-    def _draw_status_widget(self, item: _ItemType, action: process.Action):
-        if self.for_recordings:
-            if process.is_action_possible_for_recording_type(action, item.definition.type):
+    def _draw_status_widget(self, item: session.Session, action: process.Action):
+        if not item.has_all_recordings():
+            imgui.text_colored(colors.error, '-')
+        else:
+            if process.is_session_level_action(action):
                 draw_process_state(item.state[action], item.name)
             else:
-                imgui.text('-')
-                glassesTools.gui.utils.draw_hover_text(f'Not applicable to a {item.definition.type.value} recording','')
-        else:
-            if not item.has_all_recordings():
-                imgui.text_colored(colors.error, '-')
-            else:
-                if process.is_session_level_action(action):
-                    draw_process_state(item.state[action], item.name)
-                else:
-                    not_completed = item.action_not_completed_recordings(action)
-                    n_rec = len(item.definition.recordings)
-                    clr = colors.error if not_completed else colors.ok
-                    imgui.text_colored(clr, f'{n_rec-len(not_completed)}/{n_rec}')
-                    if not_completed:
-                        glassesTools.gui.utils.draw_hover_text('not completed for recordings:\n'+'\n'.join(not_completed),'')
+                not_completed = item.action_not_completed_recordings(action)
+                n_rec = len(item.definition.recordings)
+                clr = colors.error if not_completed else colors.ok
+                imgui.text_colored(clr, f'{n_rec-len(not_completed)}/{n_rec}')
+                if not_completed:
+                    glassesTools.gui.utils.draw_hover_text('not completed for recordings:\n'+'\n'.join(not_completed),'')
         if self.item_context_callback and imgui.begin_popup_context_item(f"##{item.name}_{action}_context"):
             self.item_context_callback(item.name)
             imgui.end_popup()
@@ -266,17 +254,14 @@ class List(typing.Generic[_ItemType]):
                 match sort_spec.column_index:
                     case 1:     # Name
                         key = lambda iid: self.items[iid].name
-                    case 2 if self._has_recordings_col:     # Number of recordings
+                    case 2:     # Number of recordings
                         key = lambda iid: self.items[iid].num_present_recordings()
                     case _:     # status indicators
                         action = self.display_actions[sort_spec.column_index-self._view_column_count_base]
-                        if self.for_recordings:
-                            key = lambda iid: self.items[iid].state[action]
+                        if process.is_session_level_action(action):
+                            key = lambda iid: 999 if not self.items[iid].has_all_recordings() else self.items[iid].state[action]
                         else:
-                            if process.is_session_level_action(action):
-                                key = lambda iid: 999 if not self.items[iid].has_all_recordings() else self.items[iid].state[action]
-                            else:
-                                key = lambda iid: 999 if not self.items[iid].has_all_recordings() else self.items[iid].action_completed_num_recordings(action)
+                            key = lambda iid: 999 if not self.items[iid].has_all_recordings() else self.items[iid].action_completed_num_recordings(action)
                 ids.sort(key=key, reverse=sort_spec.get_sort_direction()==imgui.SortDirection.descending)
             self.sorted_ids = ids
             sort_specs_in.specs_dirty = False
