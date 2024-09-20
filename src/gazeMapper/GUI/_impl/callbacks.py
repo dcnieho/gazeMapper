@@ -172,7 +172,7 @@ def remove_folder(folder: pathlib.Path):
     if folder.is_dir():
         shutil.rmtree(folder)
 
-async def _show_addable_recordings(g, paths: list[pathlib.Path], eye_tracker: glassesTools.eyetracker.EyeTracker):
+async def _show_addable_recordings(g, paths: list[pathlib.Path], eye_tracker: glassesTools.eyetracker.EyeTracker, sessions: list[str]):
     from . import gui
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
     # notify we're preparing the recordings to be opened
@@ -203,8 +203,8 @@ async def _show_addable_recordings(g, paths: list[pathlib.Path], eye_tracker: gl
 
     # step 1, find what recordings of this type of eye tracker are in the path
     recs = glassesTools.recording.find_recordings(paths, eye_tracker)
-    all_recs = []
-    dup_recs = []
+    all_recs: list[glassesTools.recording.Recording] = []
+    dup_recs: list[glassesTools.recording.Recording] = []
     for rec in recs:
         # skip duplicates
         if rec.source_directory not in (g.sessions[s].recordings[r].info.source_directory for s in g.sessions for r in g.sessions[s].recordings if g.sessions[s].recordings[r].definition.type==session.RecordingType.Eye_Tracker):
@@ -230,34 +230,37 @@ async def _show_addable_recordings(g, paths: list[pathlib.Path], eye_tracker: gl
 
     # 3. if something importable found, show to user so they can select the ones they want
     # put in dict
-    recordings_to_add: dict[int, glassesTools.recording.Recording] = {}
-    recordings_selected_to_add: dict[int, bool] = {}
-    for iid,rec in enumerate(all_recs):
-        recordings_to_add[iid] = rec
-        recordings_selected_to_add[iid] = True
+    recordings_to_add = {i:r for i,r in enumerate(all_recs)}
 
     def _recording_context_menu(iid: int):
         if imgui.selectable(ifa6.ICON_FA_FOLDER_OPEN + f" Open folder##{iid}", False)[0]:
             open_folder(recordings_to_add[iid].source_directory)
 
-    recording_list = glassesTools.gui.recording_table.RecordingTable(recordings_to_add, recordings_selected_to_add, [], _recording_context_menu)
+    recording_list = glassesTools.gui.recording_table.RecordingTable(recordings_to_add, None, [], _recording_context_menu)
     recording_list.set_local_item_remover()
     def list_recs_popup():
         nonlocal g, recording_list
         spacing = 2 * imgui.get_style().item_spacing.x
         imgui.same_line(spacing=spacing)
 
-        imgui.text_unformatted("Select which recordings you would like to import.")
+        imgui.text_unformatted("Select which recordings you would like to import. Drag each to a recording in a session on the left. Add new sessions if needed")
         imgui.dummy((0,1*imgui.get_style().item_spacing.y))
 
         size_mult = hello_imgui.dpi_window_size_factor()
-        imgui.begin_child("##main_frame_adder", size=(800*size_mult,min(300*size_mult,(len(recording_list.recordings)+2)*imgui.get_frame_height_with_spacing())))
+        imgui.begin_child("##main_frame_adder", size=(1260*size_mult,min(400*size_mult,(len(recording_list.recordings)+2)*imgui.get_frame_height_with_spacing())))
+        imgui.begin_child("##session_list", size=(600*size_mult,0))
+        for s in sessions:
+            imgui.text(s)
+        imgui.end_child()
+        imgui.same_line()
+        imgui.begin_child("##import_source")
         imgui.begin_child("##recording_list_frame_adder", size=(0,-imgui.get_frame_height_with_spacing()), window_flags=imgui.WindowFlags_.horizontal_scrollbar)
         recording_list.draw()
         imgui.end_child()
         imgui.begin_child("##bottombar_frame_adder")
         recording_list.filter_box_text, recording_list.require_sort = \
             draw_filterbar(g, recording_list.filter_box_text, recording_list.require_sort)
+        imgui.end_child()
         imgui.end_child()
         imgui.end_child()
 
@@ -293,11 +296,13 @@ def draw_filterbar(g, filter_box_text: str, require_sort: bool):
 
     return filter_box_text, require_sort
 
-def add_recordings(g, paths: list[pathlib.Path]):
+def add_eyetracking_recordings(g, paths: list[pathlib.Path], sessions: list[str]):
     from . import gui
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
     combo_value = 0
     eye_tracker = glassesTools.eyetracker.EyeTracker(glassesTools.eyetracker.eye_tracker_names[combo_value])
+    if not sessions:
+        sessions = [s for s in g.sessions if not g.sessions[s].has_all_recordings()]
 
     def add_recs_popup():
         nonlocal g, combo_value, eye_tracker
@@ -329,7 +334,7 @@ def add_recordings(g, paths: list[pathlib.Path]):
         return combo_value, eye_tracker
 
     buttons = {
-        ifa6.ICON_FA_CHECK+" Continue": lambda: glassesTools.async_thread.run(_show_addable_recordings(g, paths, eye_tracker)),
+        ifa6.ICON_FA_CHECK+" Continue": lambda: glassesTools.async_thread.run(_show_addable_recordings(g, paths, eye_tracker, sessions)),
         ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
     }
 

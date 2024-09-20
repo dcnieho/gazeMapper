@@ -123,7 +123,7 @@ class GUI:
         else:
             if self.project_dir is not None:
                 # import recordings
-                callbacks.add_recordings(self, paths)
+                callbacks.add_eyetracking_recordings(self, paths, [s for s in self._selected_sessions if self._selected_sessions[s] and not self.sessions[s].has_all_recordings()])
             else:
                 # load project
                 if len(paths)!=1 or not (path := paths[0]).is_dir():
