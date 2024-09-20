@@ -530,11 +530,12 @@ class GUI:
             not self.need_setup_plane and \
             not self.need_setup_episode
 
-    def _session_lister_set_actions_to_show(self, lister: session_lister.List[session.Session|session.Recording], for_recordings=False):
+    def _session_lister_set_actions_to_show(self, lister: session_lister.List):
         if self.study_config is None:
             lister.set_actions_to_show(set())
+            return
 
-        actions = process.get_actions_for_config(self.study_config, exclude_session_level=for_recordings)
+        actions = process.get_actions_for_config(self.study_config, exclude_session_level=False)
         lister.set_actions_to_show(actions)
 
     def close_project(self):
