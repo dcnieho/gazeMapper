@@ -41,10 +41,9 @@ class GUI:
         self._selected_sessions: dict[str, bool]                        = {}
         self._session_lister = session_lister.List(self.sessions, self._sessions_lock, self._selected_sessions, info_callback=self._open_session_detail, item_context_callback=self._session_context_menu)
 
-        self.recording_config_overrides: dict[str, dict[str, config.StudyOverride]] = {}
-        self._recording_listers  : dict[str, session_lister.List[session.Recording]]= {}
-        self._recordings_lock    : dict[str, threading.Lock]                        = {}
-        self._selected_recordings: dict[str, dict[str, bool]]                       = {}
+        self.recording_config_overrides: dict[str, dict[str, config.StudyOverride]]             = {}
+        self._recording_listers  : dict[str, glassesTools.gui.recording_table.RecordingTable]   = {}
+        self._selected_recordings: dict[str, dict[str, bool]]                                   = {}
 
         self._possible_value_getters: dict[str] = {}
 
@@ -225,7 +224,6 @@ class GUI:
                     # cleanup
                     self.session_config_overrides.pop(sess_name)
                     self.recording_config_overrides.pop(sess_name)
-                    self._recordings_lock.pop(sess_name)
                     self._selected_recordings.pop(sess_name)
                     self._recording_listers.pop(sess_name)
 
@@ -538,6 +536,23 @@ class GUI:
         actions = process.get_actions_for_config(self.study_config, exclude_session_level=False)
         lister.set_actions_to_show(actions)
 
+    def _recording_lister_set_actions_to_show(self, lister: glassesTools.gui.recording_table.RecordingTable, sess: str):
+        config = self.session_config_overrides[sess].apply(self.study_config, strict_check=False)
+        actions = process.get_actions_for_config(config, exclude_session_level=True)
+        def _draw_status(action: process.Action, item: session.Recording):
+            if process.is_action_possible_for_recording_type(action, item.definition.type):
+                session_lister.draw_process_state(item.state[action])
+            else:
+                imgui.text('-')
+                glassesTools.gui.utils.draw_hover_text(f'Not applicable to a {item.definition.type.value} recording','')
+        # build set of column, trigger column rebuild
+        columns = [
+            glassesTools.gui.recording_table.ColumnSpec(1,ifa6.ICON_FA_SIGNATURE+" Recording name",imgui.TableColumnFlags_.default_sort | imgui.TableColumnFlags_.no_hide, lambda rec: imgui.text(rec.name), lambda iid: iid, "Recording name")
+        ]+[
+            glassesTools.gui.recording_table.ColumnSpec(2+c, a.displayable_name, imgui.TableColumnFlags_.angled_header, lambda rec, a=a: _draw_status(a, rec), lambda iid, a=a: self.sessions[sess].recordings[iid].state[a]) for c,a in enumerate(actions)
+        ]
+        lister.build_columns(columns)
+
     def close_project(self):
         self._project_settings_pane.is_visible = False
         self._action_list_pane.is_visible = False
@@ -700,8 +715,8 @@ class GUI:
                 self.study_config = new_config
                 self.study_config.store_as_json()
                 self._session_lister_set_actions_to_show(self._session_lister)
-                for iid in self._recording_listers:
-                    self._session_lister_set_actions_to_show(self._recording_listers[iid], for_recordings=True)
+                for sess in self._recording_listers:
+                    self._recording_lister_set_actions_to_show(self._recording_listers[sess], sess)
 
     def _action_list_pane_drawer(self):
         if not self.job_scheduler.jobs:
@@ -1138,18 +1153,19 @@ class GUI:
             self._window_list = window_list
             self._to_dock = [win_name]
             self._to_focus= win_name
-            self._recordings_lock[sess.name] = threading.Lock()
             self._selected_recordings[sess.name] = {k:False for k in sess.recordings}
-            self._recording_listers[sess.name] = session_lister.List(sess.recordings, self._recordings_lock[sess.name], self._selected_recordings[sess.name], for_recordings=True, item_context_callback=lambda rec_name: self._recording_context_menu(sess.name, rec_name))
-            self._session_lister_set_actions_to_show(self._recording_listers[sess.name], for_recordings=True)
+            self._recording_listers[sess.name] = glassesTools.gui.recording_table.RecordingTable(sess.recordings, self._selected_recordings[sess.name], None, lambda r: r.info, item_context_callback=lambda rec_name: self._recording_context_menu(sess.name, rec_name))
             self.session_config_overrides[sess.name] = config.load_or_create_override(config.OverrideLevel.Session, sess.working_directory)
             self.recording_config_overrides[sess.name] = {}
+            for r in sess.recordings:
+                self.recording_config_overrides[sess.name][r] = config.load_or_create_override(config.OverrideLevel.Recording, sess.recordings[r].info.working_directory)
+            self._recording_lister_set_actions_to_show(self._recording_listers[sess.name], sess.name)
 
     def _session_detail_GUI(self, sess: session.Session):
         missing_recs = sess.missing_recordings()
         if missing_recs:
             imgui.text_colored(colors.error,'*The following recordings are missing for this session:\n'+'\n'.join(missing_recs))
-        self._recording_listers[sess.name].draw(True)
+        self._recording_listers[sess.name].draw(limit_outer_size=True)
         sess_changed = False
         if imgui.tree_node_ex('Setting overrides for this session',imgui.TreeNodeFlags_.framed):
             fields = config.StudyOverride.get_allowed_parameters(config.OverrideLevel.Session)[0]
@@ -1168,8 +1184,6 @@ class GUI:
             imgui.tree_pop()
         for r in sess.recordings:
             if imgui.tree_node_ex(f'Setting overrides for {r} recording',imgui.TreeNodeFlags_.framed):
-                if r not in self.recording_config_overrides[sess.name]:
-                    self.recording_config_overrides[sess.name][r] = config.load_or_create_override(config.OverrideLevel.Recording, sess.recordings[r].info.working_directory)
                 fields = config.StudyOverride.get_allowed_parameters(config.OverrideLevel.Recording)[0]
                 effective_config_for_session = self.session_config_overrides[sess.name].apply(self.study_config, strict_check=False)
                 effective_config = self.recording_config_overrides[sess.name][r].apply(effective_config_for_session, strict_check=False)
