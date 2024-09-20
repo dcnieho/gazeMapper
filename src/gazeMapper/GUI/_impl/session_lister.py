@@ -152,7 +152,8 @@ class List:
                             selectable_clicked, selectable_out = imgui.selectable(f"##{iid}_hitbox", self.selected_items[iid], flags=imgui.SelectableFlags_.span_all_columns|imgui.SelectableFlags_.allow_overlap|imgui.internal.SelectableFlagsPrivate_.select_on_click, size=(0,frame_height+cell_padding_y))
                             imgui.set_cursor_pos_y(cur_pos_y)   # instead of imgui.same_line(), we just need this part of its effect
                             imgui.pop_style_var(3)
-                            selectable_right_clicked = glassesTools.gui.utils.handle_item_hitbox_events(iid, self.selected_items, context_menu=self.item_context_callback)
+                            selectable_right_clicked, selectables_edited = glassesTools.gui.utils.handle_item_hitbox_events(iid, self.selected_items, context_menu=self.item_context_callback)
+                            self._require_sort |= selectables_edited
                             has_drawn_hitbox = True
 
                         if num_columns_drawn==1:
