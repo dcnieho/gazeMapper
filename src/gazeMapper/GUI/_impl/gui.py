@@ -771,7 +771,7 @@ class GUI:
                             imgui.text(f'{job_id}')
                         case 1:
                             # Status
-                            session_lister.draw_process_state((job_state:=jobs[job_id].get_state()), job_id)
+                            session_lister.draw_process_state((job_state:=jobs[job_id].get_state()))
                             if job_state in [process.State.Pending, process.State.Running]:
                                 imgui.same_line()
                                 if imgui.button(ifa6.ICON_FA_HAND+f' Cancel##{job_id}'):

@@ -31,7 +31,6 @@ class Recording:
     def __init__(self, definition: RecordingDefinition, info:EyeTrackerRecording|camera_recording.Recording|None=None):
         self.definition = definition
         self.info       = info
-        self.name       = self.definition.name  # for easy access and consistency with Session object
 
         self.state: dict[process.Action, process.State] = {}
         self.load_action_states(True)
