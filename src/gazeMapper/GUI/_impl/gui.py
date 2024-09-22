@@ -1132,11 +1132,13 @@ class GUI:
             source_directory = self.sessions[session_name].recordings[rec_name].info.source_directory
             if source_directory.is_dir() and imgui.selectable(ifa6.ICON_FA_FOLDER_OPEN + f" Open source folder##{lbl}", False)[0]:
                 callbacks.open_folder(source_directory)
+            but_lbls = ('working', 'recording')
         else:
             working_directory = self.sessions[session_name].working_directory
-        if imgui.selectable(ifa6.ICON_FA_FOLDER_OPEN + f" Open working folder##{lbl}", False)[0]:
+            but_lbls = ('session', 'session')
+        if imgui.selectable(ifa6.ICON_FA_FOLDER_OPEN + f" Open {but_lbls[0]} folder##{lbl}", False)[0]:
             callbacks.open_folder(working_directory)
-        if imgui.selectable(ifa6.ICON_FA_TRASH_CAN + f" Delete working folder##{lbl}", False)[0]:
+        if imgui.selectable(ifa6.ICON_FA_TRASH_CAN + f" Delete {but_lbls[1]}##{lbl}", False)[0]:
             callbacks.remove_folder(working_directory)
             changed = True
         return changed
