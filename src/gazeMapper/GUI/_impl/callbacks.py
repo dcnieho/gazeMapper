@@ -267,36 +267,113 @@ async def _show_addable_recordings(g, paths: list[pathlib.Path], eye_tracker: gl
         glassesTools.gui.utils.push_popup(g, glassesTools.gui.msg_box.msgbox, "Nothing to import", msg, glassesTools.gui.msg_box.MsgBox.warn, more=more)
         return
 
-    # 3. if something importable found, show to user so they can select the ones they want
-    # put in dict
+    # 3. if something importable found, show to user so they can assign them to recordings in sessions
     recordings_to_add = {i:r for i,r in enumerate(all_recs)}
+    recording_assignment: dict[str, dict[str, int]] = {}
+    rec_names = [r.name for r in g.study_config.session_def.recordings]
+    selected_slot: tuple(str,str) = None
 
-    def _recording_context_menu(iid: int):
+    def _recording_context_menu(iid: int) -> bool:
+        nonlocal selected_slot
         if imgui.selectable(ifa6.ICON_FA_FOLDER_OPEN + f" Open folder##{iid}", False)[0]:
             open_folder(recordings_to_add[iid].source_directory)
+        if selected_slot is not None and imgui.selectable(ifa6.ICON_FA_ARROW_LEFT + f" Assign to selected recording", False)[0]:
+            recording_assignment[selected_slot[0]][selected_slot[1]] = iid
+            selected_slot = None
+            recording_list.require_sort = True
+        return False
 
-    recording_list = glassesTools.gui.recording_table.RecordingTable(recordings_to_add, None, [], _recording_context_menu)
+    def _add_new_session(new_sess: str):
+        sessions.append(new_sess)
+
+    recording_list = glassesTools.gui.recording_table.RecordingTable(recordings_to_add, None, item_context_callback=_recording_context_menu)
     recording_list.set_local_item_remover()
+    recording_list.set_act_as_drag_drop_source(True)
+    not_assigned_filter = glassesTools.gui.recording_table.Filter(lambda iid, _: iid not in (recording_assignment[s][r] for s in recording_assignment for r in recording_assignment[s]))
+    recording_list.add_filter(not_assigned_filter)
     def list_recs_popup():
-        nonlocal g, recording_list
+        nonlocal selected_slot
         spacing = 2 * imgui.get_style().item_spacing.x
         imgui.same_line(spacing=spacing)
 
-        imgui.text_unformatted("Select which recordings you would like to import. Drag each to a recording in a session on the left. Add new sessions if needed")
+        imgui.text_unformatted("Select which recordings you would like to import. Assign a recording from the list on the right to a recording in a session on the left by dragging and dropping it. Add new sessions if needed")
         imgui.dummy((0,1*imgui.get_style().item_spacing.y))
 
         size_mult = hello_imgui.dpi_window_size_factor()
         imgui.begin_child("##main_frame_adder", size=(1260*size_mult,min(400*size_mult,(len(recording_list.recordings)+2)*imgui.get_frame_height_with_spacing())))
         imgui.begin_child("##session_list", size=(600*size_mult,0))
+        if imgui.button('+ new session'):
+            new_session_button(g, _add_new_session)
         for s in sessions:
-            imgui.text(s)
+            sess = g.sessions.get(s, None)
+            if sess is None:
+                continue
+            if sess.name not in recording_assignment:
+                recording_assignment[sess.name] = {}
+            if imgui.tree_node_ex(sess.name):
+                table_opened = False
+                for r in rec_names:
+                    disable = False
+                    rec: glassesTools.recording.Recording = None
+                    if r in sess.recordings:
+                        rec = sess.recordings[r].info
+                        disable = True
+                    elif r in recording_assignment[sess.name]:
+                        rec = recordings_to_add[recording_assignment[sess.name][r]]
+                    if rec is not None:
+                        if disable:
+                            imgui.begin_disabled()
+                        if table_opened or imgui.begin_table(f'##{sess.name}', 4, imgui.TableFlags_.sizing_fixed_fit):
+                            table_opened = True
+                            imgui.table_next_column()
+                            imgui.align_text_to_frame_padding()
+                            if not disable:
+                                imgui.selectable(r, False, imgui.SelectableFlags_.span_all_columns|imgui.SelectableFlags_.allow_overlap)
+                                if imgui.begin_popup_context_item(f"##{sess.name}_{r}_context"):
+                                    if imgui.selectable(ifa6.ICON_FA_ARROW_RIGHT + f" Unassign this recording", False)[0]:
+                                        recording_assignment[sess.name].pop(r, None)
+                                        recording_list.require_sort = True
+                                    imgui.end_popup()
+                            else:
+                                imgui.text(r)
+                            imgui.table_next_column()
+                            recording_list.draw_eye_tracker_widget(rec, align=True)
+                            imgui.table_next_column()
+                            imgui.text(rec.name)
+                            imgui.table_next_column()
+                            imgui.text(rec.participant)
+                        if disable:
+                            imgui.end_disabled()
+                    else:
+                        if table_opened:
+                            table_opened = False
+                            imgui.end_table()
+                        selected = False if not selected_slot else (sess.name,r)==selected_slot
+                        interacted, was_selected = imgui.selectable(f'drop recording here to assign##{sess.name}_{r}', selected)
+                        if interacted:
+                            if was_selected:
+                                selected_slot = (sess.name,r)
+                            else:
+                                selected_slot = None
+                        if imgui.begin_drag_drop_target():
+                            payload = imgui.accept_drag_drop_payload_py_id("RECORDING")
+                            if payload is not None:
+                                recording_assignment[sess.name][r] = payload.data_id
+                                recording_list.require_sort = True
+                            imgui.end_drag_drop_target()
+
+                if table_opened:
+                    table_opened = False
+                    imgui.end_table()
+                imgui.tree_pop()
+
         imgui.end_child()
         imgui.same_line()
         imgui.begin_child("##import_source")
-        imgui.begin_child("##recording_list_frame_adder", size=(0,-imgui.get_frame_height_with_spacing()), window_flags=imgui.WindowFlags_.horizontal_scrollbar)
+        imgui.begin_child("##recording_list_frame", size=(0,-imgui.get_frame_height_with_spacing()), window_flags=imgui.WindowFlags_.horizontal_scrollbar)
         recording_list.draw()
         imgui.end_child()
-        imgui.begin_child("##bottombar_frame_adder")
+        imgui.begin_child("##recording_list_bottombar_frame")
         recording_list.filter_box_text, recording_list.require_sort = \
             draw_filterbar(g, recording_list.filter_box_text, recording_list.require_sort)
         imgui.end_child()
@@ -310,7 +387,7 @@ async def _show_addable_recordings(g, paths: list[pathlib.Path], eye_tracker: gl
         ifa6.ICON_FA_CHECK+" Continue": lambda: glassesTools.async_thread.run(_add_recordings(recordings_to_add, recordings_selected_to_add)),
         ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
     }
-    glassesTools.gui.utils.push_popup(g, lambda: glassesTools.gui.utils.popup("Select recordings", list_recs_popup, buttons = buttons, closable=True, outside=False))
+    glassesTools.gui.utils.push_popup(g, lambda: glassesTools.gui.utils.popup("Assign and import recordings", list_recs_popup, buttons = buttons, closable=True, outside=False))
 
 def draw_filterbar(g, filter_box_text: str, require_sort: bool):
     from . import gui
@@ -344,7 +421,7 @@ def add_eyetracking_recordings(g, paths: list[pathlib.Path], sessions: list[str]
         sessions = [s for s in g.sessions if not g.sessions[s].has_all_recordings()]
 
     def add_recs_popup():
-        nonlocal g, combo_value, eye_tracker
+        nonlocal combo_value, eye_tracker
         spacing = 2 * imgui.get_style().item_spacing.x
         color = (0.45, 0.09, 1.00, 1.00)
         imgui.push_font(g._icon_font)
