@@ -12,7 +12,7 @@ import glassesTools.gui
 from glassesValidator.config import deploy_validation_config, get_validation_setup
 
 from . import colors, utils
-from ... import config, marker, plane, session
+from ... import config, marker, plane, process, session
 
 def get_folder_picker(g, reason: str):
     from . import gui
@@ -384,10 +384,25 @@ async def _show_addable_recordings(g, paths: list[pathlib.Path], eye_tracker: gl
         imgui.dummy((0,6*imgui.get_style().item_spacing.y))
 
     buttons = {
-        ifa6.ICON_FA_CHECK+" Continue": lambda: glassesTools.async_thread.run(_add_recordings(recordings_to_add, recordings_selected_to_add)),
+        ifa6.ICON_FA_CHECK+" Continue": lambda: glassesTools.async_thread.run(_import_recordings(g, recordings_to_add, recording_assignment)),
         ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
     }
     glassesTools.gui.utils.push_popup(g, lambda: glassesTools.gui.utils.popup("Assign and import recordings", list_recs_popup, buttons = buttons, closable=True, outside=False))
+
+async def _import_recordings(g, recordings: list[glassesTools.recording.Recording], recording_assignment: dict[str, dict[str, int]]):
+    from . import gui
+    g = typing.cast(gui.GUI,g)  # indicate type to typechecker
+    for s in recording_assignment:
+        sess = g.sessions.get(s, None)
+        if sess is None:
+            continue
+        for r in recording_assignment[s]:
+            rec = recordings[recording_assignment[s][r]]
+            # first create recording only in memory
+            sess.add_recording_from_info(r, rec)
+            # then launch import task
+            g.launch_task(s, r, process.Action.IMPORT)
+
 
 def draw_filterbar(g, filter_box_text: str, require_sort: bool):
     from . import gui
