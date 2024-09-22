@@ -117,33 +117,28 @@ class Session:
         if not (self.working_directory/Session.status_file_name).is_file():
             _create_action_states_file(self.working_directory, False)
 
-    def import_recording(self, which: str, do_copy_video: bool|None = None, source_dir_as_relative_path: bool|None = None, cam_cal_file: str|pathlib.Path=None):
+    def import_recording(self, which: str, cam_cal_file: str|pathlib.Path=None, **kwargs):
+        from . import config
         rec_def = self.definition.get_recording_def(which)
-        if do_copy_video is None or source_dir_as_relative_path is None:
-            from . import config
-            config_dir = config.guess_config_dir(self.working_directory)
-            study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: self.working_directory})
-            if do_copy_video is None:
-                do_copy_video = study_config.import_do_copy_video
-            if source_dir_as_relative_path is None:
-                source_dir_as_relative_path = study_config.import_source_dir_as_relative_path
+        config_dir = config.guess_config_dir(self.working_directory)
+        study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: self.working_directory}, **kwargs)
 
         # do import
         rec_info = self.recordings[which].info
         rec_info.working_directory = self.working_directory / rec_def.name
         if rec_def.type==RecordingType.Eye_Tracker:
-            rec_info = importing.do_import(rec_info=rec_info, copy_scene_video=do_copy_video, source_dir_as_relative_path=source_dir_as_relative_path, cam_cal_file=cam_cal_file)
+            rec_info = importing.do_import(rec_info=rec_info, copy_scene_video=study_config.import_do_copy_video, source_dir_as_relative_path=study_config.import_source_dir_as_relative_path, cam_cal_file=cam_cal_file)
         else:
-            rec_info = camera_recording.do_import(rec_info=rec_info, copy_video=do_copy_video, source_dir_as_relative_path=source_dir_as_relative_path, cam_cal_file=cam_cal_file)
+            rec_info = camera_recording.do_import(rec_info=rec_info, copy_video=study_config.import_do_copy_video, source_dir_as_relative_path=study_config.import_source_dir_as_relative_path, cam_cal_file=cam_cal_file)
         self._update_recording_info(which, rec_info)    # the import call may have updated the info (e.g. filled in recording length that wasn't known from metadata). Update what we hold in memory
         # denote import finished
         _create_action_states_file(rec_info.working_directory, True)
-        update_action_states(rec_info.working_directory, process.Action.IMPORT, process.State.Completed)
-        self.recordings[which].load_action_states()
+        update_action_states(rec_info.working_directory, process.Action.IMPORT, process.State.Completed, study_config)
+        self.recordings[which].load_action_states(False)
 
-    def add_recording_and_import(self, which: str, rec_info: EyeTrackerRecording|camera_recording.Recording, do_copy_video: bool|None = None, source_dir_as_relative_path: bool|None = None, cam_cal_file: str|pathlib.Path=None) -> Recording:
+    def add_recording_and_import(self, which: str, rec_info: EyeTrackerRecording|camera_recording.Recording, cam_cal_file: str|pathlib.Path=None, **kwargs) -> Recording:
         rec = self.add_recording_from_info(which, rec_info)
-        self.import_recording(which, do_copy_video, source_dir_as_relative_path, cam_cal_file)
+        self.import_recording(which, cam_cal_file, **kwargs)
         return rec
 
     def load_existing_recordings(self):
