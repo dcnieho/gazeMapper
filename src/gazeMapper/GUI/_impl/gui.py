@@ -374,7 +374,7 @@ class GUI:
                 case _:
                     pass    # ignore, not of interest
 
-    def _launch_task(self, sess: str, recording: str|None, action: process.Action):
+    def launch_task(self, sess: str, recording: str|None, action: process.Action):
         # NB: this is run under lock, so sess and recording are valid
         job = utils.JobInfo(action, sess, recording)
         if action==process.Action.IMPORT:
@@ -1090,10 +1090,10 @@ class GUI:
                 hover_text = f'Run {a.displayable_name} for recordings:\n'+'\n'.join(actions[a])
             if imgui.selectable(f"{a.displayable_name}##{session_name}", False)[0]:
                 if process.is_session_level_action(a):
-                    self._launch_task(session_name, None, a)
+                    self.launch_task(session_name, None, a)
                 else:
                     for r in actions[a]:
-                        self._launch_task(session_name, r, a)
+                        self.launch_task(session_name, r, a)
             glassesTools.gui.utils.draw_hover_text(hover_text, '')
         lbl = session_name + rec_name if rec_name else ''
         if rec_name:
