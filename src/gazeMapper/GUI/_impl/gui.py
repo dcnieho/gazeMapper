@@ -1105,9 +1105,9 @@ class GUI:
         else:
             working_directory = self.sessions[session_name].working_directory
             but_lbls = ('session', 'session')
-        if imgui.selectable(ifa6.ICON_FA_FOLDER_OPEN + f" Open {but_lbls[0]} folder##{lbl}", False)[0]:
+        if working_directory and imgui.selectable(ifa6.ICON_FA_FOLDER_OPEN + f" Open {but_lbls[0]} folder##{lbl}", False)[0]:
             callbacks.open_folder(working_directory)
-        if imgui.selectable(ifa6.ICON_FA_TRASH_CAN + f" Delete {but_lbls[1]}##{lbl}", False)[0]:
+        if working_directory and imgui.selectable(ifa6.ICON_FA_TRASH_CAN + f" Delete {but_lbls[1]}##{lbl}", False)[0]:
             callbacks.remove_folder(working_directory)
             changed = True
         return changed
