@@ -455,4 +455,4 @@ def add_eyetracking_recordings(g, paths: list[pathlib.Path], sessions: list[str]
     }
 
     # ask what type of eye tracker we should be looking for
-    glassesTools.gui.utils.push_popup(g, lambda: glassesTools.gui.utils.popup("Select eye tracker", add_recs_popup, buttons = buttons, closable=True, outside=True))
+    glassesTools.gui.utils.push_popup(g, lambda: glassesTools.gui.utils.popup("Select eye tracker", add_recs_popup, buttons = buttons, closable=True, outside=False))
