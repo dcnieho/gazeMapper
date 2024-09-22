@@ -282,6 +282,8 @@ def _get_action_status_fname(for_recording: bool) -> str:
         return Session.status_file_name
 
 def _create_action_states_file(file: pathlib.Path, for_recording: bool):
+    if file.is_dir():
+        file /= _get_action_status_fname(for_recording)
     if for_recording:
         filt = lambda x: not process.is_session_level_action(x)
     else:
