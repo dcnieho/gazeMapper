@@ -4,6 +4,7 @@ import shutil
 import os
 import asyncio
 import subprocess
+import pathvalidate
 from imgui_bundle import imgui, imspinner, hello_imgui, icons_fontawesome_6 as ifa6
 
 import glassesTools
@@ -140,6 +141,44 @@ def delete_individual_marker(study_config: config.Study, mark: marker.Marker):
     study_config.individual_markers = [m for m in study_config.individual_markers if m.id!=mark.id]
     # store config
     study_config.store_as_json()
+
+def new_session_button(g, notify_func: typing.Callable[[str], None]|None = None):
+    from . import gui
+    g = typing.cast(gui.GUI,g)  # indicate type to typechecker
+    new_sess_name = ''
+    def _valid_sess_name():
+        return new_sess_name and pathvalidate.is_valid_filename(new_sess_name, "auto") and g.sessions.get(new_sess_name, None) is None
+    def _add_sess_popup():
+        nonlocal new_sess_name
+        imgui.dummy((30*imgui.calc_text_size('x').x,0))
+        if imgui.begin_table("##new_sess_info",2):
+            imgui.table_setup_column("##new_sess_infos_left", imgui.TableColumnFlags_.width_fixed)
+            imgui.table_setup_column("##new_sess_infos_right", imgui.TableColumnFlags_.width_stretch)
+            imgui.table_next_row()
+            imgui.table_next_column()
+            imgui.align_text_to_frame_padding()
+            invalid = not _valid_sess_name()
+            if invalid:
+                imgui.push_style_color(imgui.Col_.text, colors.error)
+            imgui.text("Session name")
+            if invalid:
+                imgui.pop_style_color()
+            imgui.table_next_column()
+            imgui.set_next_item_width(-1)
+            _,new_sess_name = imgui.input_text("##new_sess_name",new_sess_name)
+            imgui.end_table()
+        return 0 if imgui.is_key_released(imgui.Key.enter) else None
+
+    def _make_session():
+        make_session(g.project_dir, new_sess_name)
+        if notify_func is not None:
+            notify_func(new_sess_name)
+
+    buttons = {
+        ifa6.ICON_FA_CHECK+" Create session": (_make_session, lambda: not _valid_sess_name()),
+        ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
+    }
+    glassesTools.gui.utils.push_popup(g, lambda: glassesTools.gui.utils.popup("Add session", _add_sess_popup, buttons = buttons, outside=False))
 
 def make_session(project_dir: pathlib.Path, session_name: str):
     sess_dir = project_dir/session_name
