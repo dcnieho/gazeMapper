@@ -329,47 +329,49 @@ async def _show_addable_recordings(g, paths: list[pathlib.Path], eye_tracker: gl
                         disable = True
                     elif r in recording_assignment[sess.name]:
                         rec = recordings_to_add[recording_assignment[sess.name][r]]
-                    if rec is not None:
-                        if disable:
-                            imgui.begin_disabled()
-                        if table_opened or imgui.begin_table(f'##{sess.name}', 4, imgui.TableFlags_.sizing_fixed_fit):
-                            table_opened = True
-                            imgui.table_next_column()
-                            imgui.align_text_to_frame_padding()
-                            if not disable:
-                                imgui.selectable(r, False, imgui.SelectableFlags_.span_all_columns|imgui.SelectableFlags_.allow_overlap)
+                    has_rec = rec is not None
+                    if disable:
+                        imgui.begin_disabled()
+                    if table_opened or imgui.begin_table(f'##{sess.name}', 4, imgui.TableFlags_.sizing_fixed_fit):
+                        table_opened = True
+                        imgui.table_next_column()
+                        imgui.align_text_to_frame_padding()
+                        if not disable:
+                            selected = False if not selected_slot else (sess.name,r)==selected_slot
+                            interacted, was_selected = imgui.selectable(r, selected, imgui.SelectableFlags_.span_all_columns|imgui.SelectableFlags_.allow_overlap)
+                            if has_rec:
                                 if imgui.begin_popup_context_item(f"##{sess.name}_{r}_context"):
                                     if imgui.selectable(ifa6.ICON_FA_ARROW_RIGHT + f" Unassign this recording", False)[0]:
                                         recording_assignment[sess.name].pop(r, None)
                                         recording_list.require_sort = True
                                     imgui.end_popup()
                             else:
-                                imgui.text(r)
-                            imgui.table_next_column()
+                                if interacted:
+                                    if was_selected:
+                                        selected_slot = (sess.name,r)
+                                    else:
+                                        selected_slot = None
+                                if imgui.begin_drag_drop_target():
+                                    payload = imgui.accept_drag_drop_payload_py_id("RECORDING")
+                                    if payload is not None:
+                                        recording_assignment[sess.name][r] = payload.data_id
+                                        recording_list.require_sort = True
+                                    imgui.end_drag_drop_target()
+                        else:
+                            imgui.text(r)
+                        imgui.table_next_column()
+                        if has_rec:
                             recording_list.draw_eye_tracker_widget(rec, align=True)
-                            imgui.table_next_column()
+                        imgui.table_next_column()
+                        if has_rec:
                             imgui.text(rec.name)
-                            imgui.table_next_column()
+                        else:
+                            imgui.text('drop recording here to assign')
+                        imgui.table_next_column()
+                        if has_rec:
                             imgui.text(rec.participant)
-                        if disable:
-                            imgui.end_disabled()
-                    else:
-                        if table_opened:
-                            table_opened = False
-                            imgui.end_table()
-                        selected = False if not selected_slot else (sess.name,r)==selected_slot
-                        interacted, was_selected = imgui.selectable(f'{r}: drop recording here to assign##{sess.name}_{r}', selected)
-                        if interacted:
-                            if was_selected:
-                                selected_slot = (sess.name,r)
-                            else:
-                                selected_slot = None
-                        if imgui.begin_drag_drop_target():
-                            payload = imgui.accept_drag_drop_payload_py_id("RECORDING")
-                            if payload is not None:
-                                recording_assignment[sess.name][r] = payload.data_id
-                                recording_list.require_sort = True
-                            imgui.end_drag_drop_target()
+                    if disable:
+                        imgui.end_disabled()
 
                 if table_opened:
                     table_opened = False
