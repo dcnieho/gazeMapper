@@ -358,7 +358,7 @@ async def _show_addable_recordings(g, paths: list[pathlib.Path], eye_tracker: gl
                             table_opened = False
                             imgui.end_table()
                         selected = False if not selected_slot else (sess.name,r)==selected_slot
-                        interacted, was_selected = imgui.selectable(f'drop recording here to assign##{sess.name}_{r}', selected)
+                        interacted, was_selected = imgui.selectable(f'{r}: drop recording here to assign##{sess.name}_{r}', selected)
                         if interacted:
                             if was_selected:
                                 selected_slot = (sess.name,r)
