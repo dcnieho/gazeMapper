@@ -320,6 +320,8 @@ async def _show_addable_recordings(g, paths: list[pathlib.Path], eye_tracker: gl
             if imgui.tree_node_ex(sess.name):
                 table_opened = False
                 for r in rec_names:
+                    if sess.definition.get_recording_def(r).type!=session.RecordingType.Eye_Tracker:
+                        continue
                     disable = False
                     rec: glassesTools.recording.Recording = None
                     if r in sess.recordings:
