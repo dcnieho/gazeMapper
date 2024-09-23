@@ -623,7 +623,7 @@ class GUI:
         if any((r.type==session.RecordingType.Camera for r in self.study_config.session_def.recordings)):
             imgui.same_line()
             if imgui.button(ifa6.ICON_FA_FILE_IMPORT+' import camera recordings'):
-                pass
+                glassesTools.gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='add_cam_recordings', sessions=[s for s in self._selected_sessions if self._selected_sessions[s] and self.sessions[s].missing_recordings(session.RecordingType.Camera)]))
         self._session_lister.draw()
 
     def _unopened_interface_drawer(self):
@@ -1177,7 +1177,7 @@ class GUI:
             if show_import_et:
                 imgui.same_line()
             if imgui.button(ifa6.ICON_FA_FILE_IMPORT+' import camera recordings'):
-                pass
+                glassesTools.gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='add_cam_recordings', sessions=[sess.name]))
         self._recording_listers[sess.name].draw(limit_outer_size=True)
         sess_changed = False
         if imgui.tree_node_ex('Setting overrides for this session',imgui.TreeNodeFlags_.framed):

@@ -24,6 +24,8 @@ def get_folder_picker(g, reason: str, *args, **kwargs):
                 try_load_project(g, selected, action=reason)
             case 'add_et_recordings':
                 add_eyetracking_recordings(g, selected, *args, **kwargs)
+            case 'add_cam_recordings':
+                add_camera_recordings(g, selected, *args, **kwargs)
             case _:
                 raise ValueError(f'reason "{reason}" not understood')
 
@@ -31,10 +33,18 @@ def get_folder_picker(g, reason: str, *args, **kwargs):
         case 'loading' | 'creating':
             header = "Select or drop project folder"
             allow_multiple = False
+            picker_type = glassesTools.gui.file_picker.DirPicker
         case 'add_et_recordings':
             header = "Select or drop recording folders"
             allow_multiple = True
-    picker = glassesTools.gui.file_picker.DirPicker(title=header, allow_multiple=allow_multiple, callback=select_callback)
+            picker_type = glassesTools.gui.file_picker.DirPicker
+        case 'add_cam_recordings':
+            header = "Select or drop recording folders or files"
+            allow_multiple = True
+            picker_type = glassesTools.gui.file_picker.FilePicker
+        case _:
+            raise ValueError(f'reason "{reason}" not understood')
+    picker = picker_type(title=header, allow_multiple=allow_multiple, callback=select_callback)
     picker.set_show_only_dirs(False)
     return picker
 
