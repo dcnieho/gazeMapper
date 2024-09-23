@@ -300,7 +300,7 @@ async def _show_addable_recordings(g, paths: list[pathlib.Path], eye_tracker: gl
         imgui.dummy((0,1*imgui.get_style().item_spacing.y))
 
         size_mult = hello_imgui.dpi_window_size_factor()
-        imgui.begin_child("##main_frame_adder", size=(1260*size_mult,min(400*size_mult,(len(recording_list.recordings)+2)*imgui.get_frame_height_with_spacing())))
+        imgui.begin_child("##main_frame_adder", size=(1260*size_mult,min(700*size_mult,max(400*size_mult,(len(recording_list.recordings)+2)*imgui.get_frame_height_with_spacing()))))
         imgui.begin_child("##session_list", size=(600*size_mult,0))
         if imgui.button('+ new session'):
             new_session_button(g, _add_new_session)
