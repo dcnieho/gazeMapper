@@ -33,7 +33,11 @@ class Recording:
         self.info       = info
 
         self.state: dict[process.Action, process.State] = {}
-        self.load_action_states(True)
+        if not self.info.working_directory:
+            # don't create action states file if this recording only exists in memory (still needs to be imported)
+            self.state = _get_not_run_action_states(True)
+        else:
+            self.load_action_states(True)
 
     def load_action_states(self, create_if_missing: bool):
         self.state |= get_action_states(self.info.working_directory, for_recording=True, create_if_missing=create_if_missing)
@@ -276,14 +280,17 @@ def _get_action_status_fname(for_recording: bool) -> str:
     else:
         return Session.status_file_name
 
-def _create_action_states_file(file: pathlib.Path, for_recording: bool):
-    if file.is_dir():
-        file /= _get_action_status_fname(for_recording)
+def _get_not_run_action_states(for_recording: bool) -> dict[process.Action, process.State]:
     if for_recording:
         filt = lambda x: not process.is_session_level_action(x)
     else:
         filt = lambda x:     process.is_session_level_action(x)
-    action_states = {k:process.State.Not_Run for k in process.Action if filt(k)}
+    return {k:process.State.Not_Run for k in process.Action if filt(k)}
+
+def _create_action_states_file(file: pathlib.Path, for_recording: bool):
+    if file.is_dir():
+        file /= _get_action_status_fname(for_recording)
+    action_states = _get_not_run_action_states(for_recording)
     _write_action_states_to_file(file, action_states)
 
 def _write_action_states_to_file(file: pathlib.Path, action_states: dict[process.Action, process.State]):
