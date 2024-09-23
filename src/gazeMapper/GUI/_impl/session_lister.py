@@ -207,16 +207,15 @@ class List:
                         if not imgui.get_io().key_ctrl and not imgui.get_io().key_shift and imgui.is_mouse_double_clicked(imgui.MouseButton_.left):
                             self._show_item_info(iid)
 
-            self._last_y = imgui.get_cursor_pos().y
-            last_cursor_y = imgui.get_cursor_screen_pos().y
-            imgui.end_table()
+                self._last_y = imgui.get_cursor_pos().y
+                last_cursor_y = imgui.get_cursor_screen_pos().y
+                imgui.end_table()
 
-            # handle click in table area outside header+contents:
-            # deselect all, and if right click, show popup
-            # check mouse is below bottom of last drawn row so that clicking on the one pixel empty space between selectables
-            # does not cause everything to unselect or popup to open
-            if imgui.is_item_clicked(imgui.MouseButton_.left) and not any_selectable_clicked and imgui.get_io().mouse_pos.y>last_cursor_y:  # NB: table header is not signalled by is_item_clicked(), so this works correctly
-                with self.items_lock:
+                # handle click in table area outside header+contents:
+                # deselect all, and if right click, show popup
+                # check mouse is below bottom of last drawn row so that clicking on the one pixel empty space between selectables
+                # does not cause everything to unselect or popup to open
+                if imgui.is_item_clicked(imgui.MouseButton_.left) and not any_selectable_clicked and imgui.get_io().mouse_pos.y>last_cursor_y:  # NB: table header is not signalled by is_item_clicked(), so this works correctly
                     glassesTools.utils.set_all(self.selected_items, False)
 
             # show menu when right-clicking the empty space
