@@ -1138,7 +1138,8 @@ class GUI:
             self._to_dock = [win_name]
             self._to_focus= win_name
             self._selected_recordings[sess.name] = {k:False for k in sess.recordings}
-            self._recording_listers[sess.name] = glassesTools.gui.recording_table.RecordingTable(sess.recordings, self._selected_recordings[sess.name], None, lambda r: r.info, item_context_callback=lambda rec_name: self._recording_context_menu(sess.name, rec_name))
+            self._recording_listers[sess.name] = glassesTools.gui.recording_table.RecordingTable(sess.recordings, self._sessions_lock, self._selected_recordings[sess.name], None, lambda r: r.info, item_context_callback=lambda rec_name: self._recording_context_menu(sess.name, rec_name))
+            self._recording_listers[sess.name].dont_show_empty = True
             self.session_config_overrides[sess.name] = config.load_or_create_override(config.OverrideLevel.Session, sess.working_directory)
             self.recording_config_overrides[sess.name] = {}
             for r in sess.recordings:

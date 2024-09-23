@@ -5,6 +5,7 @@ import os
 import asyncio
 import subprocess
 import pathvalidate
+import threading
 from imgui_bundle import imgui, imspinner, hello_imgui, icons_fontawesome_6 as ifa6
 
 import glassesTools
@@ -291,7 +292,8 @@ async def _show_addable_recordings(g, paths: list[pathlib.Path], eye_tracker: gl
     def _add_new_session(new_sess: str):
         sessions.append(new_sess)
 
-    recording_list = glassesTools.gui.recording_table.RecordingTable(recordings_to_add, None, item_context_callback=_recording_context_menu)
+    recording_lock = threading.Lock()
+    recording_list = glassesTools.gui.recording_table.RecordingTable(recordings_to_add, recording_lock, None, item_context_callback=_recording_context_menu)
     recording_list.set_local_item_remover()
     recording_list.set_act_as_drag_drop_source(True)
     not_assigned_filter = glassesTools.gui.recording_table.Filter(lambda iid, _: iid not in (recording_assignment[s][r] for s in recording_assignment for r in recording_assignment[s]))
