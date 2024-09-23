@@ -509,7 +509,7 @@ def add_recordings(g, paths: list[pathlib.Path], sessions: list[str]):
         imgui.begin_group()
         imgui.dummy((0,2*imgui.get_style().item_spacing.y))
         imgui.text_unformatted("For which device would you like to import recordings?")
-        imgui.dummy((0,3*imgui.get_style().item_spacing.y))
+        imgui.dummy((0,1.5*imgui.get_style().item_spacing.y))
         full_width = imgui.get_content_region_avail().x
         imgui.push_item_width(full_width*.4)
         imgui.set_cursor_pos_x(full_width*.3)
@@ -518,6 +518,16 @@ def add_recordings(g, paths: list[pathlib.Path], sessions: list[str]):
             dev_type = options[combo_value]
         imgui.pop_item_width()
         imgui.dummy((0,2*imgui.get_style().item_spacing.y))
+        if dev_type==session.RecordingType.Camera:
+            imgui.text_unformatted("Extension filter to search for video files in")
+            imgui.text_unformatted("the selected paths (leave empty to not filter)")
+            imgui.dummy((0,1.5*imgui.get_style().item_spacing.y))
+            full_width = imgui.get_content_region_avail().x
+            imgui.push_item_width(full_width*.4)
+            imgui.set_cursor_pos_x(full_width*.3)
+            _, glob_filter = imgui.input_text('##file_filter', glob_filter)
+            imgui.pop_item_width()
+            imgui.dummy((0,2*imgui.get_style().item_spacing.y))
 
         imgui.end_group()
         imgui.same_line(spacing=spacing)
