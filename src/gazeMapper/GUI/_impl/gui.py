@@ -1072,12 +1072,13 @@ class GUI:
     def _session_context_menu(self, session_name: str) -> bool:
         sess = self.sessions[session_name]
         actions = process.get_possible_actions(sess.state, {r:sess.recordings[r].state for r in sess.recordings}, {a for a in process.Action if a!=process.Action.IMPORT}, self.study_config)
-        return self._draw_session_context_menu(session_name, None, self._filter_session_context_menu_actions(session_name, actions))
+        return self._draw_session_context_menu(session_name, None, actions)
     def _recording_context_menu(self, session_name: str, rec_name: str) -> bool:
         sess = self.sessions[session_name]
         actions = process.get_possible_actions(sess.state, {rec_name:sess.recordings[rec_name].state}, {a for a in process.Action if a!=process.Action.IMPORT and not process.is_session_level_action(a)}, self.study_config)
         return self._draw_session_context_menu(session_name, rec_name, actions)
-    def _filter_session_context_menu_actions(self, session_name: str, actions: dict[process.Action,bool|list[str]]) -> dict[process.Action,bool|list[str]]:
+    def _filter_session_context_menu_actions(self, session_name: str, rec_name: str|None, actions: dict[process.Action,bool|list[str]]) -> dict[process.Action,bool|list[str]]:
+        # filter out running and pending tasks
         if not actions:
             return {}
 
@@ -1088,13 +1089,18 @@ class GUI:
                 if utils.JobInfo(a, session_name) not in active_jobs:
                     actions_filt[a] = actions[a]
             else:
-                # check each recording
-                recs = [r for r in actions[a] if utils.JobInfo(a, session_name, r) not in active_jobs]
-                if recs:
-                    actions_filt[a] = recs
+                if rec_name:
+                    if utils.JobInfo(a, session_name, rec_name) not in active_jobs:
+                        actions_filt[a] = actions[a]
+                else:
+                    # check each recording
+                    recs = [r for r in actions[a] if utils.JobInfo(a, session_name, r) not in active_jobs]
+                    if recs:
+                        actions_filt[a] = recs
         return actions_filt
     def _draw_session_context_menu(self, session_name: str, rec_name: str|None, actions: dict[process.Action,bool|list[str]]) -> bool:
         changed = False
+        actions = self._filter_session_context_menu_actions(session_name, rec_name, actions)
         # draw menu
         for a in actions:
             if process.is_session_level_action(a):
