@@ -134,7 +134,7 @@ class Session:
             rec_info = importing.do_import(rec_info=rec_info, copy_scene_video=study_config.import_do_copy_video, source_dir_as_relative_path=study_config.import_source_dir_as_relative_path, cam_cal_file=cam_cal_file)
         else:
             rec_info = camera_recording.do_import(rec_info=rec_info, copy_video=study_config.import_do_copy_video, source_dir_as_relative_path=study_config.import_source_dir_as_relative_path, cam_cal_file=cam_cal_file)
-        self._update_recording_info(which, rec_info)    # the import call may have updated the info (e.g. filled in recording length that wasn't known from metadata). Update what we hold in memory
+        self.update_recording_info(which, rec_info)    # the import call may have updated the info (e.g. filled in recording length that wasn't known from metadata). Update what we hold in memory
         # denote import finished
         _create_action_states_file(rec_info.working_directory, True)
         update_action_states(rec_info.working_directory, process.Action.IMPORT, process.State.Completed, study_config)
@@ -151,6 +151,17 @@ class Session:
             if (self.working_directory / r.name).is_dir():
                 self.add_existing_recording(r.name)
 
+    def load_recording_info(self, which) -> EyeTrackerRecording|camera_recording.Recording:
+        r_fold = self.working_directory / which
+        if not r_fold.is_dir():
+            return
+
+        rec_def = self.definition.get_recording_def(which)
+        if rec_def.type==RecordingType.Eye_Tracker:
+            return EyeTrackerRecording.load_from_json(r_fold)
+        else:
+            return camera_recording.Recording.load_from_json(r_fold)
+
     def add_existing_recording(self, which: str) -> Recording:
         if which in self.recordings:
             return  # nothing to do
@@ -159,11 +170,7 @@ class Session:
             return
 
         # get info about recording
-        rec_def = self.definition.get_recording_def(which)
-        if rec_def.type==RecordingType.Eye_Tracker:
-            rec_info = EyeTrackerRecording.load_from_json(r_fold)
-        else:
-            rec_info = camera_recording.Recording.load_from_json(r_fold)
+        rec_info = self.load_recording_info(which)
 
         # add recording
         self.add_recording_from_info(which, rec_info)
@@ -178,7 +185,7 @@ class Session:
             if not isinstance(rec_info,camera_recording.Recording):
                 raise TypeError(f"The provided rec_info is not for a camera recording, but {which} is a camera recording")
 
-    def _update_recording_info(self, which: str, rec_info: EyeTrackerRecording|camera_recording.Recording):
+    def update_recording_info(self, which: str, rec_info: EyeTrackerRecording|camera_recording.Recording):
         if which not in self.recordings:
             return
         self.check_recording_info(which, rec_info)
