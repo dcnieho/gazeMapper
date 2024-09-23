@@ -554,11 +554,18 @@ class GUI:
             else:
                 imgui.text('-')
                 glassesTools.gui.utils.draw_hover_text(f'Not applicable to a {item.definition.type.value} recording','')
+        def _get_sort_value(action: process.Action, iid: int):
+            item = self.sessions[sess].recordings[iid]
+            if process.is_action_possible_for_recording_type(action, item.definition.type):
+                return item.state[action]
+            else:
+                return 999
+
         # build set of column, trigger column rebuild
         columns = [
             glassesTools.gui.recording_table.ColumnSpec(1,ifa6.ICON_FA_SIGNATURE+" Recording name",imgui.TableColumnFlags_.default_sort | imgui.TableColumnFlags_.no_hide, lambda rec: imgui.text(rec.definition.name), lambda iid: iid, "Recording name")
         ]+[
-            glassesTools.gui.recording_table.ColumnSpec(2+c, a.displayable_name, imgui.TableColumnFlags_.angled_header, lambda rec, a=a: _draw_status(a, rec), lambda iid, a=a: self.sessions[sess].recordings[iid].state[a]) for c,a in enumerate(actions)
+            glassesTools.gui.recording_table.ColumnSpec(2+c, a.displayable_name, imgui.TableColumnFlags_.angled_header, lambda rec, a=a: _draw_status(a, rec), lambda iid, a=a: _get_sort_value(a, iid)) for c,a in enumerate(actions)
         ]
         lister.build_columns(columns)
 
