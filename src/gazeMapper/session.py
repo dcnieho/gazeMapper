@@ -3,10 +3,11 @@ import pathlib
 import json
 import typeguard
 
-from glassesTools import importing, utils
+from glassesTools import camera_recording, importing, utils
 from glassesTools.recording import Recording as EyeTrackerRecording
+from glassesTools.camera_recording import Recording as CameraRecording
 
-from . import camera_recording, process
+from . import process
 
 
 class RecordingType(utils.AutoName):
@@ -28,7 +29,7 @@ class Recording:
     status_file_name = 'recording.gazeMapper'
 
     @typeguard.typechecked
-    def __init__(self, definition: RecordingDefinition, info:EyeTrackerRecording|camera_recording.Recording|None=None):
+    def __init__(self, definition: RecordingDefinition, info:EyeTrackerRecording|CameraRecording|None=None):
         self.definition = definition
         self.info       = info
 
@@ -43,15 +44,15 @@ class Recording:
         self.state |= get_action_states(self.info.working_directory, for_recording=True, create_if_missing=create_if_missing)
 utils.register_type(utils.CustomTypeEntry(Recording,'__session.Recording__',lambda x: {'defition': x.defition, 'info': x.info}, lambda x: Recording(**x)))
 
-def read_recording_info(working_dir: pathlib.Path, rec_type: RecordingType) -> tuple[EyeTrackerRecording|camera_recording.Recording, pathlib.Path]:
+def read_recording_info(working_dir: pathlib.Path, rec_type: RecordingType) -> tuple[EyeTrackerRecording|CameraRecording, pathlib.Path]:
     if rec_type==RecordingType.Camera:
-        rec_info = camera_recording.Recording.load_from_json(working_dir)
+        rec_info = CameraRecording.load_from_json(working_dir)
     elif rec_type==RecordingType.Eye_Tracker:
         rec_info = EyeTrackerRecording.load_from_json(working_dir)
     return rec_info, get_video_path(rec_info)
 
-def get_video_path(rec_info: EyeTrackerRecording|camera_recording.Recording) -> pathlib.Path:
-    if isinstance(rec_info, camera_recording.Recording):
+def get_video_path(rec_info: EyeTrackerRecording|CameraRecording) -> pathlib.Path:
+    if isinstance(rec_info, CameraRecording):
         return rec_info.get_video_path()
     elif isinstance(rec_info, EyeTrackerRecording):
         return rec_info.get_scene_video_path()
@@ -140,7 +141,7 @@ class Session:
         update_action_states(rec_info.working_directory, process.Action.IMPORT, process.State.Completed, study_config)
         self.recordings[which].load_action_states(False)
 
-    def add_recording_and_import(self, which: str, rec_info: EyeTrackerRecording|camera_recording.Recording, cam_cal_file: str|pathlib.Path=None, **kwargs) -> Recording:
+    def add_recording_and_import(self, which: str, rec_info: EyeTrackerRecording|CameraRecording, cam_cal_file: str|pathlib.Path=None, **kwargs) -> Recording:
         rec = self.add_recording_from_info(which, rec_info)
         self.import_recording(which, cam_cal_file, **kwargs)
         return rec
@@ -151,7 +152,7 @@ class Session:
             if (self.working_directory / r.name).is_dir():
                 self.add_existing_recording(r.name)
 
-    def load_recording_info(self, which) -> EyeTrackerRecording|camera_recording.Recording:
+    def load_recording_info(self, which) -> EyeTrackerRecording|CameraRecording:
         r_fold = self.working_directory / which
         if not r_fold.is_dir():
             return
@@ -160,7 +161,7 @@ class Session:
         if rec_def.type==RecordingType.Eye_Tracker:
             return EyeTrackerRecording.load_from_json(r_fold)
         else:
-            return camera_recording.Recording.load_from_json(r_fold)
+            return CameraRecording.load_from_json(r_fold)
 
     def add_existing_recording(self, which: str) -> Recording:
         if which in self.recordings:
@@ -176,22 +177,22 @@ class Session:
         self.add_recording_from_info(which, rec_info)
         return self.recordings[which]
 
-    def check_recording_info(self, which: str, rec_info: EyeTrackerRecording|camera_recording.Recording):
+    def check_recording_info(self, which: str, rec_info: EyeTrackerRecording|CameraRecording):
         rec_def = self.definition.get_recording_def(which)
         if rec_def.type==RecordingType.Eye_Tracker:
             if not isinstance(rec_info,EyeTrackerRecording):
                 raise TypeError(f"The provided rec_info is not for an eye tracker recording, but {which} is an eye tracker recording")
         elif rec_def.type==RecordingType.Camera:
-            if not isinstance(rec_info,camera_recording.Recording):
+            if not isinstance(rec_info,CameraRecording):
                 raise TypeError(f"The provided rec_info is not for a camera recording, but {which} is a camera recording")
 
-    def update_recording_info(self, which: str, rec_info: EyeTrackerRecording|camera_recording.Recording):
+    def update_recording_info(self, which: str, rec_info: EyeTrackerRecording|CameraRecording):
         if which not in self.recordings:
             return
         self.check_recording_info(which, rec_info)
         self.recordings[which].info = rec_info
 
-    def add_recording_from_info(self, which: str, rec_info: EyeTrackerRecording|camera_recording.Recording) -> Recording:
+    def add_recording_from_info(self, which: str, rec_info: EyeTrackerRecording|CameraRecording) -> Recording:
         rec_def = self.definition.get_recording_def(which)
         self.check_recording_info(which, rec_info)
         self.recordings[which] = Recording(rec_def, rec_info)
