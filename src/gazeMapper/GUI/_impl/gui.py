@@ -1149,6 +1149,15 @@ class GUI:
         missing_recs = sess.missing_recordings()
         if missing_recs:
             imgui.text_colored(colors.error,'*The following recordings are missing for this session:\n'+'\n'.join(missing_recs))
+        show_import_et = any((sess.definition.get_recording_def(r).type==session.RecordingType.Eye_Tracker for r in missing_recs))
+        show_import_cam = any((sess.definition.get_recording_def(r).type==session.RecordingType.Camera for r in missing_recs))
+        if show_import_et and imgui.button(ifa6.ICON_FA_FILE_IMPORT+' import eye tracker recordings'):
+            glassesTools.gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='add_et_recordings', sessions=[sess.name]))
+        if show_import_cam:
+            if show_import_et:
+                imgui.same_line()
+            if imgui.button(ifa6.ICON_FA_FILE_IMPORT+' import camera recordings'):
+                pass
         self._recording_listers[sess.name].draw(limit_outer_size=True)
         sess_changed = False
         if imgui.tree_node_ex('Setting overrides for this session',imgui.TreeNodeFlags_.framed):
