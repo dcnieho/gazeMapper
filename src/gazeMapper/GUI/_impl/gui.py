@@ -607,6 +607,13 @@ class GUI:
 
         if imgui.button('+ new session'):
             callbacks.new_session_button(self)
+        imgui.same_line()
+        if imgui.button(ifa6.ICON_FA_FILE_IMPORT+' import eye tracker recordings'):
+            glassesTools.gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='add_et_recordings'))
+        if any((r.type==session.RecordingType.Camera for r in self.study_config.session_def.recordings)):
+            imgui.same_line()
+            if imgui.button(ifa6.ICON_FA_FILE_IMPORT+' import camera recordings'):
+                pass
         self._session_lister.draw()
 
     def _unopened_interface_drawer(self):
