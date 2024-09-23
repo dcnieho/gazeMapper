@@ -1099,9 +1099,12 @@ class GUI:
         for a in actions:
             if process.is_session_level_action(a):
                 hover_text = f'Run {a.displayable_name} for session: {session_name}'
+                status = self.sessions[session_name].state[a]
             else:
                 hover_text = f'Run {a.displayable_name} for recordings:\n'+'\n'.join(actions[a])
-            if imgui.selectable(f"{a.displayable_name}##{session_name}", False)[0]:
+                status = max([self.sessions[session_name].recordings[r].state[a] for r in actions[a]])
+            icon = ifa6.ICON_FA_PLAY if status<process.State.Completed else ifa6.ICON_FA_ARROW_ROTATE_RIGHT
+            if imgui.selectable(icon+f" {a.displayable_name}##{session_name}", False)[0]:
                 if process.is_session_level_action(a):
                     self.launch_task(session_name, None, a)
                 else:
