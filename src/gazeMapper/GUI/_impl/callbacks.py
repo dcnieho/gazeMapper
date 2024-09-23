@@ -14,7 +14,7 @@ from glassesValidator.config import deploy_validation_config, get_validation_set
 from . import colors, utils
 from ... import config, marker, plane, process, session
 
-def get_folder_picker(g, reason: str):
+def get_folder_picker(g, reason: str, *args, **kwargs):
     from . import gui
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
     def select_callback(selected):
@@ -22,7 +22,7 @@ def get_folder_picker(g, reason: str):
             case 'loading' | 'creating':
                 try_load_project(g, selected, action=reason)
             case 'add_et_recordings':
-                add_eyetracking_recordings(g, selected, [s for s in g._selected_sessions if g._selected_sessions[s] and not g.sessions[s].has_all_recordings()])
+                add_eyetracking_recordings(g, selected, *args, **kwargs)
             case _:
                 raise ValueError(f'reason "{reason}" not understood')
 
