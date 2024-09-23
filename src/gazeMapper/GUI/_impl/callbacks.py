@@ -482,3 +482,73 @@ def add_eyetracking_recordings(g, paths: list[pathlib.Path], sessions: list[str]
 
     # ask what type of eye tracker we should be looking for
     glassesTools.gui.utils.push_popup(g, lambda: glassesTools.gui.utils.popup("Select eye tracker", add_recs_popup, buttons = buttons, closable=True, outside=False))
+
+def add_recordings(g, paths: list[pathlib.Path], sessions: list[str]):
+    from . import gui
+    g = typing.cast(gui.GUI,g)  # indicate type to typechecker
+    options: list[session.RecordingType] = []
+    if any((r.type==session.RecordingType.Eye_Tracker for r in g.study_config.session_def.recordings)):
+        options.append(session.RecordingType.Eye_Tracker)
+    if any((r.type==session.RecordingType.Camera for r in g.study_config.session_def.recordings)):
+        options.append(session.RecordingType.Camera)
+    if not options:
+        return
+    combo_value = 0
+    dev_type = options[combo_value]
+    glob_filter = '*.mp4,*.avi'
+
+    def choose_dev_popup():
+        nonlocal combo_value, dev_type, glob_filter
+        spacing = 2 * imgui.get_style().item_spacing.x
+        color = (0.45, 0.09, 1.00, 1.00)
+        imgui.push_font(g._icon_font)
+        imgui.text_colored(color, ifa6.ICON_FA_CIRCLE_INFO)
+        imgui.pop_font()
+        imgui.same_line(spacing=spacing)
+
+        imgui.begin_group()
+        imgui.dummy((0,2*imgui.get_style().item_spacing.y))
+        imgui.text_unformatted("For which device would you like to import recordings?")
+        imgui.dummy((0,3*imgui.get_style().item_spacing.y))
+        full_width = imgui.get_content_region_avail().x
+        imgui.push_item_width(full_width*.4)
+        imgui.set_cursor_pos_x(full_width*.3)
+        changed, combo_value = imgui.combo("##select_device", combo_value, [d.value for d in options])
+        if changed:
+            dev_type = options[combo_value]
+        imgui.pop_item_width()
+        imgui.dummy((0,2*imgui.get_style().item_spacing.y))
+
+        imgui.end_group()
+        imgui.same_line(spacing=spacing)
+        imgui.dummy((0, 0))
+
+        return combo_value, dev_type
+
+    def _run(sessions: list[str]):
+        if not sessions:
+            sessions: list[str]= []
+            for s in g.sessions:
+                if not (mis_rec:=g.sessions[s].missing_recordings()):
+                    continue
+                mis_rec = [r for r in mis_rec if g.sessions[s].definition.get_recording_def(r).type==dev_type]
+                if mis_rec:
+                    sessions.append(s)
+        match dev_type:
+            case session.RecordingType.Eye_Tracker:
+                add_eyetracking_recordings(g, paths, sessions)
+            case session.RecordingType.Camera:
+                add_camera_recordings(g, paths, glob_filter, sessions)
+
+    if len(options)==1 and options[0]==session.RecordingType.Eye_Tracker:
+        # no need to show selection popup, as there is only one choice and nothing to configure for that choice
+        _run(sessions)
+        return
+
+    buttons = {
+        ifa6.ICON_FA_CHECK+" Continue": lambda: _run(sessions),
+        ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
+    }
+
+    # ask what type of device recordings we want to import
+    glassesTools.gui.utils.push_popup(g, lambda: glassesTools.gui.utils.popup("Select device", choose_dev_popup, buttons = buttons, closable=True, outside=False))
