@@ -204,8 +204,8 @@ class Session:
     def has_all_recordings(self) -> bool:
         return all((r.name in self.recordings for r in self.definition.recordings))
 
-    def missing_recordings(self) -> list[str]:
-        return [r.name for r in self.definition.recordings if r.name not in self.recordings]
+    def missing_recordings(self, rec_type: RecordingType|None=None) -> list[str]:
+        return [r.name for r in self.definition.recordings if r.name not in self.recordings and (rec_type is None or r.type==rec_type)]
 
     # state of processing actions on recordings in a session
     def load_action_states(self, create_if_missing: bool):

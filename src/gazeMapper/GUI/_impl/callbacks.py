@@ -444,7 +444,7 @@ def add_eyetracking_recordings(g, paths: list[pathlib.Path], sessions: list[str]
     combo_value = 0
     eye_tracker = glassesTools.eyetracker.EyeTracker(glassesTools.eyetracker.eye_tracker_names[combo_value])
     if not sessions:
-        sessions = [s for s in g.sessions if not g.sessions[s].has_all_recordings()]
+        sessions = [s for s in g.sessions if g.sessions[s].missing_recordings(session.RecordingType.Eye_Tracker)]
 
     def add_recs_popup():
         nonlocal combo_value, eye_tracker
@@ -537,13 +537,13 @@ def add_recordings(g, paths: list[pathlib.Path], sessions: list[str]):
 
     def _run(sessions: list[str]):
         if not sessions:
-            sessions: list[str]= []
+            sessions: list[str] = []
             for s in g.sessions:
-                if not (mis_rec:=g.sessions[s].missing_recordings()):
+                if not (mis_rec:=g.sessions[s].missing_recordings(dev_type)):
                     continue
-                mis_rec = [r for r in mis_rec if g.sessions[s].definition.get_recording_def(r).type==dev_type]
-                if mis_rec:
-                    sessions.append(s)
+                sessions.append(s)
+        else:
+            sessions = [s for s in sessions if g.sessions[s].missing_recordings(dev_type)]
         match dev_type:
             case session.RecordingType.Eye_Tracker:
                 add_eyetracking_recordings(g, paths, sessions)
