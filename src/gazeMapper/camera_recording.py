@@ -77,7 +77,7 @@ def do_import(rec_info: Recording, cam_cal_file: str|pathlib.Path=None, copy_vid
     print('  Getting frame timestamps...')
     ts = video_utils.get_frame_timestamps_from_video(rec_info.get_video_path())
     ts.to_csv(str(rec_info.working_directory / 'frameTimestamps.tsv'), sep='\t')
-    rec_info.duration = (ts.timestamp.iat[-1]-ts.timestamp.iat[0])/1000.    # ms -> s
+    rec_info.duration = (ts.timestamp.iat[-1]-ts.timestamp.iat[0])
 
     # store recording info to folder
     if source_dir_as_relative_path:
