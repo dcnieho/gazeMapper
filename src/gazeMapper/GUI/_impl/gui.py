@@ -367,7 +367,7 @@ class GUI:
                             self.sessions[sess].recordings.pop(rec)
                             if sess in self._selected_recordings:
                                 self._selected_recordings[sess].pop(rec, None)
-                        else:
+                        elif rec not in self.sessions[sess].recordings: # don't replace if already present
                             self.sessions[sess].add_existing_recording(rec)
                             if sess in self._selected_recordings:
                                 self._selected_recordings[sess] |= {rec: False}
