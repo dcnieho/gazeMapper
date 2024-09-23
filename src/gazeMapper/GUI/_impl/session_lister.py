@@ -228,8 +228,8 @@ class List:
             if process.is_session_level_action(action):
                 draw_process_state(item.state[action])
             else:
-                not_completed = item.action_not_completed_recordings(action)
-                n_rec = len(item.definition.recordings)
+                not_completed = [r for r in item.action_not_completed_recordings(action) if process.is_action_possible_for_recording_type(action, item.definition.get_recording_def(r).type)]
+                n_rec = len([r for r in item.definition.recordings if process.is_action_possible_for_recording_type(action, r.type)])
                 clr = colors.error if not_completed else colors.ok
                 imgui.text_colored(clr, f'{n_rec-len(not_completed)}/{n_rec}')
                 if not_completed:
