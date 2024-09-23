@@ -33,8 +33,6 @@ class List:
 
         self._last_y = None
 
-        with self.items_lock:
-            self._num_items = len(self.items)
         self.table_flags: int = (
             imgui.TableFlags_.scroll_x |
             imgui.TableFlags_.scroll_y |
@@ -54,9 +52,7 @@ class List:
     def draw(self, limit_outer_size=False):
         with self.items_lock:
             num_items = len(self.items)
-        if num_items != self._num_items:
-            self._num_items = num_items
-        if self._num_items==0:
+        if num_items==0:
             imgui.text_wrapped('There are no sessions')
             return
         outer_size = imgui.ImVec2(0,0)
