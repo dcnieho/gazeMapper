@@ -377,6 +377,9 @@ class GUI:
     def launch_task(self, sess: str, recording: str|None, action: process.Action):
         # NB: this is run under lock, so sess and recording are valid
         job = utils.JobInfo(action, sess, recording)
+        if job in self._get_pending_running_job_list():
+            # already scheduled, nothing to do
+            return
         if action==process.Action.IMPORT:
             # NB: when adding recording, immediately do
             # rec_info = glassesTools.importing.get_recording_info(bla, bla)
