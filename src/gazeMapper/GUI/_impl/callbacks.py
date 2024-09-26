@@ -453,8 +453,7 @@ def add_eyetracking_recordings(g, paths: list[pathlib.Path], sessions: list[str]
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
     combo_value = 0
     eye_tracker = glassesTools.eyetracker.EyeTracker(glassesTools.eyetracker.eye_tracker_names[combo_value])
-    if not sessions:
-        sessions = [s for s in g.sessions if g.sessions[s].missing_recordings(session.RecordingType.Eye_Tracker)]
+    sessions = get_and_filter_eligible_sessions(g, sessions, session.RecordingType.Eye_Tracker)
 
     def add_recs_popup():
         nonlocal combo_value, eye_tracker
@@ -492,6 +491,19 @@ def add_eyetracking_recordings(g, paths: list[pathlib.Path], sessions: list[str]
 
     # ask what type of eye tracker we should be looking for
     glassesTools.gui.utils.push_popup(g, lambda: glassesTools.gui.utils.popup("Select eye tracker", add_recs_popup, buttons = buttons, closable=True, outside=False))
+
+def get_and_filter_eligible_sessions(g, sessions: list[str], dev_type:session.RecordingType) -> list[str]:
+    from . import gui
+    g = typing.cast(gui.GUI,g)  # indicate type to typechecker
+    if not sessions:
+        sessions: list[str] = []
+        for s in g.sessions:
+            if not g.sessions[s].missing_recordings(dev_type):
+                continue
+            sessions.append(s)
+    else:
+        sessions = [s for s in sessions if g.sessions[s].missing_recordings(dev_type)]
+    return sessions
 
 def add_recordings(g, paths: list[pathlib.Path], sessions: list[str]):
     from . import gui
@@ -545,15 +557,7 @@ def add_recordings(g, paths: list[pathlib.Path], sessions: list[str]):
 
         return combo_value, dev_type
 
-    def _run(sessions: list[str]):
-        if not sessions:
-            sessions: list[str] = []
-            for s in g.sessions:
-                if not (mis_rec:=g.sessions[s].missing_recordings(dev_type)):
-                    continue
-                sessions.append(s)
-        else:
-            sessions = [s for s in sessions if g.sessions[s].missing_recordings(dev_type)]
+    def _run():
         match dev_type:
             case session.RecordingType.Eye_Tracker:
                 add_eyetracking_recordings(g, paths, sessions)
@@ -562,11 +566,11 @@ def add_recordings(g, paths: list[pathlib.Path], sessions: list[str]):
 
     if len(options)==1 and options[0]==session.RecordingType.Eye_Tracker:
         # no need to show selection popup, as there is only one choice and nothing to configure for that choice
-        _run(sessions)
+        _run()
         return
 
     buttons = {
-        ifa6.ICON_FA_CHECK+" Continue": lambda: _run(sessions),
+        ifa6.ICON_FA_CHECK+" Continue": _run,
         ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
     }
 
