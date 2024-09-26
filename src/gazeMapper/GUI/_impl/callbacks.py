@@ -308,6 +308,8 @@ async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[glasse
     recording_list = glassesTools.gui.recording_table.RecordingTable(recordings_to_add, recording_lock, None, item_context_callback=_recording_context_menu)
     recording_list.set_local_item_remover()
     recording_list.set_act_as_drag_drop_source(True)
+    if dev_type==session.RecordingType.Camera:
+        recording_list.show_hide_columns({'Eye Tracker': False, 'Participant': False, 'Source Directory': True, 'Video File': True})
     not_assigned_filter = glassesTools.gui.recording_table.Filter(lambda iid, _: iid not in (recording_assignment[s][r] for s in recording_assignment for r in recording_assignment[s]))
     recording_list.add_filter(not_assigned_filter)
     def list_recs_popup():
