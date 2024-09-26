@@ -463,7 +463,7 @@ class GUI:
                 if job.action==process.Action.IMPORT:
                     # the import call has created a working directory for the recording, and may have updated the info in other
                     # ways (e.g. filled in recording length that wasn't known from metadata). Read from file and update what we
-                    # hold in memory. NB: mustr be loaded from file as recording update is run in a different process
+                    # hold in memory. NB: must be loaded from file as recording update is run in a different process
                     rec_info = self.sessions[job.session].load_recording_info(job.recording)
                     self.sessions[job.session].update_recording_info(job.recording, rec_info)
                 self.sessions[job.session].recordings[job.recording].load_action_states(False)
