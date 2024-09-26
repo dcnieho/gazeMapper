@@ -4,12 +4,14 @@ import shutil
 import os
 import asyncio
 import subprocess
+import glassesTools.video_utils
 import pathvalidate
 import threading
 from imgui_bundle import imgui, imspinner, hello_imgui, icons_fontawesome_6 as ifa6
 
 import glassesTools
 import glassesTools.gui
+import glassesTools.camera_recording
 from glassesValidator.config import deploy_validation_config, get_validation_setup
 
 from . import colors, utils
@@ -371,14 +373,20 @@ async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[glasse
                             imgui.text(r)
                         imgui.table_next_column()
                         if has_rec:
-                            recording_list.draw_eye_tracker_widget(rec, align=True)
+                            if dev_type==session.RecordingType.Eye_Tracker:
+                                recording_list.draw_eye_tracker_widget(rec, align=True)
+                            else:
+                                imgui.text(rec.video_file)
                         imgui.table_next_column()
                         if has_rec:
-                            imgui.text(rec.name)
+                            if dev_type==session.RecordingType.Eye_Tracker:
+                                imgui.text(rec.name)
+                            else:
+                                imgui.text(str(rec.source_directory))
                         else:
                             imgui.text('drop recording here to assign')
                         imgui.table_next_column()
-                        if has_rec:
+                        if has_rec and dev_type==session.RecordingType.Eye_Tracker:
                             imgui.text(rec.participant)
                     if disable:
                         imgui.end_disabled()
@@ -507,9 +515,7 @@ def _find_camera_recordings(paths: list[pathlib.Path], glob_filter: str) -> list
         elif p.is_dir():
             video_paths.extend([pth.resolve() for pth in p.glob("**/*") if pth.suffix in extensions])
     # turn into list of recordings
-    recs: list[glassesTools.camera_recording.Recording] = []
-
-    return recs
+    return [glassesTools.camera_recording.Recording('',p.name,p.parent, duration=glassesTools.video_utils.get_video_duration(p)) for p in video_paths]
 
 def get_and_filter_eligible_sessions(g, sessions: list[str], dev_type:session.RecordingType) -> list[str]:
     from . import gui
