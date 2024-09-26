@@ -36,6 +36,10 @@ class RecordingDefinition:
             return cal_path
         return None
 
+    def remove_default_cal_file(self, rec_def_path: str|pathlib.Path):
+        cal_path = pathlib.Path(rec_def_path) / f'{self.name}_{RecordingDefinition.cal_file_name}'
+        cal_path.unlink(missing_ok=True)
+
 utils.register_type(utils.CustomTypeEntry(RecordingDefinition,'__session.RecordingDefinition__',lambda x: {'name': x.name, 'type': x.type}, lambda x: RecordingDefinition(**x)))
 
 
