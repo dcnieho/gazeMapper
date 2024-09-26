@@ -2,6 +2,7 @@ from enum import auto
 import pathlib
 import json
 import typeguard
+import shutil
 
 from glassesTools import camera_recording, importing, utils
 from glassesTools.recording import Recording as EyeTrackerRecording
@@ -18,10 +19,23 @@ recording_types = [r for r in RecordingType]
 
 
 class RecordingDefinition:
+    cal_file_name = 'calibration.xml'
     @typeguard.typechecked
     def __init__(self, name:str, type:RecordingType):
         self.name = name
         self.type = type
+
+    def set_default_cal_file(self, cal_path: str|pathlib.Path, rec_def_path: str|pathlib.Path):
+        cal_path = pathlib.Path(cal_path)
+        rec_def_path = pathlib.Path(rec_def_path)
+        shutil.copyfile(str(cal_path), str(rec_def_path / f'{self.name}_{RecordingDefinition.cal_file_name}'))
+
+    def get_default_cal_file(self, rec_def_path: str|pathlib.Path) -> pathlib.Path|None:
+        cal_path = pathlib.Path(rec_def_path) / f'{self.name}_{RecordingDefinition.cal_file_name}'
+        if cal_path.is_file():
+            return cal_path
+        return None
+
 utils.register_type(utils.CustomTypeEntry(RecordingDefinition,'__session.RecordingDefinition__',lambda x: {'name': x.name, 'type': x.type}, lambda x: RecordingDefinition(**x)))
 
 
@@ -131,6 +145,9 @@ class Session:
         # do import
         rec_info = self.recordings[which].info
         rec_info.working_directory = self.working_directory / rec_def.name
+        if cam_cal_file is None:
+            # get default calibration file, if there is one
+            cam_cal_file = self.recordings[which].definition.get_default_cal_file(config_dir)
         if rec_def.type==RecordingType.Eye_Tracker:
             rec_info = importing.do_import(rec_info=rec_info, copy_scene_video=study_config.import_do_copy_video, source_dir_as_relative_path=study_config.import_source_dir_as_relative_path, cam_cal_file=cam_cal_file)
         else:
