@@ -227,7 +227,7 @@ def remove_folder(folder: pathlib.Path):
     if folder.is_dir():
         shutil.rmtree(folder)
 
-async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[glassesTools.recording.Recording|glassesTools.camera_recording.Recording]], dev_lbl: str, sessions: list[str]):
+async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[glassesTools.recording.Recording|glassesTools.camera_recording.Recording]], dev_lbl: str, dev_type: session.RecordingType, sessions: list[str]):
     from . import gui
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
     # notify we're preparing the recordings to be opened
@@ -262,7 +262,7 @@ async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[glasse
     dup_recs: list[glassesTools.recording.Recording] = []
     for rec in recs:
         # skip duplicates
-        if rec.source_directory not in (g.sessions[s].recordings[r].info.source_directory for s in g.sessions for r in g.sessions[s].recordings if g.sessions[s].recordings[r].definition.type==session.RecordingType.Eye_Tracker):
+        if rec.source_directory not in (g.sessions[s].recordings[r].info.source_directory for s in g.sessions for r in g.sessions[s].recordings if g.sessions[s].recordings[r].definition.type==dev_type):
             all_recs.append(rec)
         else:
             dup_recs.append(rec)
@@ -330,7 +330,7 @@ async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[glasse
             if imgui.tree_node_ex(sess.name):
                 table_opened = False
                 for r in rec_names:
-                    if sess.definition.get_recording_def(r).type!=session.RecordingType.Eye_Tracker:
+                    if sess.definition.get_recording_def(r).type!=dev_type:
                         continue
                     disable = False
                     rec: glassesTools.recording.Recording = None
@@ -484,12 +484,32 @@ def add_eyetracking_recordings(g, paths: list[pathlib.Path], sessions: list[str]
         return combo_value, eye_tracker
 
     buttons = {
-        ifa6.ICON_FA_CHECK+" Continue": lambda: glassesTools.async_thread.run(_show_addable_recordings(g, lambda: glassesTools.recording.find_recordings(paths, eye_tracker), eye_tracker.value, sessions)),
+        ifa6.ICON_FA_CHECK+" Continue": lambda: glassesTools.async_thread.run(_show_addable_recordings(g, lambda: glassesTools.recording.find_recordings(paths, eye_tracker), eye_tracker.value, session.RecordingType.Eye_Tracker, sessions)),
         ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
     }
 
     # ask what type of eye tracker we should be looking for
     glassesTools.gui.utils.push_popup(g, lambda: glassesTools.gui.utils.popup("Select eye tracker", add_recs_popup, buttons = buttons, closable=True, outside=False))
+
+def add_camera_recordings(g, paths: list[pathlib.Path], glob_filter: str, sessions: list[str]):
+    from . import gui
+    g = typing.cast(gui.GUI,g)  # indicate type to typechecker
+    sessions = get_and_filter_eligible_sessions(g, sessions, session.RecordingType.Camera)
+    glassesTools.async_thread.run(_show_addable_recordings(g, lambda: _find_camera_recordings(paths, glob_filter), 'Camera', session.RecordingType.Camera, sessions))
+
+def _find_camera_recordings(paths: list[pathlib.Path], glob_filter: str) -> list[glassesTools.camera_recording.Recording]:
+    extensions = {'.'+x.strip('.* ') for x in glob_filter.split(',')}
+    video_paths: list[pathlib.Path] = []
+    for p in paths:
+        if p.is_file():
+            if p.suffix in extensions:
+                video_paths.append(p)
+        elif p.is_dir():
+            video_paths.extend([pth.resolve() for pth in p.glob("**/*") if pth.suffix in extensions])
+    # turn into list of recordings
+    recs: list[glassesTools.camera_recording.Recording] = []
+
+    return recs
 
 def get_and_filter_eligible_sessions(g, sessions: list[str], dev_type:session.RecordingType) -> list[str]:
     from . import gui
