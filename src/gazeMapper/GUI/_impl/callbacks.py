@@ -227,7 +227,7 @@ def remove_folder(folder: pathlib.Path):
     if folder.is_dir():
         shutil.rmtree(folder)
 
-async def _show_addable_recordings(g, paths: list[pathlib.Path], eye_tracker: glassesTools.eyetracker.EyeTracker, sessions: list[str]):
+async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[glassesTools.recording.Recording|glassesTools.camera_recording.Recording]], dev_lbl: str, sessions: list[str]):
     from . import gui
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
     # notify we're preparing the recordings to be opened
@@ -241,7 +241,7 @@ async def _show_addable_recordings(g, paths: list[pathlib.Path], eye_tracker: gl
 
         imgui.begin_group()
         imgui.dummy((0,2*imgui.get_style().item_spacing.y))
-        text = f'Searching the path(s) you provided for {eye_tracker.value} recordings.'
+        text = f'Searching the path(s) you provided for {dev_lbl} recordings.'
         imgui.text_unformatted(text)
         imgui.dummy((0,3*imgui.get_style().item_spacing.y))
         text_size = imgui.calc_text_size(text)
@@ -257,7 +257,7 @@ async def _show_addable_recordings(g, paths: list[pathlib.Path], eye_tracker: gl
     glassesTools.gui.utils.push_popup(g, lambda: glassesTools.gui.utils.popup("Preparing import", prepping_recs_popup, buttons = None, closable=False, outside=False))
 
     # step 1, find what recordings of this type of eye tracker are in the path
-    recs = glassesTools.recording.find_recordings(paths, eye_tracker)
+    recs = rec_getter()
     all_recs: list[glassesTools.recording.Recording] = []
     dup_recs: list[glassesTools.recording.Recording] = []
     for rec in recs:
@@ -274,10 +274,10 @@ async def _show_addable_recordings(g, paths: list[pathlib.Path], eye_tracker: gl
     # 2. if nothing importable found, notify
     if not all_recs:
         if dup_recs:
-            msg = f"{eye_tracker.value} recordings were found in the specified import paths, but could not be imported as they are already part of sessions in this gazeMapper project."
+            msg = f"{dev_lbl} recordings were found in the specified import paths, but could not be imported as they are already part of sessions in this gazeMapper project."
             more= "Duplicates that were not imported:\n"+('\n'.join([str(r.source_directory) for r in dup_recs]))
         else:
-            msg = f"No {eye_tracker.value} recordings were found among the specified import paths."
+            msg = f"No {dev_lbl} recordings were found among the specified import paths."
             more = None
 
         glassesTools.gui.utils.push_popup(g, glassesTools.gui.msg_box.msgbox, "Nothing to import", msg, glassesTools.gui.msg_box.MsgBox.warn, more=more)
@@ -287,7 +287,7 @@ async def _show_addable_recordings(g, paths: list[pathlib.Path], eye_tracker: gl
     recordings_to_add = {i:r for i,r in enumerate(all_recs)}
     recording_assignment: dict[str, dict[str, int]] = {}
     rec_names = [r.name for r in g.study_config.session_def.recordings]
-    selected_slot: tuple(str,str) = None
+    selected_slot: tuple[str,str] = None
 
     def _recording_context_menu(iid: int) -> bool:
         nonlocal selected_slot
@@ -410,7 +410,7 @@ async def _show_addable_recordings(g, paths: list[pathlib.Path], eye_tracker: gl
     }
     glassesTools.gui.utils.push_popup(g, lambda: glassesTools.gui.utils.popup("Assign and import recordings", list_recs_popup, buttons = buttons, closable=True, outside=False))
 
-async def _import_recordings(g, recordings: list[glassesTools.recording.Recording], recording_assignment: dict[str, dict[str, int]]):
+async def _import_recordings(g, recordings: list[glassesTools.recording.Recording|glassesTools.camera_recording.Recording], recording_assignment: dict[str, dict[str, int]]):
     from . import gui
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
     for s in recording_assignment:
@@ -423,7 +423,6 @@ async def _import_recordings(g, recordings: list[glassesTools.recording.Recordin
             sess.add_recording_from_info(r, rec)
             # then launch import task
             g.launch_task(s, r, process.Action.IMPORT)
-
 
 def draw_filterbar(g, filter_box_text: str, require_sort: bool):
     from . import gui
@@ -485,7 +484,7 @@ def add_eyetracking_recordings(g, paths: list[pathlib.Path], sessions: list[str]
         return combo_value, eye_tracker
 
     buttons = {
-        ifa6.ICON_FA_CHECK+" Continue": lambda: glassesTools.async_thread.run(_show_addable_recordings(g, paths, eye_tracker, sessions)),
+        ifa6.ICON_FA_CHECK+" Continue": lambda: glassesTools.async_thread.run(_show_addable_recordings(g, lambda: glassesTools.recording.find_recordings(paths, eye_tracker), eye_tracker.value, sessions)),
         ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
     }
 
