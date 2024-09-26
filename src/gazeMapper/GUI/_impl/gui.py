@@ -803,24 +803,38 @@ class GUI:
             imgui.text_colored(colors.error,'*At minimum one recording should be defined')
         if 'session_def' in self._problems_cache:
             imgui.text_colored(colors.error,f"*{self._problems_cache['session_def']}")
-        table_is_started = imgui.begin_table(f"##session_def_list", 2)
+        table_is_started = imgui.begin_table(f"##session_def_list", 3)
         if not table_is_started:
             return
         imgui.table_setup_column("recording", imgui.TableColumnFlags_.width_fixed, init_width_or_weight=settings_editor.get_fields_text_width([r.name for r in self.study_config.session_def.recordings]+['recording']))
-        imgui.table_setup_column("type", imgui.TableColumnFlags_.width_stretch)
+        imgui.table_setup_column("type", imgui.TableColumnFlags_.width_fixed)
+        imgui.table_setup_column("camera calibration", imgui.TableColumnFlags_.width_stretch)
         imgui.table_headers_row()
+        config_path = config.guess_config_dir(self.study_config.working_directory)
         for r in self.study_config.session_def.recordings:
             imgui.table_next_row()
             imgui.table_next_column()
-            imgui.align_text_to_frame_padding()
+            if imgui.button(ifa6.ICON_FA_TRASH_CAN+f'##{r.name}'):
+                callbacks.delete_recording_definition(self.study_config, r)
+                self._reload_sessions()
+            imgui.same_line()
             imgui.text(r.name)
             imgui.table_next_column()
             imgui.align_text_to_frame_padding()
             imgui.text(r.type.value)
+            imgui.table_next_column()
+            imgui.align_text_to_frame_padding()
+            cal_path = r.get_default_cal_file(config_path)
+            if cal_path is None:
+                imgui.text('Default camera calibration not set')
+            else:
+                imgui.text('Default camera calibration set')
+                imgui.same_line()
+                if imgui.button(ifa6.ICON_FA_TRASH_CAN+f' delete default calibration##{r.name}'):
+                    r.remove_default_cal_file(config_path)
             imgui.same_line()
-            if imgui.button(ifa6.ICON_FA_TRASH_CAN+f' delete recording##{r.name}'):
-                callbacks.delete_recording_definition(self.study_config, r)
-                self._reload_sessions()
+            if imgui.button(ifa6.ICON_FA_DOWNLOAD+f' select calibration xml##cal_{r.name}'):
+                glassesTools.gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='set_default_cam_cal', rec_def=r, rec_def_path=config_path))
         imgui.end_table()
         if imgui.button('+ new recording'):
             new_rec_name = ''

@@ -28,6 +28,8 @@ def get_folder_picker(g, reason: str, *args, **kwargs):
                 add_eyetracking_recordings(g, selected, *args, **kwargs)
             case 'add_cam_recordings':
                 add_camera_recordings(g, selected, *args, **kwargs)
+            case 'set_default_cam_cal':
+                set_default_cam_cal(selected, *args, **kwargs)
             case _:
                 raise ValueError(f'reason "{reason}" not understood')
 
@@ -43,6 +45,10 @@ def get_folder_picker(g, reason: str, *args, **kwargs):
         case 'add_cam_recordings':
             header = "Select or drop recording folders or files"
             allow_multiple = True
+            picker_type = glassesTools.gui.file_picker.FilePicker
+        case 'set_default_cam_cal':
+            header = "Select or drop calibration xml file"
+            allow_multiple = False
             picker_type = glassesTools.gui.file_picker.FilePicker
         case _:
             raise ValueError(f'reason "{reason}" not understood')
@@ -94,6 +100,9 @@ def try_load_project(g, path: str|pathlib.Path, action='loading'):
                 ifa6.ICON_FA_CIRCLE_XMARK+" No": None
             }
             glassesTools.gui.utils.push_popup(g, glassesTools.gui.msg_box.msgbox, "Create new project", "The selected folder is empty. Do you want to use it as a new project folder?", glassesTools.gui.msg_box.MsgBox.warn, buttons)
+
+def set_default_cam_cal(cal_path: str|pathlib.Path, rec_def: session.RecordingDefinition, rec_def_path: pathlib.Path):
+    rec_def.set_default_cal_file(cal_path[0], rec_def_path)
 
 def make_plane(study_config: config.Study, p_type: plane.Type, name: str):
     path = config.guess_config_dir(study_config.working_directory)
