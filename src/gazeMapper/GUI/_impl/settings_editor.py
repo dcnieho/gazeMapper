@@ -576,4 +576,4 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type):
             elif isinstance(val,set):
                 val.add(to_add)
 
-        return val
+    return val
