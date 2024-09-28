@@ -476,7 +476,7 @@ class GUI:
             self.study_config = config.Study.load_from_json(config_dir, strict_check=False)
             self._reload_sessions()
         except Exception as e:
-            gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Project loading error", f"Failed to load the project at {self.project_dir}:\n{e}\n\n{utils.gt_gui.get_traceback(e)}", gt_gui.msg_box.MsgBox.error)
+            gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Project loading error", f"Failed to load the project at {self.project_dir}:\n{e}\n\n{gt_gui.utils.get_traceback(e)}", gt_gui.msg_box.MsgBox.error)
             self.close_project()
             return
 
