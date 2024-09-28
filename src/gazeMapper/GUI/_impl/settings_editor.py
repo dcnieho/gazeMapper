@@ -4,7 +4,7 @@ import inspect
 import pathlib
 import enum
 
-from imgui_bundle import imgui, imgui_md, icons_fontawesome_6 as ifa6
+from imgui_bundle import imgui, hello_imgui, imgui_md, icons_fontawesome_6 as ifa6
 
 import glassesTools
 import glassesTools.gui
@@ -458,12 +458,7 @@ def draw_value(field_lbl: str, val: _T, f_type: typing.Type, nullable: bool, def
         case builtins.float:
             new_val = imgui.input_double(f'##{field_lbl}', val)[1]
         case builtins.list | builtins.set:
-            # temporary, this does not need a new level but a special input type
-            # should be rendered as a tag list [A x][B x] with either text input if
-            # unconstrained subtype (e.g. int, str, use typecheck utility), or
-            # dropdown if known list of options
-            imgui.text(f'{f_type}')
-            new_val = val
+            new_val = draw_list_set_editor(field_lbl, val, f_type)
         case typing.Literal:
             values = list(typing.get_args(f_type))
             if val is None:
@@ -502,3 +497,83 @@ def draw_value(field_lbl: str, val: _T, f_type: typing.Type, nullable: bool, def
 
     return new_val, new_edit, removed
 draw_value.should_edit_id = None
+
+def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type):
+    val = val.copy()
+    win = imgui.internal.get_current_window()
+    if win.skip_items:
+        return val
+
+    w = imgui.calc_item_width()
+    ts = imgui.calc_text_size('x')
+    pos = imgui.get_cursor_screen_pos()
+    x_padding = imgui.get_style().frame_padding.x
+    bb = imgui.internal.ImRect(pos, (pos.x+w, pos.y+ts.y+2*imgui.get_style().frame_padding.y))
+
+    if imgui.internal.item_add(bb, imgui.get_id('##set_list_editor')):
+        imgui.push_clip_rect(bb.min, bb.max, False)
+
+        # draw background rect
+        frame_col = imgui.get_color_u32(imgui.Col_.frame_bg)
+        imgui.internal.render_frame(bb.min,bb.max,frame_col,True,imgui.get_style().frame_rounding)
+
+        # draw items
+        imgui.set_cursor_screen_pos(pos+(x_padding, 0))
+        to_remove = None
+        to_add    = None
+        for i,v in enumerate(val):
+            if i>0:
+                imgui.same_line()
+            imgui.push_style_var(imgui.StyleVar_.frame_border_size, 0)
+            imgui.begin_group()
+            imgui.set_cursor_pos_y(imgui.get_cursor_pos_y() + imgui.get_style().frame_padding.y)
+
+            # prep for drawing widget: determine its size and position and see if visible
+            v_txt   = f'{v}'
+            t_size  = imgui.calc_text_size(v_txt)
+            size    = t_size + (4*x_padding, 0) + (ts.x, 0)
+            t_pos   = imgui.get_cursor_screen_pos()
+            t_bb    = imgui.internal.ImRect(t_pos, (t_pos.x+size.x, t_pos.y+size.y))
+            imgui.internal.item_size(size, 0)
+            # if visible
+            if imgui.internal.item_add(t_bb, imgui.get_id(f'{v_txt}##{field_lbl}')):
+                # draw frame
+                imgui.internal.render_frame(t_bb.min, t_bb.max, imgui.get_color_u32(imgui.Col_.button), True, imgui.get_style().frame_rounding)
+                # draw text on top
+                imgui.internal.render_text_clipped((t_bb.min.x+x_padding, t_bb.min.y), (t_bb.max.x-x_padding, t_bb.max.y), v_txt, None, size, imgui.get_style().button_text_align, t_bb)
+                imgui.set_cursor_screen_pos((t_bb.min.x+2*x_padding+t_size.x,t_pos.y))
+                if imgui.small_button(f'x##{field_lbl}_{v_txt}'):
+                    to_remove = v
+
+            imgui.end_group()
+            imgui.pop_style_var()
+
+        # draw value adder, if needed
+        all_values = typing.get_args(typing.get_args(f_type)[0])
+        if (miss_values := list(set(all_values)-set(val))):
+            str_values = miss_values
+            if f_type in val_to_str_registry:
+                str_values = ['' if v is None else val_to_str_registry[f_type][v] for v in str_values]
+            elif not isinstance(str_values[0],str):
+                str_values = ['' if v is None else str(v) for v in str_values]
+            imgui.same_line()
+            imgui.set_next_item_width(get_fields_text_width(str_values)+imgui.get_frame_height()+2*imgui.get_style().frame_padding.x)
+            selected,p_idx = imgui.combo(f"##{field_lbl}", -1, str_values, popup_max_height_in_items=min(10,len(str_values)))
+            if selected:
+                to_add = miss_values[p_idx]
+
+        imgui.pop_clip_rect()
+        # allocate size
+        imgui.set_cursor_screen_pos(pos)
+        imgui.internal.item_size(bb)
+
+        # process edits
+        if to_remove is not None:
+            val.remove(to_remove)   # NB: both list and set have remove()
+        if to_add is not None:
+            if isinstance(val,list):
+                val.append(to_add)
+            elif isinstance(val,set):
+                val.add(to_add)
+
+        return val
