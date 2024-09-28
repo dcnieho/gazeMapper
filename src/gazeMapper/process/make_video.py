@@ -7,7 +7,7 @@ import numpy as np
 import threading
 import copy
 
-from glassesTools import annotation, aruco, drawing, intervals, gaze_headref, gaze_worldref, ocv, plane, timestamps, transforms, utils
+from glassesTools import annotation, aruco, drawing, intervals, gaze_headref, gaze_worldref, naming as gt_naming, ocv, plane, timestamps, transforms, utils
 from glassesTools.gui.video_player import GUI
 
 from .. import config, episode, marker, naming, process, session, synchronization
@@ -79,17 +79,17 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
         # Read gaze data
         if rec_def.type==session.RecordingType.Eye_Tracker:
             # NB: we want to use synced gaze data for these videos, if available
-            gazes_head[rec]     = gaze_headref.read_dict_from_file(rec_working_dir / 'gazeData.tsv', ts_column_suffixes=['ref', 'VOR', ''])[0]
+            gazes_head[rec]     = gaze_headref.read_dict_from_file(rec_working_dir / gt_naming.gaze_data_fname, ts_column_suffixes=['ref', 'VOR', ''])[0]
             # check we have timestamps synced to ref, if relevant
             if study_config.sync_ref_recording and rec!=study_config.sync_ref_recording:
                 if gazes_head[rec][next(iter(gazes_head[rec]))][0].timestamp_ref is None:
                     raise ValueError(f'This study has a reference recording ({study_config.sync_ref_recording}) to synchronize the recordings to, but the gaze data for this recording ({rec}) has not been synchronized. Run sync_to_ref before running this.')
 
         # get camera calibration info
-        camera_params[rec]      = ocv.CameraParams.read_from_file(rec_working_dir / "calibration.xml")
+        camera_params[rec]      = ocv.CameraParams.read_from_file(rec_working_dir / gt_naming.scene_camera_calibration_fname)
 
         # get frame timestamps
-        videos_ts[rec] = timestamps.VideoTimestamps(rec_working_dir / "frameTimestamps.tsv")
+        videos_ts[rec] = timestamps.VideoTimestamps(rec_working_dir / gt_naming.frame_timestamps_fname)
 
     # get frame sync info, and recording's episodes expressed in the reference video's frame indices
     if study_config.sync_ref_recording:

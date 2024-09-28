@@ -4,14 +4,11 @@ import shutil
 import os
 import asyncio
 import subprocess
-import glassesTools.video_utils
 import pathvalidate
 import threading
 from imgui_bundle import imgui, imspinner, hello_imgui, icons_fontawesome_6 as ifa6
 
-import glassesTools
-import glassesTools.gui
-import glassesTools.camera_recording
+from glassesTools import async_thread, camera_recording, eyetracker, gui as gt_gui, naming, platform, recording, video_utils
 from glassesValidator.config import deploy_validation_config, get_validation_setup
 
 from . import colors, utils
@@ -39,19 +36,19 @@ def get_folder_picker(g, reason: str, *args, **kwargs):
         case 'loading' | 'creating':
             header = "Select or drop project folder"
             allow_multiple = False
-            picker_type = glassesTools.gui.file_picker.DirPicker
+            picker_type = gt_gui.file_picker.DirPicker
         case 'add_et_recordings':
             header = "Select or drop recording folders"
             allow_multiple = True
-            picker_type = glassesTools.gui.file_picker.DirPicker
+            picker_type = gt_gui.file_picker.DirPicker
         case 'add_cam_recordings':
             header = "Select or drop recording folders or files"
             allow_multiple = True
-            picker_type = glassesTools.gui.file_picker.FilePicker
+            picker_type = gt_gui.file_picker.FilePicker
         case 'set_default_cam_cal' | 'set_cam_cal':
             header = "Select or drop calibration xml file"
             allow_multiple = False
-            picker_type = glassesTools.gui.file_picker.FilePicker
+            picker_type = gt_gui.file_picker.FilePicker
         case _:
             raise ValueError(f'reason "{reason}" not understood')
     picker = picker_type(title=header, allow_multiple=allow_multiple, callback=select_callback)
@@ -63,10 +60,10 @@ def try_load_project(g, path: str|pathlib.Path, action='loading'):
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
     if isinstance(path,list):
         if not path:
-            glassesTools.gui.utils.push_popup(g, glassesTools.gui.msg_box.msgbox, "Project opening error", "A single project directory should be provided. None provided so cannot open.", glassesTools.gui.msg_box.MsgBox.error, more="Dropped paths:\n"+('\n'.join([str(p) for p in path])))
+            gt_gui.utils.push_popup(g, gt_gui.msg_box.msgbox, "Project opening error", "A single project directory should be provided. None provided so cannot open.", gt_gui.msg_box.MsgBox.error, more="Dropped paths:\n"+('\n'.join([str(p) for p in path])))
             return
         elif len(path)>1:
-            glassesTools.gui.utils.push_popup(g, glassesTools.gui.msg_box.msgbox, "Project opening error", f"Only a single project directory should be provided, but {len(path)} were provided. Cannot open multiple projects.", glassesTools.gui.msg_box.MsgBox.error, more="Dropped paths:\n"+('\n'.join([str(p) for p in path])))
+            gt_gui.utils.push_popup(g, gt_gui.msg_box.msgbox, "Project opening error", f"Only a single project directory should be provided, but {len(path)} were provided. Cannot open multiple projects.", gt_gui.msg_box.MsgBox.error, more="Dropped paths:\n"+('\n'.join([str(p) for p in path])))
             return
         else:
             path = path[0]
@@ -78,14 +75,14 @@ def try_load_project(g, path: str|pathlib.Path, action='loading'):
                 ifa6.ICON_FA_CHECK+" Yes": lambda: g.load_project(path),
                 ifa6.ICON_FA_CIRCLE_XMARK+" No": None
             }
-            glassesTools.gui.utils.push_popup(g, glassesTools.gui.msg_box.msgbox, "Create new project", "The selected folder is already a project folder.\nDo you want to open it?", glassesTools.gui.msg_box.MsgBox.question, buttons)
+            gt_gui.utils.push_popup(g, gt_gui.msg_box.msgbox, "Create new project", "The selected folder is already a project folder.\nDo you want to open it?", gt_gui.msg_box.MsgBox.question, buttons)
         else:
             g.load_project(path)
     elif any(path.iterdir()):
         if action=='creating':
-            glassesTools.gui.utils.push_popup(g, glassesTools.gui.msg_box.msgbox, "Project creation error", "The selected folder is not empty. Cannot be used to create a project folder.", glassesTools.gui.msg_box.MsgBox.error)
+            gt_gui.utils.push_popup(g, gt_gui.msg_box.msgbox, "Project creation error", "The selected folder is not empty. Cannot be used to create a project folder.", gt_gui.msg_box.MsgBox.error)
         else:
-            glassesTools.gui.utils.push_popup(g, glassesTools.gui.msg_box.msgbox, "Project opening error", "The selected folder is not a project folder. Cannot open.", glassesTools.gui.msg_box.MsgBox.error)
+            gt_gui.utils.push_popup(g, gt_gui.msg_box.msgbox, "Project opening error", "The selected folder is not a project folder. Cannot open.", gt_gui.msg_box.MsgBox.error)
     else:
         def init_project_and_ask():
             utils.init_project_folder(path)
@@ -93,7 +90,7 @@ def try_load_project(g, path: str|pathlib.Path, action='loading'):
                 ifa6.ICON_FA_CHECK+" Yes": lambda: g.load_project(path),
                 ifa6.ICON_FA_CIRCLE_XMARK+" No": None
             }
-            glassesTools.gui.utils.push_popup(g, glassesTools.gui.msg_box.msgbox, "Open new project", "Do you want to open the new project folder?", glassesTools.gui.msg_box.MsgBox.question, buttons)
+            gt_gui.utils.push_popup(g, gt_gui.msg_box.msgbox, "Open new project", "Do you want to open the new project folder?", gt_gui.msg_box.MsgBox.question, buttons)
         if action=='creating':
             init_project_and_ask()
         else:
@@ -101,7 +98,7 @@ def try_load_project(g, path: str|pathlib.Path, action='loading'):
                 ifa6.ICON_FA_CHECK+" Yes": lambda: init_project_and_ask(),
                 ifa6.ICON_FA_CIRCLE_XMARK+" No": None
             }
-            glassesTools.gui.utils.push_popup(g, glassesTools.gui.msg_box.msgbox, "Create new project", "The selected folder is empty. Do you want to use it as a new project folder?", glassesTools.gui.msg_box.MsgBox.warn, buttons)
+            gt_gui.utils.push_popup(g, gt_gui.msg_box.msgbox, "Create new project", "The selected folder is empty. Do you want to use it as a new project folder?", gt_gui.msg_box.MsgBox.warn, buttons)
 
 def set_default_cam_cal(cal_path: str|pathlib.Path, rec_def: session.RecordingDefinition, rec_def_path: pathlib.Path):
     rec_def.set_default_cal_file(cal_path, rec_def_path)
@@ -109,10 +106,10 @@ def set_default_cam_cal(cal_path: str|pathlib.Path, rec_def: session.RecordingDe
 def set_cam_cal(cal_path: str|pathlib.Path, working_directory: str|pathlib.Path):
     cal_path = pathlib.Path(cal_path)
     working_directory = pathlib.Path(working_directory)
-    shutil.copyfile(str(cal_path), str(working_directory / 'calibration.xml'))
+    shutil.copyfile(str(cal_path), str(working_directory / naming.scene_camera_calibration_fname))
 
 def delete_cam_cal(working_directory: str|pathlib.Path):
-    pathlib.Path(working_directory / 'calibration.xml').unlink(missing_ok=True)
+    pathlib.Path(working_directory / naming.scene_camera_calibration_fname).unlink(missing_ok=True)
 
 def make_plane(study_config: config.Study, p_type: plane.Type, name: str):
     path = config.guess_config_dir(study_config.working_directory)
@@ -215,7 +212,7 @@ def new_session_button(g, notify_func: typing.Callable[[str], None]|None = None)
         ifa6.ICON_FA_CHECK+" Create session": (_make_session, lambda: not _valid_sess_name()),
         ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
     }
-    glassesTools.gui.utils.push_popup(g, lambda: glassesTools.gui.utils.popup("Add session", _add_sess_popup, buttons = buttons, outside=False))
+    gt_gui.utils.push_popup(g, lambda: gt_gui.utils.popup("Add session", _add_sess_popup, buttons = buttons, outside=False))
 
 def make_session(project_dir: pathlib.Path, session_name: str):
     sess_dir = project_dir/session_name
@@ -224,14 +221,14 @@ def make_session(project_dir: pathlib.Path, session_name: str):
 
 def open_url(path: str):
     # this works for files, folders and URLs
-    if glassesTools.platform.os==glassesTools.platform.Os.Windows:
+    if platform.os==platform.Os.Windows:
         os.startfile(path)
     else:
-        if glassesTools.platform.os==glassesTools.platform.Os.Linux:
+        if platform.os==platform.Os.Linux:
             open_util = "xdg-open"
-        elif glassesTools.platform.os==glassesTools.platform.Os.MacOS:
+        elif platform.os==platform.Os.MacOS:
             open_util = "open"
-        glassesTools.async_thread.run(asyncio.create_subprocess_exec(
+        async_thread.run(asyncio.create_subprocess_exec(
             open_util, path,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
@@ -240,7 +237,7 @@ def open_url(path: str):
 
 def open_folder(path: pathlib.Path):
     if not path.is_dir():
-        glassesTools.gui.utils.push_popup(globals, glassesTools.gui.msg_box.msgbox, "Folder not found", f"The folder you're trying to open\n{path}\ncould not be found.", glassesTools.gui.msg_box.MsgBox.warn)
+        gt_gui.utils.push_popup(globals, gt_gui.msg_box.msgbox, "Folder not found", f"The folder you're trying to open\n{path}\ncould not be found.", gt_gui.msg_box.MsgBox.warn)
         return
     open_url(str(path))
 
@@ -248,7 +245,7 @@ def remove_folder(folder: pathlib.Path):
     if folder.is_dir():
         shutil.rmtree(folder)
 
-async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[glassesTools.recording.Recording|glassesTools.camera_recording.Recording]], dev_lbl: str, dev_type: session.RecordingType, sessions: list[str]):
+async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[recording.Recording|camera_recording.Recording]], dev_lbl: str, dev_type: session.RecordingType, sessions: list[str]):
     from . import gui
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
     # notify we're preparing the recordings to be opened
@@ -275,12 +272,12 @@ async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[glasse
 
         imgui.same_line(spacing=spacing)
         imgui.dummy((0, 0))
-    glassesTools.gui.utils.push_popup(g, lambda: glassesTools.gui.utils.popup("Preparing import", prepping_recs_popup, buttons = None, closable=False, outside=False))
+    gt_gui.utils.push_popup(g, lambda: gt_gui.utils.popup("Preparing import", prepping_recs_popup, buttons = None, closable=False, outside=False))
 
     # step 1, find what recordings of this type of eye tracker are in the path
     recs = rec_getter()
-    all_recs: list[glassesTools.recording.Recording] = []
-    dup_recs: list[glassesTools.recording.Recording] = []
+    all_recs: list[recording.Recording] = []
+    dup_recs: list[recording.Recording] = []
     for rec in recs:
         # skip duplicates
         if rec.source_directory not in (g.sessions[s].recordings[r].info.source_directory for s in g.sessions for r in g.sessions[s].recordings if g.sessions[s].recordings[r].definition.type==dev_type):
@@ -301,7 +298,7 @@ async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[glasse
             msg = f"No {dev_lbl} recordings were found among the specified import paths."
             more = None
 
-        glassesTools.gui.utils.push_popup(g, glassesTools.gui.msg_box.msgbox, "Nothing to import", msg, glassesTools.gui.msg_box.MsgBox.warn, more=more)
+        gt_gui.utils.push_popup(g, gt_gui.msg_box.msgbox, "Nothing to import", msg, gt_gui.msg_box.MsgBox.warn, more=more)
         return
 
     # 3. if something importable found, show to user so they can assign them to recordings in sessions
@@ -324,12 +321,12 @@ async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[glasse
         sessions.append(new_sess)
 
     recording_lock = threading.Lock()
-    recording_list = glassesTools.gui.recording_table.RecordingTable(recordings_to_add, recording_lock, None, item_context_callback=_recording_context_menu)
+    recording_list = gt_gui.recording_table.RecordingTable(recordings_to_add, recording_lock, None, item_context_callback=_recording_context_menu)
     recording_list.set_local_item_remover()
     recording_list.set_act_as_drag_drop_source(True)
     if dev_type==session.RecordingType.Camera:
         recording_list.show_hide_columns({'Eye Tracker': False, 'Participant': False, 'Source Directory': True, 'Video File': True})
-    not_assigned_filter = glassesTools.gui.recording_table.Filter(lambda iid, _: iid not in (recording_assignment[s][r] for s in recording_assignment for r in recording_assignment[s]))
+    not_assigned_filter = gt_gui.recording_table.Filter(lambda iid, _: iid not in (recording_assignment[s][r] for s in recording_assignment for r in recording_assignment[s]))
     recording_list.add_filter(not_assigned_filter)
     def list_recs_popup():
         nonlocal selected_slot
@@ -356,7 +353,7 @@ async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[glasse
                     if sess.definition.get_recording_def(r).type!=dev_type:
                         continue
                     disable = False
-                    rec: glassesTools.recording.Recording = None
+                    rec: recording.Recording = None
                     if r in sess.recordings:
                         rec = sess.recordings[r].info
                         disable = True
@@ -434,12 +431,12 @@ async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[glasse
         imgui.dummy((0,6*imgui.get_style().item_spacing.y))
 
     buttons = {
-        ifa6.ICON_FA_CHECK+" Continue": lambda: glassesTools.async_thread.run(_import_recordings(g, recordings_to_add, recording_assignment)),
+        ifa6.ICON_FA_CHECK+" Continue": lambda: async_thread.run(_import_recordings(g, recordings_to_add, recording_assignment)),
         ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
     }
-    glassesTools.gui.utils.push_popup(g, lambda: glassesTools.gui.utils.popup("Assign and import recordings", list_recs_popup, buttons = buttons, closable=True, outside=False))
+    gt_gui.utils.push_popup(g, lambda: gt_gui.utils.popup("Assign and import recordings", list_recs_popup, buttons = buttons, closable=True, outside=False))
 
-async def _import_recordings(g, recordings: list[glassesTools.recording.Recording|glassesTools.camera_recording.Recording], recording_assignment: dict[str, dict[str, int]]):
+async def _import_recordings(g, recordings: list[recording.Recording|camera_recording.Recording], recording_assignment: dict[str, dict[str, int]]):
     from . import gui
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
     for s in recording_assignment:
@@ -464,10 +461,10 @@ def draw_filterbar(g, filter_box_text: str, require_sort: bool):
             value += imgui.get_clipboard_text() or ""
         imgui.separator()
         if imgui.selectable(ifa6.ICON_FA_CIRCLE_INFO+" More info", False)[0]:
-            glassesTools.gui.utils.push_popup(g,
-                glassesTools.gui.msg_box.msgbox, "About the filter bar",
+            gt_gui.utils.push_popup(g,
+                gt_gui.msg_box.msgbox, "About the filter bar",
                 "This is the filter bar. By typing inside it you can search your recording list inside the eye tracker, name, participant and project properties.",
-                glassesTools.gui.msg_box.MsgBox.info
+                gt_gui.msg_box.MsgBox.info
             )
         imgui.end_popup()
     if value != filter_box_text:
@@ -480,7 +477,7 @@ def add_eyetracking_recordings(g, paths: list[pathlib.Path], sessions: list[str]
     from . import gui
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
     combo_value = 0
-    eye_tracker = glassesTools.eyetracker.EyeTracker(glassesTools.eyetracker.eye_tracker_names[combo_value])
+    eye_tracker = eyetracker.EyeTracker(eyetracker.eye_tracker_names[combo_value])
     sessions = get_and_filter_eligible_sessions(g, sessions, session.RecordingType.Eye_Tracker)
 
     def add_recs_popup():
@@ -499,7 +496,7 @@ def add_eyetracking_recordings(g, paths: list[pathlib.Path], sessions: list[str]
         full_width = imgui.get_content_region_avail().x
         imgui.push_item_width(full_width*.4)
         imgui.set_cursor_pos_x(full_width*.3)
-        changed, combo_value = imgui.combo("##select_eye_tracker", combo_value, glassesTools.eyetracker.eye_tracker_names)
+        changed, combo_value = imgui.combo("##select_eye_tracker", combo_value, eyetracker.eye_tracker_names)
         imgui.pop_item_width()
         imgui.dummy((0,2*imgui.get_style().item_spacing.y))
 
@@ -508,25 +505,25 @@ def add_eyetracking_recordings(g, paths: list[pathlib.Path], sessions: list[str]
         imgui.dummy((0, 0))
 
         if changed:
-            eye_tracker = glassesTools.eyetracker.EyeTracker(glassesTools.eyetracker.eye_tracker_names[combo_value])
+            eye_tracker = eyetracker.EyeTracker(eyetracker.eye_tracker_names[combo_value])
 
         return combo_value, eye_tracker
 
     buttons = {
-        ifa6.ICON_FA_CHECK+" Continue": lambda: glassesTools.async_thread.run(_show_addable_recordings(g, lambda: glassesTools.recording.find_recordings(paths, eye_tracker), eye_tracker.value, session.RecordingType.Eye_Tracker, sessions)),
+        ifa6.ICON_FA_CHECK+" Continue": lambda: async_thread.run(_show_addable_recordings(g, lambda: recording.find_recordings(paths, eye_tracker), eye_tracker.value, session.RecordingType.Eye_Tracker, sessions)),
         ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
     }
 
     # ask what type of eye tracker we should be looking for
-    glassesTools.gui.utils.push_popup(g, lambda: glassesTools.gui.utils.popup("Select eye tracker", add_recs_popup, buttons = buttons, closable=True, outside=False))
+    gt_gui.utils.push_popup(g, lambda: gt_gui.utils.popup("Select eye tracker", add_recs_popup, buttons = buttons, closable=True, outside=False))
 
 def add_camera_recordings(g, paths: list[pathlib.Path], glob_filter: str, sessions: list[str]):
     from . import gui
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
     sessions = get_and_filter_eligible_sessions(g, sessions, session.RecordingType.Camera)
-    glassesTools.async_thread.run(_show_addable_recordings(g, lambda: _find_camera_recordings(paths, glob_filter), 'Camera', session.RecordingType.Camera, sessions))
+    async_thread.run(_show_addable_recordings(g, lambda: _find_camera_recordings(paths, glob_filter), 'Camera', session.RecordingType.Camera, sessions))
 
-def _find_camera_recordings(paths: list[pathlib.Path], glob_filter: str) -> list[glassesTools.camera_recording.Recording]:
+def _find_camera_recordings(paths: list[pathlib.Path], glob_filter: str) -> list[camera_recording.Recording]:
     extensions = {'.'+x.strip('.* ') for x in glob_filter.split(',')}
     video_paths: list[pathlib.Path] = []
     for p in paths:
@@ -536,7 +533,7 @@ def _find_camera_recordings(paths: list[pathlib.Path], glob_filter: str) -> list
         elif p.is_dir():
             video_paths.extend([pth.resolve() for pth in p.glob("**/*") if pth.suffix in extensions])
     # turn into list of recordings
-    return [glassesTools.camera_recording.Recording('',p.name,p.parent, duration=glassesTools.video_utils.get_video_duration(p)) for p in video_paths]
+    return [camera_recording.Recording('',p.name,p.parent, duration=video_utils.get_video_duration(p)) for p in video_paths]
 
 def get_and_filter_eligible_sessions(g, sessions: list[str], dev_type:session.RecordingType) -> list[str]:
     from . import gui
@@ -621,4 +618,4 @@ def add_recordings(g, paths: list[pathlib.Path], sessions: list[str]):
     }
 
     # ask what type of device recordings we want to import
-    glassesTools.gui.utils.push_popup(g, lambda: glassesTools.gui.utils.popup("Select device", choose_dev_popup, buttons = buttons, closable=True, outside=False))
+    gt_gui.utils.push_popup(g, lambda: gt_gui.utils.popup("Select device", choose_dev_popup, buttons = buttons, closable=True, outside=False))

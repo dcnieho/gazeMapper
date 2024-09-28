@@ -9,7 +9,6 @@ from typing import Callable
 import copy
 import threading
 import time
-import pathvalidate
 
 import imgui_bundle
 from imgui_bundle import imgui, immapp, imgui_md, hello_imgui, glfw_utils, icons_fontawesome_6 as ifa6
@@ -18,7 +17,7 @@ import OpenGL
 import OpenGL.GL as gl
 
 import glassesTools
-import glassesTools.gui
+from glassesTools import annotation, gui as gt_gui, naming as gt_naming, platform as gt_platform
 import glassesValidator
 
 from ... import config, config_watcher, marker, plane, process, session, type_utils, version
@@ -41,9 +40,9 @@ class GUI:
         self._selected_sessions: dict[str, bool]                        = {}
         self._session_lister = session_lister.List(self.sessions, self._sessions_lock, self._selected_sessions, info_callback=self._open_session_detail, item_context_callback=self._session_context_menu)
 
-        self.recording_config_overrides: dict[str, dict[str, config.StudyOverride]]             = {}
-        self._recording_listers  : dict[str, glassesTools.gui.recording_table.RecordingTable]   = {}
-        self._selected_recordings: dict[str, dict[str, bool]]                                   = {}
+        self.recording_config_overrides: dict[str, dict[str, config.StudyOverride]]   = {}
+        self._recording_listers  : dict[str, gt_gui.recording_table.RecordingTable]   = {}
+        self._selected_recordings: dict[str, dict[str, bool]]                         = {}
 
         self._possible_value_getters: dict[str] = {}
 
@@ -84,11 +83,11 @@ class GUI:
                 return
             if not exc:
                 return
-            tb = glassesTools.gui.utils.get_traceback(type(exc), exc, exc.__traceback__)
+            tb = gt_gui.utils.get_traceback(type(exc), exc, exc.__traceback__)
             if isinstance(exc, asyncio.TimeoutError):
-                glassesTools.gui.utils.push_popup(self, glassesTools.gui.msg_box.msgbox, "Processing error", f"A background process has failed:\n{type(exc).__name__}: {str(exc) or 'No further details'}", glassesTools.gui.msg_box.MsgBox.warn, more=tb)
+                gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Processing error", f"A background process has failed:\n{type(exc).__name__}: {str(exc) or 'No further details'}", gt_gui.msg_box.MsgBox.warn, more=tb)
                 return
-            glassesTools.gui.utils.push_popup(self, glassesTools.gui.msg_box.msgbox, "Processing error", f"Something went wrong in an asynchronous task of a separate thread:\n\n{tb}", glassesTools.gui.msg_box.MsgBox.error)
+            gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Processing error", f"Something went wrong in an asynchronous task of a separate thread:\n\n{tb}", gt_gui.msg_box.MsgBox.error)
         async_thread.done_callback = asyncexcepthook
 
     def _load_fonts(self):
@@ -108,7 +107,7 @@ class GUI:
         msg_box_size = 69.
         large_icons_params = hello_imgui.FontLoadingParams()
         large_icons_params.glyph_ranges = selected_glyphs_to_ranges([ifa6.ICON_FA_CIRCLE_QUESTION, ifa6.ICON_FA_CIRCLE_INFO, ifa6.ICON_FA_TRIANGLE_EXCLAMATION])
-        self._icon_font = glassesTools.gui.msg_box.icon_font = \
+        self._icon_font = gt_gui.msg_box.icon_font = \
             hello_imgui.load_font("fonts/Font_Awesome_6_Free-Solid-900.otf", msg_box_size, large_icons_params)
 
     def _setup_glfw(self):
@@ -117,7 +116,7 @@ class GUI:
 
     def _drop_callback(self, _: glfw._GLFWwindow, items: list[str]):
         paths = [pathlib.Path(item) for item in items]
-        if self.popup_stack and isinstance(picker := self.popup_stack[-1], glassesTools.gui.file_picker.FilePicker):
+        if self.popup_stack and isinstance(picker := self.popup_stack[-1], gt_gui.file_picker.FilePicker):
             picker.set_dir(paths)
         else:
             if self.project_dir is not None:
@@ -126,7 +125,7 @@ class GUI:
             else:
                 # load project
                 if len(paths)!=1 or not (path := paths[0]).is_dir():
-                    glassesTools.gui.utils.push_popup(glassesTools.gui.msg_box.msgbox, "Project opening error", "Only a single project directory should be drag-dropped on the glassesValidator GUI.", glassesTools.gui.msg_box.MsgBox.error, more="Dropped paths:\n"+('\n'.join([str(p) for p in paths])))
+                    gt_gui.utils.push_popup(gt_gui.msg_box.msgbox, "Project opening error", "Only a single project directory should be drag-dropped on the glassesValidator GUI.", gt_gui.msg_box.MsgBox.error, more="Dropped paths:\n"+('\n'.join([str(p) for p in paths])))
                 else:
                     callbacks.try_load_project(self, path, 'loading')
 
@@ -263,7 +262,7 @@ class GUI:
     def _show_menu_gui(self):
         # this is always called, so we handle popups and other state here
         self._check_project_setup_state()
-        glassesTools.gui.utils.handle_popup_stack(self.popup_stack)
+        gt_gui.utils.handle_popup_stack(self.popup_stack)
         self._update_jobs_and_process_pool()
         # also handle showing of debug windows
         if self._show_demo_window:
@@ -272,7 +271,7 @@ class GUI:
         # now actual menu
         if imgui.begin_menu("Help"):
             if imgui.menu_item("About", "", False)[0]:
-                glassesTools.gui.utils.push_popup(self, self._about_popup_drawer)
+                gt_gui.utils.push_popup(self, self._about_popup_drawer)
             self._show_demo_window = imgui.menu_item("Debug window", "", self._show_demo_window)[1]
             imgui.end_menu()
 
@@ -437,15 +436,15 @@ class GUI:
         session_level = job.recording is None
         if state==process.State.Failed:
             exc = future.exception()    # should not throw exception since CancelledError is already encoded in state and future is done
-            tb = glassesTools.gui.utils.get_traceback(type(exc), exc, exc.__traceback__)
+            tb = gt_gui.utils.get_traceback(type(exc), exc, exc.__traceback__)
             lbl = f'session "{job.session}"'
             if not session_level:
                 lbl += f', recording "{job.recording}"'
             lbl += f' (work item {job_id}, action {job.action.displayable_name})'
             if isinstance(exc, concurrent.futures.TimeoutError):
-                glassesTools.gui.utils.push_popup(self, glassesTools.gui.msg_box.msgbox, "Processing error", f"A worker process has failed for {lbl}:\n{type(exc).__name__}: {str(exc) or 'No further details'}\n\nPossible causes include:\n - You are running with too many workers, try lowering them in settings", glassesTools.gui.msg_box.MsgBox.warn, more=tb)
+                gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Processing error", f"A worker process has failed for {lbl}:\n{type(exc).__name__}: {str(exc) or 'No further details'}\n\nPossible causes include:\n - You are running with too many workers, try lowering them in settings", gt_gui.msg_box.MsgBox.warn, more=tb)
                 return
-            glassesTools.gui.utils.push_popup(self, glassesTools.gui.msg_box.msgbox, "Processing error", f"Something went wrong in a worker process for {lbl}:\n\n{tb}", glassesTools.gui.msg_box.MsgBox.error)
+            gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Processing error", f"Something went wrong in a worker process for {lbl}:\n\n{tb}", gt_gui.msg_box.MsgBox.error)
 
         # clean up, if needed, when a task failed or was canceled
         if job.action==process.Action.IMPORT and state in [process.State.Canceled, process.State.Failed]:
@@ -477,7 +476,7 @@ class GUI:
             self.study_config = config.Study.load_from_json(config_dir, strict_check=False)
             self._reload_sessions()
         except Exception as e:
-            glassesTools.gui.utils.push_popup(self, glassesTools.gui.msg_box.msgbox, "Project loading error", f"Failed to load the project at {self.project_dir}:\n{e}\n\n{utils.glassesTools.gui.get_traceback(e)}", glassesTools.gui.msg_box.MsgBox.error)
+            gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Project loading error", f"Failed to load the project at {self.project_dir}:\n{e}\n\n{utils.gt_gui.get_traceback(e)}", gt_gui.msg_box.MsgBox.error)
             self.close_project()
             return
 
@@ -490,8 +489,8 @@ class GUI:
             return {m.id for m in self.study_config.individual_markers}
         def _get_known_planes() -> set[str]:
             return {p.name for p in self.study_config.planes}
-        def _get_episodes_to_code_for_planes() -> set[glassesTools.annotation.Event]:
-            return {e for e in self.study_config.episodes_to_code if e!=glassesTools.annotation.Event.Sync_Camera}
+        def _get_episodes_to_code_for_planes() -> set[annotation.Event]:
+            return {e for e in self.study_config.episodes_to_code if e!=annotation.Event.Sync_Camera}
         self._possible_value_getters = {
             'video_make_which': _get_known_recordings,
             'video_recording_colors': _get_known_recordings,
@@ -545,7 +544,7 @@ class GUI:
         actions = process.get_actions_for_config(self.study_config, exclude_session_level=False)
         lister.set_actions_to_show(actions)
 
-    def _recording_lister_set_actions_to_show(self, lister: glassesTools.gui.recording_table.RecordingTable, sess: str):
+    def _recording_lister_set_actions_to_show(self, lister: gt_gui.recording_table.RecordingTable, sess: str):
         config = self.session_config_overrides[sess].apply(self.study_config, strict_check=False)
         actions = process.get_actions_for_config(config, exclude_session_level=True)
         def _draw_status(action: process.Action, item: session.Recording):
@@ -553,7 +552,7 @@ class GUI:
                 session_lister.draw_process_state(item.state[action])
             else:
                 imgui.text('-')
-                glassesTools.gui.utils.draw_hover_text(f'Not applicable to a {item.definition.type.value} recording','')
+                gt_gui.utils.draw_hover_text(f'Not applicable to a {item.definition.type.value} recording','')
         def _get_sort_value(action: process.Action, iid: int):
             item = self.sessions[sess].recordings[iid]
             if process.is_action_possible_for_recording_type(action, item.definition.type):
@@ -563,9 +562,9 @@ class GUI:
 
         # build set of column, trigger column rebuild
         columns = [
-            glassesTools.gui.recording_table.ColumnSpec(1,ifa6.ICON_FA_SIGNATURE+" Recording name",imgui.TableColumnFlags_.default_sort | imgui.TableColumnFlags_.no_hide, lambda rec: imgui.text(rec.definition.name), lambda iid: iid, "Recording name")
+            gt_gui.recording_table.ColumnSpec(1,ifa6.ICON_FA_SIGNATURE+" Recording name",imgui.TableColumnFlags_.default_sort | imgui.TableColumnFlags_.no_hide, lambda rec: imgui.text(rec.definition.name), lambda iid: iid, "Recording name")
         ]+[
-            glassesTools.gui.recording_table.ColumnSpec(2+c, a.displayable_name, imgui.TableColumnFlags_.angled_header, lambda rec, a=a: _draw_status(a, rec), lambda iid, a=a: _get_sort_value(a, iid)) for c,a in enumerate(actions)
+            gt_gui.recording_table.ColumnSpec(2+c, a.displayable_name, imgui.TableColumnFlags_.angled_header, lambda rec, a=a: _draw_status(a, rec), lambda iid, a=a: _get_sort_value(a, iid)) for c,a in enumerate(actions)
         ]
         lister.build_columns(columns)
 
@@ -619,11 +618,11 @@ class GUI:
             callbacks.new_session_button(self)
         imgui.same_line()
         if imgui.button(ifa6.ICON_FA_FILE_IMPORT+' import eye tracker recordings'):
-            glassesTools.gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='add_et_recordings', sessions=[s for s in self._selected_sessions if self._selected_sessions[s] and self.sessions[s].missing_recordings(session.RecordingType.Eye_Tracker)]))
+            gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='add_et_recordings', sessions=[s for s in self._selected_sessions if self._selected_sessions[s] and self.sessions[s].missing_recordings(session.RecordingType.Eye_Tracker)]))
         if any((r.type==session.RecordingType.Camera for r in self.study_config.session_def.recordings)):
             imgui.same_line()
             if imgui.button(ifa6.ICON_FA_FILE_IMPORT+' import camera recordings'):
-                glassesTools.gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='add_cam_recordings', sessions=[s for s in self._selected_sessions if self._selected_sessions[s] and self.sessions[s].missing_recordings(session.RecordingType.Camera)]))
+                gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='add_cam_recordings', sessions=[s for s in self._selected_sessions if self._selected_sessions[s] and self.sessions[s].missing_recordings(session.RecordingType.Camera)]))
         self._session_lister.draw()
 
     def _unopened_interface_drawer(self):
@@ -643,10 +642,10 @@ class GUI:
 
         imgui.set_cursor_pos((but_x, but_y))
         if imgui.button(ifa6.ICON_FA_FOLDER_PLUS+" New project", size=(but_width, but_height)):
-            glassesTools.gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='creating'))
+            gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='creating'))
         imgui.same_line(spacing=10*imgui.get_style().item_spacing.x)
         if imgui.button(ifa6.ICON_FA_FOLDER_OPEN+" Open project", size=(but_width, but_height)):
-            glassesTools.gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='loading'))
+            gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='loading'))
 
     def _project_settings_pane_drawer(self):
         def _indicate_needs_attention():
@@ -701,7 +700,7 @@ class GUI:
                 new_config.check_valid(strict_check=False)
             except Exception as e:
                 # do not persist invalid config, inform user of problem
-                glassesTools.gui.utils.push_popup(self, glassesTools.gui.msg_box.msgbox, "Settings error", f"You cannot make this change to the project's settings:\n{e}", glassesTools.gui.msg_box.MsgBox.error)
+                gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Settings error", f"You cannot make this change to the project's settings:\n{e}", gt_gui.msg_box.MsgBox.error)
             else:
                 # persist changed config
                 self.study_config = new_config
@@ -834,7 +833,7 @@ class GUI:
                     r.remove_default_cal_file(config_path)
             imgui.same_line()
             if imgui.button(ifa6.ICON_FA_DOWNLOAD+f' select calibration xml##cal_{r.name}'):
-                glassesTools.gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='set_default_cam_cal', rec_def=r, rec_def_path=config_path))
+                gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='set_default_cam_cal', rec_def=r, rec_def_path=config_path))
         imgui.end_table()
         if imgui.button('+ new recording'):
             new_rec_name = ''
@@ -882,7 +881,7 @@ class GUI:
                 ifa6.ICON_FA_CHECK+" Create recording": (lambda: (callbacks.make_recording_definition(self.study_config, new_rec_type, new_rec_name), self._reload_sessions()), lambda: not _valid_rec_name() or new_rec_type is None),
                 ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
             }
-            glassesTools.gui.utils.push_popup(self, lambda: glassesTools.gui.utils.popup("Add recording", _add_rec_popup, buttons = buttons, outside=False))
+            gt_gui.utils.push_popup(self, lambda: gt_gui.utils.popup("Add recording", _add_rec_popup, buttons = buttons, outside=False))
 
     def _plane_editor_pane_drawer(self):
         if not self.study_config.planes:
@@ -958,7 +957,7 @@ class GUI:
                 ifa6.ICON_FA_CHECK+" Create plane": (lambda: callbacks.make_plane(self.study_config, new_plane_type, new_plane_name), lambda: not _valid_plane_name() or new_plane_type is None),
                 ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
             }
-            glassesTools.gui.utils.push_popup(self, lambda: glassesTools.gui.utils.popup("Add plane", _add_plane_popup, buttons = buttons, outside=False))
+            gt_gui.utils.push_popup(self, lambda: gt_gui.utils.popup("Add plane", _add_plane_popup, buttons = buttons, outside=False))
 
     def _episode_setup_pane_drawer(self):
         if not self.study_config.episodes_to_code:
@@ -990,7 +989,7 @@ class GUI:
                 new_config.check_valid(strict_check=False)
             except Exception as e:
                 # do not persist invalid config, inform user of problem
-                glassesTools.gui.utils.push_popup(self, glassesTools.gui.msg_box.msgbox, "Settings error", f"You cannot make this change to the project's settings:\n{e}", glassesTools.gui.msg_box.MsgBox.error)
+                gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Settings error", f"You cannot make this change to the project's settings:\n{e}", gt_gui.msg_box.MsgBox.error)
             else:
                 # persist changed config
                 self.study_config = new_config
@@ -1084,7 +1083,7 @@ class GUI:
                 ifa6.ICON_FA_CHECK+" Create marker": (lambda: callbacks.make_individual_marker(self.study_config, new_mark_id, new_mark_size), lambda: not _valid_mark_id() or new_mark_size<=0.),
                 ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
             }
-            glassesTools.gui.utils.push_popup(self, lambda: glassesTools.gui.utils.popup("Add marker", _add_rec_popup, buttons = buttons, outside=False))
+            gt_gui.utils.push_popup(self, lambda: gt_gui.utils.popup("Add marker", _add_rec_popup, buttons = buttons, outside=False))
 
     def _get_pending_running_job_list(self) -> set[utils.JobInfo]:
         active_jobs: set[utils.JobInfo] = set()
@@ -1140,7 +1139,7 @@ class GUI:
                 else:
                     for r in actions[a]:
                         self.launch_task(session_name, r, a)
-            glassesTools.gui.utils.draw_hover_text(hover_text, '')
+            gt_gui.utils.draw_hover_text(hover_text, '')
         lbl = session_name + rec_name if rec_name else ''
         if rec_name:
             working_directory = self.sessions[session_name].recordings[rec_name].info.working_directory
@@ -1149,14 +1148,14 @@ class GUI:
                 callbacks.open_folder(source_directory)
             but_lbls = ('working', 'recording')
             if imgui.begin_menu('Camera calibration'):
-                has_cam_cal_file = (working_directory/'calibration.xml').is_file()
+                has_cam_cal_file = (working_directory/gt_naming.scene_camera_calibration_fname).is_file()
                 if not has_cam_cal_file:
                     imgui.text_colored(colors.error,'No camera calibration!')
                 else:
                     if imgui.selectable(ifa6.ICON_FA_TRASH_CAN+f' Delete calibration file##{lbl}', False)[0]:
                         callbacks.delete_cam_cal(working_directory)
                 if imgui.selectable(ifa6.ICON_FA_DOWNLOAD+f' Set calibration xml##{lbl}', False)[0]:
-                    glassesTools.gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='set_cam_cal', working_directory=working_directory))
+                    gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='set_cam_cal', working_directory=working_directory))
                 imgui.end_menu()
         else:
             working_directory = self.sessions[session_name].working_directory
@@ -1181,7 +1180,7 @@ class GUI:
             self._to_dock = [win_name]
             self._to_focus= win_name
             self._selected_recordings[sess.name] = {k:False for k in sess.recordings}
-            self._recording_listers[sess.name] = glassesTools.gui.recording_table.RecordingTable(sess.recordings, self._sessions_lock, self._selected_recordings[sess.name], None, lambda r: r.info, item_context_callback=lambda rec_name: self._recording_context_menu(sess.name, rec_name))
+            self._recording_listers[sess.name] = gt_gui.recording_table.RecordingTable(sess.recordings, self._sessions_lock, self._selected_recordings[sess.name], None, lambda r: r.info, item_context_callback=lambda rec_name: self._recording_context_menu(sess.name, rec_name))
             self._recording_listers[sess.name].dont_show_empty = True
             self.session_config_overrides[sess.name] = config.load_or_create_override(config.OverrideLevel.Session, sess.working_directory)
             self.recording_config_overrides[sess.name] = {}
@@ -1196,12 +1195,12 @@ class GUI:
         show_import_et = any((sess.definition.get_recording_def(r).type==session.RecordingType.Eye_Tracker for r in missing_recs))
         show_import_cam = any((sess.definition.get_recording_def(r).type==session.RecordingType.Camera for r in missing_recs))
         if show_import_et and imgui.button(ifa6.ICON_FA_FILE_IMPORT+' import eye tracker recordings'):
-            glassesTools.gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='add_et_recordings', sessions=[sess.name]))
+            gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='add_et_recordings', sessions=[sess.name]))
         if show_import_cam:
             if show_import_et:
                 imgui.same_line()
             if imgui.button(ifa6.ICON_FA_FILE_IMPORT+' import camera recordings'):
-                glassesTools.gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='add_cam_recordings', sessions=[sess.name]))
+                gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='add_cam_recordings', sessions=[sess.name]))
         self._recording_listers[sess.name].draw(limit_outer_size=True)
         sess_changed = False
         if imgui.tree_node_ex('Setting overrides for this session',imgui.TreeNodeFlags_.framed):
@@ -1214,7 +1213,7 @@ class GUI:
                     self.session_config_overrides[sess.name] = config.StudyOverride.from_study_diff(new_config, self.study_config, config.OverrideLevel.Session)
                 except Exception as e:
                     # do not persist invalid config, inform user of problem
-                    glassesTools.gui.utils.push_popup(self, glassesTools.gui.msg_box.msgbox, "Settings error", f"You cannot make this change to the settings for session {sess.name}:\n{e}", glassesTools.gui.msg_box.MsgBox.error)
+                    gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Settings error", f"You cannot make this change to the settings for session {sess.name}:\n{e}", gt_gui.msg_box.MsgBox.error)
                 else:
                     # persist changed config
                     self.session_config_overrides[sess.name].store_as_json(sess.working_directory)
@@ -1231,7 +1230,7 @@ class GUI:
                         self.recording_config_overrides[sess.name][r] = config.StudyOverride.from_study_diff(new_config, effective_config_for_session, config.OverrideLevel.Recording)
                     except Exception as e:
                         # do not persist invalid config, inform user of problem
-                        glassesTools.gui.utils.push_popup(self, glassesTools.gui.msg_box.msgbox, "Settings error", f"You cannot make this change to the settings for recording {r} in session {sess.name}:\n{e}", glassesTools.gui.msg_box.MsgBox.error)
+                        gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Settings error", f"You cannot make this change to the settings for recording {r} in session {sess.name}:\n{e}", gt_gui.msg_box.MsgBox.error)
                     else:
                         # persist changed config
                         self.recording_config_overrides[sess.name][r].store_as_json(sess.recordings[r].info.working_directory)
@@ -1261,13 +1260,13 @@ class GUI:
             imgui.text(f"OpenGL {'.'.join(str(gl.glGetInteger(num)) for num in (gl.GL_MAJOR_VERSION, gl.GL_MINOR_VERSION))}, PyOpenGL {OpenGL.__version__}")
             imgui.text(f"GLFW {'.'.join(str(num) for num in glfw.get_version())}, pyGLFW {glfw.__version__}")
             imgui_md.render(f"ImGui {imgui.get_version()}, [imgui_bundle {imgui_bundle.__version__}](https://github.com/pthom/imgui_bundle)")
-            match glassesTools.platform.os:
-                case glassesTools.platform.Os.Linux:
+            match gt_platform.os:
+                case gt_platform.Os.Linux:
                     imgui.text(f"{platform.system()} {platform.release()}")
-                case glassesTools.platform.Os.Windows:
+                case gt_platform.Os.Windows:
                     rel = 11 if sys.getwindowsversion().build>22000 else platform.release()
                     imgui.text(f"{platform.system()} {rel} {platform.win32_edition()} ({platform.version()})")
-                case glassesTools.platform.Os.MacOS:
+                case gt_platform.Os.MacOS:
                     imgui.text(f"{platform.system()} {platform.release()}")
             imgui.pop_text_wrap_pos()
             imgui.end_group()
@@ -1327,7 +1326,7 @@ class GUI:
                 if imgui.selectable("BibTeX", False)[0]:
                     imgui.set_clipboard_text(reference_bibtex)
                 imgui.end_popup()
-            glassesTools.gui.utils.draw_hover_text(text='', hover_text="Right-click to copy citation to clipboard")
+            gt_gui.utils.draw_hover_text(text='', hover_text="Right-click to copy citation to clipboard")
 
             imgui.pop_text_wrap_pos()
-        return glassesTools.gui.utils.popup("About gazeMapper", popup_content, closable=True, outside=True)
+        return gt_gui.utils.popup("About gazeMapper", popup_content, closable=True, outside=True)

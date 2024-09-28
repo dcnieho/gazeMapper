@@ -26,7 +26,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
         raise ValueError(f'You can only run run_validation on eye tracker recordings, not on a {str(rec_def.type).split(".")[1]} recording')
 
     # get interval(s) coded to be analyzed, if any
-    episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / 'coding.tsv'))[annotation.Event.Validate]
+    episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / naming.coding_file))[annotation.Event.Validate]
 
     # per plane, run the glassesValidator steps
     for p in planes:

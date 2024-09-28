@@ -12,7 +12,7 @@ isMacOS = sys.platform.startswith("darwin")
 if isMacOS:
     import AppKit
 
-from glassesTools import annotation, drawing, gaze_headref, gaze_worldref, ocv, plane, timestamps
+from glassesTools import annotation, drawing, gaze_headref, gaze_worldref, naming as gt_naming, ocv, plane, timestamps
 from glassesTools.gui.video_player import GUI
 
 
@@ -69,7 +69,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
     elif rec_def.type==session.RecordingType.Eye_Tracker:
         # Read gaze data
         has_gaze = True
-        gazes = gaze_headref.read_dict_from_file(working_dir / 'gazeData.tsv', ts_column_suffixes=['VOR',''])[0]
+        gazes = gaze_headref.read_dict_from_file(working_dir / gt_naming.gaze_data_fname, ts_column_suffixes=['VOR',''])[0]
 
         planes: set[str] = set()
         for e in [annotation.Event.Validate, annotation.Event.Trial]:
@@ -89,7 +89,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
         raise ValueError(f'recording type "{rec_def.type}" is not understood')
 
     # get camera calibration info
-    cam_params = ocv.CameraParams.read_from_file(working_dir / "calibration.xml")
+    cam_params = ocv.CameraParams.read_from_file(working_dir / gt_naming.scene_camera_calibration_fname)
 
     # get previous interval coding, if available
     coding_file = working_dir / naming.coding_file
@@ -106,7 +106,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
 
     # set up video playback
     # 1. timestamp info for relating audio to video frames
-    video_ts = timestamps.VideoTimestamps(working_dir / 'frameTimestamps.tsv')
+    video_ts = timestamps.VideoTimestamps(working_dir / gt_naming.frame_timestamps_fname)
     # 2. mediaplayer for the actual video playback, with sound if available
     ff_opts = {'volume': 1., 'sync': 'audio', 'framedrop': True}
     player = MediaPlayer(str(in_video), ff_opts=ff_opts)

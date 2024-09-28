@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from typing import Any, Callable
 
-from glassesTools import annotation, aruco, drawing, marker as gt_marker, plane as gt_plane
+from glassesTools import annotation, aruco, drawing, marker as gt_marker, naming as gt_naming, plane as gt_plane
 from glassesTools.gui.video_player import GUI
 
 
@@ -58,7 +58,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
     planes_setup, analyze_frames = _get_plane_setup(study_config, config_dir, episodes)
 
     # set up pose estimator and run it
-    estimator = aruco.PoseEstimator(in_video, working_dir / "frameTimestamps.tsv", working_dir / "calibration.xml")
+    estimator = aruco.PoseEstimator(in_video, working_dir / gt_naming.frame_timestamps_fname, working_dir / gt_naming.scene_camera_calibration_fname)
     for p in planes_setup:
         estimator.add_plane(p, planes_setup[p], analyze_frames[p])
     for i in (markers:=marker.get_marker_dict_from_list(study_config.individual_markers)):

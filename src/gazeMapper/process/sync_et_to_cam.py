@@ -10,7 +10,7 @@ isMacOS = sys.platform.startswith("darwin")
 if isMacOS:
     import AppKit
 
-from glassesTools import annotation, gaze_headref, ocv, plane, timestamps, video_utils
+from glassesTools import annotation, gaze_headref, naming as gt_naming, ocv, plane, timestamps, video_utils
 from glassesTools.gui.signal_sync import GUI, TargetPos
 
 
@@ -64,9 +64,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
         raise RuntimeError(f'No {annotation.Event.Sync_ET_Data.value} episodes found for this recording. Run code_episodes and code at least one {annotation.Event.Sync_ET_Data.value} episode.')
 
     # Read gaze data
-    gazes = gaze_headref.read_dict_from_file(working_dir / 'gazeData.tsv', episodes)[0]
+    gazes = gaze_headref.read_dict_from_file(working_dir / gt_naming.gaze_data_fname, episodes)[0]
     # time info
-    video_ts = timestamps.VideoTimestamps(working_dir / 'frameTimestamps.tsv')
+    video_ts = timestamps.VideoTimestamps(working_dir / gt_naming.frame_timestamps_fname)
 
     match study_config.get_cam_movement_for_et_sync_method:
         case 'plane':
@@ -82,7 +82,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
             poses = plane.read_dict_from_file(pln_file, episodes)
 
             # get camera calibration info
-            camera_params= ocv.CameraParams.read_from_file(working_dir / "calibration.xml")
+            camera_params= ocv.CameraParams.read_from_file(working_dir / gt_naming.scene_camera_calibration_fname)
             camera_params.has_intrinsics()
 
             # compute target positions
@@ -161,14 +161,14 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     else:
         toff = VOR_sync.iloc[0,'offset_t']
     # just read whole gaze dataframe so we can apply things vectorized
-    df = pd.read_csv(working_dir / 'gazeData.tsv', delimiter='\t', index_col=False)
+    df = pd.read_csv(working_dir / gt_naming.gaze_data_fname, delimiter='\t', index_col=False)
     # resync gaze timestamps using VOR, and get correct scene camera frame numbers
     ts_VOR = df['timestamp'].to_numpy() + toff*1000.   # s -> ms
     fr_VOR = video_utils.timestamps_to_frame_number(ts_VOR,video_ts.timestamps,trim=True)['frame_idx'].to_numpy()
     # write into df (use polars as that library saves to file waaay faster)
     df = _utils.insert_ts_fridx_in_df(df, gaze_headref.Gaze, 'VOR', ts_VOR, fr_VOR)
     df = pl.from_pandas(df)
-    df.write_csv(working_dir / 'gazeData.tsv', separator='\t', null_value='nan', float_precision=8)
+    df.write_csv(working_dir / gt_naming.gaze_data_fname, separator='\t', null_value='nan', float_precision=8)
 
     # update state
     session.update_action_states(working_dir, process.Action.SYNC_ET_TO_CAM, process.State.Completed, study_config)

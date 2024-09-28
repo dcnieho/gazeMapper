@@ -3,7 +3,7 @@ import pandas as pd
 import pathlib
 from typing import overload
 
-from glassesTools import annotation, timestamps, video_utils
+from glassesTools import annotation, naming as gt_naming, timestamps, video_utils
 
 from . import episode, naming
 
@@ -20,7 +20,7 @@ def get_sync_for_recs(working_dir: str|pathlib.Path, recs: str|list[str], ref_re
         recs = [recs]
     recs = [r for r in recs if r!=ref_rec]
     ref_episodes = get_coding_file(working_dir / ref_rec)
-    video_ts_ref = timestamps.VideoTimestamps(working_dir / ref_rec / 'frameTimestamps.tsv')
+    video_ts_ref = timestamps.VideoTimestamps(working_dir / ref_rec / gt_naming.frame_timestamps_fname)
 
     index = pd.MultiIndex.from_product([recs, range(len(ref_episodes))], names=['recording','interval'])
     sync  = pd.DataFrame(columns=get_cols(do_time_stretch), dtype=float, index=index)
@@ -35,7 +35,7 @@ def get_sync_for_recs(working_dir: str|pathlib.Path, recs: str|list[str], ref_re
             raise ValueError(f"The number of sync points for this recording ({len(episodes)}, {r}) is not equal to that for the reference recording ({len(ref_episodes)}, {ref_rec}). Cannot continue, fix your coding")
 
         # get time information
-        video_ts = timestamps.VideoTimestamps(working_dir / r / 'frameTimestamps.tsv')
+        video_ts = timestamps.VideoTimestamps(working_dir / r / gt_naming.frame_timestamps_fname)
 
         # get timestamps corresponding to sync frames
         for ival in range(len(episodes)):
@@ -125,8 +125,8 @@ def get_episode_frame_indices_from_ref(working_dir: str|pathlib.Path, event: ann
         raise KeyError(f'Trying to get {event.value} episodes from the reference recording ({ref_rec}), but the coding file for this reference recording doesn\'t contain any ({event.value}) episodes')
     # get sync and timestamp info we need to transform reference frames indices to frame indices of this recording
     sync = get_sync_for_recs(working_dir.parent, all_recs, ref_rec, do_time_stretch, average_recordings)
-    video_ts_ref = timestamps.VideoTimestamps(working_dir.parent / ref_rec / 'frameTimestamps.tsv')
-    video_ts     = timestamps.VideoTimestamps(working_dir / 'frameTimestamps.tsv')
+    video_ts_ref = timestamps.VideoTimestamps(working_dir.parent / ref_rec / gt_naming.frame_timestamps_fname)
+    video_ts     = timestamps.VideoTimestamps(working_dir / gt_naming.frame_timestamps_fname)
     # get frame indices in this recording's video corresponding to each of the reference frames
     frame_idx = reference_frames_to_video(rec, sync, ref_episodes[event], video_ts.timestamps, video_ts_ref.timestamps, do_time_stretch, stretch_which)
     return [[i+e for i,e in zip(ifs, [-extra_fr, extra_fr])] for ifs in frame_idx]   # expand by extra_fr frames on each edge

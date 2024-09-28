@@ -2,7 +2,7 @@ import pathlib
 import pandas as pd
 import polars as pl
 
-from glassesTools import annotation, gaze_headref, timestamps
+from glassesTools import annotation, gaze_headref, naming, timestamps
 
 
 from . import _utils
@@ -47,7 +47,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
 
     # get info from reference recording
     ref_episodes = synchronization.get_coding_file(working_dir / study_config.sync_ref_recording)
-    ref_vid_ts_file = working_dir / study_config.sync_ref_recording / 'frameTimestamps.tsv'
+    ref_vid_ts_file = working_dir / study_config.sync_ref_recording / naming.frame_timestamps_fname
     video_ts_ref = timestamps.VideoTimestamps(ref_vid_ts_file)
 
     # check input
@@ -71,7 +71,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
     # now that we have determined how to sync, apply
     for r in recs:
         # just read whole gaze dataframe so we can apply things vectorized
-        df = pd.read_csv(working_dir / r / 'gazeData.tsv', delimiter='\t', index_col=False)
+        df = pd.read_csv(working_dir / r / naming.gaze_data_fname, delimiter='\t', index_col=False)
         ts_col = 'timestamp_VOR' if 'timestamp_VOR' in df else 'timestamp'
         # get gaze timestamps and camera frame numbers _in reference video timeline_
         ts_ref, ref_vid_ts, fr_ref = synchronization.apply_sync(r, sync, df[ts_col].to_numpy(), video_ts_ref.timestamps,
@@ -95,7 +95,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
         # write into df (use polars as that library saves to file waaay faster)
         df = _utils.insert_ts_fridx_in_df(df, gaze_headref.Gaze, 'ref', ts_ref, fr_ref)
         df = pl.from_pandas(df)
-        df.write_csv(working_dir / r / 'gazeData.tsv', separator='\t', null_value='nan', float_precision=8)
+        df.write_csv(working_dir / r / naming.gaze_data_fname, separator='\t', null_value='nan', float_precision=8)
 
     # update state
     session.update_action_states(working_dir, process.Action.SYNC_TO_REFERENCE, process.State.Completed, study_config)

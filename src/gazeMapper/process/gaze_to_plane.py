@@ -1,7 +1,7 @@
 import pathlib
 import threading
 
-from glassesTools import annotation, gaze_headref, gaze_worldref, ocv, plane as gt_plane
+from glassesTools import annotation, gaze_headref, gaze_worldref, naming as gt_naming, ocv, plane as gt_plane
 from glassesTools.gui import worldgaze as worldgaze_gui
 from glassesTools.gui.video_player import GUI
 
@@ -71,11 +71,11 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, f
     # load gaze data and poses
     processing_intervals = [e for p in mapping_setup for e in mapping_setup[p]] # NB: doesn't need to be sorted
     should_load_part = not gui or show_only_intervals
-    head_gazes = gaze_headref.read_dict_from_file(working_dir / 'gazeData.tsv', processing_intervals if should_load_part else None, ts_column_suffixes=['VOR', ''])[0]
+    head_gazes = gaze_headref.read_dict_from_file(working_dir / gt_naming.gaze_data_fname, processing_intervals if should_load_part else None, ts_column_suffixes=['VOR', ''])[0]
     poses = {p:gt_plane.read_dict_from_file(working_dir/f'{naming.plane_pose_prefix}{p}.tsv', mapping_setup[p] if should_load_part else None) for p in mapping_setup}
 
     # get camera calibration info
-    camera_params = ocv.CameraParams.read_from_file(working_dir / "calibration.xml")
+    camera_params = ocv.CameraParams.read_from_file(working_dir / gt_naming.scene_camera_calibration_fname)
 
     # transform gaze to plane(s)
     plane_gazes: dict[str, dict[int,list[gaze_worldref.Gaze]]] = {}
@@ -92,7 +92,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, f
 
     in_video = session.read_recording_info(working_dir, rec_def.type)[1]
     worldgaze_gui.show_visualization(
-        in_video, working_dir / 'frameTimestamps.tsv', working_dir / "calibration.xml",
+        in_video, working_dir / gt_naming.frame_timestamps_fname, working_dir / gt_naming.scene_camera_calibration_fname,
         planes, poses, head_gazes, plane_gazes,
         {e:episodes[e] for e in [annotation.Event.Validate, annotation.Event.Trial] if e in episodes},
         gui, frame_win_id, show_planes, show_only_intervals, 8

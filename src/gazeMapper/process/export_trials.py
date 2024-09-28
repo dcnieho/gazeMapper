@@ -4,7 +4,7 @@ import pandas as pd
 import polars as pl
 from collections import defaultdict
 
-from glassesTools import annotation, gaze_worldref
+from glassesTools import annotation, gaze_worldref, naming as gt_naming
 
 from .. import config, episode, marker, naming, process, session
 
@@ -85,7 +85,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
                 plane_gazes[f'marker_{i}_presence'] = plane_gazes[f'marker_{i}_presence'].notnull()
 
         # add scene and reference camera timestamp info, if present
-        ts = pd.read_csv(working_dir / r / 'frameTimestamps.tsv',sep='\t').rename(columns={'timestamp':'frame_ts'})
+        ts = pd.read_csv(working_dir / r / gt_naming.frame_timestamps_fname,sep='\t').rename(columns={'timestamp':'frame_ts'})
         plane_gazes = plane_gazes.merge(ts, how="left", on='frame_idx')
         to_move = 1
         if 'frame_idx_VOR' in plane_gazes.columns:
@@ -93,7 +93,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
             plane_gazes = plane_gazes.merge(ts, how="left", on='frame_idx_VOR')
             to_move += 1
         if 'frame_idx_ref' in plane_gazes.columns:
-            ts = pd.read_csv(working_dir / study_config.sync_ref_recording / 'frameTimestamps.tsv',sep='\t').rename(columns={'frame_idx':'frame_idx_ref','timestamp':'frame_ts_ref','timestamp_stretched':'frame_ts_ref_stretched'})
+            ts = pd.read_csv(working_dir / study_config.sync_ref_recording / gt_naming.frame_timestamps_fname,sep='\t').rename(columns={'frame_idx':'frame_idx_ref','timestamp':'frame_ts_ref','timestamp_stretched':'frame_ts_ref_stretched'})
             plane_gazes = plane_gazes.merge(ts, how="left", on='frame_idx_ref')
             to_move += len([c for c in ts.columns if c.startswith('frame_ts_')])
         # reorder to get ts columns in the right place

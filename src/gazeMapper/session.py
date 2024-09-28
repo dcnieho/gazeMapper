@@ -4,7 +4,7 @@ import json
 import typeguard
 import shutil
 
-from glassesTools import camera_recording, importing, utils
+from glassesTools import camera_recording, importing, naming, utils
 from glassesTools.recording import Recording as EyeTrackerRecording
 from glassesTools.camera_recording import Recording as CameraRecording
 
@@ -19,7 +19,7 @@ recording_types = [r for r in RecordingType]
 
 
 class RecordingDefinition:
-    cal_file_name = 'calibration.xml'
+    cal_file_name = naming.scene_camera_calibration_fname
     @typeguard.typechecked
     def __init__(self, name:str, type:RecordingType):
         self.name = name
