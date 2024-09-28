@@ -1148,6 +1148,16 @@ class GUI:
             if source_directory.is_dir() and imgui.selectable(ifa6.ICON_FA_FOLDER_OPEN + f" Open source folder##{lbl}", False)[0]:
                 callbacks.open_folder(source_directory)
             but_lbls = ('working', 'recording')
+            if imgui.begin_menu('Camera calibration'):
+                has_cam_cal_file = (working_directory/'calibration.xml').is_file()
+                if not has_cam_cal_file:
+                    imgui.text_colored(colors.error,'No camera calibration!')
+                else:
+                    if imgui.selectable(ifa6.ICON_FA_TRASH_CAN+f' Delete calibration file##{lbl}', False)[0]:
+                        callbacks.delete_cam_cal(working_directory)
+                if imgui.selectable(ifa6.ICON_FA_DOWNLOAD+f' Set calibration xml##{lbl}', False)[0]:
+                    glassesTools.gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='set_cam_cal', working_directory=working_directory))
+                imgui.end_menu()
         else:
             working_directory = self.sessions[session_name].working_directory
             but_lbls = ('session', 'session')

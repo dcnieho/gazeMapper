@@ -20,7 +20,7 @@ from ... import config, marker, plane, process, session
 def get_folder_picker(g, reason: str, *args, **kwargs):
     from . import gui
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
-    def select_callback(selected):
+    def select_callback(selected: list[pathlib.Path]):
         match reason:
             case 'loading' | 'creating':
                 try_load_project(g, selected, action=reason)
@@ -29,7 +29,9 @@ def get_folder_picker(g, reason: str, *args, **kwargs):
             case 'add_cam_recordings':
                 add_camera_recordings(g, selected, *args, **kwargs)
             case 'set_default_cam_cal':
-                set_default_cam_cal(selected, *args, **kwargs)
+                set_default_cam_cal(selected[0], *args, **kwargs)
+            case 'set_cam_cal':
+                set_cam_cal(selected[0], *args, **kwargs)
             case _:
                 raise ValueError(f'reason "{reason}" not understood')
 
@@ -46,7 +48,7 @@ def get_folder_picker(g, reason: str, *args, **kwargs):
             header = "Select or drop recording folders or files"
             allow_multiple = True
             picker_type = glassesTools.gui.file_picker.FilePicker
-        case 'set_default_cam_cal':
+        case 'set_default_cam_cal' | 'set_cam_cal':
             header = "Select or drop calibration xml file"
             allow_multiple = False
             picker_type = glassesTools.gui.file_picker.FilePicker
@@ -102,7 +104,15 @@ def try_load_project(g, path: str|pathlib.Path, action='loading'):
             glassesTools.gui.utils.push_popup(g, glassesTools.gui.msg_box.msgbox, "Create new project", "The selected folder is empty. Do you want to use it as a new project folder?", glassesTools.gui.msg_box.MsgBox.warn, buttons)
 
 def set_default_cam_cal(cal_path: str|pathlib.Path, rec_def: session.RecordingDefinition, rec_def_path: pathlib.Path):
-    rec_def.set_default_cal_file(cal_path[0], rec_def_path)
+    rec_def.set_default_cal_file(cal_path, rec_def_path)
+
+def set_cam_cal(cal_path: str|pathlib.Path, working_directory: str|pathlib.Path):
+    cal_path = pathlib.Path(cal_path)
+    working_directory = pathlib.Path(working_directory)
+    shutil.copyfile(str(cal_path), str(working_directory / 'calibration.xml'))
+
+def delete_cam_cal(working_directory: str|pathlib.Path):
+    pathlib.Path(working_directory / 'calibration.xml').unlink(missing_ok=True)
 
 def make_plane(study_config: config.Study, p_type: plane.Type, name: str):
     path = config.guess_config_dir(study_config.working_directory)
