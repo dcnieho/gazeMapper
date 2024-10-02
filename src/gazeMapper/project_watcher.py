@@ -5,7 +5,7 @@ from typing import Callable
 
 from glassesTools import utils
 
-class ConfigFilter(DefaultFilter):
+class ProjectFilter(DefaultFilter):
     def __init__(self, extensions={'.json', '.gazeMapper'}, do_report_directories:bool=False, exclude_paths:set[pathlib.Path]=None, files_only_modified=False, dirs_only_added_deleted=False):
         super().__init__(ignore_paths=exclude_paths)
         self.extensions             = extensions
@@ -50,7 +50,7 @@ class ConfigFilter(DefaultFilter):
             else:
                 return path.suffix in self.extensions
 
-async def watch_and_report_changes(path: pathlib.Path, callback: Callable, stop_event: asyncio.Event, watch_filter=ConfigFilter()):
+async def watch_and_report_changes(path: pathlib.Path, callback: Callable, stop_event: asyncio.Event, watch_filter=ProjectFilter()):
     watch_filter.set_base_dir(path)
 
     async for changes in awatch(path, debounce=500, watch_filter=watch_filter, stop_event=stop_event):

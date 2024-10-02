@@ -20,7 +20,7 @@ import glassesTools
 from glassesTools import annotation, gui as gt_gui, naming as gt_naming, platform as gt_platform
 import glassesValidator
 
-from ... import config, config_watcher, marker, plane, process, session, type_utils, version
+from ... import config, marker, plane, process, project_watcher, session, type_utils, version
 from .. import async_thread
 from . import callbacks, colors, image_helper, process_pool, session_lister, settings_editor, utils
 
@@ -481,7 +481,7 @@ class GUI:
             return
 
         self.config_watcher_stop_event = asyncio.Event()
-        self.config_watcher = async_thread.run(config_watcher.watch_and_report_changes(self.project_dir, self._config_change_callback, self.config_watcher_stop_event, watch_filter=config_watcher.ConfigFilter(('.gazeMapper',), True, {config_dir}, True, True)))
+        self.config_watcher = async_thread.run(project_watcher.watch_and_report_changes(self.project_dir, self._config_change_callback, self.config_watcher_stop_event, watch_filter=project_watcher.ProjectFilter(('.gazeMapper',), True, {config_dir}, True, True)))
 
         def _get_known_recordings(filter_ref=False) -> set[str]:
             recs = {r.name for r in self.study_config.session_def.recordings}
