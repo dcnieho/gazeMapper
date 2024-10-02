@@ -1188,7 +1188,7 @@ class GUI:
             self.session_config_overrides[sess.name] = config.load_or_create_override(config.OverrideLevel.Session, sess.working_directory)
             self.recording_config_overrides[sess.name] = {}
             for r in sess.recordings:
-                self.recording_config_overrides[sess.name][r] = config.load_or_create_override(config.OverrideLevel.Recording, sess.recordings[r].info.working_directory)
+                self.recording_config_overrides[sess.name][r] = config.load_or_create_override(config.OverrideLevel.Recording, sess.recordings[r].info.working_directory, sess.recordings[r].definition.type)
             self._recording_lister_set_actions_to_show(self._recording_listers[sess.name], sess.name)
 
     def _session_detail_GUI(self, sess: session.Session):
@@ -1223,14 +1223,14 @@ class GUI:
             imgui.tree_pop()
         for r in sess.recordings:
             if imgui.tree_node_ex(f'Setting overrides for {r} recording',imgui.TreeNodeFlags_.framed):
-                fields = config.StudyOverride.get_allowed_parameters(config.OverrideLevel.Recording)[0]
+                fields = config.StudyOverride.get_allowed_parameters(config.OverrideLevel.Recording, sess.recordings[r].definition.type)[0]
                 effective_config_for_session = self.session_config_overrides[sess.name].apply(self.study_config, strict_check=False)
                 effective_config = self.recording_config_overrides[sess.name][r].apply(effective_config_for_session, strict_check=False)
                 changed, new_config = settings_editor.draw(effective_config, fields, config.study_parameter_types, config.study_defaults, self._possible_value_getters, effective_config_for_session, effective_config.field_problems())
                 if changed or sess_changed: # NB: also need to update file when parent has changed
                     try:
                         new_config.check_valid(strict_check=False)
-                        self.recording_config_overrides[sess.name][r] = config.StudyOverride.from_study_diff(new_config, effective_config_for_session, config.OverrideLevel.Recording)
+                        self.recording_config_overrides[sess.name][r] = config.StudyOverride.from_study_diff(new_config, effective_config_for_session, config.OverrideLevel.Recording, sess.recordings[r].definition.type)
                     except Exception as e:
                         # do not persist invalid config, inform user of problem
                         gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Settings error", f"You cannot make this change to the settings for recording {r} in session {sess.name}:\n{e}", gt_gui.msg_box.MsgBox.error)

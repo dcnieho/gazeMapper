@@ -509,7 +509,7 @@ class StudyOverride:
     default_json_file_name = 'study_def_override.json'
 
     @staticmethod
-    def get_allowed_parameters(level: OverrideLevel) -> tuple[list[str],set[str]]:
+    def get_allowed_parameters(level: OverrideLevel, recording_type: session.RecordingType|None = None) -> tuple[list[str],set[str]]:
         # NB: list instead of set as want to keep ordering
         all_params = list(study_parameter_types.keys())
         exclude = {'self', 'session_def', 'planes', 'individual_markers', 'working_directory', 'planes_per_episode'}
@@ -520,39 +520,45 @@ class StudyOverride:
             # arguments they may make sense depending on the processing function that
             # is being called, but we cannot differentiate, so reject to be conservative
             # use whitelist
-            include = {'get_cam_movement_for_et_sync_method','get_cam_movement_for_et_sync_function',
-                       'auto_code_sync_points', 'auto_code_trial_episodes',
-                       'validate_do_global_shift', 'validate_max_dist_fac', 'validate_dq_types', 'validate_allow_dq_fallback', 'validate_include_data_loss', 'validate_I2MC_settings'}
+            if recording_type==session.RecordingType.Camera:
+                # if for a camera recording, almost no parameters make sense to set
+                include = {'auto_code_sync_points', 'auto_code_trial_episodes'}
+            else:
+                include = {'get_cam_movement_for_et_sync_method','get_cam_movement_for_et_sync_function',
+                           'auto_code_sync_points', 'auto_code_trial_episodes',
+                           'validate_do_global_shift', 'validate_max_dist_fac', 'validate_dq_types', 'validate_allow_dq_fallback', 'validate_include_data_loss', 'validate_I2MC_settings'}
             exclude = set(all_params)-include
         allowed_params = [a for a in all_params if a not in exclude]
         return allowed_params, exclude
 
-    def __init__(self, level: OverrideLevel, **kwargs):
+    def __init__(self, level: OverrideLevel, recording_type: session.RecordingType|None = None, **kwargs):
         self.override_level = level
-        self._allowed_params, exclude = self.get_allowed_parameters(level)
+        self.recording_type = recording_type
+        self._allowed_params, exclude = self.get_allowed_parameters(level, recording_type)
         self._overridden_params: list[str] = []
         for p in self._allowed_params:
             setattr(self,p,None)
         def typecheck_exception_handler(exc: typeguard.TypeCheckError, key: str):
             e = typeguard.TypeCheckError(*exc.args)
-            if self.override_level==OverrideLevel.FunctionArgs:
-                err_text = 'in the parameter overrides provided as extra arguments to the processing function'
-            else:
-                err_text = f'in the {self.override_level.name}-level parameter overrides'
-            e.append_path_element(f'argument "{key}" {err_text} ({exc._path[0]})')
+            e.append_path_element(f'argument "{key}" {self.get_err_msg()} ({exc._path[0]})')
             raise e from None
         for p in kwargs:
             if p in exclude:
-                if self.override_level==OverrideLevel.FunctionArgs:
-                    err_text = 'with parameter overrides provided as extra arguments to the processing function'
-                else:
-                    err_text = f'with {self.override_level.name}-level parameter overrides'
-                raise TypeError(f"{StudyOverride.__name__}.__init__(): you are not allowed to override the '{p}' parameter of a {Study.__name__} class {err_text}")
+                raise TypeError(f"{StudyOverride.__name__}.__init__(): you are not allowed to override the '{p}' parameter of a {Study.__name__} class {self.get_err_msg()}")
             if p not in self._allowed_params:
                 raise TypeError(f"{StudyOverride.__name__}.__init__(): got an unknown parameter '{p}'")
             typeguard.check_type(kwargs[p], study_parameter_types[p], typecheck_fail_callback=lambda x,_: typecheck_exception_handler(x,p), collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
             setattr(self,p,kwargs[p])
             self._overridden_params.append(p)
+
+    def _get_err_msg(self):
+        if self.override_level==OverrideLevel.FunctionArgs:
+            err_text = 'in the parameter overrides provided as extra arguments to the processing function'
+        else:
+            err_text = f'in the {self.override_level.name}-level parameter overrides'
+        if self.recording_type is not None:
+            err_text += f' for a {self.recording_type.value} recording'
+        return err_text
 
     def apply(self, study: Study, strict_check=True) -> Study:
         study = copy.copy(study)
@@ -567,11 +573,7 @@ class StudyOverride:
         try:
             study.check_valid(strict_check)
         except Exception as oe:
-            if self.override_level==OverrideLevel.FunctionArgs:
-                err_text = 'when applying parameter overrides provided as extra arguments to the processing function'
-            else:
-                err_text = f'when applying {self.override_level.name}-level parameter overrides'
-            raise ValueError(f'Study setup became invalid {err_text}: {str(oe)}').with_traceback(oe.__traceback__) from None
+            raise ValueError(f'Study setup became invalid {self._get_err_msg()}: {str(oe)}').with_traceback(oe.__traceback__) from None
         return study
 
     def store_as_json(self, path: str | pathlib.Path):
@@ -583,19 +585,19 @@ class StudyOverride:
             json.dump(to_dump, f, cls=utils.CustomTypeEncoder, indent=2)
 
     @staticmethod
-    def load_from_json(level: OverrideLevel, path: str | pathlib.Path) -> 'StudyOverride':
+    def load_from_json(level: OverrideLevel, path: str | pathlib.Path, recording_type: session.RecordingType|None = None) -> 'StudyOverride':
         path = pathlib.Path(path)
         if path.is_dir():
             path = path / StudyOverride.default_json_file_name
         with open(path, 'r') as f:
             kwds = json.load(f, object_hook=utils.json_reconstitute)
-        return StudyOverride(level, **kwds)
+        return StudyOverride(level, recording_type, **kwds)
 
     @staticmethod
-    def from_study_diff(config: Study, parent_config: Study, level: OverrideLevel) -> 'StudyOverride':
-        fields = StudyOverride.get_allowed_parameters(level)[0]
+    def from_study_diff(config: Study, parent_config: Study, level: OverrideLevel, recording_type: session.RecordingType|None = None) -> 'StudyOverride':
+        fields = StudyOverride.get_allowed_parameters(level, recording_type)[0]
         kwds = _study_diff_impl(config, parent_config, fields)
-        return StudyOverride(level, **kwds)
+        return StudyOverride(level, recording_type, **kwds)
 
 def _study_diff_impl(config: Study, parent_config: Study, fields: list[str]) -> dict[str,Any]:
     kwds: dict[str,Any] = {}
@@ -609,25 +611,25 @@ def _study_diff_impl(config: Study, parent_config: Study, fields: list[str]) -> 
             kwds[f] = val
     return kwds
 
-def load_override_and_apply(study: Study, level: OverrideLevel, override_path: str|pathlib.Path, strict_check=True) -> Study:
+def load_override_and_apply(study: Study, level: OverrideLevel, override_path: str|pathlib.Path, recording_type: session.RecordingType|None = None, strict_check=True) -> Study:
     override_path = pathlib.Path(override_path)
     if override_path.is_dir():
         override_path = override_path / StudyOverride.default_json_file_name
     if not override_path.is_file():
         return study
 
-    study_override = StudyOverride.load_from_json(level, override_path)
+    study_override = StudyOverride.load_from_json(level, override_path, recording_type)
     return study_override.apply(study, strict_check)
 
-def load_or_create_override(level: OverrideLevel, override_path: str|pathlib.Path) -> StudyOverride:
+def load_or_create_override(level: OverrideLevel, override_path: str|pathlib.Path, recording_type: session.RecordingType|None = None) -> StudyOverride:
     override_path = pathlib.Path(override_path)
     if override_path.is_dir():
         override_path = override_path / StudyOverride.default_json_file_name
 
     if not override_path.is_file():
-        return StudyOverride(level)
+        return StudyOverride(level, recording_type)
     else:
-        return StudyOverride.load_from_json(level, override_path)
+        return StudyOverride.load_from_json(level, override_path, recording_type)
 
 def apply_kwarg_overrides(study: Study, strict_check=True, **kwargs) -> Study:
     if not kwargs:
@@ -635,12 +637,12 @@ def apply_kwarg_overrides(study: Study, strict_check=True, **kwargs) -> Study:
     overrides = StudyOverride(OverrideLevel.FunctionArgs, **kwargs)
     return overrides.apply(study, strict_check)
 
-def read_study_config_with_overrides(config_path: str|pathlib.Path, overrides: dict[OverrideLevel, str|pathlib.Path]=None, strict_check=True, **kwargs) -> Study:
+def read_study_config_with_overrides(config_path: str|pathlib.Path, overrides: dict[OverrideLevel, str|pathlib.Path]=None, recording_type: session.RecordingType|None = None, strict_check=True, **kwargs) -> Study:
     study = Study.load_from_json(config_path)
     if overrides:
         for l in [OverrideLevel.Session, OverrideLevel.Recording]:
             if l in overrides:
-                study = load_override_and_apply(study, l, overrides[l], strict_check)
+                study = load_override_and_apply(study, l, overrides[l], recording_type, strict_check)
     if kwargs:
         study = apply_kwarg_overrides(study, strict_check, **kwargs)
     return study
