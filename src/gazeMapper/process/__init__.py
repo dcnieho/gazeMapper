@@ -152,7 +152,7 @@ def _determine_to_invalidate(action: Action, study_config: 'config.Study') -> se
             # NB: SYNC_ET_TO_CAM and SYNC_TO_REFERENCE operate on gazeData not gaze on plane data, and MAKE_VIDEO does the job itself/doesn't use this file
             return {a for a in action.next_values() if a not in [Action.AUTO_CODE_SYNC, Action.AUTO_CODE_TRIALS, Action.SYNC_ET_TO_CAM, Action.SYNC_TO_REFERENCE, Action.MAKE_VIDEO]}
         case Action.AUTO_CODE_SYNC:
-            return {Action.CODE_EPISODES, Action.GAZE_TO_PLANE, Action.EXPORT_TRIALS, Action.MAKE_VIDEO}
+            return {Action.CODE_EPISODES, Action.GAZE_TO_PLANE, Action.SYNC_TO_REFERENCE, Action.EXPORT_TRIALS, Action.MAKE_VIDEO}
         case Action.AUTO_CODE_TRIALS:
             actions = {a for a in Action.CODE_EPISODES.next_values(inclusive=True) if a not in [Action.AUTO_CODE_TRIALS, Action.AUTO_CODE_SYNC, Action.SYNC_ET_TO_CAM, Action.SYNC_TO_REFERENCE, Action.RUN_VALIDATION]}
             if study_config.auto_code_sync_points or study_config.auto_code_trial_episodes:
@@ -223,24 +223,20 @@ def _is_session_action_possible(session_action_states: dict[Action, State], reco
     match action:
         case Action.SYNC_TO_REFERENCE:
             preconditions.update([Action.CODE_EPISODES])
-            if study_config.auto_code_sync_points:
-                preconditions.add(Action.AUTO_CODE_SYNC)
+            # NB: even if study_config.auto_code_sync_points is defined, user may decide to code sync manually. So don't add Action.AUTO_CODE_SYNC to preconditions
             if study_config.get_cam_movement_for_et_sync_method in ['plane', 'function']:
                 preconditions.add(Action.SYNC_ET_TO_CAM)
         case Action.EXPORT_TRIALS:
             preconditions.update([Action.CODE_EPISODES, Action.GAZE_TO_PLANE])
-            if study_config.auto_code_trial_episodes:
-                preconditions.add(Action.AUTO_CODE_TRIALS)
+            # NB: even if study_config.auto_code_trial_episodes is defined, user may decide to code trials manually. So don't add Action.AUTO_CODE_TRIALS to preconditions
             if study_config.sync_ref_recording:
                 preconditions.add(Action.SYNC_TO_REFERENCE)
             elif study_config.get_cam_movement_for_et_sync_method in ['plane', 'function']:
                 preconditions.add(Action.SYNC_ET_TO_CAM)
         case Action.MAKE_VIDEO:
             preconditions.update([Action.CODE_EPISODES])
-            if study_config.auto_code_sync_points:
-                preconditions.add(Action.AUTO_CODE_SYNC)
-            if study_config.auto_code_trial_episodes:
-                preconditions.add(Action.AUTO_CODE_TRIALS)
+            # NB: even if study_config.auto_code_sync_points is defined, user may decide to code sync manually. So don't add Action.AUTO_CODE_SYNC to preconditions
+            # NB: even if study_config.auto_code_trial_episodes is defined, user may decide to code trials manually. So don't add Action.AUTO_CODE_TRIALS to preconditions
             if study_config.sync_ref_recording:
                 preconditions.add(Action.SYNC_TO_REFERENCE)
             elif study_config.get_cam_movement_for_et_sync_method in ['plane', 'function']:
