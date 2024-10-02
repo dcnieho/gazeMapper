@@ -1,5 +1,4 @@
 import pathlib
-import threading
 import numpy as np
 import pandas as pd
 import polars as pl
@@ -10,7 +9,7 @@ isMacOS = sys.platform.startswith("darwin")
 if isMacOS:
     import AppKit
 
-from glassesTools import annotation, gaze_headref, naming as gt_naming, ocv, plane, timestamps, video_utils
+from glassesTools import annotation, gaze_headref, naming as gt_naming, ocv, plane, propagating_thread, timestamps, video_utils
 from glassesTools.gui.signal_sync import GUI, TargetPos
 
 
@@ -32,7 +31,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
     # We run processing in a separate thread (GUI needs to be on the main thread for OSX, see https://github.com/pthom/hello_imgui/issues/33)
     gui = GUI(use_thread = False)
 
-    proc_thread = threading.Thread(target=do_the_work, args=(working_dir, config_dir, gui), kwargs=study_settings)
+    proc_thread = propagating_thread.PropagatingThread(target=do_the_work, args=(working_dir, config_dir, gui), kwargs=study_settings, cleanup_fun=gui.stop)
     proc_thread.start()
     gui.start()
     proc_thread.join()

@@ -4,10 +4,9 @@ import pathlib
 import math
 import cv2
 import numpy as np
-import threading
 import copy
 
-from glassesTools import annotation, aruco, drawing, intervals, gaze_headref, gaze_worldref, naming as gt_naming, ocv, plane, timestamps, transforms, utils
+from glassesTools import annotation, aruco, drawing, intervals, gaze_headref, gaze_worldref, naming as gt_naming, ocv, plane, propagating_thread, timestamps, transforms, utils
 from glassesTools.gui.video_player import GUI
 
 from .. import config, episode, marker, naming, process, session, synchronization
@@ -32,7 +31,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show
         gui = GUI(use_thread = False)
         main_win_id = gui.add_window(working_dir.name)
 
-        proc_thread = threading.Thread(target=do_the_work, args=(working_dir, config_dir, gui, main_win_id), kwargs=study_settings)
+        proc_thread = propagating_thread.PropagatingThread(target=do_the_work, args=(working_dir, config_dir, gui, main_win_id), kwargs=study_settings, cleanup_fun=gui.stop)
         proc_thread.start()
         gui.start()
         proc_thread.join()
