@@ -1310,7 +1310,6 @@ class GUI:
             imgui.text("Reference")
             imgui.pop_font()
             imgui.spacing()
-            imgui.spacing()
             reference         = r"Niehorster, D.C., Hessels, R.S., Nyström, M., Benjamins, J.S. & Hooge, I.T.C. (in prep). gazeMapper: A tool for automated world-based analysis of wearable eye tracker data"
             reference_bibtex  = r"""@article{niehorster2025gazeMapper,
     Author = {Niehorster, Diederick C. and Hessels, R. S. and Nystr{\"o}m, Marcus and Benjamins, J. S. and Hooge, I. T. C.},
@@ -1320,6 +1319,31 @@ class GUI:
     Title = {gazeMapper: A tool for automated world-based analysis of wearable eye tracker data},
     Year = {in prep},
     doi = {}
+}
+"""
+            imgui.text(reference)
+            if imgui.begin_popup_context_item(f"##reference_context"):
+                if imgui.selectable("APA", False)[0]:
+                    imgui.set_clipboard_text(reference)
+                if imgui.selectable("BibTeX", False)[0]:
+                    imgui.set_clipboard_text(reference_bibtex)
+                imgui.end_popup()
+            gt_gui.utils.draw_hover_text(text='', hover_text="Right-click to copy citation to clipboard")
+            imgui.spacing()
+            imgui.spacing()
+            imgui.spacing()
+            imgui_md.render(f"This tool makes use of [glassesValidator](https://github.com/dcnieho/glassesValidator) ([paper](https://doi.org/10.3758/s13428-023-02105-5)), please also reference:")
+            imgui.spacing()
+            reference         = r"Niehorster, D.C., Hessels, R.S., Benjamins, J.S., Nyström, M. & Hooge, I.T.C. (2023). GlassesValidator: Data quality tool for eye tracking glasses. Behavior Research Methods. doi: 10.3758/s13428-023-02105-5"
+            reference_bibtex  = r"""@article{niehorster2023glassesValidator,
+                Author = {Niehorster, Diederick C. and Hessels, Roy S. and Benjamins, Jeroen S. and Nystr{\"o}m, Marcus and Hooge, Ignace T. C.},
+                Journal = {Behavior Research Methods},
+                Number = {},
+                Pages = {},
+                Title = {GlassesValidator: A data quality tool for eye tracking glasses},
+                Year = {2023},
+                doi = {10.3758/s13428-023-02105-5}
+            }
 }
 """
             imgui.text(reference)
