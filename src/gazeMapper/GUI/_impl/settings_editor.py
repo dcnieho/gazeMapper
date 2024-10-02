@@ -572,7 +572,11 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type):
                     reordering = True
 
         # draw value adder, if needed
-        all_values = typing.get_args(typing.get_args(f_type)[0])
+        v_type = typing.get_args(f_type)[0]
+        if typing.get_origin(v_type)==typing.Literal:
+            all_values = typing.get_args(v_type)
+        elif issubclass(v_type, enum.Enum):
+            all_values = (e for e in v_type)
         if (miss_values := list(set(all_values)-set(val))):
             str_values = miss_values
             if f_type in val_to_str_registry:
