@@ -1,8 +1,8 @@
 from imgui_bundle import imgui
 
-error       = imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.64))
-error_bright= imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.93))
-error_dark  = imgui.ImVec4(*imgui.ImColor.hsv(0.9667,.88,.43))
+error       = imgui.ImColor.hsv(0.9667,.88,.64).value
+error_bright= imgui.ImColor.hsv(0.9667,.88,.93).value
+error_dark  = imgui.ImColor.hsv(0.9667,.88,.43).value
 
 warning     = imgui.ImVec4(1.0000, 193/255, 7/255, 1.)
 

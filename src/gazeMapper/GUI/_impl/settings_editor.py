@@ -407,7 +407,7 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
             glassesTools.gui.utils.draw_hover_text(problem,text='')
     elif is_default or is_parent or is_none or fixed:
         imgui.align_text_to_frame_padding()
-        imgui.text_colored(imgui.ImVec4(*color_darken(imgui.ImColor(imgui.get_style_color_vec4(imgui.Col_.text)), .75)), field_lbl)
+        imgui.text_colored(color_darken(imgui.ImColor(imgui.get_style_color_vec4(imgui.Col_.text)), .75).value, field_lbl)
     else:
         imgui_md.render(f'**{field_lbl}**')
     imgui.table_next_column()
