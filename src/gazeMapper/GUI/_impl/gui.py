@@ -483,8 +483,11 @@ class GUI:
         self.config_watcher_stop_event = asyncio.Event()
         self.config_watcher = async_thread.run(config_watcher.watch_and_report_changes(self.project_dir, self._config_change_callback, self.config_watcher_stop_event, watch_filter=config_watcher.ConfigFilter(('.gazeMapper',), True, {config_dir}, True, True)))
 
-        def _get_known_recordings() -> set[str]:
-            return {r.name for r in self.study_config.session_def.recordings}
+        def _get_known_recordings(filter_ref=False) -> set[str]:
+            recs = {r.name for r in self.study_config.session_def.recordings}
+            if filter_ref and self.study_config.sync_ref_recording:
+                recs = {r for r in recs if r!=self.study_config.sync_ref_recording}
+            return recs
         def _get_known_individual_markers() -> set[str]:
             return {m.id for m in self.study_config.individual_markers}
         def _get_known_planes() -> set[str]:
@@ -495,7 +498,7 @@ class GUI:
             'video_make_which': _get_known_recordings,
             'video_recording_colors': _get_known_recordings,
             'sync_ref_recording': _get_known_recordings,
-            'sync_ref_average_recordings': _get_known_recordings,
+            'sync_ref_average_recordings': lambda: _get_known_recordings(filter_ref=True),
             'planes_per_episode': [_get_episodes_to_code_for_planes, _get_known_planes],
             'auto_code_sync_points': {'markers': _get_known_individual_markers},
             'auto_code_trial_episodes': {'start_markers': _get_known_individual_markers, 'end_markers': _get_known_individual_markers}
