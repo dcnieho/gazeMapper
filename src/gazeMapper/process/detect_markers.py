@@ -26,6 +26,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show
         gui.add_window(working_dir.name)
         gui.set_show_controls(True)
         gui.set_show_play_percentage(True)
+        gui.set_show_action_tooltip(True)
 
         proc_thread = propagating_thread.PropagatingThread(target=do_the_work, args=(working_dir, config_dir, gui, visualization_show_rejected_markers), kwargs=study_settings, cleanup_fun=gui.stop)
         proc_thread.start()

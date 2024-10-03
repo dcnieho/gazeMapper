@@ -274,6 +274,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                 gui.set_show_controls(True, gui_window_ids[v])
                 gui.set_timecode_position('r', gui_window_ids[v])
                 gui.set_show_play_percentage(True, gui_window_ids[v])
+                gui.set_show_action_tooltip(True, gui_window_ids[v])
 
         # open output video files
         for v in write_vids:

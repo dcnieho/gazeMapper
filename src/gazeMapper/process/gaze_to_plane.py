@@ -25,6 +25,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show
         frame_win_id = gui.add_window(working_dir.name)
         gui.set_show_controls(True)
         gui.set_show_play_percentage(True)
+        gui.set_show_action_tooltip(True)
 
         proc_thread = propagating_thread.PropagatingThread(target=do_the_work, args=(working_dir, config_dir, gui, frame_win_id, show_planes, show_only_intervals), kwargs=study_settings, cleanup_fun=gui.stop)
         proc_thread.start()

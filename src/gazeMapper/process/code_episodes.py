@@ -118,6 +118,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
     gui.set_allow_annotate(True, {e:_event_type_to_key_map[e] for e in episodes})
     gui.set_show_timeline(True, video_ts, episodes, main_win_id)
     gui.set_show_annotation_label(True, main_win_id)
+    gui.set_show_action_tooltip(True)
 
     # show
     sub_pixel_fac = 8   # for sub-pixel positioning
