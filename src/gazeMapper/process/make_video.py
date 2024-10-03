@@ -29,16 +29,16 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show
     if show_visualization:
         # We run processing in a separate thread (GUI needs to be on the main thread for OSX, see https://github.com/pthom/hello_imgui/issues/33)
         gui = GUI(use_thread = False)
-        main_win_id = gui.add_window(working_dir.name)
+        gui.add_window(working_dir.name)
 
-        proc_thread = propagating_thread.PropagatingThread(target=do_the_work, args=(working_dir, config_dir, gui, main_win_id), kwargs=study_settings, cleanup_fun=gui.stop)
+        proc_thread = propagating_thread.PropagatingThread(target=do_the_work, args=(working_dir, config_dir, gui), kwargs=study_settings, cleanup_fun=gui.stop)
         proc_thread.start()
         gui.start()
         proc_thread.join()
     else:
-        do_the_work(working_dir, config_dir, None, None, **study_settings)
+        do_the_work(working_dir, config_dir, None, **study_settings)
 
-def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, main_win_id: int, **study_settings):
+def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, **study_settings):
     has_gui = gui is not None
     sub_pixel_fac = 8   # for anti-aliased drawing
 
@@ -259,14 +259,14 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
         if has_gui:
             # clean up any previous windows (except main window, this will have to be renamed only)
             for v in gui_window_ids:
-                if gui_window_ids[v]!=0:    # main window is id 0
+                if gui_window_ids[v]!=gui.main_window_id:
                     gui.delete_window(v)
             gui_window_ids.clear()
             for v in all_vids:
                 # if we have a gui, set it up for this recording
                 if v==lead_vid:
-                    gui_window_ids[v] = main_win_id
-                    gui.set_window_title(f'{working_dir.name}: {v}', main_win_id)
+                    gui_window_ids[v] = gui.main_window_id
+                    gui.set_window_title(f'{working_dir.name}: {v}', gui.main_window_id)
                 else:
                     gui_window_ids[v] = gui.add_window(f'{working_dir.name}: {v}')
                 gui.set_show_timeline(True, videos_ts[lead_vid], episodes_as_ref_flat[v], gui_window_ids[v])
@@ -411,7 +411,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
             # update gui, if any
             if has_gui:
                 for v in write_vids:
-                    gui.update_image(frame[v], frame_ts[lead_vid]/1000., frame_idx[lead_vid], window_id = gui_window_ids[v])
+                    gui.update_image(frame[v], frame_ts[lead_vid]/1000., frame_idx[lead_vid], window_id=gui_window_ids[v])
 
                 requests = gui.get_requests()
                 for r,_ in requests:

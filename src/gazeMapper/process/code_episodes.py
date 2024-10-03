@@ -44,15 +44,15 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
 
     # We run processing in a separate thread (GUI needs to be on the main thread for OSX, see https://github.com/pthom/hello_imgui/issues/33)
     gui = GUI(use_thread = False)
-    main_win_id = gui.add_window(f'{working_dir.parent.name}, {working_dir.name}')
+    gui.add_window(f'{working_dir.parent.name}, {working_dir.name}')
 
-    proc_thread = propagating_thread.PropagatingThread(target=do_the_work, args=(working_dir, config_dir, gui, main_win_id), kwargs=study_settings, cleanup_fun=gui.stop)
+    proc_thread = propagating_thread.PropagatingThread(target=do_the_work, args=(working_dir, config_dir, gui), kwargs=study_settings, cleanup_fun=gui.stop)
     proc_thread.start()
     gui.start()
     proc_thread.join()
 
 
-def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, main_win_id: int, **study_settings):
+def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, **study_settings):
     # get settings for the study
     study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent, config.OverrideLevel.Recording: working_dir}, **study_settings)
 
@@ -114,11 +114,11 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
     gui.set_allow_pause(True)
     gui.set_allow_seek(True)
     gui.set_allow_timeline_zoom(True)
-    gui.set_show_controls(True)
+    gui.set_show_controls(True, gui.main_window_id)
     gui.set_allow_annotate(True, {e:_event_type_to_key_map[e] for e in episodes})
-    gui.set_show_timeline(True, video_ts, episodes, main_win_id)
-    gui.set_show_annotation_label(True, main_win_id)
-    gui.set_show_action_tooltip(True)
+    gui.set_show_timeline(True, video_ts, episodes, gui.main_window_id)
+    gui.set_show_annotation_label(True, gui.main_window_id)
+    gui.set_show_action_tooltip(True, gui.main_window_id)
 
     # show
     sub_pixel_fac = 8   # for sub-pixel positioning
@@ -160,7 +160,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, m
                         plane_gazes[p][frame_idx][0].draw_on_world_video(frame, cam_params, sub_pixel_fac)
 
             if frame is not None:
-                gui.update_image(frame, pts, frame_idx, window_id = main_win_id)
+                gui.update_image(frame, pts, frame_idx, window_id=gui.main_window_id)
 
         if not has_requested_focus:
             AppKit.NSApplication.sharedApplication().activateIgnoringOtherApps_(1)

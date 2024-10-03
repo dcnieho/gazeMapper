@@ -22,20 +22,20 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show
     # if we need gui, we run processing in a separate thread (GUI needs to be on the main thread for OSX, see https://github.com/pthom/hello_imgui/issues/33)
     if show_visualization:
         gui = GUI(use_thread = False)
-        frame_win_id = gui.add_window(working_dir.name)
+        gui.add_window(working_dir.name)
         gui.set_show_controls(True)
         gui.set_show_play_percentage(True)
         gui.set_show_action_tooltip(True)
 
-        proc_thread = propagating_thread.PropagatingThread(target=do_the_work, args=(working_dir, config_dir, gui, frame_win_id, show_planes, show_only_intervals), kwargs=study_settings, cleanup_fun=gui.stop)
+        proc_thread = propagating_thread.PropagatingThread(target=do_the_work, args=(working_dir, config_dir, gui, show_planes, show_only_intervals), kwargs=study_settings, cleanup_fun=gui.stop)
         proc_thread.start()
         gui.start()
         proc_thread.join()
     else:
-        do_the_work(working_dir, config_dir, None, None, False, False, **study_settings)
+        do_the_work(working_dir, config_dir, None, False, False, **study_settings)
 
 
-def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, frame_win_id: int, show_planes: bool, show_only_intervals: bool, **study_settings):
+def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, show_planes: bool, show_only_intervals: bool, **study_settings):
     # get settings for the study
     study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent, config.OverrideLevel.Recording: working_dir}, **study_settings)
 
@@ -95,5 +95,5 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, f
         in_video, working_dir / gt_naming.frame_timestamps_fname, working_dir / gt_naming.scene_camera_calibration_fname,
         planes, poses, head_gazes, plane_gazes,
         {e:episodes[e] for e in [annotation.Event.Validate, annotation.Event.Trial] if e in episodes},
-        gui, frame_win_id, show_planes, show_only_intervals, 8
+        gui, show_planes, show_only_intervals, 8
     )
