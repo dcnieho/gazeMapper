@@ -112,7 +112,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
         # store
         # write into df (use polars as that library saves to file waaay faster)
         plane_gazes = pl.from_pandas(plane_gazes)
-        plane_gazes.write_csv(working_dir / f'{naming.plane_pose_prefix}{r}.tsv', separator='\t', null_value='nan', float_precision=8)
+        plane_gazes.write_csv(working_dir / f'{naming.export_prefix}{r}.tsv', separator='\t', null_value='nan', float_precision=8)
 
     # update state
     session.update_action_states(working_dir, process.Action.EXPORT_TRIALS, process.State.Completed, study_config)
