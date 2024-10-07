@@ -49,21 +49,38 @@ Once pip-installed in your Python distribution, there are three ways to run the 
     ```
 
 # Usage
-The gazeMapper xxx. The gazeMapper package includes a graphical user interface (GUI) that can be used to perform all processing. Below we describe an example workflow using the GUI. Advanced users can however opt to call all the GUI's functionality directly from their own Python scripts without making use of the graphical user interface. The interested reader is referred to the [configuration](#configuration) and [API](#api) sections below for further details regarding how to use the gazeMapper functionality directly from their own scripts.
+To use gazeMapper, first a recording session needs to be defined for the project. This entails telling gazeMapper which eye tracker and external camera recording(s) to expect, and what planes to map gaze to. The very simplest setup consists of a single eye tracker recording per session and a single plane to map gaze to, but multiple planes and any number of eye tracker and external camera recordings per session is supported. Sessions consisting of only a single external camera recording are not supported, at least one eye tracker recording should be included. Once this setup has been performed, new sessions can be created and recordings imported to the defined eye tracker and external camera recording slots of these new sessions. Once imported, further processing can commence.
+
+The gazeMapper package includes a graphical user interface (GUI) that can be used to perform all configuration and processing. Below we describe an example workflow using the GUI for a simple recording involving two eye trackers and two planes. Not all of gazeMapper's functionality will be used, full a full description of all configuration options, the reader is referred to the [configuration](#configuration) section of this readme.
+
+Besides using the GUI, advanced users can instead opt to call all the GUI's functionality directly from their own Python scripts without making use of the graphical user interface. The interested reader is referred to the [API](#api) section below for further details regarding how to use the gazeMapper functionality directly from their own scripts.
 
 ## Workflow and example data
-Here we first present an example workflow using the GUI. More detailed information about [using the GUI](#the-gui), or [gazeMapper configuration](#configuration) and [its programming API](#api), are provided below.
+Here we first present an example workflow using the GUI. More detailed information about [using the GUI](#the-gui), or [gazeMapper configuration](#configuration) and [its programming API](#api), are provided below. Example data with which this workflow can be followed is forthcoming.
 
 **TODO**
 
 ## gazeMapper projects
 The gazeMapper GUI organizes recordings into a project folder. Each session to be processed is represented by a folder in this project folder, and one or multiple recordings are stored in subfolders of a session folder. After importing recordings, all further processing is done inside these session and recording folders. The source directories containing the original recordings remain
 untouched when running gazeMapper. A gazeMapper project folder furthermore contains a folder `config` specifying the configuration
-of the project.
+of the project. So an example directory structure may look like:
+```
+my project/
+├── config/
+├── session 01/
+│   ├── teacher/
+│   ├── student/
+│   └── overview camera/
+├── session 02/
+│   ├── teacher/
+│   ├── student/
+│   └── overview camera/
+...
+```
+where `session 01` and `session 02` are individual recording session, each made up of a teacher, a student and an overview camera recording.
 
 When not using the GUI and running gazeMapper using your own scripts, such a project folder organization is not required. Working folders
-for a session can be placed anywhere, and a folder for a custom configuration can also be placed anywhere (but its location needs to be provided using the `config_dir` argument of all the functions in `gazeMapper.process`](#gazemapperprocess)). The
-`gazeMapper.process`](#gazemapperprocess) functions simply take the path to a session or recording folder.
+for a session can be placed anywhere (though recording folders should be placed inside a session folder), and a folder for a custom configuration can also be placed anywhere (but its location needs to be provided using the `config_dir` argument of all the functions in [`gazeMapper.process`](#gazemapperprocess)). The [`gazeMapper.process`](#gazemapperprocess) functions simply take the path to a session or recording folder.
 
 ## Output
 During the importing and processing of a recording, a series of files are created in the working folder of a recording. These are the following:
@@ -71,7 +88,7 @@ During the importing and processing of a recording, a series of files are create
 | --- | --- | --- | --- |
 
 ### Coordinate system of data
-Gaze data in poster space in the `gazePosterPos.tsv` file of a processed recording has its origin (0,0) at the center of the position
+The gaze data in plane-space in the `gazePosterPos.tsv` file of a processed recording has its origin (0,0) at the center of the position
 of the fixation target that was indicated to be the center target with the `centerTarget` setting in the [`validationSetup.txt`
 configuration file](/src/glassesValidator/config/validationSetup.txt). The positive x-axis points to the right and the positive y-axis
 downward, which means that (-,-) coordinates are to the left and above of the poster origin, and (+,+) to the right and below.
@@ -164,6 +181,8 @@ software before they can be imported into gazeMapper. These are:
 # The GUI
 
 # Configuration
+
+subsections for importing, sync, etc
 
 ## Overriding a project's settings for a specific session or recording
 
