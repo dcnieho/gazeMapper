@@ -12,10 +12,10 @@ gazeMapper can:
 3) Determine data quality measures, e.g., accuracy and precision using [glassesValidator](https://github.com/dcnieho/glassesValidator) ([Niehorster et al., 2023](https://doi.org/10.3758/s13428-023-02105-5)).
 
 If you use this tool or any of the code in this repository, please cite:<br>
-Niehorster, D.C., Hessels, R.S., Nyström, M., Benjamins, J.S. and Hooge, I.T.C. (in prep). gazeMapper: A tool for automated world-based analysis of wearable eye tracker data<br>
-If you use the functionality for automatic determining the data quality (accuracy and precision) of wearable eye tracker recordings,please additionally cite:<br>
+Niehorster, D.C., Hessels, R.S., Nyström, M., Benjamins, J.S. and Hooge, I.T.C. (in prep). gazeMapper: A tool for automated world-based analysis of wearable eye tracker data ([BibTeX](#bibtex))<br>
+If you use the functionality for automatic determining the data quality (accuracy and precision) of wearable eye tracker recordings, please additionally cite:<br>
 [Niehorster, D.C., Hessels, R.S., Benjamins, J.S., Nyström, M. and Hooge, I.T.C. (2023). GlassesValidator:
-A data quality tool for eye tracking glasses. Behavior Research Methods. doi: 10.3758/s13428-023-02105-5](https://doi.org/10.3758/s13428-023-02105-5)
+A data quality tool for eye tracking glasses. Behavior Research Methods. doi: 10.3758/s13428-023-02105-5](https://doi.org/10.3758/s13428-023-02105-5) ([BibTeX](#bibtex))
 
 ![application example](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/world_data.png?raw=true)
 Example where gazeMapper has been used to map head-centered gaze from two head-worn eye tracker recordings to synchronized world-centered
@@ -188,3 +188,38 @@ gazeMapper makes extensive use of the functionality of [glassesTools](https://gi
 |`output_dir`|Path to the directory to which recordings will be imported. Each recording will be placed in a subdirectory of the specified path.|
 |`working_dir`|Path to a gazeMapper session or recording directory.|
 |`rec_info`|Recording info ([`glassesTools.recording.Recording`](https://github.com/dcnieho/glassesTools/blob/master/README.md#recording-info) or `glassesTools.camera_recording.Recording`) or list of recording info specifying what is expected to be found in the specified `source_dir`, so that this does not have to be rediscovered and changes can be made e.g. to the recording name that is used for auto-generating the recording's `working_dir`, or even directly specifying the `working_dir` by filling the `working_directory` field before import.|
+
+# Citation
+If you use this tool or any of the code in this repository, please cite:<br>
+Niehorster, D.C., Hessels, R.S., Nyström, M., Benjamins, J.S. and Hooge, I.T.C. (in prep). gazeMapper: A tool for automated world-based analysis of wearable eye tracker data<br>
+If you use the functionality for automatic determining the data quality (accuracy and precision) of wearable eye tracker recordings, please additionally cite:<br>
+[Niehorster, D.C., Hessels, R.S., Benjamins, J.S., Nyström, M. and Hooge, I.T.C. (2023). GlassesValidator:
+A data quality tool for eye tracking glasses. Behavior Research Methods. doi: 10.3758/s13428-023-02105-5](https://doi.org/10.3758/s13428-023-02105-5)
+
+## BibTeX
+```latex
+@article{niehorstergazeMapper,
+    Author = {Niehorster, Diederick C. and
+              Hessels, R. S. and
+              Nystr{\"o}m, Marcus and
+              Benjamins, J. S. and
+              Hooge, I. T. C.},
+    Journal = {},
+    Number = {},
+    Title = {{gazeMapper}: A tool for automated world-based analysis of wearable eye tracker data},
+    Year = {}
+}
+
+@article{niehorster2023glassesValidator,
+    Author = {Niehorster, Diederick C. and
+              Hessels, R. S. and
+              Benjamins, J. S. and
+              Nystr{\"o}m, Marcus and
+              Hooge, I. T. C.},
+    Journal = {Behavior Research Methods},
+    Number = {},
+    Title = {{GlassesValidator}: A data quality tool for eye tracking glasses},
+    Year = {2023},
+    doi = {10.3758/s13428-023-02105-5}
+}
+```
