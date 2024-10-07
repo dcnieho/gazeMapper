@@ -42,9 +42,9 @@ setuptools.setup(
     include_package_data=True,
     python_requires=">=3.10",
     install_requires=required,
-    # entry_points={
-    #     "gui_scripts": [
-    #         "gazeMapper = gazeMapper.GUI:run",
-    #     ],
-    # },
+    entry_points={
+        "gui_scripts": [
+            "gazeMapper = gazeMapper.GUI:run",
+        ],
+    },
 )
