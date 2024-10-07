@@ -39,17 +39,13 @@ Once pip-installed in your Python distribution, there are three ways to run the 
 2. Open a Python console. From such a console, running the GUI requires only the following two lines of code:
     ```python
     import gazeMapper.GUI
-    gazeMapper.GUI.set_up()
     gazeMapper.GUI.run()
-    gazeMapper.GUI.clean_up()
     ```
 3. If you run the gazeMapper's GUI from a script, make sure to wrap your script in `if __name__=="__main__"`. This is required for correct operation from a script because the GUI uses multiprocessing functionality. Do as follows:
     ```python
     if __name__=="__main__":
         import gazeMapper.GUI
-        gazeMapper.GUI.set_up()
         gazeMapper.GUI.run()
-        gazeMapper.GUI.clean_up()
     ```
 
 # Usage
