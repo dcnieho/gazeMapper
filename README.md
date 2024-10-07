@@ -83,20 +83,31 @@ When not using the GUI and running gazeMapper using your own scripts, such a pro
 for a session can be placed anywhere (though recording folders should be placed inside a session folder), and a folder for a custom configuration can also be placed anywhere (but its location needs to be provided using the `config_dir` argument of all the functions in [`gazeMapper.process`](#gazemapperprocess)). The [`gazeMapper.process`](#gazemapperprocess) functions simply take the path to a session or recording folder.
 
 ## Output
-During the importing and processing of a recording, a series of files are created in the working folder of a recording. These are the following:
-|file|produced<br>by|input<br>for|description|
+During the importing and processing of a eye tracker or camera recording, a series of files are created in the working folder of the recording. These are the following (not all of the files are created for a camera recording, for instance, there is no gaze data associated with such a recording):
+|file|location|produced<br>by|description|
 | --- | --- | --- | --- |
+|`calibration.xml`|recording|[`Session.import_recording`](#gazemappersession)|Camera calibration parameters for the scene camera.|
+|`frameTimestamps.tsv`|recording|[`Session.import_recording`](#gazemappersession)|Timestamps for each frame in the scene camera video.|
+|`gazeData.tsv`|recording|[`Session.import_recording`](#gazemappersession)|Gaze data cast into a common format understood by glassesValidator.|
+|`recording_info.json`|recording|[`Session.import_recording`](#gazemappersession)|Information about the recording.|
+|`recording.gazeMapper`|recording|[`Session.import_recording`](#gazemappersession)|JSON file encoding the state of each [recording-level gazeMapper action](#actions).|
+|`worldCamera.mp4`|recording|[`Session.import_recording`](#gazemappersession)|Copy of the scene camera video (optional, depends on the `import_do_copy_video` option).|
+|||||
+|`coding.tsv`|recording|[`process.code_episodes`](#coding-analysis-synchronization-and-validation-episodes)|File denoting the analysis, synchronization and validation episodes to be processed. This is produced with the coding interface included with gazeMapper. Can be manually created or edited to override the coded episodes.|
+|`planePose_<plane name>.tsv`|recording|[`process.detect_markers`](#gazemapper-planes)|File with information about plane pose w.r.t. the scene camera for each frame where the plane was detected.|
+|`markerPose_<marker ID>.tsv`|recording|[`process.detect_markers`](#gazemapper-planes)|File with information about marker pose w.r.t. the scene camera for each frame where the marker was detected.|
+|`planeGaze_<plane name>.tsv`|recording|`process.gaze_to_plane`|File with gaze data projected to the plane/surface.|
+|`validate_<plane name>_*`|recording|`process.run_validation`|Series of files with output of the glassesValidator validation procedure. See the [glassesValidator readme](https://github.com/dcnieho/glassesValidator/blob/master/README.md#output) for descriptions.|
+|`VOR_sync.tsv`|recording|`process.sync_et_to_cam`|File containing the synchronization offset (s) between eye tracker data and the scene camera.|
+|||||
+|`session.gazeMapper`|session|[`Session.import_recording`](#gazemappersession)|JSON file encoding the state of each [session-level gazeMapper action](#actions).|
+|`ref_sync.tsv`|session|`process.sync_to_ref`|File containing the synchronization offset (s) and other information about sync between multiple recordings.|
+|`planeGaze_<recording name>.tsv`|session|`process.export_trials`|File containing the gaze position on one or multiple planes, per recording.|
 
 ### Coordinate system of data
-The gaze data in plane-space in the `gazePosterPos.tsv` file of a processed recording has its origin (0,0) at the center of the position
-of the fixation target that was indicated to be the center target with the `centerTarget` setting in the [`validationSetup.txt`
-configuration file](/src/glassesValidator/config/validationSetup.txt). The positive x-axis points to the right and the positive y-axis
-downward, which means that (-,-) coordinates are to the left and above of the poster origin, and (+,+) to the right and below.
-
-Angular accuracy values in the `dataQuality.tsv` file of a processed recording use the same sign-coding as the gaze data in poster space.
-That is, for the horizontal component of reported accuracy values, positive means gaze is to the right of the fixation target and
-negative to the left. For the vertical component, positive means gaze is below the fixation target, and negative that it is above the
-fixation target.
+gazeMapper produces data in the reference frame of a plane/surface. This 2D data is stored in the `planeGaze_*` files produced when exporting the gazeMapper results, and also in the `planeGaze_*` files stored inside individual recordings' working folders.
+The gaze data in these files has its origin (0,0) at a position that is specified in the plane setup (or in the case of a glassesValidator poster at the center of the fixation target that was indicated to be the center target with the `centerTarget` setting in the validation poster's `validationSetup.txt` configuration file). The positive x-axis points to the right and the positive y-axis
+downward, which means that (-,-) coordinates are to the left and above of the plane origin, and (+,+) to the right and below.
 
 
 ## Eye trackers
@@ -168,9 +179,12 @@ software before they can be imported into gazeMapper. These are:
 
 ### Validation
 
+## Actions
+Overview of all actions (table), some specifics in the section below
+
 ## Coding analysis, synchronization and validation episodes
 
-### Automatic coding of analysis and synchronization episodes.
+### Automatic coding of analysis and synchronization episodes
 
 ## Synchronization
 
@@ -193,6 +207,12 @@ public API. Many functions share common input arguments. These are documented [h
 overview below.
 gazeMapper makes extensive use of the functionality of [glassesTools](https://github.com/dcnieho/glassesTools) and its functionality for validating the calibration of a recording is a thin wrapper around [glassesValidator](https://github.com/dcnieho/glassesValidator). See the [glassesTools](https://github.com/dcnieho/glassesTools/blob/master/README.md) and [glassesValidator](https://github.com/dcnieho/glassesValidator/blob/master/README.md) documentation for more information about these functions.
 
+## `gazeMapper.config`
+
+## `gazeMapper.session`
+
+## `gazeMapper.process`
+### `gazeMapper.process.auto_code_sync`
 
 ### Common input arguments
 |argument|description|
