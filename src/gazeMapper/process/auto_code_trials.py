@@ -75,7 +75,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
             break
         # for all starts in contention, find the last one that is before the next end
         gaps = ends[e_idx]-starts[s_idx:]
-        # NB: it cannot occur that ther are no starts before this end, since we move e_idx above in that case
+        # NB: it cannot occur that there are no starts before this end, since we move e_idx above in that case
         # and bail out if there are no ends left
         gaps[gaps<=0] = np.iinfo(gaps.dtype).max
         mini = np.argmin(gaps)
