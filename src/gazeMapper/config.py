@@ -15,7 +15,7 @@ from . import marker, plane, session, typed_dict_defaults, type_utils
 
 
 class AutoCodeSyncPoints(typed_dict_defaults.TypedDictDefault, total=False):
-    markers         : list[int]
+    markers         : set[int]
     max_gap_duration: int       = 4
     min_duration    : int       = 6
 
