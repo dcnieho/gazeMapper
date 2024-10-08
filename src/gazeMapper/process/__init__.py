@@ -172,7 +172,7 @@ def _determine_to_invalidate(action: Action, study_config: 'config.Study') -> se
         case _:
             raise NotImplementedError(f'Logic is not implemented for {action}, major developer oversight! Let him know.')
 
-def action_update_and_invalidate(action: Action, state: State, study_config: 'config.Study') -> tuple[dict[Action, State], dict[Action, State]]:
+def action_update_and_invalidate(action: Action, state: State, study_config: 'config.Study') -> dict[Action, State]:
     # set status of indicated task
     action_state_mutations = {action: state}
 
