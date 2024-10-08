@@ -75,10 +75,9 @@ class Study:
                  sync_ref_stretch_which                         : Literal['ref','other']|None       = None,
                  sync_ref_average_recordings                    : set[str]|None                     = None,
 
-                 sync_et_to_cam_use_average                     : bool                              = True,
-
                  get_cam_movement_for_et_sync_method            : Literal['','plane','function']    = '',
                  get_cam_movement_for_et_sync_function          : CamMovementForEtSyncFunction|None = None,
+                 sync_et_to_cam_use_average                     : bool                              = True,
 
                  auto_code_sync_points                          : AutoCodeSyncPoints|None           = None,
                  auto_code_trial_episodes                       : AutoCodeTrialEpisodes|None        = None,
@@ -126,7 +125,6 @@ class Study:
 
         self.get_cam_movement_for_et_sync_method            = get_cam_movement_for_et_sync_method
         self.get_cam_movement_for_et_sync_function          = get_cam_movement_for_et_sync_function
-
         self.sync_et_to_cam_use_average                     = sync_et_to_cam_use_average
 
         self.sync_ref_recording                             = sync_ref_recording
