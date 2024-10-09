@@ -244,24 +244,30 @@ gazeMapper can perform the following processing actions on a wearable eye tracki
 In the GUI, an overview of what processing actions are enqueued or running for a session or recording are shown in the `Sessions` pane, in the detail view for a specific session, and in the `Processing Queue` pane.
 
 ## Coding analysis, synchronization and validation episodes
-To process a recording, gazeMapper needs to be told where in the recording several events are, such as the trial(s) for which you want to have gaze data mapped to the plane. There are four types of episodes (`glassesTools.annotation.Event`) that can be coded, which are available depends on the configuration of the gazeMapper project:
+To process a recording, gazeMapper needs to be told where in the recording several events are, such as the trial(s) for which you want to have gaze data mapped to the plane. There are four types of episodes (`glassesTools.annotation.Event`) that can be coded, which are available depends on the set of events that are set to be coded for the project with the `episodes_to_code` setting. Some may not be of use, depending on the configuration of the gazeMapper project:
 | Episode | Availability | Description |
 | --- | --- | --- |
-|`Trial`|always|Denotes an episode for which to map gaze to plane(s). This determines for which segments there will be gaze data when running the [`EXPORT_TRIALS` action](#actions).|
-|`Validate`|[plane setup](#gazemapper-planes) and [episode coding setup](#coding-analysis-synchronization-and-validation-episodes)|Denotes an episode during which a participant looked at a validation poster, to be used to run [glassesValidator](#validation-glassesvalidator-planes) to compute data quality of the gaze data.|
+|`Trial`|always|Denotes an episode for which to map gaze to plane(s). This determines for which segments there will be gaze data when running the [`gazeMapper.process.Action.EXPORT_TRIALS` action](#actions).|
+|`Validate`|[plane setup](#gazemapper-planes)|Denotes an episode during which a participant looked at a validation poster, to be used to run [glassesValidator](#validation-glassesvalidator-planes) to compute data quality of the gaze data.|
 |`Sync_Camera`|`sync_ref_recording` option|Time point (frame from video) when a synchronization event happened, used for synchronizing different recordings.|
 |`Sync_ET_Data`|`get_cam_movement_for_et_sync_method` option|Episode to be used for [synchronization of eye tracker data to scene camera](#synchronizing-eye-tracker-data-and-scene-camera) (e.g. using VOR).|
+
+Furthermore, the `Trial`, `Validate` and `Sync_Camera` episodes need to be associated with one or multiple planes to be detected during these episodes. Which planes to detect per episode is set up with the `planes_per_episode` setting.
+
+Note that when you have multiple recordings, `glassesTools.annotation.Event.Trial` events can only be coded for the reference recording (set by the `sync_ref_recording` setting). The trial coding in the reference recording is automatically propagated to the other recordings once they are [synchronized](#synchronizing-multiple-eye-tracker-or-external-camera-recordings).
 
 The coding is stored in the [`coding.tsv` file](#output) in a recording directory.
 
 ### Automatic coding of analysis and synchronization episodes
 gazeMapper supports automatically coding synchronization points (`glassesTools.annotation.Event.Sync_Camera`) and trial intervals (`glassesTools.annotation.Event.Trial`) using fiducial markers in the scene video. Specifically, individual markers can be configured to denote such sync points and individual markers or sequences of individual markers can denote the start of a trial or the end of a trial. To do so, first the [individual markers](#individual-markers) to be used for this purpose need to be configured to be detected by the [`gazeMapper.process.Action.DETECT_MARKERS` action](#actions). Then, on the `Project settings` pane, automatic coding of synchronization points can be configured using the `auto_code_sync_points` option, and automatic coding of trial starts and ends using the `auto_code_trial_episodes` option.
 
+Note that when the `gazeMapper.process.Action.AUTO_CODE_SYNC` or `gazeMapper.process.Action.AUTO_CODE_TRIALS` actions are run from the GUI, these reset the `gazeMapper.process.Action.CODE_EPISODES` to not run status. This is done to require that the output of the automatic coding processes is manually checked in the coding interface before further processing is done. Make sure to zoom in on the timeline (using the mouse scroll wheel when hovering the cursor over the timeline) to check that there are not multiple (spurious) events close together.
+
+#### Automatic coding of synchronization timepoints
 For automatic coding of synchronization points, the configuration of the `auto_code_sync_points` option works as follows. First, any marker whose appearance should be taken as a sync point should be listed by its ID in `auto_code_sync_points.markers`. Sequences of frames where the marker(s) are detected are taken from the output of the `gazeMapper.process.Action.DETECT_MARKERS` action and processed according to two further settings. Firstly, any gaps between sequences of frames where the marker is detected that are shorter than or equal to `auto_code_sync_points.max_gap_duration` frames will be filled (i.e., the two separate sequences will be merged in to one). This reduces the chance that a single marker presentation is detected as multiple events. Then, any sequences of frames where the marker is detected that are shorter than `auto_code_sync_points.min_duration` frames will be removed. This reduces the chance that a spurious marker detection is picked up as a sync point. For the purposes of this processing, if more than one marker is specified, detections of each of these markers are processed separately.
 
+#### Automatic coding of analysis episodes
 For automatic coding of trial starts and ends, the configuration of the `auto_code_trial_episodes` option works as follows. First, the marker whose appearance should be taken as the start of a trial should be listed by its ID in `auto_code_trial_episodes.start_markers` and the marker whose disappearance should be taken as the end of a trial in `auto_code_trial_episodes.end_markers`. Different from the synchronization point coding above, trial starts and ends can be denoted by a sequence of markers, do decrease the change for spurious detections. To make use of this, specify more than one marker in `auto_code_trial_episodes.start_markers` and/or `auto_code_trial_episodes.end_markers` in the order in which they are shown. If this is used, trail starts are coded as the last frame where the last marker in the sequence is detected, and trial ends as the first frame where the first marker of the sequence is detected. Sequences of frames where the marker(s) are detected as delivered by the `gazeMapper.process.Action.DETECT_MARKERS` action are processed as follows. First, detections for individual markers are processed with the same logic for removing spurious detections as for `auto_code_sync_points` above, using the `auto_code_trial_episodes.max_gap_duration` and `auto_code_trial_episodes.min_duration` parameters. If a trial start or end consists of a single marker, that is all that is done. If a trial start/end consists of a sequence of markers, then these sequences are found from the sequence of individual marker detections by looking for detections of the indicated markers in the right order with a gap between them that is no longer than `auto_code_trial_episodes.max_intermarker_gap_duration` frames.
-
-When the `gazeMapper.process.Action.AUTO_CODE_SYNC` or `gazeMapper.process.Action.AUTO_CODE_TRIALS` actions are run from the GUI, these reset the `gazeMapper.process.Action.CODE_EPISODES` to not run status. This is done to require that the output of the automatic coding processes is manually checked in the coding interface before further processing is done. Make sure to zoom in on the timeline (using the mouse scroll wheel when hovering the cursor over the timeline) to check that there are not multiple (spurious) events close together.
 
 ## Synchronization
 For eye tracker recordings, the gaze data is not always synchronized correctly to the scene camera. Furthermore, when a gazeMapper session consists of multiple recordings from eye trackers and/or external cameras, these have to be synchronized together. GazeMapper includes methods for solving both these sync problems.
@@ -281,11 +287,115 @@ By setting `sync_ref_do_time_stretch` to `True`, multiple time points can howeve
 TODO: perhaps put pictures of the GUI where relevant in the other sections of the manual instead.
 
 # Configuration
+In this section, a full overview of gazeMapper's settings is given. These settings are stored in a `gazeMapper.config.Study` file, and stored in the `study_def.json` JSON file in a gazeMapper project's configuration directory.
 
-subsections for importing, sync, etc
+|Setting<br>name in GUI|Setting name<br>in settings file|Default<br>value|Description|
+| --- | --- | --- | --- |
+|`Session definition` pane|`session_def`||[gazeMapper session setup](#gazemapper-sessions). Should be a `gazeMapper.session.SessionDefinition` object.|
+|`Plane editor` pane|`planes`||[gazeMapper plane setup](#gazemapper-planes). Should be a list of `gazeMapper.plane.Definition` objects.|
+|Episodes to code on the `Episode setup` pane|`episodes_to_code`||[gazeMapper coding setup](#coding-analysis-synchronization-and-validation-episodes). Should be a set of `glassesTools.annotation.Event` objects.|
+|Planes per episode on the `Episode setup` pane|`planes_per_episode`||[gazeMapper coding setup](#coding-analysis-synchronization-and-validation-episodes), indicating which plane(s) to detect for each episode. Should be a `dict` with `glassesTools.annotation.Event`s as keys, and a set of plane names as value for each key.|
+|`Individual marker editor`|`individual_markers`||[gazeMapper individual marker setup](#individual-markers). Should be a list of `gazeMapper.marker.Marker` objects.|
+|||||
+|Copy video during import?|`import_do_copy_video`|`True`|If `False`, the scene video of an eye tracker recording, or the video of an external camera is not copied to the gazeMapper recording directory during import. Instead, the video will be loaded from the recording's source directory (so do not move it). Ignored when the video must be transcoded to be processed with gazeMapper.|
+||`import_source_dir_as_relative_path`|`False`|Specifies whether the path to the source directory stored in the [recording info file](#output) is an absolute path (`False`) or a relative path (`True`). If a relative path is used, the imported recording and the source directory can be moved to another location, and the source directory can still be found as long as the relative path (e.g., one folder up and in the directory `original recordings`: `../original recordings`) doesn't change.|
+|||||
+||`sync_ref_recording`|`None`|If set to the name of a recording, allows [synchronization](#synchronizing-multiple-eye-tracker-or-external-camera-recordings) of other recordings in a session to the indicated recording.|
+||`sync_ref_do_time_stretch`|`None`|If True, multiple sync points are used to calculate a time stretch factor to compensate for clock drift when [synchronizing multiple recordings](#synchronizing-multiple-eye-tracker-or-external-camera-recordings). Should be set if `sync_ref_recording` is set.|
+||`sync_ref_stretch_which`|`None`|Which recording(s) should be [corrected for clock drift](#synchronizing-multiple-eye-tracker-or-external-camera-recordings) if `sync_ref_do_time_stretch` is `True`. Possible values are `'ref'` and `'other'`. Should be set if `sync_ref_recording` is set.|
+||`sync_ref_average_recordings`|`None`|Whether to average the clock drifts for multiple recordings if `sync_ref_do_time_stretch` is `True`. Should be set if `sync_ref_recording` is set.|
+|||||
+||`get_cam_movement_for_et_sync_method`|`''`|Method used to derive the head motion for [synchronizing eye tracker data and scene camera](#synchronizing-eye-tracker-data-and-scene-camera). Possible values are `''` (no synchronization), `'plane'` and `'function'`|
+||`get_cam_movement_for_et_sync_function`|`None`|Function to use for deriving the head motion when [synchronizing eye tracker data and scene camera](#synchronizing-eye-tracker-data-and-scene-camera) if `get_cam_movement_for_et_sync_method` is set to `'function'`. Should be a [`gazeMapper.config.CamMovementForEtSyncFunction`](#gazemapperconfigcammovementforetsyncfunction) object.|
+||`sync_et_to_cam_use_average`|`True`|Whether to use the average offset of multiple sync episodes. If False, the offset for the first sync episode is used, the rest are ignored.|
+|||||
+||`auto_code_sync_points`|`None`|Setup for [automatic coding of synchronization timepoints](#automatic-coding-of-synchronization-timepoints). Should be a [`gazeMapper.config.AutoCodeSyncPoints`](#gazemapperconfigautocodesyncpoints) object.|
+||`auto_code_trial_episodes`|`None`|Setup for [automatic coding of analysis episodes](#automatic-coding-of-analysis-episodes). Should be a [`gazeMapper.config.AutoCodeTrialEpisodes`](#gazemapperconfigautocodetrialepisodes) object.|
+|||||
+||`export_output3D`|`False`|Determines whether gaze positions on the plane in the scene camera reference frame are exported when invoking the [`gazeMapper.process.Action.EXPORT_TRIALS` action](#actions). See [the glassesTools manual](https://github.com/dcnieho/glassesTools/blob/master/README.md#world-referenced-gaze-data).|
+||`export_output2D`|`True`|Determines whether gaze positions on the plane in the plane's reference frame are exported when invoking the [`gazeMapper.process.Action.EXPORT_TRIALS` action](#actions). See [the glassesTools manual](https://github.com/dcnieho/glassesTools/blob/master/README.md#world-referenced-gaze-data).|
+||`export_only_code_marker_presence`|`True`|If True, for each marker only a single column is added to the export created by the [`gazeMapper.process.Action.EXPORT_TRIALS` action](#actions), indicating whether the given marker was detected or not on a given frame. If `False`, marker pose information is included in the export.|
+|||||
+||`validate_do_global_shift`|`True`|glassesValidator setting: if `True`, for each validation interval the mean position will be removed from the gaze data and the targets, removing any overall shift of the data. This improves the matching of fixations to targets when there is a significant overall offset in the data. It may fail (backfire) if there are data samples far outside the range of the validation targets, or if there is no data for some targets.|
+||`validate_max_dist_fac`|`.5`|glassesValidator setting: factor for determining distance limit when assigning fixation points to validation targets. If for a given target the closest fixation point is further away than <factor>*[minimum intertarget distance], then no fixation point will be assigned to this target, i.e., it will not be matched to any fixation point. Set to a large value to essentially disable.|
+||`validate_dq_types`|`None`|glassesValidator setting: selects the types of data quality you would like to calculate for each of the recordings. When none are selected, a good default is used for each recording. When none of the selected types is available, depending on the `validate_allow_dq_fallback` setting, either an error is thrown or that same default is used instead. Whether a data quality type is available depends on what type of gaze information is available for a recording, as well as whether the camera is calibrated. See the [glassesValidator documentation](https://github.com/dcnieho/glassesValidator/blob/master/README.md#advanced-settings) for more information.|
+||`validate_allow_dq_fallback`|`False`|glassesValidator setting: applies if the `validate_dq_types` setting is set. If `False`, an error is raised when the indicated data quality type(s) are not available, if `True`, a sensible default other data type will be used instead.|
+||`validate_include_data_loss`|`False`|glassesValidator setting: if `True`, the data quality report will include data loss during the episode selected for each target on the validation poster. This is NOT the data loss of the whole recording and thus not what you want to report in your paper.|
+||`validate_I2MC_settings`|`I2MCSettings()`|glassesValidator setting: settings for the [I2MC](https://link.springer.com/article/10.3758/s13428-016-0822-1) fixation classifier used as part of determining the fixation that are assigned to validation targets. Should be a [`gazeMapper.config.I2MCSettings`](#gazemapperconfigi2mcsettings) object.|
+|||||
+||`video_make_which`|`None`|Indicating one or multiple recordings for which to make videos of the eye tracker scene camera or external camera (synchronized if there are multiple) showing gaze on the scene video from the eye tracker, gaze projected to the detected planes, detected plane origins, detected individual markers, and gaze from other eye tracker recordings (if available, and each depending on the below seeings). Value should be a `set`.|
+||`video_recording_colors`|`None`|Color used for drawing each recording's gaze point, scene camera and gaze vector (depending on settings). Each key should be a recording, value in the dict should be a [`gazeMapper.config.RgbColor`](#gazemapperconfigrgbcolor) object.|
+||`video_process_planes_for_all_frames`|`False`|If True, shows detection results for all planes for all frames. If False, detection of each plane is only shown during the episode(s) to which it is assigned.|
+||`video_process_annotations_for_all_recordings`|`True`|Episode annotations are shown in a bar on the bottom of the screen. If this setting is `True`, annotations for not only the recording for which the video is made, but also for the other recordings are shown in this bar.|
+||`video_show_detected_markers`|`True`|If True, known detected markers are indicated in the output video.|
+||`video_show_board_axes`|`True`|If Ture, the axes of the detected board |
+||`video_process_individual_markers_for_all_frames`|`True`|If `True`, detection results are shown for all frames in the video. If `False`, detection results are only shown during coded episodes of the video.|
+||`video_show_individual_marker_axes`|`True`|If True, the pose axis and not only an outline of detected individual markers is shown.|
+||`video_show_sync_func_output`|`True`|Applies if the `get_cam_movement_for_et_sync_method` setting is set to `'function'`. If `True`, draw the output of the function on the output video.|
+||`video_show_unexpected_markers`|`False`|If `False`, only markers that are part of defined planes or configured individual markers will be drawn on the video. If `True`, also other, unexpected markers will be drawn.|
+||`video_show_rejected_markers`|`False`|If `True`, all shapes that potentially are markers but were rejected by OpenCV's ArUco detector are shown. For debug purposes.|
+||`video_show_camera_in_ref`|`True`|If `True`, the position of other cameras is marked in the generated video of the reference recording.|
+||`video_show_camera_in_other`|`True`|If `True`, the position of other cameras is marked in the generated video of recordings other than the reference recording.|
+||`video_show_gaze_vec_in_ref`|`True`|If `True`, a line is drawn for each eye tracker recording between the gaze position and the position of the eye tracker's camera in the generated video of the reference recording.|
+||`video_show_gaze_vec_in_other`|`False`|If `True`, a line is drawn for each eye tracker recording between the gaze position and the position of the eye tracker's camera in the generated video of recordings other than the reference recording.|
+||`video_gaze_to_plane_margin`|`0.25`|Gaze position more than this factor outside a defined plane will not be drawn.|
+
+## `gazeMapper.config.AutoCodeSyncPoints`
+These settings are discussed [here](#automatic-coding-of-synchronization-timepoints).
+|Setting<br>name in GUI|Setting name<br>in settings file|Default<br>value|Description|
+| --- | --- | --- | --- |
+||`markers`||Set of marker IDs whose appearance indicates a sync points.|
+||`max_gap_duration`|`4`|Maximum gap (number of frames) to be filled in sequences of marker detections.|
+||`min_duration`|`6`|Minimum length (number of frames) of a sequence of marker detections. Shorter runs are removed.|
+
+## `gazeMapper.config.AutoCodeTrialEpisodes`
+These settings are discussed [here](#automatic-coding-of-analysis-episodes).
+|Setting<br>name in GUI|Setting name<br>in settings file|Default<br>value|Description|
+| --- | --- | --- | --- |
+||`start_markers`||A single marker ID or a sequence (`list`) of marker IDs that indicate the start of a trial.|
+||`end_markers`||A single marker ID or a sequence (`list`) of marker IDs that indicate the end of a trial.|
+||`max_gap_duration`|`4`|Maximum gap (number of frames) to be filled in sequences of marker detections.|
+||`max_intermarker_gap_duration`|`15`|Maximum gap (number of frames) between the detection of two markers in a sequence.|
+||`min_duration`|`6`|Minimum length (number of frames) of a sequence of marker detections. Shorter runs are removed.|
+
+## `gazeMapper.config.CamMovementForEtSyncFunction`
+These settings are used for when the `get_cam_movement_for_et_sync_method` setting is set to `'function'`, see [here](#synchronizing-eye-tracker-data-and-scene-camera).
+|Setting<br>name in GUI|Setting name<br>in settings file|Default<br>value|Description|
+| --- | --- | --- | --- |
+||`module_or_file`||Importable module or file (can be a full path) that contains the function to run.|
+||`function`||Name of the function to run.|
+||`parameters`||`dict` of `kwargs` to pass to the function. The frame to process (`np.ndarray`) is the first (positional) input passed to the function, and should not be specified in this dict.|
+
+## `gazeMapper.config.I2MCSettings`
+Settings used when running [I2MC](https://link.springer.com/article/10.3758/s13428-016-0822-1) fixation classifier used as part of determining the fixation that are assigned to validation targets. Used for the [`gazeMapper.process.Action.RUN_VALIDATION`](#actions), see [here](#validation-glassesvalidator-planes).
+N.B.: The below fields with `None` as the default value are set by glassesValidator based on the input gaze data. When a value is set for one of these settings, it overrides glassesValidator's dynamic parameter setting.
+|Setting<br>name in GUI|Setting name<br>in settings file|Default<br>value|Description|
+| --- | --- | --- | --- |
+||`freq`|`None`|Sampling frequency of the eye tracking data.|
+||`windowtimeInterp`|`.25`|Maximum duration (s) of gap in the data that is interpolated.|
+||`edgeSampInterp`|`2`|Amount of data (number of samples) at edges needed for interpolation.|
+||`maxdisp`|`50`|Maximum distance (mm) between the two edges of a gap below which the missing data is interpolated|
+||`windowtime`|`.2`|Length of the moving window (s) used by I2MC to calculate 2-means clustering when processing the data.|
+||`steptime`|`.02`|Step size (s) by which the moving window is moved.|
+||`downsamples`|`None`|Set of integer decimation factors used to downsample the gaze data as part of I2MC processing.|
+||`downsampFilter`|`None`|If `True`, a Chebyshev low-pass filter is applied when downsampling.|
+||`chebyOrder`|`None`|Order of the Chebyshev low-pass filter.|
+||`maxerrors`|`100`|Maximum number of errors before processing of a trial is aborted.|
+||`cutoffstd`|`None`|Number of standard deviations above mean k-means weights that will be used as fixation cutoff.|
+||`onoffsetThresh`|`3.`|Number of MAD away from median fixation duration. Will be used to walk forward at fixation starts and backward at fixation ends to refine their placement and stop algorithm from eating into saccades.|
+||`maxMergeDist`|`20`|Maximum Euclidean distance (mm) between fixations for merging to be possible.|
+||`maxMergeTime`|`81`|Maximum time (ms) between fixations for merging to be possible.|
+||`minFixDur`|`50`|Minimum fixation duration (ms) after merging, fixations with shorter duration are removed from output.|
+
+## `gazeMapper.config.RgbColor`
+|Setting<br>name in GUI|Setting name<br>in settings file|Default<br>value|Description|
+| --- | --- | --- | --- |
+||`r`|`0`|Value of the red channel (0-255).|
+||`g`|`0`|Value of the green channel (0-255).|
+||`b`|`0`|Value of the blue channel (0-255).|
 
 ## Overriding a project's settings for a specific session or recording
-
+gazeMapper support overriding a subset of the above settings for a specific session or recording. These settings overrides can be set in the GUI on the pane for a specific session, and are stored in JSON files (`study_def_override.json`) in the respective session's or recording's working directory. Programmatically, these settings overrides are handled using `gazeMapper.config.StudyOverride` objects. When using the API, settings can furthermore be overridden by means of keyword arguments to any of the `gazeMapper.process` functions. When overriding subobjects of a `gazeMapper.config.Study` (such as fields in a `dict`), set only the fields you want to override. The other fields will keep their original value.
 
 # API
 All of gazeMapper's functionality is exposed through its API. Below are all functions that are part of the
