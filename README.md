@@ -69,7 +69,8 @@ of the project. So an example directory structure may look like:
 my project/
 ├── config/
 │   ├── plane 1/
-│   └── plane 2/
+│   ├── plane 2/
+│   └── validation plane/
 ├── session 01/
 │   ├── teacher/
 │   ├── student/
@@ -80,7 +81,7 @@ my project/
 │   └── overview camera/
 ...
 ```
-where `session 01` and `session 02` are individual recording session, each made up of a teacher, a student and an overview camera recording. `plane 1` and `plane 2` contain definitions of planes that gazeMapper will map gaze to, see [below](#gazemapper-planes) for documentation.
+where `session 01` and `session 02` are individual recording session, each made up of a teacher, a student and an overview camera recording. `plane 1` and `plane 2` contain definitions of planes that gazeMapper will map gaze to and `validation plane` is an additional plane used for validation of the eye tracker's calibration using glassesValidator, see [below](#gazemapper-planes) for documentation.
 
 When not using the GUI and running gazeMapper using your own scripts, such a project folder organization is not required. Working folders
 for a session can be placed anywhere (though recording folders should be placed inside a session folder), and a folder for a custom configuration can also be placed anywhere (but its location needs to be provided using the `config_dir` argument of all the functions in [`gazeMapper.process`](#gazemapperprocess)). The [`gazeMapper.process`](#gazemapperprocess) functions simply take the path to a session or recording folder.
