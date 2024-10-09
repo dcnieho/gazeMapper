@@ -168,7 +168,7 @@ class GUI:
         # define first windows
         self._sessions_pane = self._make_main_space_window("Sessions", self._sessions_pane_drawer)
         self._project_settings_pane = self._make_main_space_window("Project settings", self._project_settings_pane_drawer, is_visible=False)
-        self._action_list_pane = self._make_main_space_window("Processing Queue", self._action_list_pane_drawer, is_visible=False)
+        self._action_list_pane = self._make_main_space_window("Processing queue", self._action_list_pane_drawer, is_visible=False)
         # transmit them to HelloImGui
         runner_params.docking_params.dockable_windows = [
             self._sessions_pane,
@@ -213,7 +213,7 @@ class GUI:
         else:
             # check if any session detail windows were closed. Those should be removed from the list
             hello_imgui.get_runner_params().docking_params.dockable_windows = \
-                [w for w in hello_imgui.get_runner_params().docking_params.dockable_windows if w.is_visible or w.label in ['Project settings', 'Processing Queue']]
+                [w for w in hello_imgui.get_runner_params().docking_params.dockable_windows if w.is_visible or w.label in ['Project settings', 'Processing queue']]
         current_windows = {w.label for w in hello_imgui.get_runner_params().docking_params.dockable_windows}
         # some cleanup may be needed for some of the closed windows
         if (removed:=old_window_labels-current_windows):
