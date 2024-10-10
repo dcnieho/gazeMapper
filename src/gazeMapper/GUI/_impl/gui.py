@@ -603,6 +603,10 @@ class GUI:
         self.sessions.clear()
         self._selected_sessions.clear()
         self._need_set_window_title = True
+        self.recording_config_overrides.clear()
+        self._recording_listers.clear()
+        self._selected_recordings.clear()
+        self._marker_preview_cache.clear()
 
 
     def _sessions_pane_drawer(self):
