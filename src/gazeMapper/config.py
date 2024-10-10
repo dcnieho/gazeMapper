@@ -166,10 +166,6 @@ class Study:
         self.check_valid(strict_check=strict_check)
 
     def check_valid(self, strict_check=True):
-        # always check this as invalid value would crash the gui
-        if self.get_cam_movement_for_et_sync_method not in ['','plane','function']:
-            raise ValueError('get_cam_movement_for_et_sync_method parameter should be an empty string, "plane", or "function"')
-
         if strict_check:
             self._check_session_def(strict_check)
             self._check_planes_per_episode(strict_check)
@@ -352,6 +348,18 @@ class Study:
 
     def _check_et_sync_method(self, strict_check) -> type_utils.ProblemDict:
         problems: type_utils.ProblemDict = {}
+        cam_mov_possible_values = typing.get_args(study_parameter_types['get_cam_movement_for_et_sync_method'])
+        if self.get_cam_movement_for_et_sync_method not in cam_mov_possible_values:
+            values = list(cam_mov_possible_values)
+            values.remove('')
+            values_str = '"' + '", "'.join(values) + '"'
+            temp = values_str.partition(f'"{values[-1]}"')
+            values_str = ('' if len(values)==1 else ', ') + temp[0] + 'or ' + temp[1]
+            if strict_check:
+                raise ValueError(f'get_cam_movement_for_et_sync_method parameter should be an empty string{values_str}')
+            else:
+                problems['get_cam_movement_for_et_sync_method'] = f'get_cam_movement_for_et_sync_method parameter should be an empty string{values_str}'
+
         if self.get_cam_movement_for_et_sync_method not in ['plane', 'function']:
             # nothing to do
             return problems
