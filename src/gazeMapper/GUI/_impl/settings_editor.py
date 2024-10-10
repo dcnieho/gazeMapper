@@ -463,7 +463,12 @@ def draw_value(field_lbl: str, val: _T, f_type: typing.Type, nullable: bool, def
             values = list(typing.get_args(f_type))
             if val is None:
                 values.insert(0,None)
-            p_idx = values.index(val)
+            try:
+                p_idx = values.index(val)
+            except ValueError:
+                p_idx = 0
+                if values[0] is not None:
+                    values.insert(0,None)
             str_values = values
             if f_type in val_to_str_registry:
                 str_values = ['' if v is None else val_to_str_registry[f_type][v] for v in str_values]
