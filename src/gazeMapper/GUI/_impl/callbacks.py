@@ -8,7 +8,7 @@ import pathvalidate
 import threading
 from imgui_bundle import imgui, imspinner, hello_imgui, icons_fontawesome_6 as ifa6
 
-from glassesTools import async_thread, camera_recording, eyetracker, gui as gt_gui, naming, platform, recording, video_utils
+from glassesTools import aruco, async_thread, camera_recording, eyetracker, gui as gt_gui, naming, platform, recording, video_utils
 from glassesValidator.config import deploy_validation_config, get_validation_setup
 
 from . import colors, utils
@@ -29,6 +29,8 @@ def get_folder_picker(g, reason: str, *args, **kwargs):
                 set_default_cam_cal(selected[0], *args, **kwargs)
             case 'set_cam_cal':
                 set_cam_cal(selected[0], *args, **kwargs)
+            case 'deploy_aruco':
+                aruco.deploy_marker_images(selected[0], 1000, *args, **kwargs)
             case _:
                 raise ValueError(f'reason "{reason}" not understood')
 
@@ -49,6 +51,10 @@ def get_folder_picker(g, reason: str, *args, **kwargs):
             header = "Select or drop calibration xml file"
             allow_multiple = False
             picker_type = gt_gui.file_picker.FilePicker
+        case 'deploy_aruco':
+            header = "Select folder to store ArUco marker images"
+            allow_multiple = False
+            picker_type = gt_gui.file_picker.DirPicker
         case _:
             raise ValueError(f'reason "{reason}" not understood')
     picker = picker_type(title=header, allow_multiple=allow_multiple, callback=select_callback)
