@@ -537,7 +537,6 @@ missing_recordings(self, rec_type: RecordingType|None=None) -> list[str]:
 load_action_states(self, create_if_missing: bool):
 is_action_completed(self, action: process.Action) -> bool:
 action_completed_num_recordings(self, action: process.Action) -> list[str]:
-action_not_completed_recordings(self, action: process.Action) -> list[str]:
 from_definition(definition: SessionDefinition|None, path: str | pathlib.Path) (static)
 
 ### Free functions

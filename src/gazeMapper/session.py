@@ -245,12 +245,6 @@ class Session:
 
         return sum([self.recordings[r].state[action]==process.State.Completed for r in self.recordings])
 
-    def action_not_completed_recordings(self, action: process.Action) -> list[str]:
-        if process.is_session_level_action(action):
-            raise ValueError('The status of session-level actions cannot be listed per recording')
-
-        return [r for r in self.recordings if self.recordings[r].state[action]!=process.State.Completed]
-
     @staticmethod
     def from_definition(definition: SessionDefinition|None, path: str | pathlib.Path) -> 'Session':
         # for loading a recording directory that doesn't contain a session json file
