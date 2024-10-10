@@ -17,7 +17,7 @@ import OpenGL
 import OpenGL.GL as gl
 
 import glassesTools
-from glassesTools import annotation, gui as gt_gui, naming as gt_naming, platform as gt_platform
+from glassesTools import annotation, gui as gt_gui, naming as gt_naming, plane as gt_plane, platform as gt_platform
 import glassesValidator
 
 from ... import config, marker, plane, process, project_watcher, session, type_utils, version
@@ -75,6 +75,7 @@ class GUI:
 
         self._problems_cache        : type_utils.ProblemDict                            = {}
         self._marker_preview_cache  : dict[tuple[int,int,int], image_helper.ImageHelper]= {}
+        self._plane_preview_cache   : dict[str               , image_helper.ImageHelper]= {}
 
         # Show errors in threads
         def asyncexcepthook(future: asyncio.Future):
@@ -606,6 +607,7 @@ class GUI:
         self.recording_config_overrides.clear()
         self._recording_listers.clear()
         self._selected_recordings.clear()
+        self._plane_preview_cache.clear()
         self._marker_preview_cache.clear()
 
 
@@ -921,6 +923,16 @@ class GUI:
                         callbacks.glasses_validator_plane_check_config(self.study_config, new_p)
                     # recreate plane so any settings changes (e.g. applied defaults) are reflected in the gui
                     self.study_config.planes[i] = plane.Definition.load_from_json(plane_dir)
+                    self._plane_preview_cache.pop(p.name, None)
+                if imgui.button(ifa6.ICON_FA_IMAGE+' generate reference image'):
+                    p_dir = config.guess_config_dir(self.study_config.working_directory) / p.name
+                    plane.get_plane_from_definition(p, p_dir)   # constructing the plane triggers generation of the reference image
+                    self._plane_preview_cache[p.name] = utils.load_image_with_helper(p_dir/gt_plane.Plane.default_ref_image_name)
+                if p.name in self._plane_preview_cache and imgui.is_item_hovered(imgui.HoveredFlags_.for_tooltip|imgui.HoveredFlags_.delay_normal):
+                    imgui.begin_tooltip()
+                    self._plane_preview_cache[p.name].render(largest=400*hello_imgui.dpi_window_size_factor())
+                    imgui.end_tooltip()
+                imgui.same_line()
                 if imgui.button(ifa6.ICON_FA_TRASH_CAN+' delete plane'):
                     callbacks.delete_plane(self.study_config, p)
                 imgui.tree_pop()

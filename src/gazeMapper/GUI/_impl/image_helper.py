@@ -1,6 +1,7 @@
 from imgui_bundle import imgui
 import OpenGL.GL as gl
 import numpy as np
+import math
 
 
 class ImageHelper:
@@ -26,7 +27,17 @@ class ImageHelper:
         gl.glTexImage2D(gl.GL_TEXTURE_2D, 0, fmt, self.width, self.height, 0, fmt, gl.GL_UNSIGNED_BYTE, self.data.data)
 
 
-    def render(self, width: int, height: int, *args, **kwargs):
+    def render(self, width: int=None, height: int=None, largest: int=None, *args, **kwargs):
+        if largest is not None:
+            aspect_ratio = self.width/self.height
+            if aspect_ratio>1:
+                width       = largest
+                height      = math.ceil(largest/aspect_ratio)
+            else:
+                width       = math.ceil(largest*aspect_ratio)
+                height      = largest
+        if width is None or height is None:
+            raise ValueError()
         if imgui.is_rect_visible((width, height)):
             imgui.image(self.texture_id, (width, height), *args, **kwargs)
             return True
