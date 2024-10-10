@@ -113,6 +113,8 @@ def is_action_possible_given_config(action: Action, study_config: 'config.Study'
             return not not study_config.sync_ref_recording
         case Action.RUN_VALIDATION:
             return annotation.Event.Validate in study_config.planes_per_episode
+        case Action.EXPORT_TRIALS:
+            return annotation.Event.Trial in study_config.planes_per_episode
         case Action.MAKE_VIDEO:
             return not not study_config.video_make_which
 
