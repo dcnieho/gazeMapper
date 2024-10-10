@@ -50,6 +50,7 @@ class GUI:
         self.need_setup_plane       = True
         self.need_setup_episode     = True
         self.can_accept_sessions    = False
+        self._session_actions: set[process.Action] = set()
 
         self.config_watcher             : concurrent.futures.Future = None
         self.config_watcher_stop_event  : asyncio.Event             = None
@@ -546,8 +547,8 @@ class GUI:
             lister.set_actions_to_show(set())
             return
 
-        actions = process.get_actions_for_config(self.study_config, exclude_session_level=False)
-        lister.set_actions_to_show(actions)
+        self._session_actions = process.get_actions_for_config(self.study_config, exclude_session_level=False)
+        lister.set_actions_to_show(self._session_actions)
 
     def _recording_lister_set_actions_to_show(self, lister: gt_gui.recording_table.RecordingTable, sess: str):
         config = self.session_config_overrides[sess].apply(self.study_config, strict_check=False)
@@ -1211,6 +1212,24 @@ class GUI:
                 imgui.same_line()
             if imgui.button(ifa6.ICON_FA_FILE_IMPORT+' import camera recordings'):
                 gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='add_cam_recordings', sessions=[sess.name]))
+        session_level_actions = [a for a in self._session_actions if process.is_session_level_action(a)]
+        possible_actions = process.get_possible_actions(sess.state, {r:sess.recordings[r].state for r in sess.recordings}, set(session_level_actions), self.study_config)
+        menu_actions = self._filter_session_context_menu_actions(sess.name, None, possible_actions)
+        if session_level_actions and imgui.begin_table(f'##{sess.name}_session_level', 2, imgui.TableFlags_.sizing_fixed_fit):
+            for a in session_level_actions:
+                imgui.table_next_column()
+                session_lister.draw_process_state(sess.state[a])
+                imgui.table_next_column()
+                imgui.selectable(a.displayable_name, False, imgui.SelectableFlags_.span_all_columns|imgui.SelectableFlags_.allow_overlap)
+                if a in menu_actions and imgui.begin_popup_context_item(f"##{sess.name}_{a}_context"):
+                    hover_text = f'Run {a.displayable_name} for session: {sess.name}'
+                    status = self.sessions[sess.name].state[a]
+                    icon = ifa6.ICON_FA_PLAY if status<process.State.Completed else ifa6.ICON_FA_ARROW_ROTATE_RIGHT
+                    if imgui.selectable(icon+f" {a.displayable_name}##{sess.name}", False)[0]:
+                        self.launch_task(sess.name, None, a)
+                    gt_gui.utils.draw_hover_text(hover_text, '')
+                    imgui.end_popup()
+            imgui.end_table()
         self._recording_listers[sess.name].draw(limit_outer_size=True)
         sess_changed = False
         if imgui.tree_node_ex('Setting overrides for this session',imgui.TreeNodeFlags_.framed):
