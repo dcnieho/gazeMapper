@@ -380,7 +380,11 @@ class Study:
         if self.video_make_which:
             # check have colors for all eye tracker recordings
             all_recs = {r.name for r in self.session_def.recordings if r.type==session.RecordingType.Eye_Tracker}
-            if (missing:=list(all_recs-set(self.video_recording_colors.keys()))):
+            if self.video_recording_colors:
+                missing = list(all_recs-set(self.video_recording_colors.keys()))
+            else:
+                missing = list(all_recs)
+            if missing:
                 msg = f'Colors need to be defined for all eye tracker recordings. Missing for {missing[0] if len(missing)==1 else missing}'
                 if strict_check:
                     raise ValueError(msg)
