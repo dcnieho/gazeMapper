@@ -84,7 +84,7 @@ class Definition_GlassesValidator(Definition):
 
     def fixed_fields(self) -> type_utils.NestedDict:
         # these cannot be edited from the GUI, are for info only
-        return {k:None for k in ['aruco_dict', 'marker_border_bits', 'min_num_markers', 'ref_image_size']}
+        return {k:None for k in ['name','aruco_dict', 'marker_border_bits', 'min_num_markers', 'ref_image_size']}
 
     def has_complete_setup(self) -> bool:
         return True
@@ -124,7 +124,7 @@ class Definition_Plane_2D(Definition):
         return wrong
 
     def fixed_fields(self) -> type_utils.NestedDict:
-        return {}
+        return {k:None for k in ['name']}
 
     def has_complete_setup(self) -> bool:
         return not self.field_problems()
