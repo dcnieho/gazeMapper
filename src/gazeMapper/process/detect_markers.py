@@ -54,7 +54,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
         all_recs = [r.name for r in study_config.session_def.recordings]
         episodes[annotation.Event.Trial] = synchronization.get_episode_frame_indices_from_ref(working_dir, annotation.Event.Trial, rec_def.name, study_config.sync_ref_recording, all_recs, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings, study_config.sync_ref_stretch_which)
 
-    sync_target_function         = _get_sync_function(study_config, rec_def, episodes[annotation.Event.Sync_ET_Data])
+    sync_target_function         = _get_sync_function(study_config, rec_def, None if annotation.Event.Sync_ET_Data not in episodes else episodes[annotation.Event.Sync_ET_Data])
     planes_setup, analyze_frames = _get_plane_setup(study_config, config_dir, episodes)
 
     # set up pose estimator and run it
