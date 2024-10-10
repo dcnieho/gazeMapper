@@ -521,7 +521,7 @@ class GUI:
             selected = self._selected_sessions.copy()
             self._selected_sessions.clear()
             self._selected_sessions |= {k:(selected[k] if k in selected else False) for k in self.sessions}
-        self._session_lister_set_actions_to_show(self._session_lister)
+        self._update_shown_actions_for_config()
 
     def _check_project_setup_state(self):
         if self.study_config is not None:
@@ -572,6 +572,11 @@ class GUI:
             gt_gui.recording_table.ColumnSpec(2+c, a.displayable_name, imgui.TableColumnFlags_.angled_header, lambda rec, a=a: _draw_status(a, rec), lambda iid, a=a: _get_sort_value(a, iid)) for c,a in enumerate(actions)
         ]
         lister.build_columns(columns)
+
+    def _update_shown_actions_for_config(self):
+        self._session_lister_set_actions_to_show(self._session_lister)
+        for sess in self._recording_listers:
+            self._recording_lister_set_actions_to_show(self._recording_listers[sess], sess)
 
     def close_project(self):
         self._project_settings_pane.is_visible = False
@@ -710,9 +715,7 @@ class GUI:
                 # persist changed config
                 self.study_config = new_config
                 self.study_config.store_as_json()
-                self._session_lister_set_actions_to_show(self._session_lister)
-                for sess in self._recording_listers:
-                    self._recording_lister_set_actions_to_show(self._recording_listers[sess], sess)
+                self._update_shown_actions_for_config()
 
     def _action_list_pane_drawer(self):
         if not self.job_scheduler.jobs:
@@ -999,6 +1002,7 @@ class GUI:
                 # persist changed config
                 self.study_config = new_config
                 self.study_config.store_as_json()
+                self._update_shown_actions_for_config()
 
     def _individual_marker_setup_pane_drawer(self):
         table_is_started = imgui.begin_table(f"##markers_def_list", 4)
@@ -1044,6 +1048,7 @@ class GUI:
                 callbacks.delete_individual_marker(self.study_config, m)
         if changed:
             self.study_config.store_as_json()
+            self._update_shown_actions_for_config()
         imgui.end_table()
         if imgui.button('+ new individual marker'):
             new_mark_id = -1
