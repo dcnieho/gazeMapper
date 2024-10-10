@@ -59,7 +59,7 @@ Besides using the GUI, advanced users can instead opt to call all the GUI's func
 ## Workflow and example data
 Here we first present an example workflow using the GUI. More detailed information about [using the GUI](#the-gui), or [gazeMapper configuration](#configuration) and [its programming API](#api), are provided below. Example data with which this workflow can be followed is forthcoming.
 
-**TODO**
+**TODO** perhaps two or three examples. 1st using glassesValidator example data and just running validator. 2nd single person and overview camera. 3rd teacher student
 
 ## gazeMapper projects
 The gazeMapper GUI organizes recordings into a project folder. Each session to be processed is represented by a folder in this project folder, and one or multiple recordings are stored in subfolders of a session folder. After importing recordings, all further processing is done inside these session and recording folders. The source directories containing the original recordings remain
@@ -242,7 +242,7 @@ gazeMapper can perform the following processing actions on a wearable eye tracki
 |`EXPORT_TRIALS`|always|session|Create file for each recording containing the gaze position on one or multiple planes.|
 |`MAKE_VIDEO`|`video_make_which` option|session|Make videos of the eye tracker scene camera or external camera (synchronized if there are multiple) showing gaze on the scene video from the eye tracker, gaze projected to the detected planes, detected plane origins, detected individual markers, and gaze from other eye tracker recordings (if available).|
 
-In the GUI, an overview of what processing actions are enqueued or running for a session or recording are shown in the `Sessions` pane, in the detail view for a specific session, and in the `Processing Queue` pane.
+In the GUI, an overview of what processing actions are enqueued or running for a session or recording are shown in the `Sessions` pane, in the detail view for a specific session, and in the `Processing queue` pane.
 
 ## Coding analysis, synchronization and validation episodes
 To process a recording, gazeMapper needs to be told where in the recording several events are, such as the trial(s) for which you want to have gaze data mapped to the plane. There are four types of episodes (`glassesTools.annotation.Event`) that can be coded, which are available depends on the set of events that are set to be coded for the project with the `episodes_to_code` setting. Some may not be of use, depending on the configuration of the gazeMapper project:
@@ -405,17 +405,149 @@ overview below.
 gazeMapper makes extensive use of the functionality of [glassesTools](https://github.com/dcnieho/glassesTools) and its functionality for validating the calibration of a recording is a thin wrapper around [glassesValidator](https://github.com/dcnieho/glassesValidator). See the [glassesTools](https://github.com/dcnieho/glassesTools/blob/master/README.md) and [glassesValidator](https://github.com/dcnieho/glassesValidator/blob/master/README.md) documentation for more information about these functions.
 
 ## `gazeMapper.config`
+|function|inputs|description|
+guess_config_dir
+load_override_and_apply(study: Study, level: OverrideLevel, override_path: str|pathlib.Path, recording_type: session.RecordingType|None = None, strict_check=True) -> Study:
+load_or_create_override(level: OverrideLevel, override_path: str|pathlib.Path, recording_type: session.RecordingType|None = None) -> StudyOverride:
+apply_kwarg_overrides(study: Study, strict_check=True, **kwargs)
+read_study_config_with_overrides(config_path: str|pathlib.Path, overrides: dict[OverrideLevel, str|pathlib.Path]=None, recording_type: session.RecordingType|None = None, strict_check=True, **kwargs)
+
+### `gazeMapper.config.Study`
+|member function|inputs|description|
+__init__: takes all the parameters listed under [configuration](#configuration).
+check_valid(self, strict_check
+field_problems
+store_as_json path: str|pathlib.Path
+get_empty (static)
+load_from_json(path: str | pathlib.Path, strict_check (static)
+
+### `gazeMapper.config.StudyOverride`
+|member function|inputs|description|
+__init__(self, level: OverrideLevel, recording_type: session.RecordingType
+get_allowed_parameters(level: OverrideLevel, recording_type: session.RecordingType (static)
+apply(self, study: Study, strict_check
+store_as_json(path: str | pathlib.Path)
+load_from_json(level: OverrideLevel, path: str | pathlib.Path, recording_type: session.RecordingType (static)
+from_study_diff(config: Study, parent_config: Study, level: OverrideLevel, recording_type: session.RecordingType (static)
 
 ## `gazeMapper.episode`
+|function|inputs|description|
+Episode.__init__(event:annotation.Event, start_frame:int, end_frame:int)
+read_list_from_file(fileName: str|pathlib.Path)
+write_list_to_file(episodes: list[Episode],fileName: str|pathlib.Path
+get_empty_marker_dict(episodes: list[annotation.Event]=None)
+list_to_marker_dict(episodes: list[Episode], expected_types: list[annotation.Event]=None)
+marker_dict_to_list(episodes: dict[annotation.Event,list[int]|list[list[int]]])
+is_in_interval(episodes: dict[annotation.Event,list[int]]|list[Episode], idx: int)
 
 ## `gazeMapper.marker`
+|function|inputs|description|
+Marker.__init__
+get_marker_dict_from_list(markers: list[Marker])
+load_file(marker: Marker, folder: str|pathlib.Path)
+code_marker_for_presence(markers: pd.DataFrame)
+fill_gaps_in_marker_detection(markers: pd.DataFrame, fill_value)
 
 ## `gazeMapper.plane`
+make(path: pathlib.Path, p_type: Type, name: str, **kwargs) -> Definition_GlassesValidator|Definition_Plane_2D:
+get_plane_from_path(path: str|pathlib.Path) -> plane.Plane:
+get_plane_from_definition(plane_def: Definition, path: str | pathlib.Path) -> plane.Plane:
+get_plane_setup(plane_def: Definition)
+
+### `gazeMapper.plane.Type`
+Enum, two values: GlassesValidator, Plane_2D
+|function|inputs|description|
+make(path: pathlib.Path, p_type: Type, name: str, **kwargs)
+get_plane_from_path(path: str|pathlib.Path)
+get_plane_from_definition(plane_def: Definition, path: str | pathlib.Path)
+get_plane_setup(plane_def: Definition)
+
+### `gazeMapper.plane.Definition` and subclasses
+`gazeMapper.plane.Definition_GlassesValidator` and `gazeMapper.plane.Definition_Plane_2D`
+|member function|inputs|description|
+__init__: parameters described above
+field_problems(self) -> type_utils.ProblemDict:
+fixed_fields(self) -> type_utils.NestedDict:
+has_complete_setup(self) -> bool:
+store_as_json(self, path: str | pathlib.Path):
+load_from_json(path: str | pathlib.Path) (static)
 
 ## `gazeMapper.process`
-Actions, one function per action, and a bunch of helper functions
+[`gazeMapper.process.Action`](#actions) is described above.
+
+`gazeMapper.process.State` enum:
+| Value | Description |
+| --- | --- |
+|`Not_Run`|Action not run.|
+|`Pending`|Action enqueued to be run.|
+|`Running`|Action running.|
+|`Completed`|Action ran successfully.|
+|`Canceled`|Action run cancelled.|
+|`Failed`|Action failed.|
+
+NB: the `Pending`, `Canceled` and `Completed` states are only used in the GUI.
+
+action_to_func(action: Action)
+is_session_level_action(action: Action) -> bool:
+is_action_possible_given_config(action: Action, study_config: 'config.Study')
+is_action_possible_for_recording_type(action: Action, rec_type: 'session.RecordingType') -> bool:
+get_actions_for_config(study_config: 'config.Study', exclude_session_level: bool=False)
+action_update_and_invalidate(action: Action, state: State, study_config: 'config.Study')
+get_possible_actions(session_action_states: dict[Action, State], recording_action_states: dict[str,dict[Action, State]], actions_to_check: set[Action], study_config: 'config.Study')
 
 ## `gazeMapper.session`
+### `gazeMapper.session.RecordingType`
+Enumeration
+| Value | Description |
+| --- | --- |
+|`Eye_Tracker`|Recording is an eye tracker recording.|
+|`Camera`|Recording is an external camera recording.|
+
+### `gazeMapper.session.RecordingDefinition`
+__init__(self, name:str, type:RecordingType):
+set_default_cal_file(self, cal_path: str|pathlib.Path, rec_def_path: str|pathlib.Path):
+get_default_cal_file(self, rec_def_path: str|pathlib.Path) -> pathlib.Path|None:
+remove_default_cal_file(self, rec_def_path: str|pathlib.Path
+
+### `gazeMapper.session.Recording`
+__init__(self, definition: RecordingDefinition, info:EyeTrackerRecording|CameraRecording|None=None):
+load_action_states(self, create_if_missing: bool)
+
+### `gazeMapper.session.SessionDefinition`
+__init__(self, recordings: list[RecordingDefinition]|None=None):
+add_recording_def(self, recording: RecordingDefinition):
+get_recording_def(self, which: str) -> RecordingDefinition:
+is_known_recording(self, which: str) -> bool:
+store_as_json(self, path: str | pathlib.Path):
+load_from_json(path: str | pathlib.Path) (static)
+
+### `gazeMapper.session.Session`
+__init__(self, definition: SessionDefinition, name: str, working_directory: str|pathlib.Path|None = None, recordings: dict[str,Recording]|None = None):
+create_working_directory(self, parent_directory: str|pathlib.Path):
+import_recording(self, which: str, cam_cal_file: str|pathlib.Path=None, **kwargs):
+add_recording_and_import(self, which: str, rec_info: EyeTrackerRecording|CameraRecording, cam_cal_file: str|pathlib.Path=None, load_existing_recordings(self):
+load_recording_info(self, which) -> EyeTrackerRecording|CameraRecording:
+add_existing_recording(self, which: str) -> Recording:
+check_recording_info(self, which: str, rec_info: EyeTrackerRecording|CameraRecording):
+update_recording_info(self, which: str, rec_info: EyeTrackerRecording|CameraRecording):
+add_recording_from_info(self, which: str, rec_info: EyeTrackerRecording|CameraRecording) -> Recording:
+num_present_recordings(self) -> int:
+has_all_recordings(self) -> bool:
+missing_recordings(self, rec_type: RecordingType|None=None) -> list[str]:
+load_action_states(self, create_if_missing: bool):
+is_action_completed(self, action: process.Action) -> bool:
+action_completed_num_recordings(self, action: process.Action) -> list[str]:
+action_not_completed_recordings(self, action: process.Action) -> list[str]:
+from_definition(definition: SessionDefinition|None, path: str | pathlib.Path) (static)
+
+### Free functions
+read_recording_info(working_dir: pathlib.Path, rec_type: RecordingType) -> tuple[EyeTrackerRecording|CameraRecording, pathlib.Path]:
+get_video_path(rec_info: EyeTrackerRecording|CameraRecording)
+get_session_from_directory(path: str|pathlib.Path, session_def: SessionDefinition|None=None) -> Session:
+get_sessions_from_project_directory(path: str|pathlib.Path, session_def: SessionDefinition|None=None) -> list[Session]:
+get_action_states(working_dir: str|pathlib.Path, for_recording: bool, create_if_missing = False, skip_if_missing=False) -> dict[process.Action, process.State]:
+update_action_states(working_dir: str|pathlib.Path, action: process.Action, state: process.State, study_config: 'config.Study', skip_if_missing=False)
+
 
 ### Common input arguments
 |argument|description|
