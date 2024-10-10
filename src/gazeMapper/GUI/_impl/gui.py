@@ -488,6 +488,8 @@ class GUI:
             if filter_ref and self.study_config.sync_ref_recording:
                 recs = {r for r in recs if r!=self.study_config.sync_ref_recording}
             return recs
+        def _get_known_recordings_filtered() -> set[str]:
+            return _get_known_recordings(filter_ref=True)
         def _get_known_individual_markers() -> set[str]:
             return {m.id for m in self.study_config.individual_markers}
         def _get_known_planes() -> set[str]:
@@ -498,7 +500,7 @@ class GUI:
             'video_make_which': _get_known_recordings,
             'video_recording_colors': _get_known_recordings,
             'sync_ref_recording': _get_known_recordings,
-            'sync_ref_average_recordings': lambda: _get_known_recordings(filter_ref=True),
+            'sync_ref_average_recordings': _get_known_recordings_filtered,
             'planes_per_episode': [_get_episodes_to_code_for_planes, _get_known_planes],
             'auto_code_sync_points': {'markers': _get_known_individual_markers},
             'auto_code_trial_episodes': {'start_markers': _get_known_individual_markers, 'end_markers': _get_known_individual_markers}
