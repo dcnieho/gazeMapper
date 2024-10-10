@@ -463,20 +463,23 @@ def draw_value(field_lbl: str, val: _T, f_type: typing.Type, nullable: bool, def
             values = list(typing.get_args(f_type))
             if val is None:
                 values.insert(0,None)
-            try:
+            is_known_value = val in values
+            if is_known_value:
                 p_idx = values.index(val)
-            except ValueError:
+            else:
                 p_idx = 0
-                if values[0] is not None:
-                    values.insert(0,None)
+                values.insert(0,f'*unknown value: {val}*')
             str_values = values
             if f_type in val_to_str_registry:
                 str_values = ['' if v is None else val_to_str_registry[f_type][v] for v in str_values]
             elif not isinstance(str_values[0],str):
                 str_values = ['' if v is None else str(v) for v in str_values]
             imgui.set_next_item_width(get_fields_text_width(str_values)+imgui.get_frame_height()+2*imgui.get_style().frame_padding.x)
-            _,p_idx = imgui.combo(f"##{field_lbl}", p_idx, str_values, popup_max_height_in_items=min(10,len(values)))
-            new_val = values[p_idx]
+            changed,p_idx = imgui.combo(f"##{field_lbl}", p_idx, str_values, popup_max_height_in_items=min(10,len(values)))
+            if is_known_value or (changed and p_idx>0):
+                new_val = values[p_idx]
+            else:
+                new_val = val
         case _:
             imgui.text(f'type {f_type} not handled')
             new_val = None
