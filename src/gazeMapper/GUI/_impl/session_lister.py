@@ -228,12 +228,18 @@ class List:
             if process.is_session_level_action(action):
                 draw_process_state(item.state[action])
             else:
-                not_completed = [r for r in item.action_not_completed_recordings(action) if process.is_action_possible_for_recording_type(action, item.definition.get_recording_def(r).type)]
-                n_rec = len([r for r in item.definition.recordings if process.is_action_possible_for_recording_type(action, r.type)])
-                clr = colors.error if not_completed else colors.ok
-                imgui.text_colored(clr, f'{n_rec-len(not_completed)}/{n_rec}')
+                states = {r:item.recordings[r].state[action] for r in item.recordings if process.is_action_possible_for_recording_type(action, item.definition.get_recording_def(r).type)}
+                not_completed = [r for r in states if states[r]!=process.State.Completed]
+                if any(st:=[s for r in states if (s:=states[r]) in [process.State.Pending, process.State.Running]]):
+                    # progress marker
+                    draw_process_state(process.State.Running if process.State.Running in st else process.State.Pending, have_hover_popup=False)
+                else:
+                    n_rec = len(states)
+                    clr = colors.error if not_completed else colors.ok
+                    imgui.text_colored(clr, f'{n_rec-len(not_completed)}/{n_rec}')
                 if not_completed:
-                    glassesTools.gui.utils.draw_hover_text('not completed for recordings:\n'+'\n'.join(not_completed),'')
+                    rec_strs = [f'{r} ({states[r].displayable_name})' for r in not_completed]
+                    glassesTools.gui.utils.draw_hover_text('not completed for recordings:\n'+'\n'.join(rec_strs),'')
         if self.item_context_callback and imgui.begin_popup_context_item(f"##{item.name}_{action}_context"):
             self.item_context_callback(item.name)
             imgui.end_popup()
@@ -263,7 +269,7 @@ class List:
             sort_specs_in.specs_dirty = False
             self._require_sort = False
 
-def draw_process_state(state: process.State):
+def draw_process_state(state: process.State, have_hover_popup=True):
     symbol_size = imgui.calc_text_size(ifa6.ICON_FA_CIRCLE)
     match state:
         case process.State.Not_Run:
@@ -288,4 +294,5 @@ def draw_process_state(state: process.State):
         case process.State.Failed:
             imgui.text_colored(colors.error_bright, ifa6.ICON_FA_TRIANGLE_EXCLAMATION)
             hover_text = 'Failed'
-    glassesTools.gui.utils.draw_hover_text(hover_text, text='')
+    if have_hover_popup:
+        glassesTools.gui.utils.draw_hover_text(hover_text, text='')
