@@ -405,21 +405,23 @@ overview below.
 gazeMapper makes extensive use of the functionality of [glassesTools](https://github.com/dcnieho/glassesTools) and its functionality for validating the calibration of a recording is a thin wrapper around [glassesValidator](https://github.com/dcnieho/glassesValidator). See the [glassesTools](https://github.com/dcnieho/glassesTools/blob/master/README.md) and [glassesValidator](https://github.com/dcnieho/glassesValidator/blob/master/README.md) documentation for more information about these functions.
 
 ## `gazeMapper.config`
-|function|inputs|description|
-guess_config_dir
-load_override_and_apply(study: Study, level: OverrideLevel, override_path: str|pathlib.Path, recording_type: session.RecordingType|None = None, strict_check=True) -> Study:
-load_or_create_override(level: OverrideLevel, override_path: str|pathlib.Path, recording_type: session.RecordingType|None = None) -> StudyOverride:
-apply_kwarg_overrides(study: Study, strict_check=True, **kwargs)
-read_study_config_with_overrides(config_path: str|pathlib.Path, overrides: dict[OverrideLevel, str|pathlib.Path]=None, recording_type: session.RecordingType|None = None, strict_check=True, **kwargs)
+|function|inputs|output|description|
+| --- | --- | --- | --- |
+|`guess_config_dir`|<ol><li>`working_dir`: location from which to start the search</li><li>`config_dir_name`: name of the configuration directory, `'config'` by default.</li><li>`json_file_name`: name of a study configuration file that is expected to be found in the configuration directory, `'study_def.json'` by default.</li></ol>|<ol><li>`pathlib.Path`</li></ol>|Find the path of the project's configuration directory when invoked from a directory 0, 1, or 2 levels deep in a project directory.|
+|`load_override_and_apply`|<ol><li>`study`: `gazeMapper.config.Study` object to which to apply override.</li><li>`level`: `gazeMapper.config.OverrideLevel` (`Session` or `Recording`) for override to be loaded.</li><li>`override_path`: path to load the study setting override JSON file from. Can be a path to a file, or a path to a folder containing such a file (in the latter case, the filename `'study_def_override.json'` will be used).</li><li>`recording_type`: [`gazeMapper.session.RecordingType`](#gazemapper-sessions) (used when applying a recording-level override, else `None`).</li><li>`strict_check`: If `True`, raise when error is found in the resulting study configuration.</li></ol>|<ol><li>`gazeMapper.config.Study`: Study configuration object with the setting overrides applied.</li></ol>|Load and apply a setting override file to the provided study configuration.|
+|`load_or_create_override`|<ol><li>`level`: `gazeMapper.config.OverrideLevel` (`Session` or `Recording`) for override to be loaded.</li><li>`override_path`: path to load the study setting override JSON file from. Can be a path to a file, or a path to a folder containing such a file (in the latter case, the filename `'study_def_override.json'` will be used).</li><li>`recording_type`: [`gazeMapper.session.RecordingType`](#gazemapper-sessions) (used when applying a recording-level override, else `None`).</li></ol>|<ol><li>`gazeMapper.config.StudyOverride`: study override object</li></ol>|Loads the override object from the indicated file if it exists, else returns an empty object.|
+|`apply_kwarg_overrides`|<ol><li>`study`: `gazeMapper.config.Study` object to which to apply override.</li><li>`strict_check`: If `True`, raise when error is found in the resulting study configuration.</li><li>`**kwargs`: overrides to apply, specified by means of keyword-arguments.</li></ol>|<ol><li>`gazeMapper.config.Study`: Study configuration object with the setting overrides applied.</li></ol>|Apply overrides specified as keyword arguments.|
+|`read_study_config_with_overrides`|<ol><li>`config_path`: path to study configuration folder or file.</li><li>`overrides`: `dict` of `gazeMapper.config.OverrideLevel`s (`Session` or `Recording`) to be loaded and corresponding path to load them from.</li><li>`recording_type`: [`gazeMapper.session.RecordingType`](#gazemapper-sessions) (used when applying a recording-level override, else `None`).</li><li>`strict_check`: If `True`, raise when error is found in the resulting study configuration.</li><li>`**kwargs`: additional overrides to apply, specified by means of keyword-arguments.</li></ol>|<ol><li>`gazeMapper.config.Study`: Study configuration object with the setting overrides applied.</li></ol>|Load study configuration and apply specified setting overrides.|
 
 ### `gazeMapper.config.Study`
-|member function|inputs|description|
-__init__: takes all the parameters listed under [configuration](#configuration).
-check_valid(self, strict_check
-field_problems
-store_as_json path: str|pathlib.Path
-get_empty (static)
-load_from_json(path: str | pathlib.Path, strict_check (static)
+|member function|inputs|output|description|
+| --- | --- | --- | --- |
+|`__init__`|takes all the parameters listed under [configuration](#configuration).|||
+|`check_valid`|<ol><li>`strict_check`</li></ol>|||
+|`field_problems`||||
+|`store_as_json`|<ol><li>`path`</li></ol>|||
+|`get_empty` (static)||||
+|`load_from_json` (static)|<ol><li>`path`</li><li>`strict_check`</li></ol>|||
 
 ### `gazeMapper.config.StudyOverride`
 |member function|inputs|description|
