@@ -236,7 +236,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     if study_config.sync_ref_recording:
         video_sets.append((study_config.sync_ref_recording,{r for r in study_config.video_make_which if r!=study_config.sync_ref_recording}, recs))
     else:
-        video_sets.extend([(r,set(),set()) for r in study_config.video_make_which])
+        video_sets.extend([(r,set(),recs) for r in study_config.video_make_which])
 
     # per set of videos
     should_exit = False
