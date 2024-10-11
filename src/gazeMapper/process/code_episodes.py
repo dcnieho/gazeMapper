@@ -62,7 +62,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     if rec_def.type==session.RecordingType.Camera:
         has_gaze, has_plane_gaze, has_plane_pose = False, False, False
         # no episode.Event.Sync_ET_Data for camera recordings, remove
-        study_config.episodes_to_code.pop(annotation.Event.Sync_ET_Data, None)
+        if annotation.Event.Sync_ET_Data in study_config.episodes_to_code:
+            study_config.episodes_to_code.remove(annotation.Event.Sync_ET_Data)
     elif rec_def.type==session.RecordingType.Eye_Tracker:
         # Read gaze data
         has_gaze = True
