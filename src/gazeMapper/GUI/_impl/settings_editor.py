@@ -584,8 +584,9 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type):
         if typing.get_origin(v_type)==typing.Literal:
             all_values = typing.get_args(v_type)
         elif issubclass(v_type, enum.Enum):
-            all_values = (e for e in v_type)
+            all_values = tuple(e for e in v_type)
         if (miss_values := list(set(all_values)-set(val))):
+            miss_values= [v for v in all_values if v in miss_values]    # preserve order
             str_values = miss_values
             if f_type in val_to_str_registry:
                 str_values = ['' if v is None else val_to_str_registry[f_type][v] for v in str_values]
