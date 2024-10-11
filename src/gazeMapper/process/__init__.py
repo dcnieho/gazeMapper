@@ -217,7 +217,7 @@ def _is_recording_action_possible(action_states: dict[Action, State], study_conf
     # check that preconditions are met
     return all((action_states[p]==State.Completed for p in preconditions))
 
-def _is_session_action_possible(session_action_states: dict[Action, State], recording_action_states: dict[str,dict[Action, State]], study_config: 'config.Study', action: Action):
+def _is_session_action_possible(session_action_states: dict[Action, State], recording_action_states: dict[str,dict[Action, State]], study_config: 'config.Study', rec_types: dict[str,'session.RecordingType'], action: Action):
     if not is_action_possible_given_config(action, study_config):
         return False
 
@@ -251,7 +251,7 @@ def _is_session_action_possible(session_action_states: dict[Action, State], reco
         if is_session_level_action(p):
             precond_met.append(session_action_states[p]==State.Completed)
         else:
-            precond_met.append(all((recording_action_states[r][p]==State.Completed for r in recording_action_states)))
+            precond_met.append(all(((not is_action_possible_for_recording_type(p, rec_types[r])) or recording_action_states[r][p]==State.Completed for r in recording_action_states)))
 
     return all(precond_met)
 
@@ -266,7 +266,7 @@ def get_possible_actions(session_action_states: dict[Action, State], recording_a
     possible_actions: dict[Action,bool|list[str]] = {}
     for a in actions_to_check:
         if is_session_level_action(a):
-            if _is_session_action_possible(session_action_states, recording_action_states, study_config, a):
+            if _is_session_action_possible(session_action_states, recording_action_states, study_config, rec_types, a):
                 possible_actions[a] = True
         else:
             possible_recs = [r for r in merged_states if _is_recording_action_possible(merged_states[r], study_config, rec_types[r], a)]
