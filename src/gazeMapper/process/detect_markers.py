@@ -86,10 +86,8 @@ def _get_sync_function(study_config: config.Study,
                        rec_def: session.RecordingDefinition,
                        episodes: list[list[int]]) -> None | list[Callable[[np.ndarray,Any], tuple[float,float]], list[list[int]], dict[str], Callable[[np.ndarray,int,float,float], None]]:
     sync_target_function: list[Callable[[np.ndarray,Any], tuple[float,float]], list[int]|list[list[int]], dict[str], Callable[[np.ndarray,int,float,float], None]] = None
-    if rec_def.type==session.RecordingType.Camera:
-        # no annotation.Event.Sync_ET_Data for camera recordings, remove
-        study_config.planes_per_episode.pop(annotation.Event.Sync_ET_Data, None)
-    elif rec_def.type==session.RecordingType.Eye_Tracker:
+    if rec_def.type==session.RecordingType.Eye_Tracker:
+        # NB: only for eye tracker recordings, others don't have eye tracking data and thus nothing to sync
         match study_config.get_cam_movement_for_et_sync_method:
             case '':
                 pass # nothing to do
