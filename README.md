@@ -442,14 +442,15 @@ Enum:
 |`from_study_diff` (static)|<ol><li>`study`: `gazeMapper.config.Study` object for a specific session or recording.</li><li>`parent_config`: `gazeMapper.config.Study` to compare to.</li><li>`level`: [OverrideLevel](#gazemapperconfigoverridelevel).</li><li>`recording_type`: [`gazeMapper.session.RecordingType`](#gazemapper-sessions) (used when applying a recording-level override, else `None`).</li></ol>|<ol><li>`gazeMapper.config.StudyOverride`: Study configuration override object.</li></ol>|Get the difference in configuration between two `Study` objects (only check whitelisted attributes), and return as `StudyOverride` object.|
 
 ## `gazeMapper.episode`
-|function|inputs|description|
-Episode.__init__(event:annotation.Event, start_frame:int, end_frame:int)
-read_list_from_file(fileName: str|pathlib.Path)
-write_list_to_file(episodes: list[Episode],fileName: str|pathlib.Path
-get_empty_marker_dict(episodes: list[annotation.Event]=None)
-list_to_marker_dict(episodes: list[Episode], expected_types: list[annotation.Event]=None)
-marker_dict_to_list(episodes: dict[annotation.Event,list[int]|list[list[int]]])
-is_in_interval(episodes: dict[annotation.Event,list[int]]|list[Episode], idx: int)
+|function|inputs|output|description|
+| --- | --- | --- | --- |
+|`Episode.__init__`|<ol><li>`event`: [`glassesTools.annotation.Event`](#coding-analysis-synchronization-and-validation-episodes).</li><li>`start_frame`: start frame of episode.</li><li>`end_frame`: end frame of episode (not set if `event` is a timepoint instead of an episode).</li></ol>||Episode constructor: makes object that encodes a time point or episode in the recording.|
+|`read_list_from_file`|<ol><li>`fileName`: path of `csv` file to read episodes from (by default a `coding.csv` file).</li></ol>|<ol><li>list of `Episode`s.</li></ol>|Read a list of episodes from a `csv` file.|
+|`write_list_to_file`|<ol><li>`episodes`: list of `Episode`s to store to file.</li><li>`fileName`: path of `csv` file to store episodes to (by default a `coding.csv` file).</li></ol>||Store a list of episodes to a `csv` file.|
+|`get_empty_marker_dict`|<ol><li>`episodes`: list or dict of [`glassesTools.annotation.Event`](#coding-analysis-synchronization-and-validation-episodes)s that should appears as keys in the output dict. Optional, if not specified, all `glassesTools.annotation.Event`s are used.</li></ol>|<ol><li>Empty dict with specified event types as keys.</li></ol>|Get empty dict that can be used for storing episodes grouped by event type.|
+|`list_to_marker_dict`|<ol><li>`episodes`: list of `Episode`s.</li><li>`expected_types`: list or dict of [`glassesTools.annotation.Event`](#coding-analysis-synchronization-and-validation-episodes)s that may appear in the list of input `episodes`. Optional, if not specified, all `glassesTools.annotation.Event`s are allowed.</li></ol>|<ol><li>Dict with episodes grouped by event type.</li></ol>|Take an intermixed list of episodes and organize into a dict by event type.|
+|`marker_dict_to_list`|<ol><li>`episodes`: dict with episodes grouped by event type.</li></ol>|<ol><li>Intermixed list of episodes.</li></ol>|Take a dict with `Episode`s grouped by event type and turn into intermixed list of episodes (sorted by `start_frame` of the `Episode`s).|
+|`is_in_interval`|<ol><li>`episodes`: dict or list of `Episode`s.</li><li>`idx`: frame index to check.</li></ol>|<ol><li>Boolean indicating whether `idx` is within one of the episodes.</li></ol>|Check whether provided frame index falls within one of the episodes.|
 
 ## `gazeMapper.marker`
 |function|inputs|description|
@@ -466,12 +467,11 @@ get_plane_from_definition(plane_def: Definition, path: str | pathlib.Path) -> pl
 get_plane_setup(plane_def: Definition)
 
 ### `gazeMapper.plane.Type`
-Enum, two values: GlassesValidator, Plane_2D
-|function|inputs|description|
-make(path: pathlib.Path, p_type: Type, name: str, **kwargs)
-get_plane_from_path(path: str|pathlib.Path)
-get_plane_from_definition(plane_def: Definition, path: str | pathlib.Path)
-get_plane_setup(plane_def: Definition)
+Enum:
+| Value | Description |
+| --- | --- |
+|`GlassesValidator`|Plane is a glassesValidator poster.|
+|`Plane_2D`|Plane is a general 2D plane.|
 
 ### `gazeMapper.plane.Definition` and subclasses
 `gazeMapper.plane.Definition_GlassesValidator` and `gazeMapper.plane.Definition_Plane_2D`
