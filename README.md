@@ -423,14 +423,23 @@ gazeMapper makes extensive use of the functionality of [glassesTools](https://gi
 |`get_empty` (static)||<ol><li>`gazeMapper.config.Study`: Empty (every default) study configuration object.</li></ol>|Get default study configuration object.|
 |`load_from_json` (static)|<ol><li>`path`: path to load study setting JSON file from. Can be a path to a file, or a path to a folder containing such a file (in the latter case, the default filename `'study_def.json'` will be used).</li><li>`strict_check`: If `True`, raise when error is found in the resulting study configuration.</li></ol>|<ol><li>`gazeMapper.config.Study`: Study configuration object.</li></ol>|Load settings from JSON file.|
 
+### `gazeMapper.config.OverrideLevel`
+Enum:
+| Value | Description |
+| --- | --- |
+|`Session`|Session-level override (setting overrides for a specific session).|
+|`Recording`|Recording-level override (setting overrides for a specific recording).|
+|`FunctionArgs`|Specifies overrides provided by means of keyword-arguments.|
+
 ### `gazeMapper.config.StudyOverride`
-|member function|inputs|description|
-__init__(self, level: OverrideLevel, recording_type: session.RecordingType
-get_allowed_parameters(level: OverrideLevel, recording_type: session.RecordingType (static)
-apply(self, study: Study, strict_check
-store_as_json(path: str | pathlib.Path)
-load_from_json(level: OverrideLevel, path: str | pathlib.Path, recording_type: session.RecordingType (static)
-from_study_diff(config: Study, parent_config: Study, level: OverrideLevel, recording_type: session.RecordingType (static)
+|member function|inputs|output|description|
+| --- | --- | --- | --- |
+|`__init__`|<ol><li>`level`: [OverrideLevel](#gazemapperconfigoverridelevel).</li><li>`recording_type`: [`gazeMapper.session.RecordingType`](#gazemapper-sessions) (used when applying a recording-level override, else `None`).</li></ol>|||
+|`get_allowed_parameters` (static)|<ol><li>`level`: [OverrideLevel](#gazemapperconfigoverridelevel).</li><li>`recording_type`: [`gazeMapper.session.RecordingType`](#gazemapper-sessions) (used when applying a recording-level override, else `None`).</li></ol>|<ol><li>Whitelist of parameters that can be set.</li></ol>|Get parameter whitelist for this override level (and recording type, if applicable).|
+|`apply`|<ol><li>`study`: `gazeMapper.config.Study` object to which to apply override.</li><li>`strict_check`: If `True`, raise when error is found in the resulting study configuration.</li></ol>|<ol><li>`gazeMapper.config.Study`: Study configuration object with the setting overrides applied.</li></ol>|Apply overrides to a `Study` object.|
+|`store_as_json`|<ol><li>`path`: path to store study settings override JSON file to. Can be a path to a file, or a path to a folder containing such a file (in the latter case, the default filename `'study_def_override.json'` will be used).</li></ol>||Store project configuration overrides to JSON file.|
+|`load_from_json` (static)|<ol><li>`level`: [OverrideLevel](#gazemapperconfigoverridelevel).</li><li>`path`: path to load study settings override JSON file from. Can be a path to a file, or a path to a folder containing such a file (in the latter case, the default filename `'study_def_override.json'` will be used).</li><li>`recording_type`: [`gazeMapper.session.RecordingType`](#gazemapper-sessions) (used when applying a recording-level override, else `None`).</li></ol>|<ol><li>`gazeMapper.config.StudyOverride`: Study configuration override object.</li></ol>|Load settings from JSON file.|
+|`from_study_diff` (static)|<ol><li>`study`: `gazeMapper.config.Study` object for a specific session or recording.</li><li>`parent_config`: `gazeMapper.config.Study` to compare to.</li><li>`level`: [OverrideLevel](#gazemapperconfigoverridelevel).</li><li>`recording_type`: [`gazeMapper.session.RecordingType`](#gazemapper-sessions) (used when applying a recording-level override, else `None`).</li></ol>|<ol><li>`gazeMapper.config.StudyOverride`: Study configuration override object.</li></ol>|Get the difference in configuration between two `Study` objects (only check whitelisted attributes), and return as `StudyOverride` object.|
 
 ## `gazeMapper.episode`
 |function|inputs|description|
@@ -466,7 +475,8 @@ get_plane_setup(plane_def: Definition)
 
 ### `gazeMapper.plane.Definition` and subclasses
 `gazeMapper.plane.Definition_GlassesValidator` and `gazeMapper.plane.Definition_Plane_2D`
-|member function|inputs|description|
+|member function|inputs|output|description|
+| --- | --- | --- | --- |
 __init__: parameters described above
 field_problems(self) -> type_utils.ProblemDict:
 fixed_fields(self) -> type_utils.NestedDict:
@@ -506,16 +516,22 @@ Enumeration
 |`Camera`|Recording is an external camera recording.|
 
 ### `gazeMapper.session.RecordingDefinition`
+|member function|inputs|output|description|
+| --- | --- | --- | --- |
 __init__(self, name:str, type:RecordingType):
 set_default_cal_file(self, cal_path: str|pathlib.Path, rec_def_path: str|pathlib.Path):
 get_default_cal_file(self, rec_def_path: str|pathlib.Path) -> pathlib.Path|None:
 remove_default_cal_file(self, rec_def_path: str|pathlib.Path
 
 ### `gazeMapper.session.Recording`
+|member function|inputs|output|description|
+| --- | --- | --- | --- |
 __init__(self, definition: RecordingDefinition, info:EyeTrackerRecording|CameraRecording|None=None):
 load_action_states(self, create_if_missing: bool)
 
 ### `gazeMapper.session.SessionDefinition`
+|member function|inputs|output|description|
+| --- | --- | --- | --- |
 __init__(self, recordings: list[RecordingDefinition]|None=None):
 add_recording_def(self, recording: RecordingDefinition):
 get_recording_def(self, which: str) -> RecordingDefinition:
@@ -524,6 +540,8 @@ store_as_json(self, path: str | pathlib.Path):
 load_from_json(path: str | pathlib.Path) (static)
 
 ### `gazeMapper.session.Session`
+|member function|inputs|output|description|
+| --- | --- | --- | --- |
 __init__(self, definition: SessionDefinition, name: str, working_directory: str|pathlib.Path|None = None, recordings: dict[str,Recording]|None = None):
 create_working_directory(self, parent_directory: str|pathlib.Path):
 import_recording(self, which: str, cam_cal_file: str|pathlib.Path=None, **kwargs):
