@@ -129,7 +129,7 @@ class Definition_Plane_2D(Definition):
     def has_complete_setup(self) -> bool:
         return not self.field_problems()
 
-def make(path: pathlib.Path, p_type: Type, name: str, **kwargs) -> Definition_GlassesValidator|Definition_Plane_2D:
+def make(p_type: Type, name: str, path: pathlib.Path|None, **kwargs) -> Definition_GlassesValidator|Definition_Plane_2D:
     cls = Definition_GlassesValidator if p_type==Type.GlassesValidator else Definition_Plane_2D
     if p_type==Type.GlassesValidator:
         validator_config_dir = None # use glassesValidator built-in/default
