@@ -453,12 +453,13 @@ Enum:
 |`is_in_interval`|<ol><li>`episodes`: dict or list of `Episode`s.</li><li>`idx`: frame index to check.</li></ol>|<ol><li>Boolean indicating whether `idx` is within one of the episodes.</li></ol>|Check whether provided frame index falls within one of the episodes.|
 
 ## `gazeMapper.marker`
-|function|inputs|description|
-Marker.__init__
-get_marker_dict_from_list(markers: list[Marker])
-load_file(marker: Marker, folder: str|pathlib.Path)
-code_marker_for_presence(markers: pd.DataFrame)
-fill_gaps_in_marker_detection(markers: pd.DataFrame, fill_value)
+|function|inputs|output|description|
+| --- | --- | --- | --- |
+|`Marker.__init__`|<ol><li>`id`: The marker ID. Must be a valid marker ID for the specified marker dictionary.</li><li>`size`: Length of the edge of a marker (mm, excluding the white edge, only the black part).</li><li>`aruco_dict`: The ArUco dictionary (see [`cv::aruco::PREDEFINED_DICTIONARY_NAME`](https://docs.opencv.org/4.10.0/de/d67/group__objdetect__aruco.html#ga4e13135a118f497c6172311d601ce00d)) of the marker.</li><li>`marker_border_bits`: Width of the [black border](https://docs.opencv.org/4.10.0/d5/dae/tutorial_aruco_detection.html) around the marker.</li></ol>||Marker constructor: makes object that encapsulates a single Marker that can be detected with the functionality in the `cv2.aruco` module.|
+|`get_marker_dict_from_list`|<ol><li>`markers`: list of `Marker` objects.</li></ol>|<ol><li>Dict with properties of each marker.</li></ol>|Turn list of `Marker` objects into a dict organized by marker id, storing properties of each marker. Used by `glassesTools.aruco.PoseEstimator.add_individual_marker()`.|
+|`load_file`|<ol><li>`marker_id`: ID of marker to load marker detection/pose results for.</li><li>`folder`: Folder from which to load the marker detect output file.</li></ol>|<ol><li>`pandas.DataFrame` containing marker detection/pose results for a specific marker.</li></ol>|Load marker detection/pose results for a specific marker.|
+|`code_marker_for_presence`|<ol><li>`markers`: `pandas.DataFrame` or dict of `pandas.DataFrame`s organized by marker ID containing marker detection/pose results for a specific marker.</li></ol>|<ol><li>Input dataframe with a boolean column added (`*_presence`) denoting whether marker was detected or not for the video frame on that row in the dataframe.</li></ol>|Code markers for whether they were detected (present) or not.|
+|`fill_gaps_in_marker_detection`|<ol><li>`markers`: `pandas.DataFrame` containing marker detection/pose results for a specific marker</li><li>`fill_value`: Value to put for missing rows.</li></ol>|<ol><li>Input data frame with missing rows added so that the `frame_idx` column is a contiguous series.</li></ol>|Rows may be missing in a marker detection/pose results file. This function fills those missing rows with the indicated value so that the `frame_idx` column is a contiguous series.|
 
 ## `gazeMapper.plane`
 make(path: pathlib.Path, p_type: Type, name: str, **kwargs) -> Definition_GlassesValidator|Definition_Plane_2D:
