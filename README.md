@@ -462,10 +462,12 @@ Enum:
 |`fill_gaps_in_marker_detection`|<ol><li>`markers`: `pandas.DataFrame` containing marker detection/pose results for a specific marker</li><li>`fill_value`: Value to put for missing rows.</li></ol>|<ol><li>Input data frame with missing rows added so that the `frame_idx` column is a contiguous series.</li></ol>|Rows may be missing in a marker detection/pose results file. This function fills those missing rows with the indicated value so that the `frame_idx` column is a contiguous series.|
 
 ## `gazeMapper.plane`
-make(path: pathlib.Path, p_type: Type, name: str, **kwargs) -> Definition_GlassesValidator|Definition_Plane_2D:
-get_plane_from_path(path: str|pathlib.Path) -> plane.Plane:
-get_plane_from_definition(plane_def: Definition, path: str | pathlib.Path) -> plane.Plane:
-get_plane_setup(plane_def: Definition)
+|function|inputs|output|description|
+| --- | --- | --- | --- |
+|`make`|<ol><li>`p_type`: [plane type](#gazemapperplanetype).</li><li>`name`: Name of the plane.</li><li>`path`: Path from which to load information about the plane. Needed for a `GlassesValidator` plane if using a non-default setup.</li><li>`**kwargs`: additional arguments that are passed along to the plane defition object's constructor.|[`GlassesValidator` or `Plane_2D` definition object](#gazemapperplanedefinition-and-subclasses).|Make plane definition object of given type and name.|
+|`get_plane_from_path`|<ol><li>`path`: plane definition folder in the project's configuration folder.</li></ol>|<ol><li>a `glassesTools.plane.Plane` object.</li></ol>|Load plane definition from file and use it to construct a `glassesTools.plane.Plane` object.|
+|`get_plane_from_definition`|<ol><li>`plane_def`: [plane definition object](#gazemapperplanedefinition-and-subclasses).</li><li>`path`: plane definition folder in the project's configuration folder.</li></ol>|<ol><li>a `glassesTools.plane.Plane` object.</li></ol>|Construct a `glassesTools.plane.Plane` object from a plane definition object.|
+|`get_plane_setup`|<ol><li>`plane_def`: [plane definition object](#gazemapperplanedefinition-and-subclasses).</li></ol>|<ol><li>Dict with information about the plane's setup.</li></ol>|Turns a plane definition object into a dict with information about that plane that is needed for `glassesTools.aruco.PoseEstimator.add_plane()`.|
 
 ### `gazeMapper.plane.Type`
 Enum:
@@ -478,12 +480,12 @@ Enum:
 `gazeMapper.plane.Definition_GlassesValidator` and `gazeMapper.plane.Definition_Plane_2D`
 |member function|inputs|output|description|
 | --- | --- | --- | --- |
-__init__: parameters described above
-field_problems(self) -> type_utils.ProblemDict:
-fixed_fields(self) -> type_utils.NestedDict:
-has_complete_setup(self) -> bool:
-store_as_json(self, path: str | pathlib.Path):
-load_from_json(path: str | pathlib.Path) (static)
+|`__init__: parameters described above
+|`field_problems`||<ol><li>`gazeMapper.type_utils.ProblemDict`: Nested dict containing fields (if any) with configuration problems, and associated error messages.</li></ol>|Check configuration for errors and returns found problems.|
+|`fixed_fields`||<ol><li>`gazeMapper.type_utils.NestedDict`: Nested dict containing fields (if any) that cannot be edited.</li></ol>|Get list of fields that cannot be edited (should be displayed as such in the GUI).|
+|`has_complete_setup`||<ol><li>Boolean indicating whether plane setup is ok or not.</li></ol>|Check whether plane setup is ok or has problems.|
+|`store_as_json`|<ol><li>`path`: Path to store plane definition JSON file to. Can be a path to a file, or a path to a folder containing such a file (in the latter case, the default filename `'plane_def.json'` will be used).</li></ol>||Store plane definition to JSON file.|
+|`load_from_json` (static)|<ol><li>`path`: path to load plane definition JSON file from. Can be a path to a file, or a path to a folder containing such a file (in the latter case, the default filename `'plane_def.json'` will be used).</li></ol>|<ol><li>[`GlassesValidator` or `Plane_2D` definition object](#gazemapperplanedefinition-and-subclasses).</li></ol>|Load plane definition from JSON file.
 
 ## `gazeMapper.process`
 [`gazeMapper.process.Action`](#actions) is described above.
