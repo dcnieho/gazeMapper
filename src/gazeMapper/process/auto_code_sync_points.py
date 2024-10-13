@@ -32,7 +32,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
         episodes = episode.get_empty_marker_dict(study_config.episodes_to_code)
 
     # get marker files
-    markers = [marker.load_file(m, working_dir) for m in study_config.individual_markers if m.id in study_config.auto_code_sync_points['markers']]
+    markers = [marker.load_file(m.id, working_dir) for m in study_config.individual_markers if m.id in study_config.auto_code_sync_points['markers']]
     # recode so we have a boolean with when markers are present
     markers = [marker.code_marker_for_presence(m) for m in markers]
     # fill gaps in marker detection

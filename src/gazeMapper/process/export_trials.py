@@ -66,7 +66,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
 
         # if there are individual markers, add them
         # load
-        markers = {m.id: marker.load_file(m, working_dir / r) for m in study_config.individual_markers}
+        markers = {m.id: marker.load_file(m.id, working_dir / r) for m in study_config.individual_markers}
         # recode to presence/absence if wanted
         if study_config.export_only_code_marker_presence:
             markers = marker.code_marker_for_presence(markers)
