@@ -592,7 +592,8 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type):
                 str_values = ['' if v is None else val_to_str_registry[f_type][v] for v in str_values]
             elif not isinstance(str_values[0],str):
                 str_values = ['' if v is None else str(v) for v in str_values]
-            imgui.same_line()
+            if val:
+                imgui.same_line()
             imgui.set_next_item_width(get_fields_text_width(str_values)+imgui.get_frame_height()+2*imgui.get_style().frame_padding.x)
             selected,p_idx = imgui.combo(f"##{field_lbl}", -1, str_values, popup_max_height_in_items=min(10,len(str_values)))
             if selected:
