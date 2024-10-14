@@ -526,6 +526,7 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type):
         disp_val= [v for v in all_values if v in val]    # preserve order
     # get width of drawing space
     item_w = imgui.calc_item_width()
+    h_edge_spacing = imgui.get_style().item_spacing.x
     # determine items to show
     tsx = imgui.calc_text_size('x')
     x_padding = imgui.get_style().frame_padding.x
@@ -545,16 +546,16 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type):
 
     # determine size of editor: how many lines we need to fit all elements
     line_break_idxs = []    # codes *before* which element we need to move to the next line
-    w = imgui.get_style().item_spacing.x
+    w = h_edge_spacing
     for i in range(len(disp_val)):
         if i>0:
-            w += imgui.get_style().item_spacing.x
+            w += h_edge_spacing
         w += w_sizes[i].x
         if w+imgui.get_style().item_spacing.x > item_w:
             line_break_idxs.append(i)
-            w = imgui.get_style().item_spacing.x + w_sizes[i].x
+            w = h_edge_spacing + w_sizes[i].x
     if val and adder_width is not None:
-        if w+imgui.get_style().item_spacing.x+adder_width+imgui.get_style().item_spacing.x > item_w:
+        if w+imgui.get_style().item_spacing.x+adder_width+h_edge_spacing > item_w:
             line_break_idxs.append(i+1)
 
     pos = imgui.get_cursor_screen_pos()
@@ -568,7 +569,7 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type):
         imgui.internal.render_frame(bb.min,bb.max,frame_col,True,imgui.get_style().frame_rounding)
 
         # draw items
-        imgui.set_cursor_screen_pos(pos+(imgui.get_style().item_spacing.x, 0))
+        imgui.set_cursor_screen_pos(pos+(h_edge_spacing, 0))
         to_remove = None
         to_add    = None
         line = 1
@@ -578,7 +579,7 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type):
                 imgui.same_line()
             elif i>0:
                 line += 1
-                imgui.set_cursor_screen_pos(imgui.get_cursor_screen_pos()+(imgui.get_style().item_spacing.x, 0))
+                imgui.set_cursor_screen_pos(imgui.get_cursor_screen_pos()+(h_edge_spacing, 0))
             imgui.push_style_var(imgui.StyleVar_.frame_border_size, 0)
             imgui.begin_group()
             if line==1:
@@ -627,10 +628,10 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type):
         # draw value adder, if needed
         if miss_values:
             if val:
-                if t_bb.max.x+imgui.get_style().item_spacing.x+adder_width+imgui.get_style().item_spacing.x <= bb.max.x:
+                if t_bb.max.x+imgui.get_style().item_spacing.x+adder_width+h_edge_spacing <= bb.max.x:
                     imgui.same_line()
                 else:
-                    imgui.set_cursor_screen_pos(imgui.get_cursor_screen_pos()+(imgui.get_style().item_spacing.x, 0))
+                    imgui.set_cursor_screen_pos(imgui.get_cursor_screen_pos()+(h_edge_spacing, 0))
                     line += 1
                 if line>1:
                     imgui.set_cursor_screen_pos(imgui.get_cursor_screen_pos()-(0, imgui.get_style().frame_padding.y))
