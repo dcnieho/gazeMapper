@@ -464,7 +464,7 @@ Enum:
 ## `gazeMapper.plane`
 |function|inputs|output|description|
 | --- | --- | --- | --- |
-|`make`|<ol><li>`p_type`: [plane type](#gazemapperplanetype).</li><li>`name`: Name of the plane.</li><li>`path`: Path from which to load information about the plane. Needed for a `GlassesValidator` plane if using a non-default setup.</li><li>`**kwargs`: additional arguments that are passed along to the plane defition object's constructor.|[`GlassesValidator` or `Plane_2D` definition object](#gazemapperplanedefinition-and-subclasses).|Make plane definition object of given type and name.|
+|`make`|<ol><li>`p_type`: [plane type](#gazemapperplanetype).</li><li>`name`: Name of the plane.</li><li>`path`: Path from which to load information about the plane. Needed for a `GlassesValidator` plane if using a non-default setup.</li><li>`**kwargs`: additional arguments that are passed along to the plane defition object's constructor.</li></ol>|[`GlassesValidator` or `Plane_2D` definition object](#gazemapperplanedefinition-and-subclasses).|Make plane definition object of given type and name.|
 |`get_plane_from_path`|<ol><li>`path`: plane definition folder in the project's configuration folder.</li></ol>|<ol><li>a `glassesTools.plane.Plane` object.</li></ol>|Load plane definition from file and use it to construct a `glassesTools.plane.Plane` object.|
 |`get_plane_from_definition`|<ol><li>`plane_def`: [plane definition object](#gazemapperplanedefinition-and-subclasses).</li><li>`path`: plane definition folder in the project's configuration folder.</li></ol>|<ol><li>a `glassesTools.plane.Plane` object.</li></ol>|Construct a `glassesTools.plane.Plane` object from a plane definition object.|
 |`get_plane_setup`|<ol><li>`plane_def`: [plane definition object](#gazemapperplanedefinition-and-subclasses).</li></ol>|<ol><li>Dict with information about the plane's setup.</li></ol>|Turns a plane definition object into a dict with information about that plane that is needed for `glassesTools.aruco.PoseEstimator.add_plane()`.|
@@ -480,7 +480,7 @@ Enum:
 `gazeMapper.plane.Definition_GlassesValidator` and `gazeMapper.plane.Definition_Plane_2D`
 |member function|inputs|output|description|
 | --- | --- | --- | --- |
-|`__init__: parameters described above
+|`__init__`|<ol><li>`type`: [plane type](#gazemapperplanetype).</li><li>`name`: Name of the plane.</li></ol>|||
 |`field_problems`||<ol><li>`gazeMapper.type_utils.ProblemDict`: Nested dict containing fields (if any) with configuration problems, and associated error messages.</li></ol>|Check configuration for errors and returns found problems.|
 |`fixed_fields`||<ol><li>`gazeMapper.type_utils.NestedDict`: Nested dict containing fields (if any) that cannot be edited.</li></ol>|Get list of fields that cannot be edited (should be displayed as such in the GUI).|
 |`has_complete_setup`||<ol><li>Boolean indicating whether plane setup is ok or not.</li></ol>|Check whether plane setup is ok or has problems.|
@@ -502,13 +502,15 @@ Enum:
 
 NB: the `Pending`, `Canceled` and `Completed` states are only used in the GUI.
 
-action_to_func(action: Action)
-is_session_level_action(action: Action) -> bool:
-is_action_possible_given_config(action: Action, study_config: 'config.Study')
-is_action_possible_for_recording_type(action: Action, rec_type: 'session.RecordingType') -> bool:
-get_actions_for_config(study_config: 'config.Study', exclude_session_level: bool=False)
-action_update_and_invalidate(action: Action, state: State, study_config: 'config.Study')
-get_possible_actions(session_action_states: dict[Action, State], recording_action_states: dict[str,dict[Action, State]], actions_to_check: set[Action], study_config: 'config.Study')
+|function|inputs|output|description|
+| --- | --- | --- | --- |
+|`action_to_func`|<ol><li>`action`: a [`gazeMapper.process.Action`](#actions).</li></ol>|<ol><li>Callable for performing the indicated action.</li></ol>|Get the callable (function) corresponding to an Action.|
+|`is_session_level_action`|<ol><li>`action`: a [`gazeMapper.process.Action`](#actions).</li></ol>|<ol><li>Boolean indicating whether action is session level or recording level.</li></ol>|Get whether action is a session level action.|
+|`is_action_possible_given_config`|<ol><li>`action`: a [`gazeMapper.process.Action`](#actions).</li><li>`study_config`: a [`gazeMapper.config.Study`](#gazemapperconfigstudy) object.</li></ol>|<ol><li>Boolean indicating whether action is possible.</li></ol>|Get whether a given action is possible given the study's configuration.|
+|`is_action_possible_for_recording_type`|<ol><li>`action`: a [`gazeMapper.process.Action`](#actions).</li><li>`rec_type`: a [`gazeMapper.session.RecordingType`](#gazemapper-sessions).</li></ol>|<ol><li>Boolean indicating whether action is possible.</li></ol>|Get whether a given (recording-level) action is possible for a recording of the indicated type.|
+|`get_actions_for_config`|<ol><li>`study_config`: a [`gazeMapper.config.Study`](#gazemapperconfigstudy) object.</li><li>`exclude_session_level`: Boolean (default `False`) indicating whether session-level actions should be included in the return value.</li></ol>|<ol><li>A set of possible actions.</li></ol>|Get the possible actions given a study's configuration.|
+|`action_update_and_invalidate`|<ol><li>`action`: a [`gazeMapper.process.Action`](#actions).</li><li>`state`: the new `gazeMapper.process.State`.</li><li>`study_config`: a [`gazeMapper.config.Study`](#gazemapperconfigstudy) object.</li></ol>|<ol><li>Dict with a `State` per `Action`.</li></ol>|Update the state of the specified action, and get the state of all actions possible for the study (updating one state may lead to other actions needing to be rerun).|
+|`get_possible_actions`|<ol><li>`session_action_states`: Dict with a `State` per session-level `Action`.</li><li>`recording_action_states`: Dict per recording with as value a dict with a `State` per recording-level `Action`.</li><li>`actions_to_check`: a set of `Action` to check.</li><li>`study_config`: a [`gazeMapper.config.Study`](#gazemapperconfigstudy) object.</li></ol>|<ol><li>A dict with per action either a Boolean indicating whether the action can be run (for session-level actions), or the names of recordings for which the action can be run (for recording-level actions).</li></ol>|Get which actions can be run given the currect session- and recording-level action states.|
 
 ## `gazeMapper.session`
 ### `gazeMapper.session.RecordingType`
@@ -521,26 +523,26 @@ Enumeration
 ### `gazeMapper.session.RecordingDefinition`
 |member function|inputs|output|description|
 | --- | --- | --- | --- |
-__init__(self, name:str, type:RecordingType):
-set_default_cal_file(self, cal_path: str|pathlib.Path, rec_def_path: str|pathlib.Path):
-get_default_cal_file(self, rec_def_path: str|pathlib.Path) -> pathlib.Path|None:
-remove_default_cal_file(self, rec_def_path: str|pathlib.Path
+|`__init__`|<ol><li>`name`: Name of the recording.</li><li>`type`: a [`gazeMapper.session.RecordingType`](#gazemapper-sessions).</li></ol>|||
+|`set_default_cal_file`|<ol><li>`cal_path`: Path to calibration file (OpenCV XML).</li><li>`rec_def_path`: Path to the recording's configuration folder.</li></ol>||Set the default calibration for the (scene) camera for this recording. Copies the calibration XML file to the recording's configuration folder.|
+|`get_default_cal_file`|<ol><li>`rec_def_path`: Path to the recording's configuration folder.</li></ol>|<ol><li>Path to the default calibration file. `None` if it does not exist.</li></ol>|Get's the default calibration file, if any.|
+|`remove_default_cal_file`|<ol><li>`rec_def_path`: Path to the recording's configuration folder.</li></ol>||Removes the default calibration file.|
 
 ### `gazeMapper.session.Recording`
 |member function|inputs|output|description|
 | --- | --- | --- | --- |
-__init__(self, definition: RecordingDefinition, info:EyeTrackerRecording|CameraRecording|None=None):
-load_action_states(self, create_if_missing: bool)
+|`__init__`|<ol><li>`definition`: a `gazeMapper.session.RecordingDefinition` object.</li><li>`info`: a [`glassesTools.recording.Recording`](https://github.com/dcnieho/glassesTools/blob/master/README.md#recording-info) or `glassesTools.camera_recording.Recording` object.</li></ol>|||
+|`load_action_states`|<ol><li>`create_if_missing`: Boolean indicating whether the action states file should be created for the recording if its missing.</li></ol>||Load the action states from file into the object's `state` property.|
 
 ### `gazeMapper.session.SessionDefinition`
 |member function|inputs|output|description|
 | --- | --- | --- | --- |
-__init__(self, recordings: list[RecordingDefinition]|None=None):
-add_recording_def(self, recording: RecordingDefinition):
-get_recording_def(self, which: str) -> RecordingDefinition:
-is_known_recording(self, which: str) -> bool:
-store_as_json(self, path: str | pathlib.Path):
-load_from_json(path: str | pathlib.Path) (static)
+|`__init__`|<ol><li>`recordings`: (Optional) list of `gazeMapper.session.RecordingDefinition` objects.</li></ol>|||
+|`add_recording_def`|<ol><li>`recording`: a `gazeMapper.session.RecordingDefinition` object.</li></ol>||Adds a new recording to the session definition.|
+|`get_recording_def`|<ol><li>`which`: Name of recording for which to get the definition.</li></ol>|<ol><li>A `gazeMapper.session.RecordingDefinition` object. Throws if not found by name.</li></ol>|Get the recording definition by name.|
+|`is_known_recording`|<ol><li>`which`: Name of recording.</li></ol>|<ol><li>Boolean indicating whether a recording by that name is present in the session definition.</li></ol>|Check whether a recording by that name is present in the session definition|
+|`store_as_json`|<ol><li>`path`: Path to store session definition JSON file to. Can be a path to a file, or a path to a folder containing such a file (in the latter case, the default filename `'session_def.json'` will be used).</li></ol>||Store session definition to JSON file.|
+|`load_from_json` (static)|<ol><li>`path`: path to load session definition JSON file from. Can be a path to a file, or a path to a folder containing such a file (in the latter case, the default filename `'session_def.json'` will be used).</li></ol>|<ol><li>A `gazeMapper.session.SessionDefinition` object.</li></ol>|Load session definition from JSON file.
 
 ### `gazeMapper.session.Session`
 |member function|inputs|output|description|
@@ -563,7 +565,9 @@ action_completed_num_recordings(self, action: process.Action) -> list[str]:
 from_definition(definition: SessionDefinition|None, path: str | pathlib.Path) (static)
 
 ### Free functions
-read_recording_info(working_dir: pathlib.Path, rec_type: RecordingType) -> tuple[EyeTrackerRecording|CameraRecording, pathlib.Path]:
+|function|inputs|output|description|
+| --- | --- | --- | --- |
+|`read_recording_info(working_dir: pathlib.Path, rec_type: RecordingType) -> tuple[EyeTrackerRecording|CameraRecording, pathlib.Path]:
 get_video_path(rec_info: EyeTrackerRecording|CameraRecording)
 get_session_from_directory(path: str|pathlib.Path, session_def: SessionDefinition|None=None) -> Session:
 get_sessions_from_project_directory(path: str|pathlib.Path, session_def: SessionDefinition|None=None) -> list[Session]:
