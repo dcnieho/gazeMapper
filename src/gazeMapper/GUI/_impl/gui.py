@@ -477,6 +477,7 @@ class GUI:
             config_dir = config.guess_config_dir(self.project_dir)
             self.study_config = config.Study.load_from_json(config_dir, strict_check=False)
             self._reload_sessions()
+            self.process_pool.set_num_workers(self.study_config.gui_num_workers)
         except Exception as e:
             gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Project loading error", f"Failed to load the project at {self.project_dir}:\n{e}\n\n{gt_gui.utils.get_traceback(e)}", gt_gui.msg_box.MsgBox.error)
             self.close_project()
@@ -723,6 +724,7 @@ class GUI:
                 self.study_config = new_config
                 self.study_config.store_as_json()
                 self._update_shown_actions_for_config()
+                self.process_pool.set_num_workers(self.study_config.gui_num_workers)
 
     def _action_list_pane_drawer(self):
         if not self.job_scheduler.jobs:

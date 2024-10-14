@@ -110,6 +110,8 @@ class Study:
                  video_show_gaze_vec_in_other                   : bool                              = False,
                  video_gaze_to_plane_margin                     : float                             = 0.25,
 
+                 gui_num_workers                                : int                               = 2,
+
                  # not a class member
                  strict_check                                   : bool                              = True
                  ):
@@ -162,6 +164,8 @@ class Study:
         self.video_show_gaze_vec_in_ref                     = video_show_gaze_vec_in_ref
         self.video_show_gaze_vec_in_other                   = video_show_gaze_vec_in_other
         self.video_gaze_to_plane_margin                     = video_gaze_to_plane_margin    # fraction of plane size, added to each side of the plane
+
+        self.gui_num_workers                                = gui_num_workers
 
         self.check_valid(strict_check=strict_check)
 

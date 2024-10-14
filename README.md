@@ -340,6 +340,8 @@ In this section, a full overview of gazeMapper's settings is given. These settin
 ||`video_show_gaze_vec_in_ref`|`True`|If `True`, a line is drawn for each eye tracker recording between the gaze position and the position of the eye tracker's camera in the generated video of the reference recording.|
 ||`video_show_gaze_vec_in_other`|`False`|If `True`, a line is drawn for each eye tracker recording between the gaze position and the position of the eye tracker's camera in the generated video of recordings other than the reference recording.|
 ||`video_gaze_to_plane_margin`|`0.25`|Gaze position more than this factor outside a defined plane will not be drawn.|
+|||||
+||`gui_num_workers`|`2`|Each action is processed by a worker and each worker can handle 1 action at a time. Having more workers means more actions are processed simultaneously, but having too many will not provide any gain and might freeze the program and your whole computer. Since much of the processing utilizes more than one processor thread, set this value to signficantly less than the number of threads available in your system. NB: If you currently have running or enqueued jobs, the number of workers will only be changed once all have completed or are cancelled.|
 
 ## `gazeMapper.config.AutoCodeSyncPoints`
 These settings are discussed [here](#automatic-coding-of-synchronization-timepoints).
