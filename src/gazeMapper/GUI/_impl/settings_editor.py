@@ -513,19 +513,26 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type):
         return val
 
     # prep
-    item_w = imgui.calc_item_width()
-    # determine items to show
-    tsx = imgui.calc_text_size('x')
-    x_padding = imgui.get_style().frame_padding.x
-    val_txt = [f'{v}' for v in val]
-    t_sizes = [imgui.calc_text_size(t) for t in val_txt]
-    w_sizes = [ts + (4*x_padding, 0) + (tsx.x, 0) for ts in t_sizes]
-    # prep value adder, if needed
+    # get possible values and their order
     v_type = typing.get_args(f_type)[0]
     if typing.get_origin(v_type)==typing.Literal:
         all_values = typing.get_args(v_type)
     elif issubclass(v_type, enum.Enum):
         all_values = tuple(e for e in v_type)
+    # for sets, make sure they are consistently (and logically) ordered, same order as the drop-down
+    disp_val = val
+    has_order = isinstance(val,list)
+    if not has_order:
+        disp_val= [v for v in all_values if v in val]    # preserve order
+    # get width of drawing space
+    item_w = imgui.calc_item_width()
+    # determine items to show
+    tsx = imgui.calc_text_size('x')
+    x_padding = imgui.get_style().frame_padding.x
+    val_txt = [f'{v}' for v in disp_val]
+    t_sizes = [imgui.calc_text_size(t) for t in val_txt]
+    w_sizes = [ts + (4*x_padding, 0) + (tsx.x, 0) for ts in t_sizes]
+    # prep value adder, if needed
     adder_width = None
     if (miss_values := list(set(all_values)-set(val))):
         miss_values= [v for v in all_values if v in miss_values]    # preserve order
@@ -539,7 +546,7 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type):
     # determine size of editor: how many lines we need to fit all elements
     line_break_idxs = []    # codes *before* which element we need to move to the next line
     w = x_padding
-    for i in range(len(val)):
+    for i in range(len(disp_val)):
         if i>0:
             w += imgui.get_style().item_spacing.x
         w += w_sizes[i].x
@@ -565,7 +572,7 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type):
         to_remove = None
         to_add    = None
         line = 1
-        for i,v in enumerate(val):
+        for i,v in enumerate(disp_val):
             if i>0 and i not in line_break_idxs:
                 imgui.same_line()
             elif i>0:
