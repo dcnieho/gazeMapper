@@ -547,32 +547,32 @@ Enumeration
 ### `gazeMapper.session.Session`
 |member function|inputs|output|description|
 | --- | --- | --- | --- |
-__init__(self, definition: SessionDefinition, name: str, working_directory: str|pathlib.Path|None = None, recordings: dict[str,Recording]|None = None):
-create_working_directory(self, parent_directory: str|pathlib.Path):
-import_recording(self, which: str, cam_cal_file: str|pathlib.Path=None, **kwargs):
-add_recording_and_import(self, which: str, rec_info: EyeTrackerRecording|CameraRecording, cam_cal_file: str|pathlib.Path=None, load_existing_recordings(self):
-load_recording_info(self, which) -> EyeTrackerRecording|CameraRecording:
-add_existing_recording(self, which: str) -> Recording:
-check_recording_info(self, which: str, rec_info: EyeTrackerRecording|CameraRecording):
-update_recording_info(self, which: str, rec_info: EyeTrackerRecording|CameraRecording):
-add_recording_from_info(self, which: str, rec_info: EyeTrackerRecording|CameraRecording) -> Recording:
-num_present_recordings(self) -> int:
-has_all_recordings(self) -> bool:
-missing_recordings(self, rec_type: RecordingType|None=None) -> list[str]:
-load_action_states(self, create_if_missing: bool):
-is_action_completed(self, action: process.Action) -> bool:
-action_completed_num_recordings(self, action: process.Action) -> list[str]:
-from_definition(definition: SessionDefinition|None, path: str | pathlib.Path) (static)
+|`__init__`|<ol><li>`definition`: SessionDefinition, `name`: str, `working_directory`: str|pathlib.Path|None = None, `recordings`: dict[str,Recording]|None = None):
+|`create_working_directory`|<ol><li>`parent_directory`: str|pathlib.Path):
+|`import_recording`|<ol><li>`which`: str, `cam_cal_file`: str|pathlib.Path=None, `**kwargs`):
+|`add_recording_and_import`|<ol><li>`which`: str, `rec_info`: EyeTrackerRecording|CameraRecording, `cam_cal_file`: str|pathlib.Path=None, |`load_existing_recordings`||||
+|`load_recording_info`|<ol><li>`which`: Name of recording.</li></ol>|EyeTrackerRecording|CameraRecording:
+|`add_existing_recording`|<ol><li>`which`: Name of recording.</li></ol>Recording:
+|`check_recording_info`|<ol><li>`which`: Name of recording.</li><li>`rec_info`: EyeTrackerRecording|CameraRecording):
+|`update_recording_info`|<ol><li>`which`: Name of recording.</li><li>`rec_info`: EyeTrackerRecording|CameraRecording):
+|`add_recording_from_info`|<ol><li>`which`: Name of recording.</li><li>`rec_info:` EyeTrackerRecording|CameraRecording) -> Recording:
+|`num_present_recordings`||int||:
+|`has_all_recordings`||bool||:
+|`missing_recordings`|<ol><li>`rec_type`: a [`gazeMapper.session.RecordingType`](#gazemapper-sessions) (optional).</li></ol>|list[str]||
+|`load_action_states`|<ol><li>`create_if_missing`.</li></ol>|bool||
+|`is_action_completed`|<ol><li>`action`: process.Action.</li></ol>|bool||
+|`action_completed_num_recordings`|<ol><li>`action`: process.Action.</li></ol>|list[str]||
+|`from_definition` (static)|<ol><li>`definition`: SessionDefinition or None, path.</li></ol>|||
 
 ### Free functions
 |function|inputs|output|description|
 | --- | --- | --- | --- |
-|`read_recording_info(working_dir: pathlib.Path, rec_type: RecordingType) -> tuple[EyeTrackerRecording|CameraRecording, pathlib.Path]:
-get_video_path(rec_info: EyeTrackerRecording|CameraRecording)
-get_session_from_directory(path: str|pathlib.Path, session_def: SessionDefinition|None=None) -> Session:
-get_sessions_from_project_directory(path: str|pathlib.Path, session_def: SessionDefinition|None=None) -> list[Session]:
-get_action_states(working_dir: str|pathlib.Path, for_recording: bool, create_if_missing = False, skip_if_missing=False) -> dict[process.Action, process.State]:
-update_action_states(working_dir: str|pathlib.Path, action: process.Action, state: process.State, study_config: 'config.Study', skip_if_missing=False)
+|`read_recording_info`|<ol><li>`working_dir`: path to a direction containing a gazeMapper recording.</li><li>`rec_type`: a [`gazeMapper.session.RecordingType`](#gazemapper-sessions).</li></ol>|<ol><li>A [`glassesTools.recording.Recording`](https://github.com/dcnieho/glassesTools/blob/master/README.md#recording-info) or `glassesTools.camera_recording.Recording` object.</li><li>The path to the recording's (scene) video.</li></ol>|Load recording from the specified path.|
+|`get_video_path`|<ol><li>`rec_info`: A [`glassesTools.recording.Recording`](https://github.com/dcnieho/glassesTools/blob/master/README.md#recording-info) or `glassesTools.camera_recording.Recording` object.</li></ol>|<ol><li>The path to the recording's (scene) video.</li></ol>|Get the path to the recording's (scene) video file.|
+|`get_session_from_directory`|<ol><li>`path`: path to a direction containing a gazeMapper session.</li><li>`session_def`: A `gazeMapper.session.SessionDefinition` object.</li></ol>|<ol><li>A `gazeMapper.session.Session` object.</li></ol>|Load the session from the indicated gazeMapper session directory.|
+|`get_sessions_from_project_directory`|<ol><li>`path`: path to a gazeMapper project directory, containing gazeMapper sessions.</li><li>`session_def`: Optional `gazeMapper.session.SessionDefinition` object. If not provided, the session definition is loaded from file from the project's configuration directory.</li></ol>|<ol><li>A list of `gazeMapper.session.Session` objects.</li></ol>|Load the sessions in the indicated gazeMapper project directory.|
+|`get_action_states`|<ol><li>`working_dir`: path to a direction containing a gazeMapper session or recording.</li><li>`for_recording`: Boolean indicating whether the path contains a gazeMapper session (`False`) or recording (`True`).</li><li>`create_if_missing`: Boolean indicating whether the status file should be created if it doesn't exist in the working directory (default `False`).</li><li>`skip_if_missing`: Boolean indicating whether the function should throw (`False`) or silently ignore when the status file doesn't exist in the working directory.</li></ol>|<ol><li>Dict with a `State` per `Action`.</li></ol>|Read the session's/recording's status file.|
+|`update_action_states`|<ol><li>`working_dir`: path to a direction containing a gazeMapper session or recording.</li><li>a [`gazeMapper.process.Action`](#actions).</li><li>`state`: the new `gazeMapper.process.State`.</li><li>`study_config`: a [`gazeMapper.config.Study`](#gazemapperconfigstudy) object.</li><li>`skip_if_missing`: Boolean indicating whether the function should throw (`False`) or silently ignore when the status file doesn't exist in the working directory.</li></ol>|<ol><li>Dict with a `State` per `Action`.</li></ol>|Update the state of the specified action and store to the status file.|
 
 
 ### Common input arguments
