@@ -564,8 +564,6 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type):
         imgui.set_cursor_screen_pos(pos+(x_padding, 0))
         to_remove = None
         to_add    = None
-        can_drag  = isinstance(val,list)
-        reordering = False  # TODO: this is a workaround for https://github.com/ocornut/imgui/pull/7961#issuecomment-2340980748, remove when no longer needed
         line = 1
         for i,v in enumerate(val):
             if i>0 and i not in line_break_idxs:
@@ -587,7 +585,7 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type):
             iid = imgui.get_id(f'{val_txt[i]}##{field_lbl}')
             if imgui.internal.item_add(t_bb, iid):
                 # enable interaction
-                if can_drag:
+                if False:
                     _, hovered, held = imgui.internal.button_behavior(t_bb, iid, False, False, imgui.internal.ButtonFlagsPrivate_.im_gui_button_flags_allow_overlap)
                     if held and hovered:
                         clr = imgui.get_color_u32(imgui.Col_.button_active)
@@ -602,20 +600,11 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type):
                 # draw text on top
                 imgui.internal.render_text_clipped((t_bb.min.x+x_padding, t_bb.min.y), (t_bb.max.x-x_padding, t_bb.max.y), val_txt[i], None, w_sizes[i], imgui.get_style().button_text_align, t_bb)
                 imgui.set_cursor_screen_pos((t_bb.min.x+2*x_padding+t_sizes[i].x,t_pos.y))
-                if imgui.small_button(f'x##{field_lbl}_{val_txt[i]}_{reordering}'):
+                if imgui.small_button(f'x##{field_lbl}_{val_txt[i]}'):
                     to_remove = v
 
             imgui.end_group()
             imgui.pop_style_var()
-
-            # drag to swap item order
-            if can_drag and imgui.is_item_active() and not imgui.is_item_hovered():
-                i_next = i + (-1 if imgui.get_mouse_drag_delta(imgui.MouseButton_.left).y < 0 else 1)
-                if i_next >= 0 and i_next < len(val):
-                    val[i] = val[i_next]
-                    val[i_next] = v
-                    imgui.reset_mouse_drag_delta()
-                    reordering = True
 
         # draw value adder, if needed
         if miss_values:
