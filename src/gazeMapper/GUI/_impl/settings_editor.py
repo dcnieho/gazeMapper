@@ -545,16 +545,16 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type):
 
     # determine size of editor: how many lines we need to fit all elements
     line_break_idxs = []    # codes *before* which element we need to move to the next line
-    w = x_padding
+    w = imgui.get_style().item_spacing.x
     for i in range(len(disp_val)):
         if i>0:
             w += imgui.get_style().item_spacing.x
         w += w_sizes[i].x
-        if w+x_padding > item_w:
+        if w+imgui.get_style().item_spacing.x > item_w:
             line_break_idxs.append(i)
-            w = x_padding + w_sizes[i].x
+            w = imgui.get_style().item_spacing.x + w_sizes[i].x
     if val and adder_width is not None:
-        if w+imgui.get_style().item_spacing.x+adder_width+x_padding > item_w:
+        if w+imgui.get_style().item_spacing.x+adder_width+imgui.get_style().item_spacing.x > item_w:
             line_break_idxs.append(i+1)
 
     pos = imgui.get_cursor_screen_pos()
@@ -568,16 +568,18 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type):
         imgui.internal.render_frame(bb.min,bb.max,frame_col,True,imgui.get_style().frame_rounding)
 
         # draw items
-        imgui.set_cursor_screen_pos(pos+(x_padding, 0))
+        imgui.set_cursor_screen_pos(pos+(imgui.get_style().item_spacing.x, 0))
         to_remove = None
         to_add    = None
         line = 1
+        drag_drop_result = None
+        bbs = []
         for i,v in enumerate(disp_val):
             if i>0 and i not in line_break_idxs:
                 imgui.same_line()
             elif i>0:
                 line += 1
-                imgui.set_cursor_screen_pos(imgui.get_cursor_screen_pos()+(x_padding, 0))
+                imgui.set_cursor_screen_pos(imgui.get_cursor_screen_pos()+(imgui.get_style().item_spacing.x, 0))
             imgui.push_style_var(imgui.StyleVar_.frame_border_size, 0)
             imgui.begin_group()
             if line==1:
@@ -586,13 +588,14 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type):
             # prep for drawing widget: determine if visible
             t_pos   = imgui.get_cursor_screen_pos()
             t_bb    = imgui.internal.ImRect(t_pos, t_pos+w_sizes[i])
+            bbs.append(t_bb)
 
             imgui.internal.item_size(w_sizes[i], 0)
             # if visible
             iid = imgui.get_id(f'{val_txt[i]}##{field_lbl}')
             if imgui.internal.item_add(t_bb, iid):
                 # enable interaction
-                if False:
+                if has_order and len(val)>1:
                     _, hovered, held = imgui.internal.button_behavior(t_bb, iid, False, False, imgui.internal.ButtonFlagsPrivate_.im_gui_button_flags_allow_overlap)
                     if held and hovered:
                         clr = imgui.get_color_u32(imgui.Col_.button_active)
@@ -606,6 +609,15 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type):
                 imgui.internal.render_frame(t_bb.min, t_bb.max, clr, True, imgui.get_style().frame_rounding)
                 # draw text on top
                 imgui.internal.render_text_clipped((t_bb.min.x+x_padding, t_bb.min.y), (t_bb.max.x-x_padding, t_bb.max.y), val_txt[i], None, w_sizes[i], imgui.get_style().button_text_align, t_bb)
+                if has_order and len(val)>1:
+                    glassesTools.gui.utils.draw_hover_text("Drag to reorder",'')
+                    if imgui.begin_drag_drop_source(imgui.DragDropFlags_.payload_auto_expire):
+                        # Set payload to carry the index of our item
+                        imgui.set_drag_drop_payload_py_id(field_lbl, i)
+                        # Display preview
+                        imgui.text(val_txt[i])
+                        imgui.end_drag_drop_source()
+
                 imgui.set_cursor_screen_pos((t_bb.min.x+2*x_padding+t_sizes[i].x,t_pos.y))
                 if imgui.small_button(f'x##{field_lbl}_{val_txt[i]}'):
                     to_remove = v
@@ -616,10 +628,10 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type):
         # draw value adder, if needed
         if miss_values:
             if val:
-                if t_bb.max.x+imgui.get_style().item_spacing.x+adder_width+x_padding <= bb.max.x:
+                if t_bb.max.x+imgui.get_style().item_spacing.x+adder_width+imgui.get_style().item_spacing.x <= bb.max.x:
                     imgui.same_line()
                 else:
-                    imgui.set_cursor_screen_pos(imgui.get_cursor_screen_pos()+(x_padding, 0))
+                    imgui.set_cursor_screen_pos(imgui.get_cursor_screen_pos()+(imgui.get_style().item_spacing.x, 0))
                     line += 1
                 if line>1:
                     imgui.set_cursor_screen_pos(imgui.get_cursor_screen_pos()-(0, imgui.get_style().frame_padding.y))
@@ -627,6 +639,33 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type):
             selected,p_idx = imgui.combo(f"##{field_lbl}", -1, str_values, popup_max_height_in_items=min(10,len(str_values)))
             if selected:
                 to_add = miss_values[p_idx]
+
+        # deal with drag-drop
+        if has_order and len(val)>1:
+            # draw invisible buttons between each item as drop targets
+            for i,t_bb in enumerate(bbs):
+                imgui.set_cursor_screen_pos(t_bb.min-(imgui.get_style().item_spacing.x, 0))
+                imgui.invisible_button(f"##{field_lbl}_before_{val_txt[i]}",(imgui.get_style().item_spacing.x, t_bb.get_height()))
+                if imgui.begin_drag_drop_target():
+                    payload = imgui.accept_drag_drop_payload_py_id(field_lbl)
+                    if payload is not None:
+                        drag_drop_result = (payload.data_id, i)
+                    imgui.end_drag_drop_target()
+                if i==len(bbs)-1 or i+1 in line_break_idxs:
+                    imgui.set_cursor_screen_pos((t_bb.max.x, t_bb.min.y))
+                    imgui.invisible_button(f"##{field_lbl}_after_{val_txt[i]}",(imgui.get_style().item_spacing.x, t_bb.get_height()))
+                    if imgui.begin_drag_drop_target():
+                        payload = imgui.accept_drag_drop_payload_py_id(field_lbl)
+                        if payload is not None:
+                            drag_drop_result = (payload.data_id, i+1)
+                        imgui.end_drag_drop_target()
+        # if we have a drop, process it
+        if drag_drop_result is not None:
+            ori_pos, new_pos = drag_drop_result
+            if new_pos-ori_pos>0:
+                new_pos -= 1    # indices change when object is popped at ori_pos
+            to_move = val.pop(ori_pos)
+            val.insert(new_pos, to_move)
 
         imgui.pop_clip_rect()
         # allocate size
