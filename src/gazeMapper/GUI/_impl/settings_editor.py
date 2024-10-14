@@ -572,7 +572,6 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type):
         to_remove = None
         to_add    = None
         line = 1
-        drag_drop_result = None
         bbs = []
         for i,v in enumerate(disp_val):
             if i>0 and i not in line_break_idxs:
@@ -643,6 +642,7 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type):
         # deal with drag-drop
         if has_order and len(val)>1:
             # draw invisible buttons between each item as drop targets
+            drag_drop_result = None
             for i,t_bb in enumerate(bbs):
                 imgui.set_cursor_screen_pos(t_bb.min-(imgui.get_style().item_spacing.x, 0))
                 imgui.invisible_button(f"##{field_lbl}_before_{val_txt[i]}",(imgui.get_style().item_spacing.x, t_bb.get_height()))
@@ -659,13 +659,13 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type):
                         if payload is not None:
                             drag_drop_result = (payload.data_id, i+1)
                         imgui.end_drag_drop_target()
-        # if we have a drop, process it
-        if drag_drop_result is not None:
-            ori_pos, new_pos = drag_drop_result
-            if new_pos-ori_pos>0:
-                new_pos -= 1    # indices change when object is popped at ori_pos
-            to_move = val.pop(ori_pos)
-            val.insert(new_pos, to_move)
+            # if we have a drop, process it
+            if drag_drop_result is not None:
+                ori_pos, new_pos = drag_drop_result
+                if new_pos-ori_pos>0:
+                    new_pos -= 1    # indices change when object is popped at ori_pos
+                to_move = val.pop(ori_pos)
+                val.insert(new_pos, to_move)
 
         imgui.pop_clip_rect()
         # allocate size
