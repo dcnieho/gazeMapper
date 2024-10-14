@@ -512,12 +512,47 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type):
     if win.skip_items:
         return val
 
-    w = imgui.calc_item_width()
-    ts = imgui.calc_text_size('x')
-    pos = imgui.get_cursor_screen_pos()
+    # prep
+    item_w = imgui.calc_item_width()
+    # determine items to show
+    tsx = imgui.calc_text_size('x')
     x_padding = imgui.get_style().frame_padding.x
-    bb = imgui.internal.ImRect(pos, (pos.x+w, pos.y+ts.y+2*imgui.get_style().frame_padding.y))
+    val_txt = [f'{v}' for v in val]
+    t_sizes = [imgui.calc_text_size(t) for t in val_txt]
+    w_sizes = [ts + (4*x_padding, 0) + (tsx.x, 0) for ts in t_sizes]
+    # prep value adder, if needed
+    v_type = typing.get_args(f_type)[0]
+    if typing.get_origin(v_type)==typing.Literal:
+        all_values = typing.get_args(v_type)
+    elif issubclass(v_type, enum.Enum):
+        all_values = tuple(e for e in v_type)
+    adder_width = None
+    if (miss_values := list(set(all_values)-set(val))):
+        miss_values= [v for v in all_values if v in miss_values]    # preserve order
+        str_values = miss_values
+        if f_type in val_to_str_registry:
+            str_values = ['' if v is None else val_to_str_registry[f_type][v] for v in str_values]
+        elif not isinstance(str_values[0],str):
+            str_values = ['' if v is None else str(v) for v in str_values]
+        adder_width = get_fields_text_width(str_values)+imgui.get_frame_height()+2*imgui.get_style().frame_padding.x
 
+    # determine size of editor: how many lines we need to fit all elements
+    line_break_idxs = []    # codes *before* which element we need to move to the next line
+    w = x_padding
+    for i in range(len(val)):
+        if i>0:
+            w += imgui.get_style().item_spacing.x
+        w += w_sizes[i].x
+        if w+x_padding > item_w:
+            line_break_idxs.append(i)
+            w = x_padding + w_sizes[i].x
+    if val and adder_width is not None:
+        if w+imgui.get_style().item_spacing.x+adder_width+x_padding > item_w:
+            line_break_idxs.append(i+1)
+
+    pos = imgui.get_cursor_screen_pos()
+    n_lines = 1+len(line_break_idxs)
+    bb = imgui.internal.ImRect(pos, pos+(item_w, 2*imgui.get_style().frame_padding.y+tsx.y*n_lines+imgui.get_style().item_spacing.y*(n_lines-1)))
     if imgui.internal.item_add(bb, imgui.get_id('##set_list_editor')):
         imgui.push_clip_rect(bb.min, bb.max, False)
 
@@ -531,22 +566,25 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type):
         to_add    = None
         can_drag  = isinstance(val,list)
         reordering = False  # TODO: this is a workaround for https://github.com/ocornut/imgui/pull/7961#issuecomment-2340980748, remove when no longer needed
+        line = 1
         for i,v in enumerate(val):
-            if i>0:
+            if i>0 and i not in line_break_idxs:
                 imgui.same_line()
+            elif i>0:
+                line += 1
+                imgui.set_cursor_screen_pos(imgui.get_cursor_screen_pos()+(x_padding, 0))
             imgui.push_style_var(imgui.StyleVar_.frame_border_size, 0)
             imgui.begin_group()
-            imgui.set_cursor_pos_y(imgui.get_cursor_pos_y() + imgui.get_style().frame_padding.y)
+            if line==1:
+                imgui.set_cursor_pos_y(imgui.get_cursor_pos_y() + imgui.get_style().frame_padding.y)
 
-            # prep for drawing widget: determine its size and position and see if visible
-            v_txt   = f'{v}'
-            t_size  = imgui.calc_text_size(v_txt)
-            size    = t_size + (4*x_padding, 0) + (ts.x, 0)
+            # prep for drawing widget: determine if visible
             t_pos   = imgui.get_cursor_screen_pos()
-            t_bb    = imgui.internal.ImRect(t_pos, (t_pos.x+size.x, t_pos.y+size.y))
-            imgui.internal.item_size(size, 0)
+            t_bb    = imgui.internal.ImRect(t_pos, t_pos+w_sizes[i])
+
+            imgui.internal.item_size(w_sizes[i], 0)
             # if visible
-            iid = imgui.get_id(f'{v_txt}##{field_lbl}')
+            iid = imgui.get_id(f'{val_txt[i]}##{field_lbl}')
             if imgui.internal.item_add(t_bb, iid):
                 # enable interaction
                 if can_drag:
@@ -562,9 +600,9 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type):
                 # draw frame
                 imgui.internal.render_frame(t_bb.min, t_bb.max, clr, True, imgui.get_style().frame_rounding)
                 # draw text on top
-                imgui.internal.render_text_clipped((t_bb.min.x+x_padding, t_bb.min.y), (t_bb.max.x-x_padding, t_bb.max.y), v_txt, None, size, imgui.get_style().button_text_align, t_bb)
-                imgui.set_cursor_screen_pos((t_bb.min.x+2*x_padding+t_size.x,t_pos.y))
-                if imgui.small_button(f'x##{field_lbl}_{v_txt}_{reordering}'):
+                imgui.internal.render_text_clipped((t_bb.min.x+x_padding, t_bb.min.y), (t_bb.max.x-x_padding, t_bb.max.y), val_txt[i], None, w_sizes[i], imgui.get_style().button_text_align, t_bb)
+                imgui.set_cursor_screen_pos((t_bb.min.x+2*x_padding+t_sizes[i].x,t_pos.y))
+                if imgui.small_button(f'x##{field_lbl}_{val_txt[i]}_{reordering}'):
                     to_remove = v
 
             imgui.end_group()
@@ -580,21 +618,16 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type):
                     reordering = True
 
         # draw value adder, if needed
-        v_type = typing.get_args(f_type)[0]
-        if typing.get_origin(v_type)==typing.Literal:
-            all_values = typing.get_args(v_type)
-        elif issubclass(v_type, enum.Enum):
-            all_values = tuple(e for e in v_type)
-        if (miss_values := list(set(all_values)-set(val))):
-            miss_values= [v for v in all_values if v in miss_values]    # preserve order
-            str_values = miss_values
-            if f_type in val_to_str_registry:
-                str_values = ['' if v is None else val_to_str_registry[f_type][v] for v in str_values]
-            elif not isinstance(str_values[0],str):
-                str_values = ['' if v is None else str(v) for v in str_values]
+        if miss_values:
             if val:
-                imgui.same_line()
-            imgui.set_next_item_width(get_fields_text_width(str_values)+imgui.get_frame_height()+2*imgui.get_style().frame_padding.x)
+                if t_bb.max.x+imgui.get_style().item_spacing.x+adder_width+x_padding <= bb.max.x:
+                    imgui.same_line()
+                else:
+                    imgui.set_cursor_screen_pos(imgui.get_cursor_screen_pos()+(x_padding, 0))
+                    line += 1
+                if line>1:
+                    imgui.set_cursor_screen_pos(imgui.get_cursor_screen_pos()-(0, imgui.get_style().frame_padding.y))
+            imgui.set_next_item_width(adder_width)
             selected,p_idx = imgui.combo(f"##{field_lbl}", -1, str_values, popup_max_height_in_items=min(10,len(str_values)))
             if selected:
                 to_add = miss_values[p_idx]
