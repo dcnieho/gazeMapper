@@ -150,6 +150,25 @@ for _t,_cls in zip([Type.GlassesValidator, Type.Plane_2D],[Definition_GlassesVal
     definition_defaults[_t]        = {k:d for k in _params if (d:=_params[k].default)!=inspect._empty}
     definition_parameter_types[_t] = {k:_params[k].annotation for k in _params if k!='self'}
     del _params
+definition_parameter_doc = {
+    'name': type_utils.GUIDocInfo('Name','The name of thep plane.'),
+    'aruco_dict': type_utils.GUIDocInfo('ArUco dictionary','The ArUco dictionary (see cv::aruco::PREDEFINED_DICTIONARY_NAME) of the markers.'),
+    'marker_border_bits': type_utils.GUIDocInfo('Marker border bits','Width of the black border around each marker.'),
+    'min_num_markers': type_utils.GUIDocInfo('Minimum number of markers','Minimum number of markers belonging to the plane that should be detected to attempt to determine pose and homography transformation.'),
+    'ref_image_size': type_utils.GUIDocInfo('Reference image size','The size in pixels of the image that is generated of the plane with fiducial markers.'),
+    'use_default': type_utils.GUIDocInfo('Use default setup','If enabled, the default glassesValidator plane is used. When not enabled, a custom configuration can be used by editing the files containing the plane setup in the plane configuration folder.'),
+    'marker_file': type_utils.GUIDocInfo('Marker file','Name of the file specifying the marker layout on the plane (e.g., markerPositions.csv).'),
+    'marker_size': type_utils.GUIDocInfo('Marker size','Length of the edge of a marker (mm, excluding the white edge, only the black part).'),
+    'plane_size': type_utils.GUIDocInfo('Plane size','Total size of the plane (mm). Can be larger than the area spanned by the fiducial markers.',{
+        'x': type_utils.GUIDocInfo('X', 'Horizontal size of the plane (mm).'),
+        'y': type_utils.GUIDocInfo('Y', 'Vertical size of the plane (mm).'),
+    }),
+    'origin': type_utils.GUIDocInfo('Origin','The position of the origin of the plane (mm).',{
+        'x': type_utils.GUIDocInfo('X', 'Horizontal coordinate of the plane\'s origin (mm).'),
+        'y': type_utils.GUIDocInfo('Y', 'Vertical coordinate of the plane\'s origin (mm).'),
+    }),
+    'unit': type_utils.GUIDocInfo('Unit','Unit in which sizes and coordinates are expressed. Purely for informational purposes, not used in the software. Should be mm.'),
+}
 
 
 def get_plane_from_path(path: str|pathlib.Path) -> plane.Plane:

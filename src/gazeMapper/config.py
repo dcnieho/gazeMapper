@@ -496,7 +496,116 @@ class Study:
 _params = inspect.signature(Study.__init__).parameters
 study_defaults = {k:d for k in _params if (d:=_params[k].default)!=inspect._empty}
 study_parameter_types = {k:_params[k].annotation for k in _params if k not in ['self','strict_check']}
+def _get_gv_data_quality_type_doc(dq: gv_process.DataQualityType):
+    t,doc = gv_process.get_DataQualityType_explanation(dq)
+    return (dq, type_utils.GUIDocInfo(t,doc))
+def _get_annotation_event_doc(a: annotation.Event):
+    t = annotation.tooltip_map[a]
+    doc = {
+        annotation.Event.Trial: 'Denotes an episode for which to map gaze to plane(s). This determines for which segments there will be gaze data when running the Export Trials.',
+        annotation.Event.Validate: 'Denotes an episode during which a participant looked at a validation poster, to be used to run glassesValidator to compute data quality of the gaze data.',
+        annotation.Event.Sync_Camera: 'Time point (frame from video) when a synchronization event happened, used for synchronizing different recordings.',
+        annotation.Event.Sync_ET_Data: 'Episode to be used for synchronization of eye tracker data to scene camera (e.g. using VOR).'
+    }.get(a)
+    return (a, type_utils.GUIDocInfo(t,doc))
+study_parameter_doc = {
+    'planes_per_episode': type_utils.GUIDocInfo('Planes per episode', 'For each episode that is enabled to be coded in the project, sets which planes will be looked for and gaze mapped to during the episode.',dict([_get_annotation_event_doc(a) for a in annotation.Event])),
+    'episodes_to_code': type_utils.GUIDocInfo('Episodes to code', 'Sets which episodes can be coded for this project.',{
+        None: # None indicates the doc specification applies to the contained values
+            dict([_get_annotation_event_doc(a) for a in annotation.Event])
+    }),
+    'import_do_copy_video': type_utils.GUIDocInfo('Copy video?', 'If not enabled, the scene video of an eye tracker recording, or the video of an external camera is not copied to the gazeMapper recording directory during import. Instead, the video will be loaded from the recording\'s source directory (so do not move it). Ignored when the video must be transcoded to be processed with gazeMapper.'),
+    'import_source_dir_as_relative_path': type_utils.GUIDocInfo('Store cource directory as relative path?', 'Specifies whether the path to the source directory stored in the recording info file is an absolute path (this option is not enabled) or a relative path (enabled). If a relative path is used, the imported recording and the source directory can be moved to another location, and the source directory can still be found as long as the relative path (e.g., one folder up and in the directory "original recordings": "../original recordings") doesn\'t change.'),
+    'sync_ref_recording': type_utils.GUIDocInfo('Synchronization: Reference recording', 'If there are multiple recordings, sets to which recording all other recordings will be synchronized.'),
+    'sync_ref_do_time_stretch': type_utils.GUIDocInfo('Synchronization: Do time stretch?', 'If enabled, multiple sync points are used to calculate a time stretch factor to compensate for clock drift when synchronizing multiple recordings.'),
+    'sync_ref_stretch_which': type_utils.GUIDocInfo('Synchronization: Stretch which recording', 'Which recording(s) should be corrected for clock drift if "Synchronization: Do time stretch?" is enabled.',{
+        None: {     # indicates the doc specification applies to the contained values
+            'ref': type_utils.GUIDocInfo('Reference recording', 'The time signal of the reference recording is stretched to compensate for clock drift.'),
+            'other': type_utils.GUIDocInfo('Other recording(s)', 'The time signal of the other recording(s) is stretched to compensate for clock drift.')
+        }
+    }),
+    'sync_ref_average_recordings': type_utils.GUIDocInfo('Synchronization: Average recordings?', 'Whether to average the clock drifts for multiple recordings if "Synchronization: Do time stretch?" is enabled.'),
+    'get_cam_movement_for_et_sync_method': type_utils.GUIDocInfo('Gaze data synchronization: Method to get camera movement', 'Method used to derive the head motion for synchronizing eye tracker data and scene camera.',{
+        None: {     # indicates the doc specification applies to the contained values
+            '': type_utils.GUIDocInfo('None', 'No gaze data synchronization'),
+            'plane': type_utils.GUIDocInfo('Plane', 'Head movement is represented by the position of the origin of the plane in the scene camera video (the plane that is set up to be used for "Sync ET Data" episodes), as extracted through pose estimation or homography using a gazeMapper plane.'),
+            'function': type_utils.GUIDocInfo('Function', 'A user-specified function (configured using the "Gaze data synchronization: Function for camera movement" setting) will be called for each frame of the scene video in a "Sync ET Data" episode and is expected to return the location of the target the participant was looking at.')
+        }
+    }),
+    'get_cam_movement_for_et_sync_function': type_utils.GUIDocInfo('Gaze data synchronization: Function for camera movement', 'Setup for function to use for deriving the head motion when synchronizing eye tracker data and scene camera if "Gaze data synchronization: Method to get camera movement" is set to "function".',{
+        'module_or_file': type_utils.GUIDocInfo('Module or file', 'Importable module or file (can be a full path) that contains the function to run.'),
+        'function': type_utils.GUIDocInfo('Function', 'Name of the function to run.'),
+        'parameters': type_utils.GUIDocInfo('Parameters', 'Set of parameters and values to pass to the function. The frame to process (np.ndarray) is the first (positional) input passed to the function, and should not be specified in this set.'),
+    }),
+    'sync_et_to_cam_use_average': type_utils.GUIDocInfo('Gaze data synchronization: Use average?', 'Whether to use the average offset of multiple sync episodes. If not enabled, the offset for the first sync episode is used, the rest are ignored.'),
+    'auto_code_sync_points': type_utils.GUIDocInfo('Automated coding of synchronization points','Setup for automatic coding of synchronization timepoints.',{
+        'markers': type_utils.GUIDocInfo('Markers', 'Set of marker IDs whose appearance indicates a synchronization timepoint.'),
+        'max_gap_duration': type_utils.GUIDocInfo('Maximum gap duration', 'Maximum gap (number of frames) to be filled in sequences of marker detections.'),
+        'min_duration': type_utils.GUIDocInfo('Minimum duration', 'Minimum length (number of frames) of a sequence of marker detections. Shorter runs are removed.')
+    }),
+    'auto_code_trial_episodes': type_utils.GUIDocInfo('Automated coding of trial episodes','Setup for automatic coding of trial (analysis) episodes.',{
+        'start_markers': type_utils.GUIDocInfo('Start marker(s)', 'A single marker ID or a sequence of marker IDs that indicate the start of a trial.'),
+        'end_markers': type_utils.GUIDocInfo('End marker(s)', 'A single marker ID or a sequence of marker IDs that indicate the end of a trial.'),
+        'max_gap_duration': type_utils.GUIDocInfo('Maximum gap duration', 'Maximum gap (number of frames) to be filled in sequences of marker detections.'),
+        'max_intermarker_gap_duration': type_utils.GUIDocInfo('Maximum intermarker gap duration', 'Maximum gap (number of frames) between the detection of two markers in a sequence.'),
+        'min_duration': type_utils.GUIDocInfo('Minimum duration', 'Minimum length (number of frames) of a sequence of marker detections. Shorter runs are removed.')
+    }),
+    'export_output3D': type_utils.GUIDocInfo('Include 3D fields in mapped data export?', 'Determines whether gaze positions on the plane in the scene camera reference frame are exported when invoking the Export Trials action.'),
+    'export_output2D': type_utils.GUIDocInfo('Include 2D fields in mapped data export?', 'Determines whether gaze positions on the plane in the plane\'s reference frame are exported when invoking the Export Trials action.'),
+    'export_only_code_marker_presence': type_utils.GUIDocInfo('Mapped data export: only include marker presence?', 'If enabled, for each marker only a single column is added to the export created by the Export Trials action, indicating whether the given marker was detected or not on a given frame. If not enabled, marker pose information is included in the export.'),
+    'validate_do_global_shift': type_utils.GUIDocInfo('glassesValidator: Apply global shift?', 'If enabled, for each validation interval the mean position will be removed from the gaze data and the targets, removing any overall shift of the data. This improves the matching of fixations to targets when there is a significant overall offset in the data. It may fail (backfire) if there are data samples far outside the range of the validation targets, or if there is no data for some targets.'),
+    'validate_max_dist_fac': type_utils.GUIDocInfo('glassesValidator: Maximum distance factor', 'Factor for determining distance limit when assigning fixation points to validation targets. If for a given target the closest fixation point is further away than <factor>*[minimum intertarget distance], then no fixation point will be assigned to this target, i.e., it will not be matched to any fixation point. Set to a large value to essentially disable.'),
+    'validate_dq_types': type_utils.GUIDocInfo('glassesValidator: Data quality types', 'Selects the types of data quality you would like to calculate for each of the recordings. When none are selected, a good default is used for each recording. When none of the selected types is available, depending on the `validate_allow_dq_fallback` setting, either an error is thrown or that same default is used instead. Whether a data quality type is available depends on what type of gaze information is available for a recording, as well as whether the camera is calibrated.',{
+        None: # None indicates the doc specification applies to the contained values
+            dict([_get_gv_data_quality_type_doc(dq) for dq in gv_process.DataQualityType])
+    }),
+    'validate_allow_dq_fallback': type_utils.GUIDocInfo('glassesValidator: Allow fallback data quality type?', 'If not enabled, an error is raised when the data quality type(s) indicated in "glassesValidator: Data quality types" are not available. If enabled, a sensible default other data type will be used instead. Does not apply if the "glassesValidator: Data quality types" is not set.'),
+    'validate_include_data_loss': type_utils.GUIDocInfo('glassesValidator: Include data loss?', 'If enabled, the data quality report will include data loss during the episode selected for each target on the validation poster. This is NOT the data loss of the whole recording and thus not what you want to report in your paper.'),
+    'validate_I2MC_settings': type_utils.GUIDocInfo('glassesValidator: I2MC settings','Settings for the I2MC fixation classifier used as part of determining the fixation that are assigned to validation targets. Settings that are "<not set>" will be determined based on the provided eye tracking data.',{
+        'freq': type_utils.GUIDocInfo('Frequency', 'Sampling frequency of the eye tracking data.'),
+        'windowtimeInterp': type_utils.GUIDocInfo('Maximum gap duration for interpolation', 'Maximum duration (s) of gap in the data that is interpolated.'),
+        'edgeSampInterp': type_utils.GUIDocInfo('# Edge samples','Amount of data (number of samples) at edges needed for interpolation.'),
+        'maxdisp': type_utils.GUIDocInfo('Maximum dispersion', 'Maximum distance (mm) between the two edges of a gap below which the missing data is interpolated.'),
+        'windowtime': type_utils.GUIDocInfo('Moving window duration','Length of the moving window (s) used by I2MC to calculate 2-means clustering when processing the data.'),
+        'steptime': type_utils.GUIDocInfo('Moving window step', 'Step size (s) by which the moving window is moved.'),
+        'downsamples': type_utils.GUIDocInfo('Downsample factors', 'Set of integer decimation factors used to downsample the gaze data as part of I2MC processing.'),
+        'downsampFilter': type_utils.GUIDocInfo('Apply Chebyshev filter?', 'If enabled, a Chebyshev low-pass filter is applied when downsampling.'),
+        'chebyOrder': type_utils.GUIDocInfo('Chebyshev filter order','Order of the Chebyshev low-pass filter.'),
+        'maxerrors': type_utils.GUIDocInfo('Maximum # errors', 'Maximum number of errors before processing of a trial is aborted.'),
+        'cutoffstd': type_utils.GUIDocInfo('Fixation cutoff', 'Number of standard deviations above mean k-means weights that will be used as fixation cutoff.'),
+        'onoffsetThresh': type_utils.GUIDocInfo('Onset/offset Threshold', 'Number of MAD away from median fixation duration. Will be used to walk forward at fixation starts and backward at fixation ends to refine their placement and stop algorithm from eating into saccades.'),
+        'maxMergeDist': type_utils.GUIDocInfo('Maximum merging distance', 'Maximum Euclidean distance (mm) between fixations for merging to be possible.'),
+        'maxMergeTime': type_utils.GUIDocInfo('Maximum gap duration for merging', 'Maximum time (ms) between fixations for merging to be possible.'),
+        'minFixDur': type_utils.GUIDocInfo('Minimum fixation duration', 'Minimum fixation duration (ms) after merging, fixations with shorter duration are removed from output.'),
+    }),
+    'video_make_which': type_utils.GUIDocInfo('Video export: Which recordings', 'Indicating for which recordings to make videos of the eye tracker scene camera or external camera (synchronized if there are multiple) showing gaze on the scene video from the eye tracker, gaze projected to the detected planes, detected plane origins, detected individual markers, and gaze from other eye tracker recordings (if available, and each depending on the below seeings).'),
+    'video_recording_colors': type_utils.GUIDocInfo('Video export: Recording colors', 'Colors used for drawing each recording\'s gaze point, scene camera and gaze vector (depending on settings).',{
+        None: {     # indicates the doc specification applies to the contained values
+            'r': type_utils.GUIDocInfo('Red', 'Intensity of the red channel (0-255).'),
+            'g': type_utils.GUIDocInfo('Green', 'Intensity of the green channel (0-255).'),
+            'b': type_utils.GUIDocInfo('Blue', 'Intensity of the blue channel (0-255).')
+        }
+    }),
+    'video_process_planes_for_all_frames': type_utils.GUIDocInfo('Video export: Process all planes for all frames?', 'If enabled, shows detection results for all planes for all frames. If not enabled, detection of each plane is only shown during the episode(s) to which it is assigned.'),
+    'video_process_annotations_for_all_recordings': type_utils.GUIDocInfo('Video export: Process all annotations for all recordings?', 'Episode annotations are shown in a bar on the bottom of the screen. If enabled, annotations for not only the recording for which the video is made, but also for the other recordings are shown in this bar.'),
+    'video_show_detected_markers': type_utils.GUIDocInfo('Video export: Show detected markers?', 'If enabled, known detected markers are indicated in the output video.'),
+    'video_show_plane_axes': type_utils.GUIDocInfo('Video export: Show planes axes?', 'If enabled, axes indicating the orientation of the detected plane are drawn at the plane\'s origin.'),
+    'video_process_individual_markers_for_all_frames': type_utils.GUIDocInfo('Video export: Process individual markers for all frames?', 'If enabled, detection results are shown for all frames in the video. If not enabled, detection results are only shown during coded episodes of the video.'),
+    'video_show_individual_marker_axes': type_utils.GUIDocInfo('Video export: Show individual markers?', 'If enabled, the pose axis and not only an outline of detected individual markers is shown.'),
+    'video_show_sync_func_output': type_utils.GUIDocInfo('Video export: Show sync function output?', 'If enabled, draw the output of the function on the output video. Applies if the "Gaze data synchronization: Function for camera movement" setting is set to "function".'),
+    'video_show_unexpected_markers': type_utils.GUIDocInfo('Video export: Show unexpected markers?', 'If not enabled, only markers that are part of defined planes or configured individual markers will be drawn on the video. If enabled, also other, unexpected markers will be drawn.'),
+    'video_show_rejected_markers': type_utils.GUIDocInfo('Video export: Show rejected markers?', 'If enabled, all shapes that potentially are markers but were rejected by OpenCV\'s ArUco detector are shown. For debug purposes.'),
+    'video_show_camera_in_ref': type_utils.GUIDocInfo('Video export: Show camera position(s) in reference recording\'s video?', 'If enabled, the position of other cameras is marked in the generated video of the reference recording.'),
+    'video_show_camera_in_other': type_utils.GUIDocInfo('Video export: Show camera position(s) in other recordings\' video?', 'If enabled, the position of other cameras is marked in the generated video of recordings other than the reference recording.'),
+    'video_show_gaze_vec_in_ref': type_utils.GUIDocInfo('Video export: Show gaze vectors(s) in reference recording\'s video?', 'If enabled, a line is drawn for each eye tracker recording between the gaze position and the position of the eye tracker\'s camera in the generated video of the reference recording.'),
+    'video_show_gaze_vec_in_other': type_utils.GUIDocInfo('Video export: Show gaze vectors(s) in other recordings\' video?', 'If enabled, a line is drawn for each eye tracker recording between the gaze position and the position of the eye tracker\'s camera in the generated video of recordings other than the reference recording.'),
+    'video_gaze_to_plane_margin': type_utils.GUIDocInfo('Video export: Gaze position margin','Gaze position more than this factor outside a defined plane will not be drawn.'),
+    'gui_num_workers': type_utils.GUIDocInfo('Number of workers','Each action is processed by a worker and each worker can handle one action at a time. Having more workers means more actions are processed simultaneously, but having too many will not provide any gain and might freeze the program and your whole computer. Since much of the processing utilizes more than one processor thread, set this value to significantly less than the number of threads available in your system. NB: If you currently have running or enqueued jobs, the number of workers will only be changed once all have completed or are cancelled.'),
+}
+if _missing_params:=[k for k in _params if k not in study_parameter_doc and k not in ['self','session_def','planes','individual_markers','working_directory','strict_check']]:
+    raise NotImplementedError('Documentation missing for parameters:\n- '+'\n- '.join(_missing_params))
 del _params
+del _missing_params
 
 def guess_config_dir(working_dir: str|pathlib.Path, config_dir_name: str = "config", json_file_name: str = Study.default_json_file_name) -> pathlib.Path:
     # can be invoked with either:

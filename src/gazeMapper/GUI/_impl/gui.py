@@ -711,7 +711,7 @@ class GUI:
             imgui.text_colored(colors.error,'*There are problems in the below setup that need to be resolved')
 
         fields = [k for k in config.study_parameter_types.keys() if k in config.study_defaults]
-        changed, new_config = settings_editor.draw(copy.deepcopy(self.study_config), fields, config.study_parameter_types, config.study_defaults, self._possible_value_getters, None, self._problems_cache)
+        changed, new_config = settings_editor.draw(copy.deepcopy(self.study_config), fields, config.study_parameter_types, config.study_defaults, self._possible_value_getters, None, self._problems_cache, config.study_parameter_doc)
         if changed:
             try:
                 new_config.check_valid(strict_check=False)
@@ -821,9 +821,9 @@ class GUI:
         table_is_started = imgui.begin_table(f"##session_def_list", 3)
         if not table_is_started:
             return
-        imgui.table_setup_column("recording", imgui.TableColumnFlags_.width_fixed)
-        imgui.table_setup_column("type", imgui.TableColumnFlags_.width_fixed)
-        imgui.table_setup_column("camera calibration", imgui.TableColumnFlags_.width_stretch)
+        imgui.table_setup_column("Recording", imgui.TableColumnFlags_.width_fixed)
+        imgui.table_setup_column("Type", imgui.TableColumnFlags_.width_fixed)
+        imgui.table_setup_column("Camera calibration", imgui.TableColumnFlags_.width_stretch)
         imgui.table_headers_row()
         config_path = config.guess_config_dir(self.study_config.working_directory)
         for r in self.study_config.session_def.recordings:
@@ -915,7 +915,7 @@ class GUI:
                     imgui.pop_style_color()
                 if p.type==plane.Type.Plane_2D and imgui.button(ifa6.ICON_FA_BARCODE+f' deploy ArUco markers'):
                     gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='deploy_aruco', ArUco_dict=p.aruco_dict, markerBorderBits=p.marker_border_bits))
-                changed, _, new_p, _ = settings_editor.draw_dict_editor(copy.deepcopy(p), type(p), 0, list(plane.definition_parameter_types[p.type].keys()), plane.definition_parameter_types[p.type], plane.definition_defaults[p.type], problems=problem_fields, fixed=fixed_fields)
+                changed, _, new_p, _ = settings_editor.draw_dict_editor(copy.deepcopy(p), type(p), 0, list(plane.definition_parameter_types[p.type].keys()), plane.definition_parameter_types[p.type], plane.definition_defaults[p.type], problems=problem_fields, fixed=fixed_fields, documentation=plane.definition_parameter_doc)
                 if changed:
                     # persist changed config
                     plane_dir = config.guess_config_dir(self.study_config.working_directory)/p.name
@@ -1011,7 +1011,7 @@ class GUI:
             imgui.text_colored(colors.error,'*There are problems in the below setup that need to be resolved')
 
         # episodes to be coded
-        changed, new_config = settings_editor.draw(copy.deepcopy(self.study_config), ['episodes_to_code', 'planes_per_episode'], config.study_parameter_types, {}, self._possible_value_getters, None, self._problems_cache)
+        changed, new_config = settings_editor.draw(copy.deepcopy(self.study_config), ['episodes_to_code', 'planes_per_episode'], config.study_parameter_types, {}, self._possible_value_getters, None, self._problems_cache, config.study_parameter_doc)
         if changed:
             try:
                 new_config.check_valid(strict_check=False)
@@ -1028,10 +1028,10 @@ class GUI:
         table_is_started = imgui.begin_table(f"##markers_def_list", 4)
         if not table_is_started:
             return
-        imgui.table_setup_column("marker ID", imgui.TableColumnFlags_.width_fixed)
-        imgui.table_setup_column("size", imgui.TableColumnFlags_.width_fixed)
-        imgui.table_setup_column("aruco_dict", imgui.TableColumnFlags_.width_fixed)
-        imgui.table_setup_column("marker_border_bits", imgui.TableColumnFlags_.width_stretch)
+        imgui.table_setup_column("Marker ID", imgui.TableColumnFlags_.width_fixed)
+        imgui.table_setup_column("Size", imgui.TableColumnFlags_.width_fixed)
+        imgui.table_setup_column("ArUco dictionary", imgui.TableColumnFlags_.width_fixed)
+        imgui.table_setup_column("Marker border bits", imgui.TableColumnFlags_.width_stretch)
         imgui.table_headers_row()
         changed = False
         for m in self.study_config.individual_markers:
@@ -1049,17 +1049,17 @@ class GUI:
                 imgui.end_tooltip()
             imgui.table_next_column()
             imgui.set_next_item_width(imgui.calc_text_size('xxxxx.xxxxxx').x+2*imgui.get_style().frame_padding.x)
-            new_val = settings_editor.draw_value(f'size_{m.id}', m.size, marker.marker_parameter_types['size'], False, marker.marker_defaults.get('size',None), None, False, False)[0]
+            new_val = settings_editor.draw_value(f'size_{m.id}', m.size, marker.marker_parameter_types['size'], False, marker.marker_defaults.get('size',None), None, False, {}, False)[0]
             if (this_changed:=m.size!=new_val):
                 m.size = new_val
                 changed |= this_changed
             imgui.table_next_column()
-            new_val = settings_editor.draw_value(f'aruco_dict_{m.id}', m.aruco_dict, marker.marker_parameter_types['aruco_dict'], False, marker.marker_defaults.get('aruco_dict',None), None, False, False)[0]
+            new_val = settings_editor.draw_value(f'aruco_dict_{m.id}', m.aruco_dict, marker.marker_parameter_types['aruco_dict'], False, marker.marker_defaults.get('aruco_dict',None), None, False, {}, False)[0]
             if (this_changed:=m.aruco_dict!=new_val):
                 m.aruco_dict = new_val
                 changed |= this_changed
             imgui.table_next_column()
-            new_val = settings_editor.draw_value(f'marker_border_bits_{m.id}', m.marker_border_bits, marker.marker_parameter_types['marker_border_bits'], False, marker.marker_defaults.get('marker_border_bits',None), None, False, False)[0]
+            new_val = settings_editor.draw_value(f'marker_border_bits_{m.id}', m.marker_border_bits, marker.marker_parameter_types['marker_border_bits'], False, marker.marker_defaults.get('marker_border_bits',None), None, False, {}, False)[0]
             if (this_changed:=m.marker_border_bits!=new_val):
                 m.marker_border_bits = new_val
                 changed |= this_changed
@@ -1301,7 +1301,7 @@ class GUI:
         if imgui.tree_node_ex('Setting overrides for this session',imgui.TreeNodeFlags_.framed):
             fields = config.StudyOverride.get_allowed_parameters(config.OverrideLevel.Session)[0]
             effective_config = self.session_config_overrides[sess.name].apply(self.study_config, strict_check=False)
-            sess_changed, new_config = settings_editor.draw(effective_config, fields, config.study_parameter_types, config.study_defaults, self._possible_value_getters, self.study_config, effective_config.field_problems())
+            sess_changed, new_config = settings_editor.draw(effective_config, fields, config.study_parameter_types, config.study_defaults, self._possible_value_getters, self.study_config, effective_config.field_problems(), config.study_parameter_doc)
             if sess_changed:
                 try:
                     new_config.check_valid(strict_check=False)
@@ -1318,7 +1318,7 @@ class GUI:
                 fields = config.StudyOverride.get_allowed_parameters(config.OverrideLevel.Recording, sess.recordings[r].definition.type)[0]
                 effective_config_for_session = self.session_config_overrides[sess.name].apply(self.study_config, strict_check=False)
                 effective_config = self.recording_config_overrides[sess.name][r].apply(effective_config_for_session, strict_check=False)
-                changed, new_config = settings_editor.draw(effective_config, fields, config.study_parameter_types, config.study_defaults, self._possible_value_getters, effective_config_for_session, effective_config.field_problems())
+                changed, new_config = settings_editor.draw(effective_config, fields, config.study_parameter_types, config.study_defaults, self._possible_value_getters, effective_config_for_session, effective_config.field_problems(), config.study_parameter_doc)
                 if changed or sess_changed: # NB: also need to update file when parent has changed
                     try:
                         new_config.check_valid(strict_check=False)
