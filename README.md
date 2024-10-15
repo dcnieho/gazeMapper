@@ -193,7 +193,7 @@ To be able to perform this mapping, gazeMapper needs to be able to determine whe
 
 For gazeMapper to be able to do its job, it needs to have precise information about the array of fiducial markers that defines the plane(s). When designing these arrays, it is important to use unique markers (in other words, each marker may only be used once across all planes and other markers that appear in the recording, e.g. for [synchronization](#synchronization) or [automatic trial coding](#automatic-coding-of-analysis-and-synchronization-episodes)). Any dictionary of fiducial markers understood by OpenCV's ArUco module (cv2.aruco, see [`cv::aruco::PREDEFINED_DICTIONARY_NAME`](https://docs.opencv.org/4.10.0/de/d67/group__objdetect__aruco.html#ga4e13135a118f497c6172311d601ce00d)) is supported (i.e. various ArUco marker dictionaries, as well as April tags), the default is `DICT_4X4_250`.
 
-Planes are configured in the `Plane editor` pane in the GUI or by means of `gazeMapper.plane.Definition` objects. There are two types of planes, either a generic 2D plane (`gazeMapper.plane.Type.Plane_2D`), or a glassesValidator plane (`gazeMapper.plane.Type.GlassesValidator`). The configuration of a plane is stored in a subfolder of the project's configuration folder. The name of the plane is given by the name of this folder. For generic 2D planes, two configuration files are needed: a file providing information about which marker is positioned where and how each marker is oriented; and a settings file containing further information about both the markers and the plane. glassesValidator planes have their own settings and are [discussed below](#validation-glassesvalidator-planes). Here we describe the setup for generic 2D planes. It should be noted that a png render of the defined plane is stored in the plane's configuration folder when running any gazeMapper processing action, or by pressing the `TODO` button in the GUI (API: `TODO`). This can be used to check whether your plane definition is correct.
+Planes are configured in the `Plane editor` pane in the GUI or by means of `gazeMapper.plane.Definition` objects. There are two types of planes, either a generic 2D plane (`gazeMapper.plane.Type.Plane_2D`), or a glassesValidator plane (`gazeMapper.plane.Type.GlassesValidator`). The configuration of a plane is stored in a subfolder of the project's configuration folder. The name of the plane is given by the name of this folder. For generic 2D planes, two configuration files are needed: a file providing information about which marker is positioned where and how each marker is oriented; and a settings file containing further information about both the markers and the plane. glassesValidator planes have their own settings and are [discussed below](#validation-glassesvalidator-planes). Here we describe the setup for generic 2D planes. It should be noted that a png render of the defined plane is stored in the plane's configuration folder when running any gazeMapper processing action, or by pressing the `generate reference image` button in the GUI. This can be used to check whether your plane definition is correct.
 
 A generic 2D fiducial marker plane is defined by a file with four columns that describes the marker layout on the plane:
 | Column | Description |
@@ -211,7 +211,7 @@ To be able turn the information of the above file into a plane, further settings
 |`marker_file`|Name of the file specifying the marker layout on the plane (e.g., `markerPositions.csv`).|
 |`marker_size`|Length of the edge of a marker (mm, excluding the white edge, only the black part).|
 |`marker_border_bits`|Width of the [black border](https://docs.opencv.org/4.10.0/d5/dae/tutorial_aruco_detection.html) around each marker.|
-|`plane_size`|Total size of the plane (mm). Can be larger than the area spanned by fiducial markers.|
+|`plane_size`|Total size of the plane (mm). Can be larger than the area spanned by the fiducial markers.|
 |`origin`|The position of the origin of the plane (mm).|
 |`unit`|Unit in which sizes and coordinates are expressed. Purely for informational purposes, not used in the software. Should be mm.|
 |`aruco_dict`|The ArUco dictionary (see [`cv::aruco::PREDEFINED_DICTIONARY_NAME`](https://docs.opencv.org/4.10.0/de/d67/group__objdetect__aruco.html#ga4e13135a118f497c6172311d601ce00d)) of the markers.|
@@ -302,20 +302,20 @@ In this section, a full overview of gazeMapper's settings is given. These settin
 ||`import_source_dir_as_relative_path`|`False`|Specifies whether the path to the source directory stored in the [recording info file](#output) is an absolute path (`False`) or a relative path (`True`). If a relative path is used, the imported recording and the source directory can be moved to another location, and the source directory can still be found as long as the relative path (e.g., one folder up and in the directory `original recordings`: `../original recordings`) doesn't change.|
 |||||
 ||`sync_ref_recording`|`None`|If set to the name of a recording, allows [synchronization](#synchronizing-multiple-eye-tracker-or-external-camera-recordings) of other recordings in a session to the indicated recording.|
-||`sync_ref_do_time_stretch`|`None`|If True, multiple sync points are used to calculate a time stretch factor to compensate for clock drift when [synchronizing multiple recordings](#synchronizing-multiple-eye-tracker-or-external-camera-recordings). Should be set if `sync_ref_recording` is set.|
+||`sync_ref_do_time_stretch`|`None`|If `True`, multiple sync points are used to calculate a time stretch factor to compensate for clock drift when [synchronizing multiple recordings](#synchronizing-multiple-eye-tracker-or-external-camera-recordings). Should be set if `sync_ref_recording` is set.|
 ||`sync_ref_stretch_which`|`None`|Which recording(s) should be [corrected for clock drift](#synchronizing-multiple-eye-tracker-or-external-camera-recordings) if `sync_ref_do_time_stretch` is `True`. Possible values are `'ref'` and `'other'`. Should be set if `sync_ref_recording` is set.|
 ||`sync_ref_average_recordings`|`None`|Whether to average the clock drifts for multiple recordings if `sync_ref_do_time_stretch` is `True`. Should be set if `sync_ref_recording` is set.|
 |||||
 ||`get_cam_movement_for_et_sync_method`|`''`|Method used to derive the head motion for [synchronizing eye tracker data and scene camera](#synchronizing-eye-tracker-data-and-scene-camera). Possible values are `''` (no synchronization), `'plane'` and `'function'`|
 ||`get_cam_movement_for_et_sync_function`|`None`|Function to use for deriving the head motion when [synchronizing eye tracker data and scene camera](#synchronizing-eye-tracker-data-and-scene-camera) if `get_cam_movement_for_et_sync_method` is set to `'function'`. Should be a [`gazeMapper.config.CamMovementForEtSyncFunction`](#gazemapperconfigcammovementforetsyncfunction) object.|
-||`sync_et_to_cam_use_average`|`True`|Whether to use the average offset of multiple sync episodes. If False, the offset for the first sync episode is used, the rest are ignored.|
+||`sync_et_to_cam_use_average`|`True`|Whether to use the average offset of multiple sync episodes. If `False`, the offset for the first sync episode is used, the rest are ignored.|
 |||||
 ||`auto_code_sync_points`|`None`|Setup for [automatic coding of synchronization timepoints](#automatic-coding-of-synchronization-timepoints). Should be a [`gazeMapper.config.AutoCodeSyncPoints`](#gazemapperconfigautocodesyncpoints) object.|
 ||`auto_code_trial_episodes`|`None`|Setup for [automatic coding of analysis episodes](#automatic-coding-of-analysis-episodes). Should be a [`gazeMapper.config.AutoCodeTrialEpisodes`](#gazemapperconfigautocodetrialepisodes) object.|
 |||||
 ||`export_output3D`|`False`|Determines whether gaze positions on the plane in the scene camera reference frame are exported when invoking the [`gazeMapper.process.Action.EXPORT_TRIALS` action](#actions). See [the glassesTools manual](https://github.com/dcnieho/glassesTools/blob/master/README.md#world-referenced-gaze-data).|
 ||`export_output2D`|`True`|Determines whether gaze positions on the plane in the plane's reference frame are exported when invoking the [`gazeMapper.process.Action.EXPORT_TRIALS` action](#actions). See [the glassesTools manual](https://github.com/dcnieho/glassesTools/blob/master/README.md#world-referenced-gaze-data).|
-||`export_only_code_marker_presence`|`True`|If True, for each marker only a single column is added to the export created by the [`gazeMapper.process.Action.EXPORT_TRIALS` action](#actions), indicating whether the given marker was detected or not on a given frame. If `False`, marker pose information is included in the export.|
+||`export_only_code_marker_presence`|`True`|If `True`, for each marker only a single column is added to the export created by the [`gazeMapper.process.Action.EXPORT_TRIALS` action](#actions), indicating whether the given marker was detected or not on a given frame. If `False`, marker pose information is included in the export.|
 |||||
 ||`validate_do_global_shift`|`True`|glassesValidator setting: if `True`, for each validation interval the mean position will be removed from the gaze data and the targets, removing any overall shift of the data. This improves the matching of fixations to targets when there is a significant overall offset in the data. It may fail (backfire) if there are data samples far outside the range of the validation targets, or if there is no data for some targets.|
 ||`validate_max_dist_fac`|`.5`|glassesValidator setting: factor for determining distance limit when assigning fixation points to validation targets. If for a given target the closest fixation point is further away than <factor>*[minimum intertarget distance], then no fixation point will be assigned to this target, i.e., it will not be matched to any fixation point. Set to a large value to essentially disable.|
@@ -326,12 +326,12 @@ In this section, a full overview of gazeMapper's settings is given. These settin
 |||||
 ||`video_make_which`|`None`|Indicating one or multiple recordings for which to make videos of the eye tracker scene camera or external camera (synchronized if there are multiple) showing gaze on the scene video from the eye tracker, gaze projected to the detected planes, detected plane origins, detected individual markers, and gaze from other eye tracker recordings (if available, and each depending on the below seeings). Value should be a `set`.|
 ||`video_recording_colors`|`None`|Color used for drawing each recording's gaze point, scene camera and gaze vector (depending on settings). Each key should be a recording, value in the dict should be a [`gazeMapper.config.RgbColor`](#gazemapperconfigrgbcolor) object.|
-||`video_process_planes_for_all_frames`|`False`|If True, shows detection results for all planes for all frames. If False, detection of each plane is only shown during the episode(s) to which it is assigned.|
+||`video_process_planes_for_all_frames`|`False`|If `True`, shows detection results for all planes for all frames. If `False`, detection of each plane is only shown during the episode(s) to which it is assigned.|
 ||`video_process_annotations_for_all_recordings`|`True`|Episode annotations are shown in a bar on the bottom of the screen. If this setting is `True`, annotations for not only the recording for which the video is made, but also for the other recordings are shown in this bar.|
-||`video_show_detected_markers`|`True`|If True, known detected markers are indicated in the output video.|
-||`video_show_board_axes`|`True`|If Ture, the axes of the detected board |
+||`video_show_detected_markers`|`True`|If `True`, known detected markers are indicated in the output video.|
+||`video_show_plane_axes`|`True`|If `True`, axes indicating the orientation of the detected plane are drawn at the plane's origin.|
 ||`video_process_individual_markers_for_all_frames`|`True`|If `True`, detection results are shown for all frames in the video. If `False`, detection results are only shown during coded episodes of the video.|
-||`video_show_individual_marker_axes`|`True`|If True, the pose axis and not only an outline of detected individual markers is shown.|
+||`video_show_individual_marker_axes`|`True`|If `True`, the pose axis and not only an outline of detected individual markers is shown.|
 ||`video_show_sync_func_output`|`True`|Applies if the `get_cam_movement_for_et_sync_method` setting is set to `'function'`. If `True`, draw the output of the function on the output video.|
 ||`video_show_unexpected_markers`|`False`|If `False`, only markers that are part of defined planes or configured individual markers will be drawn on the video. If `True`, also other, unexpected markers will be drawn.|
 ||`video_show_rejected_markers`|`False`|If `True`, all shapes that potentially are markers but were rejected by OpenCV's ArUco detector are shown. For debug purposes.|
@@ -341,13 +341,13 @@ In this section, a full overview of gazeMapper's settings is given. These settin
 ||`video_show_gaze_vec_in_other`|`False`|If `True`, a line is drawn for each eye tracker recording between the gaze position and the position of the eye tracker's camera in the generated video of recordings other than the reference recording.|
 ||`video_gaze_to_plane_margin`|`0.25`|Gaze position more than this factor outside a defined plane will not be drawn.|
 |||||
-||`gui_num_workers`|`2`|Each action is processed by a worker and each worker can handle 1 action at a time. Having more workers means more actions are processed simultaneously, but having too many will not provide any gain and might freeze the program and your whole computer. Since much of the processing utilizes more than one processor thread, set this value to signficantly less than the number of threads available in your system. NB: If you currently have running or enqueued jobs, the number of workers will only be changed once all have completed or are cancelled.|
+||`gui_num_workers`|`2`|Each action is processed by a worker and each worker can handle one action at a time. Having more workers means more actions are processed simultaneously, but having too many will not provide any gain and might freeze the program and your whole computer. Since much of the processing utilizes more than one processor thread, set this value to significantly less than the number of threads available in your system. NB: If you currently have running or enqueued jobs, the number of workers will only be changed once all have completed or are cancelled.|
 
 ## `gazeMapper.config.AutoCodeSyncPoints`
 These settings are discussed [here](#automatic-coding-of-synchronization-timepoints).
 |Setting<br>name in GUI|Setting name<br>in settings file|Default<br>value|Description|
 | --- | --- | --- | --- |
-||`markers`||Set of marker IDs whose appearance indicates a sync points.|
+||`markers`||Set of marker IDs whose appearance indicates a sync point.|
 ||`max_gap_duration`|`4`|Maximum gap (number of frames) to be filled in sequences of marker detections.|
 ||`min_duration`|`6`|Minimum length (number of frames) of a sequence of marker detections. Shorter runs are removed.|
 
@@ -377,7 +377,7 @@ N.B.: The below fields with `None` as the default value are set by glassesValida
 ||`freq`|`None`|Sampling frequency of the eye tracking data.|
 ||`windowtimeInterp`|`.25`|Maximum duration (s) of gap in the data that is interpolated.|
 ||`edgeSampInterp`|`2`|Amount of data (number of samples) at edges needed for interpolation.|
-||`maxdisp`|`50`|Maximum distance (mm) between the two edges of a gap below which the missing data is interpolated|
+||`maxdisp`|`50`|Maximum distance (mm) between the two edges of a gap below which the missing data is interpolated.|
 ||`windowtime`|`.2`|Length of the moving window (s) used by I2MC to calculate 2-means clustering when processing the data.|
 ||`steptime`|`.02`|Step size (s) by which the moving window is moved.|
 ||`downsamples`|`None`|Set of integer decimation factors used to downsample the gaze data as part of I2MC processing.|
