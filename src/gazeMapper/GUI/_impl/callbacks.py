@@ -258,14 +258,25 @@ def show_action_options(g, session_name: str, rec_name: str, action: process.Act
     # shown when `show_visualization` is true (else they don't apply)
     match action:
         case process.Action.DETECT_MARKERS:
-            options = {'visualization_show_rejected_markers': False}
+            options = {'show_visualization': [
+                    False, 'Show visualization', 'Show a viewer that allows to follow the processing of the video. Each frame is shown overlaid with info about detected markers and planes.'
+                ], 'visualization_show_rejected_markers': [
+                    False, 'Show rejected markers', 'Rejected ArUco marker candidates are also shown in the viewer. Possibly useful for debug.'
+                ]}
         case process.Action.GAZE_TO_PLANE:
-            options = {'show_planes': True, 'show_only_intervals': True}
+            options = {'show_visualization': [
+                    False, 'Show visualization', 'Show a viewer that visualizes the mapped gaze to plane. Each frame of the video is shown in the viewer, overlaid with info about detected planes and projected gaze.'
+                ], 'show_planes': [
+                    True, 'Show planes', "Additional viewer window(s) are opened, one per plane, with gaze in this plane's space is drawn on it."
+                ], 'show_only_intervals': [
+                    True, 'Show only intervals', 'Only the coded mapping episodes (if available) are shown in the viewer while the rest of the scene video is skipped past.'
+                ]}
         case process.Action.MAKE_VIDEO:
-            options = {}
+            options = {'show_visualization': [
+                    False, 'Show visualization', 'The generated video(s) are shown in a viewer as they are created.'
+                ]}
         case _:
             raise ValueError(f'Action option setting GUI not implemented for a {action} action')
-    options['show_visualization'] = False
 
     def set_action_options_popup():
         nonlocal options
@@ -280,19 +291,23 @@ def show_action_options(g, session_name: str, rec_name: str, action: process.Act
         imgui.dummy((0,2*imgui.get_style().item_spacing.y))
         imgui.text_unformatted(f'Settings for this run of the {action.displayable_name} action\nSession: "{session_name}", recording: "{rec_name}":')
         imgui.dummy((0,1.5*imgui.get_style().item_spacing.y))
-        _, options['show_visualization'] = imgui.checkbox(f'show_visualization##{session_name}_{rec_name}', options['show_visualization'])
-        if options['show_visualization']:
+        _, options['show_visualization'][0] = imgui.checkbox(f'{options["show_visualization"][1]}##{session_name}_{rec_name}', options['show_visualization'][0])
+        imgui.same_line()
+        gt_gui.utils.draw_hover_text(options['show_visualization'][2])
+        if options['show_visualization'][0]:
             for o in options:
                 if o=='show_visualization':
                     continue
-                _, options[o] = imgui.checkbox(f'{o}##{session_name}_{rec_name}', options[o])
+                _, options[o][0] = imgui.checkbox(f'{options[o][1]}##{session_name}_{rec_name}', options[o][0])
+                imgui.same_line()
+                gt_gui.utils.draw_hover_text(options[o][2])
 
         imgui.end_group()
         imgui.same_line(spacing=spacing)
         imgui.dummy((0, 0))
 
     buttons = {
-        ifa6.ICON_FA_CHECK+f" Continue##{session_name}_{rec_name}": lambda: g.launch_task(session_name, rec_name, action, **options),
+        ifa6.ICON_FA_CHECK+f" Continue##{session_name}_{rec_name}": lambda: g.launch_task(session_name, rec_name, action, **{o:options[o][0] for o in options}),
         ifa6.ICON_FA_CIRCLE_XMARK+f" Cancel##{session_name}_{rec_name}": None
     }
 
