@@ -1163,10 +1163,15 @@ class GUI:
                 hover_text = f'Run {a.displayable_name} for recordings:\n- '+'\n- '.join(actions[a])
                 status = max([self.sessions[session_name].recordings[r].state[a] for r in actions[a]])
             hover_text = hover_text.replace('Run Run','Run')    # deal with task called "Run Validation"
+            if a.has_options:
+                hover_text += '\nShift-click to bring up a popup with configuration options for this run.'
             icon = ifa6.ICON_FA_PLAY if status<process.State.Completed else ifa6.ICON_FA_ARROW_ROTATE_RIGHT
             if imgui.selectable(icon+f" {a.displayable_name}##{session_name}", False)[0]:
                 if process.is_session_level_action(a):
-                    self.launch_task(session_name, None, a)
+                    if a.has_options and imgui.get_io().key_shift:
+                        callbacks.show_action_options(self, session_name, None, a)
+                    else:
+                        self.launch_task(session_name, None, a)
                 else:
                     for r in actions[a]:
                         if a.has_options and imgui.get_io().key_shift:
@@ -1246,10 +1251,15 @@ class GUI:
                 imgui.selectable(a.displayable_name, False, imgui.SelectableFlags_.span_all_columns|imgui.SelectableFlags_.allow_overlap)
                 if a in menu_actions and imgui.begin_popup_context_item(f"##{sess.name}_{a}_context"):
                     hover_text = f'Run {a.displayable_name} for session: {sess.name}'
+                    if a.has_options:
+                        hover_text += '\nShift-click to bring up a popup with configuration options for this run.'
                     status = self.sessions[sess.name].state[a]
                     icon = ifa6.ICON_FA_PLAY if status<process.State.Completed else ifa6.ICON_FA_ARROW_ROTATE_RIGHT
                     if imgui.selectable(icon+f" {a.displayable_name}##{sess.name}", False)[0]:
-                        self.launch_task(sess.name, None, a)
+                        if a.has_options and imgui.get_io().key_shift:
+                            callbacks.show_action_options(self, sess.name, None, a)
+                        else:
+                            self.launch_task(sess.name, None, a)
                     gt_gui.utils.draw_hover_text(hover_text, '')
                     imgui.end_popup()
             imgui.end_table()

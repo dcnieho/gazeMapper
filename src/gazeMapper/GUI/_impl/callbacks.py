@@ -251,7 +251,7 @@ def remove_folder(folder: pathlib.Path):
     if folder.is_dir():
         shutil.rmtree(folder)
 
-def show_action_options(g, session_name: str, rec_name: str, action: process.Action):
+def show_action_options(g, session_name: str, rec_name: str|None, action: process.Action):
     from . import gui
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
     # NB: `show_visualization` is always an option, the others below are
