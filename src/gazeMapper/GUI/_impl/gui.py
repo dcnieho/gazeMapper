@@ -1262,8 +1262,12 @@ class GUI:
             imgui.text_colored(colors.error,'*The following recordings are missing for this session:\n'+'\n'.join(missing_recs))
         show_import_et = any((sess.definition.get_recording_def(r).type==session.RecordingType.Eye_Tracker for r in missing_recs))
         show_import_cam = any((sess.definition.get_recording_def(r).type==session.RecordingType.Camera for r in missing_recs))
-        if show_import_et and imgui.button(ifa6.ICON_FA_FILE_IMPORT+' import eye tracker recordings'):
-            gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='add_et_recordings', sessions=[sess.name]))
+        if imgui.button(ifa6.ICON_FA_FOLDER_OPEN + " Open working folder"):
+            callbacks.open_folder(sess.working_directory)
+        if show_import_et:
+            imgui.same_line()
+            if imgui.button(ifa6.ICON_FA_FILE_IMPORT+' import eye tracker recordings'):
+                gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='add_et_recordings', sessions=[sess.name]))
         if show_import_cam:
             if show_import_et:
                 imgui.same_line()
