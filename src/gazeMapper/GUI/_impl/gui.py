@@ -1123,13 +1123,96 @@ class GUI:
         return active_jobs
 
     def _session_context_menu(self, session_name: str) -> bool:
-        sess = self.sessions[session_name]
-        actions = process.get_possible_actions(sess.state, {r:sess.recordings[r].state for r in sess.recordings}, {a for a in process.Action if a!=process.Action.IMPORT}, self.study_config)
-        return self._draw_session_context_menu(session_name, None, actions)
+        # ignore input session name, get selected sessions
+        sess = [self.sessions[s] for s in self.sessions if self._selected_sessions.get(s,False)]
+        actions: dict[str, dict[process.Action, bool|list[str]]] = {}
+        for s in sess:
+            actions[s.name] = process.get_possible_actions(s.state, {r:s.recordings[r].state for r in s.recordings}, {a for a in process.Action if a!=process.Action.IMPORT}, self.study_config)
+            actions[s.name] = self._filter_session_context_menu_actions(s.name, None, actions[s.name])
+        # draw actions that can be run
+        all_actions = {a for s in actions for a in actions[s]}
+        all_actions = [a for a in process.Action if a in all_actions]   # ensure order
+        for a in all_actions:
+            if process.is_session_level_action(a):
+                to_run = [(s,None) for s in actions if a in actions[s] and actions[s][a]]
+                hover_text = f'Run {a.displayable_name} for session(s):\n- '+'\n- '.join([s for s in actions if a in actions[s] and actions[s][a]])
+                status = max([self.sessions[s].state[a] for s in actions])
+            else:
+                to_run = [(s,r) for s in actions for r in actions[s][a]]
+                hover_text = f'Run {a.displayable_name} for session(s):\n- '+'\n- '.join([f'{s}, recording(s):\n  - '+'\n  - '.join(actions[s][a]) for s in actions if a in actions[s] and actions[s][a]])
+                status = max([self.sessions[s].recordings[r].state[a] for s in actions for r in actions[s][a]])
+            hover_text = hover_text.replace('Run Run','Run')    # deal with task called "Run Validation"
+            if a.has_options:
+                hover_text += '\nShift-click to bring up a popup with configuration options for this run.'
+            icon = ifa6.ICON_FA_PLAY if status<process.State.Completed else ifa6.ICON_FA_ARROW_ROTATE_RIGHT
+            if imgui.selectable(icon+f" {a.displayable_name}", False)[0]:
+                for s,r in to_run:
+                    if a.has_options and imgui.get_io().key_shift:
+                        callbacks.show_action_options(self, s, r, a)
+                    else:
+                        self.launch_task(s, r, a)
+            gt_gui.utils.draw_hover_text(hover_text, '')
+        # draw working folder interactions
+        changed = False
+        if imgui.selectable(ifa6.ICON_FA_FOLDER_OPEN + " Open session folder", False)[0]:
+            for s in sess:
+                callbacks.open_folder(s.working_directory)
+        if imgui.selectable(ifa6.ICON_FA_TRASH_CAN + " Delete session", False)[0]:
+            for s in sess:
+                callbacks.remove_folder(s.working_directory)
+            changed = True
+        return changed
     def _recording_context_menu(self, session_name: str, rec_name: str) -> bool:
+        # ignore input recording name, get selected sessions
         sess = self.sessions[session_name]
-        actions = process.get_possible_actions(sess.state, {rec_name:sess.recordings[rec_name].state}, {a for a in process.Action if a!=process.Action.IMPORT and not process.is_session_level_action(a)}, self.study_config)
-        return self._draw_session_context_menu(session_name, rec_name, actions)
+        recs = [r for r in sess.recordings if self._selected_recordings[session_name].get(r,False)]
+        actions: dict[str, dict[process.Action, bool|list[str]]] = {}
+        for r in recs:
+            actions[r] = process.get_possible_actions(sess.state, {r:sess.recordings[r].state}, {a for a in process.Action if a!=process.Action.IMPORT and not process.is_session_level_action(a)}, self.study_config)
+            actions[r] = self._filter_session_context_menu_actions(sess.name, r, actions[r])
+        # draw actions that can be run
+        all_actions = {a for r in actions for a in actions[r]}
+        all_actions = [a for a in process.Action if a in all_actions]   # ensure order
+        for a in all_actions:
+            to_run = [r for r in actions if a in actions[r]]
+            hover_text = f'Run {a.displayable_name} for recordings:\n- '+'\n- '.join(to_run)
+            status = max([sess.recordings[r].state[a] for r in to_run])
+            hover_text = hover_text.replace('Run Run','Run')    # deal with task called "Run Validation"
+            if a.has_options:
+                hover_text += '\nShift-click to bring up a popup with configuration options for this run.'
+            icon = ifa6.ICON_FA_PLAY if status<process.State.Completed else ifa6.ICON_FA_ARROW_ROTATE_RIGHT
+            if imgui.selectable(icon+f" {a.displayable_name}##{session_name}", False)[0]:
+                for r in to_run:
+                    if a.has_options and imgui.get_io().key_shift:
+                        callbacks.show_action_options(self, session_name, r, a)
+                    else:
+                        self.launch_task(session_name, r, a)
+            gt_gui.utils.draw_hover_text(hover_text, '')
+        # draw source/working folder interactions
+        source_directories = [sd for r in recs if (sd:=sess.recordings[r].info.source_directory).is_dir()]
+        if source_directories and imgui.selectable(ifa6.ICON_FA_FOLDER_OPEN + " Open source folder", False)[0]:
+            for s in source_directories:
+                callbacks.open_folder(s)
+        if len(recs)==1 and imgui.begin_menu('Camera calibration'):
+            working_directory = sess.recordings[recs[0]].info.working_directory
+            has_cam_cal_file = (working_directory/gt_naming.scene_camera_calibration_fname).is_file()
+            if not has_cam_cal_file:
+                imgui.text_colored(colors.error,'No camera calibration!')
+            else:
+                if imgui.selectable(ifa6.ICON_FA_TRASH_CAN+' Delete calibration file', False)[0]:
+                    callbacks.delete_cam_cal(working_directory)
+            if imgui.selectable(ifa6.ICON_FA_DOWNLOAD+' Set calibration XML', False)[0]:
+                gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='set_cam_cal', working_directory=working_directory))
+            imgui.end_menu()
+        changed = False
+        if imgui.selectable(ifa6.ICON_FA_FOLDER_OPEN + " Open working folder", False)[0]:
+            for r in recs:
+                callbacks.open_folder(sess.recordings[r].info.working_directory)
+        if imgui.selectable(ifa6.ICON_FA_TRASH_CAN + " Delete recording", False)[0]:
+            for r in recs:
+                callbacks.remove_folder(sess.recordings[r].info.working_directory)
+            changed = True
+        return changed
     def _filter_session_context_menu_actions(self, session_name: str, rec_name: str|None, actions: dict[process.Action,bool|list[str]]) -> dict[process.Action,bool|list[str]]:
         # filter out running and pending tasks
         if not actions:
@@ -1151,60 +1234,6 @@ class GUI:
                     if recs:
                         actions_filt[a] = recs
         return actions_filt
-    def _draw_session_context_menu(self, session_name: str, rec_name: str|None, actions: dict[process.Action,bool|list[str]]) -> bool:
-        changed = False
-        actions = self._filter_session_context_menu_actions(session_name, rec_name, actions)
-        # draw menu
-        for a in actions:
-            if process.is_session_level_action(a):
-                hover_text = f'Run {a.displayable_name} for session: {session_name}'
-                status = self.sessions[session_name].state[a]
-            else:
-                hover_text = f'Run {a.displayable_name} for recordings:\n- '+'\n- '.join(actions[a])
-                status = max([self.sessions[session_name].recordings[r].state[a] for r in actions[a]])
-            hover_text = hover_text.replace('Run Run','Run')    # deal with task called "Run Validation"
-            if a.has_options:
-                hover_text += '\nShift-click to bring up a popup with configuration options for this run.'
-            icon = ifa6.ICON_FA_PLAY if status<process.State.Completed else ifa6.ICON_FA_ARROW_ROTATE_RIGHT
-            if imgui.selectable(icon+f" {a.displayable_name}##{session_name}", False)[0]:
-                if process.is_session_level_action(a):
-                    if a.has_options and imgui.get_io().key_shift:
-                        callbacks.show_action_options(self, session_name, None, a)
-                    else:
-                        self.launch_task(session_name, None, a)
-                else:
-                    for r in actions[a]:
-                        if a.has_options and imgui.get_io().key_shift:
-                            callbacks.show_action_options(self, session_name, r, a)
-                        else:
-                            self.launch_task(session_name, r, a)
-            gt_gui.utils.draw_hover_text(hover_text, '')
-        lbl = session_name + rec_name if rec_name else ''
-        if rec_name:
-            working_directory = self.sessions[session_name].recordings[rec_name].info.working_directory
-            source_directory = self.sessions[session_name].recordings[rec_name].info.source_directory
-            if source_directory.is_dir() and imgui.selectable(ifa6.ICON_FA_FOLDER_OPEN + f" Open source folder##{lbl}", False)[0]:
-                callbacks.open_folder(source_directory)
-            but_lbls = ('working', 'recording')
-            if imgui.begin_menu('Camera calibration'):
-                has_cam_cal_file = (working_directory/gt_naming.scene_camera_calibration_fname).is_file()
-                if not has_cam_cal_file:
-                    imgui.text_colored(colors.error,'No camera calibration!')
-                else:
-                    if imgui.selectable(ifa6.ICON_FA_TRASH_CAN+f' Delete calibration file##{lbl}', False)[0]:
-                        callbacks.delete_cam_cal(working_directory)
-                if imgui.selectable(ifa6.ICON_FA_DOWNLOAD+f' Set calibration xml##{lbl}', False)[0]:
-                    gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='set_cam_cal', working_directory=working_directory))
-                imgui.end_menu()
-        else:
-            working_directory = self.sessions[session_name].working_directory
-            but_lbls = ('session', 'session')
-        if working_directory and imgui.selectable(ifa6.ICON_FA_FOLDER_OPEN + f" Open {but_lbls[0]} folder##{lbl}", False)[0]:
-            callbacks.open_folder(working_directory)
-        if working_directory and imgui.selectable(ifa6.ICON_FA_TRASH_CAN + f" Delete {but_lbls[1]}##{lbl}", False)[0]:
-            callbacks.remove_folder(working_directory)
-            changed = True
-        return changed
 
     def _open_session_detail(self, sess: session.Session):
         win_name = f'{sess.name}##session_view'
