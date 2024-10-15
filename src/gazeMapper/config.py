@@ -98,7 +98,7 @@ class Study:
                  video_process_planes_for_all_frames            : bool                              = False,
                  video_process_annotations_for_all_recordings   : bool                              = True,
                  video_show_detected_markers                    : bool                              = True,
-                 video_show_board_axes                          : bool                              = True,
+                 video_show_plane_axes                          : bool                              = True,
                  video_process_individual_markers_for_all_frames: bool                              = True,
                  video_show_individual_marker_axes              : bool                              = True,
                  video_show_sync_func_output                    : bool                              = True,
@@ -153,7 +153,7 @@ class Study:
         self.video_process_planes_for_all_frames            = video_process_planes_for_all_frames   # if True, all planes are processed for all frames, if False, only according to the planes_per_episode setup and the coding
         self.video_process_annotations_for_all_recordings   = video_process_annotations_for_all_recordings   # if True, all coded episodes for all planes of all recordings are processed (so e.g. if validation coded for one recording in the session, that plane is processed for all)
         self.video_show_detected_markers                    = video_show_detected_markers
-        self.video_show_board_axes                          = video_show_board_axes
+        self.video_show_plane_axes                          = video_show_plane_axes
         self.video_process_individual_markers_for_all_frames= video_process_individual_markers_for_all_frames   # if True, all frames are processed in search of individual markers, if False, individual markers are only searched for when in a coded episode of any of the planes specified in planes_per_episode setup
         self.video_show_individual_marker_axes              = video_show_individual_marker_axes
         self.video_show_sync_func_output                    = video_show_sync_func_output
