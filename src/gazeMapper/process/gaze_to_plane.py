@@ -10,7 +10,7 @@ from .. import config, episode, naming, plane, process, session, synchronization
 
 def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show_visualization=False, show_planes=True, show_only_intervals=True, **study_settings):
     # if show_visualization, each frame is shown in a viewer, overlaid with info about detected planes and projected gaze
-    # if show_poster, gaze in space od each plane is also drawn in a separate windows
+    # if show_poster, gaze in space of each plane is also drawn in a separate windows
     # if show_only_intervals, only the coded mapping episodes (if available) are shown in the viewer while the rest of the scene video is skipped past
     working_dir = pathlib.Path(working_dir)
     if config_dir is None:

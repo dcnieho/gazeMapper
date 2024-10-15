@@ -19,7 +19,7 @@ from fractions import Fraction
 
 
 def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show_visualization=False, **study_settings):
-    # if show_visualization, the generated video is shown as it is created in a viewer
+    # if show_visualization, the generated video(s) are shown as they are created in a viewer
     working_dir  = pathlib.Path(working_dir) # working directory of a session, not of a recording
     if config_dir is None:
         config_dir = config.guess_config_dir(working_dir)
