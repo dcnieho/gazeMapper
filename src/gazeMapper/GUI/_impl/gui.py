@@ -1162,7 +1162,7 @@ class GUI:
             else:
                 hover_text = f'Run {a.displayable_name} for recordings:\n- '+'\n- '.join(actions[a])
                 status = max([self.sessions[session_name].recordings[r].state[a] for r in actions[a]])
-            hover_text = hover_text.replace('Run Run','Run')
+            hover_text = hover_text.replace('Run Run','Run')    # deal with task called "Run Validation"
             icon = ifa6.ICON_FA_PLAY if status<process.State.Completed else ifa6.ICON_FA_ARROW_ROTATE_RIGHT
             if imgui.selectable(icon+f" {a.displayable_name}##{session_name}", False)[0]:
                 if process.is_session_level_action(a):
