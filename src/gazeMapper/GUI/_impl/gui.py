@@ -382,11 +382,7 @@ class GUI:
             # already scheduled, nothing to do
             return
         if action==process.Action.IMPORT:
-            # NB: when adding recording, immediately do
-            # rec_info = glassesTools.importing.get_recording_info(bla, bla)
-            # self.sessions[sess].add_recording_from_info()
-            # that creates it only in memory. Then immediate call launch_task for import
-            # if import fails, remove directory, which removes recording (automatically thanks to watcher)
+            # NB: if import fails, remove directory, which removes recording from GUI (automatically thanks to watcher)
             func = self.sessions[sess].import_recording
             args = (recording,)
         else:
