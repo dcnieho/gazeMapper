@@ -34,6 +34,9 @@ class Action(enum.IntEnum):
     @property
     def needs_GUI(self):
         return self in [Action.CODE_EPISODES, Action.SYNC_ET_TO_CAM]
+    @property
+    def has_options(self):
+        return self in [Action.DETECT_MARKERS, Action.GAZE_TO_PLANE, Action.MAKE_VIDEO]
     def succ(self):
         v = self.value+1
         if v > Action.MAKE_VIDEO.value:

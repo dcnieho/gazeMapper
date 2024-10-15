@@ -251,6 +251,55 @@ def remove_folder(folder: pathlib.Path):
     if folder.is_dir():
         shutil.rmtree(folder)
 
+def show_action_options(g, session_name: str, rec_name: str, action: process.Action):
+    from . import gui
+    g = typing.cast(gui.GUI,g)  # indicate type to typechecker
+    # NB: `show_visualization` is always an option, the others below are
+    # shown when `show_visualization` is true (else they don't apply)
+    match action:
+        case process.Action.DETECT_MARKERS:
+            options = {'visualization_show_rejected_markers': False}
+        case process.Action.GAZE_TO_PLANE:
+            options = {'show_planes': True, 'show_only_intervals': True}
+        case process.Action.MAKE_VIDEO:
+            options = {}
+        case _:
+            raise ValueError(f'Action option setting GUI not implemented for a {action} action')
+    options['show_visualization'] = False
+
+    def set_action_options_popup():
+        nonlocal options
+        spacing = 2 * imgui.get_style().item_spacing.x
+        color = (0.45, 0.09, 1.00, 1.00)
+        imgui.push_font(g._icon_font)
+        imgui.text_colored(color, ifa6.ICON_FA_CIRCLE_INFO)
+        imgui.pop_font()
+        imgui.same_line(spacing=spacing)
+
+        imgui.begin_group()
+        imgui.dummy((0,2*imgui.get_style().item_spacing.y))
+        imgui.text_unformatted(f'Settings for this run of the {action.displayable_name} action\nSession: "{session_name}", recording: "{rec_name}":')
+        imgui.dummy((0,1.5*imgui.get_style().item_spacing.y))
+        _, options['show_visualization'] = imgui.checkbox(f'show_visualization##{session_name}_{rec_name}', options['show_visualization'])
+        if options['show_visualization']:
+            for o in options:
+                if o=='show_visualization':
+                    continue
+                _, options[o] = imgui.checkbox(f'{o}##{session_name}_{rec_name}', options[o])
+
+        imgui.end_group()
+        imgui.same_line(spacing=spacing)
+        imgui.dummy((0, 0))
+
+    buttons = {
+        ifa6.ICON_FA_CHECK+f" Continue##{session_name}_{rec_name}": lambda: g.launch_task(session_name, rec_name, action, **options),
+        ifa6.ICON_FA_CIRCLE_XMARK+f" Cancel##{session_name}_{rec_name}": None
+    }
+
+    # ask what type of device recordings we want to import
+    gt_gui.utils.push_popup(g, lambda: gt_gui.utils.popup(f"Set options##{session_name}_{rec_name}", set_action_options_popup, buttons = buttons, closable=True, outside=False))
+
+
 async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[recording.Recording|camera_recording.Recording]], dev_lbl: str, dev_type: session.RecordingType, sessions: list[str]):
     from . import gui
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker

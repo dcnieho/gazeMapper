@@ -375,7 +375,7 @@ class GUI:
                 case _:
                     pass    # ignore, not of interest
 
-    def launch_task(self, sess: str, recording: str|None, action: process.Action):
+    def launch_task(self, sess: str, recording: str|None, action: process.Action, **kwargs):
         # NB: this is run under lock, so sess and recording are valid
         job = utils.JobInfo(action, sess, recording)
         if job in self._get_pending_running_job_list():
@@ -394,11 +394,11 @@ class GUI:
             args = (working_dir,)
         # check if task needs a GUI, if so make sure only one needing a GUI can run at the same time, and that these
         # tasks are prioritized so we're not stuck waiting for a GUI task while some other task completes
-        exclusive_id = 1 if action.needs_GUI else None
+        exclusive_id = 1 if (action.needs_GUI or kwargs.get('show_visualization',False)) else None
         priority = 1 if exclusive_id is not None else None
 
         # add to scheduler
-        payload = process_pool.JobPayload(func, args, {})
+        payload = process_pool.JobPayload(func, args, kwargs)
         self.job_scheduler.add_job(job, payload, self._action_done_callback, exclusive_id=exclusive_id, priority=priority)
 
     def _update_jobs_and_process_pool(self):
@@ -1169,7 +1169,10 @@ class GUI:
                     self.launch_task(session_name, None, a)
                 else:
                     for r in actions[a]:
-                        self.launch_task(session_name, r, a)
+                        if a.has_options and imgui.get_io().key_shift:
+                            callbacks.show_action_options(self, session_name, r, a)
+                        else:
+                            self.launch_task(session_name, r, a)
             gt_gui.utils.draw_hover_text(hover_text, '')
         lbl = session_name + rec_name if rec_name else ''
         if rec_name:
