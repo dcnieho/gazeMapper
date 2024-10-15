@@ -733,7 +733,7 @@ class GUI:
         # gather all file actions
         jobs = self.job_scheduler.jobs.copy()
         job_ids = sorted(jobs.keys())
-        job_states ={job_id:jobs[job_id].get_state() for job_id in job_ids}
+        job_states = {job_id:jobs[job_id].get_state() for job_id in job_ids}
         if any((job_states[i] in [process.State.Pending, process.State.Running] for i in job_states)):
             if imgui.button(ifa6.ICON_FA_HAND+' Cancel all'):
                 for job_id in job_ids:

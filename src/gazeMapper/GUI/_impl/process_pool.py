@@ -203,6 +203,8 @@ class JobScheduler(typing.Generic[_UserDataT]):
         if self.jobs[job_id]._pool_job_id is not None:
             self._pool.cancel_job(self.jobs[job_id]._pool_job_id)
         else:
+            if job_id in self._pending_jobs:
+                self._pending_jobs.remove(job_id)
             self.jobs[job_id]._final_state = process.State.Canceled
             if self.jobs[job_id].done_callback:
                 self.jobs[job_id].done_callback(None, None, self.jobs[job_id].user_data, process.State.Canceled)
