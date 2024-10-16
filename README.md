@@ -90,23 +90,24 @@ for a session can be placed anywhere (though recording folders should be placed 
 During the importing and processing of a session, or an eye tracker or camera recording, a series of files are created in the working folder of the session and the recording(s). These are the following (not all of the files are created for a camera recording, for instance, there is no gaze data associated with such a recording):
 |file|location|produced<br>by|description|
 | --- | --- | --- | --- |
-|`calibration.xml`|recording|[`Session.import_recording`](#gazemappersession)|Camera calibration parameters for the scene camera.|
-|`frameTimestamps.tsv`|recording|[`Session.import_recording`](#gazemappersession)|Timestamps for each frame in the scene camera video.|
-|`gazeData.tsv`|recording|[`Session.import_recording`](#gazemappersession)|Gaze data cast into the [glassesTools common format](https://github.com/dcnieho/glassesTools/blob/master/README.md#common-data-format) used by gazeMapper.|
+|`calibration.xml`|recording|[`Session.import_recording`](#gazemappersession)|Camera calibration parameters for the (scene) camera.|
+|`frameTimestamps.tsv`|recording|[`Session.import_recording`](#gazemappersession)|Timestamps for each frame in the (scene) camera video.|
+|`gazeData.tsv`|recording|[`Session.import_recording`](#gazemappersession)|Gaze data cast into the [glassesTools common format](https://github.com/dcnieho/glassesTools/blob/master/README.md#common-data-format) used by gazeMapper. Only for eye tracker recordings.|
 |`recording_info.json`|recording|[`Session.import_recording`](#gazemappersession)|Information about the recording.|
 |`recording.gazeMapper`|recording|[`Session.import_recording`](#gazemappersession)|JSON file encoding the state of each [recording-level gazeMapper action](#actions).|
-|`worldCamera.mp4`|recording|[`Session.import_recording`](#gazemappersession)|Copy of the scene camera video (optional, depends on the `import_do_copy_video` option).|
+|`worldCamera.mp4`|recording|[`Session.import_recording`](#gazemappersession)|Copy of the (scene) camera video (optional, depends on the `import_do_copy_video` option).|
 |||||
 |`coding.tsv`|recording|[`process.code_episodes`](#coding-analysis-synchronization-and-validation-episodes)|File denoting the analysis, synchronization and validation episodes to be processed. This is produced with the coding interface included with gazeMapper. Can be manually created or edited to override the coded episodes.|
-|`planePose_<plane name>.tsv`|recording|[`process.detect_markers`](#gazemapper-planes)|File with information about plane pose w.r.t. the scene camera for each frame where the plane was detected.|
-|`markerPose_<marker ID>.tsv`|recording|[`process.detect_markers`](#gazemapper-planes)|File with information about marker pose w.r.t. the scene camera for each frame where the marker was detected.|
-|`planeGaze_<plane name>.tsv`|recording|`process.gaze_to_plane`|File with gaze data projected to the plane/surface.|
-|`validate_<plane name>_*`|recording|`process.run_validation`|Series of files with output of the glassesValidator validation procedure. See the [glassesValidator readme](https://github.com/dcnieho/glassesValidator/blob/master/README.md#output) for descriptions.|
-|`VOR_sync.tsv`|recording|`process.sync_et_to_cam`|File containing the synchronization offset (s) between eye tracker data and the scene camera.|
+|`planePose_<plane name>.tsv`|recording|[`process.detect_markers`](#gazemapper-planes)|File with information about plane pose w.r.t. the (scene) camera for each frame where the plane was detected.|
+|`markerPose_<marker ID>.tsv`|recording|[`process.detect_markers`](#gazemapper-planes)|File with information about marker pose w.r.t. the (scene) camera for each frame where the marker was detected.|
+|`planeGaze_<plane name>.tsv`|recording|`process.gaze_to_plane`|File with gaze data projected to the plane/surface. Only for eye tracker recordings.|
+|`validate_<plane name>_*`|recording|`process.run_validation`|Series of files with output of the glassesValidator validation procedure. See the [glassesValidator readme](https://github.com/dcnieho/glassesValidator/blob/master/README.md#output) for descriptions. Only for eye tracker recordings.|
+|`VOR_sync.tsv`|recording|`process.sync_et_to_cam`|File containing the synchronization offset (s) between eye tracker data and the scene camera. Only for eye tracker recordings.|
+|`detectOutput.mp4`|recording|`process.make_video`|Video of the eye tracker scene camera or external camera (synchronized to one of the recordings if there are multiple) showing detected plane origins, detected individual markers and gaze from any other recordings eye tracker recordings. Also shown for eye tracker recordings are gaze on the scene video from the eye tracker, gaze projected to the detected planes. Each only if available, and enabled in the video generation settings.|
 |||||
 |`session.gazeMapper`|session|[`Session.import_recording`](#gazemappersession)|JSON file encoding the state of each [session-level gazeMapper action](#actions).|
 |`ref_sync.tsv`|session|`process.sync_to_ref`|File containing the synchronization offset (s) and other information about sync between multiple recordings.|
-|`planeGaze_<recording name>.tsv`|session|`process.export_trials`|File containing the gaze position on one or multiple planes, per recording.|
+|`planeGaze_<recording name>.tsv`|session|`process.export_trials`|File containing the gaze position on one or multiple planes. One file is created per eye tracker recording.|
 
 ### Coordinate system of data
 gazeMapper produces data in the reference frame of a plane/surface. This 2D data is stored in the `planeGaze_*` files produced when exporting the gazeMapper results, and also in the `planeGaze_*` files stored inside individual recordings' working folders.
@@ -324,7 +325,7 @@ In this section, a full overview of gazeMapper's settings is given. These settin
 |glassesValidator: Include data loss?|`validate_include_data_loss`|`False`|glassesValidator setting: if `True`, the data quality report will include data loss during the episode selected for each target on the validation poster. This is NOT the data loss of the whole recording and thus not what you want to report in your paper.|
 |glassesValidator: I2MC settings|`validate_I2MC_settings`|`I2MCSettings()`|glassesValidator setting: settings for the [I2MC](https://link.springer.com/article/10.3758/s13428-016-0822-1) fixation classifier used as part of determining the fixation that are assigned to validation targets. Should be a [`gazeMapper.config.I2MCSettings`](#gazemapperconfigi2mcsettings) object.|
 |||||
-|Video export: Which recordings|`video_make_which`|`None`|Indicating one or multiple recordings for which to make videos of the eye tracker scene camera or external camera (synchronized if there are multiple) showing gaze on the scene video from the eye tracker, gaze projected to the detected planes, detected plane origins, detected individual markers, and gaze from other eye tracker recordings (if available, and each depending on the below seeings). Value should be a `set`.|
+|Video export: Which recordings|`video_make_which`|`None`|Indicates one or multiple recordings for which to make videos of the eye tracker scene camera or external camera (synchronized to one of the recordings if there are multiple) showing detected plane origins, detected individual markers and gaze from any other recordings eye tracker recordings. Also shown for eye tracker recordings are gaze on the scene video from the eye tracker, gaze projected to the detected planes. Each only if available, and enabled in the below video generation settings. Value should be a `set`.|
 |Video export: Recording colors|`video_recording_colors`|`None`|Color used for drawing each recording's gaze point, scene camera and gaze vector (depending on settings). Each key should be a recording, value in the dict should be a [`gazeMapper.config.RgbColor`](#gazemapperconfigrgbcolor) object.|
 |Video export: Process all planes for all frames?|`video_process_planes_for_all_frames`|`False`|If `True`, shows detection results for all planes for all frames. If `False`, detection of each plane is only shown during the episode(s) to which it is assigned.|
 |Video export: Process all annotations for all recordings?|`video_process_annotations_for_all_recordings`|`True`|Episode annotations are shown in a bar on the bottom of the screen. If this setting is `True`, annotations for not only the recording for which the video is made, but also for the other recordings are shown in this bar.|
