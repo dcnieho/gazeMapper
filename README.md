@@ -22,7 +22,7 @@ Example where gazeMapper has been used to map head-centered gaze from two head-w
 gaze data of the pair, drawn on an overview video recording with an additional external camera. From Hessels, R.S., Iwabuchi, T., Niehorster, D.C., Funawatari, R., Benjamins, J.S., Kawakami, S.; Nyström, M., Suda, M., Hooge, I.T.C., Sumiya, M., Heijnen, J., Teunisse, M. & Senju, A. (2024). A setup for the crosscultural study of gaze behavior and eye contact in face-to-face collaboration. ECEM 2024
 
 # How to acquire
-GazeMapper is available from `https://github.com/dcnieho/gazeMapper`, and supports Python 3.10 and 3.11 on Windows, MacOS and Linux.
+GazeMapper is available from `https://github.com/dcnieho/gazeMapper`, and supports Python 3.10 and 3.11 on Windows, MacOS and Linux (newer versions of Python should work fine but are not tested).
 
 For Windows users who wish to use the gazeMapper GUI, the easiest way to acquire gazeMapper is to [download
 a standalone executable](https://github.com/dcnieho/gazeMapper/releases/latest). The standalone executable is not
