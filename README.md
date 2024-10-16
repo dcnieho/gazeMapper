@@ -87,7 +87,7 @@ When not using the GUI and running gazeMapper using your own scripts, such a pro
 for a session can be placed anywhere (though recording folders should be placed inside a session folder), and a folder for a custom configuration can also be placed anywhere (but its location needs to be provided using the `config_dir` argument of all the functions in [`gazeMapper.process`](#gazemapperprocess)). The [`gazeMapper.process`](#gazemapperprocess) functions simply take the path to a session or recording folder.
 
 ## Output
-During the importing and processing of a eye tracker or camera recording, a series of files are created in the working folder of the recording. These are the following (not all of the files are created for a camera recording, for instance, there is no gaze data associated with such a recording):
+During the importing and processing of a session, or an eye tracker or camera recording, a series of files are created in the working folder of the session and the recording(s). These are the following (not all of the files are created for a camera recording, for instance, there is no gaze data associated with such a recording):
 |file|location|produced<br>by|description|
 | --- | --- | --- | --- |
 |`calibration.xml`|recording|[`Session.import_recording`](#gazemappersession)|Camera calibration parameters for the scene camera.|
