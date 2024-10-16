@@ -402,8 +402,7 @@ gazeMapper support overriding a subset of the above settings for a specific sess
 
 # API
 All of gazeMapper's functionality is exposed through its API. Below are all functions that are part of the
-public API. Many functions share common input arguments. These are documented [here](#common-input-arguments) and linked to in the API
-overview below.
+public API.
 gazeMapper makes extensive use of the functionality of [glassesTools](https://github.com/dcnieho/glassesTools) and its functionality for validating the calibration of a recording is a thin wrapper around [glassesValidator](https://github.com/dcnieho/glassesValidator). See the [glassesTools](https://github.com/dcnieho/glassesTools/blob/master/README.md) and [glassesValidator](https://github.com/dcnieho/glassesValidator/blob/master/README.md) documentation for more information about these functions.
 
 ## `gazeMapper.config`
@@ -544,27 +543,29 @@ Enumeration
 |`get_recording_def`|<ol><li>`which`: Name of recording for which to get the definition.</li></ol>|<ol><li>A `gazeMapper.session.RecordingDefinition` object. Throws if not found by name.</li></ol>|Get the recording definition by name.|
 |`is_known_recording`|<ol><li>`which`: Name of recording.</li></ol>|<ol><li>Boolean indicating whether a recording by that name is present in the session definition.</li></ol>|Check whether a recording by that name is present in the session definition|
 |`store_as_json`|<ol><li>`path`: Path to store session definition JSON file to. Can be a path to a file, or a path to a folder containing such a file (in the latter case, the default filename `'session_def.json'` will be used).</li></ol>||Store session definition to JSON file.|
-|`load_from_json` (static)|<ol><li>`path`: path to load session definition JSON file from. Can be a path to a file, or a path to a folder containing such a file (in the latter case, the default filename `'session_def.json'` will be used).</li></ol>|<ol><li>A `gazeMapper.session.SessionDefinition` object.</li></ol>|Load session definition from JSON file.
+|`load_from_json` (static)|<ol><li>`path`: path to load session definition JSON file from. Can be a path to a file, or a path to a folder containing such a file (in the latter case, the default filename `'session_def.json'` will be used).</li></ol>|<ol><li>A `gazeMapper.session.SessionDefinition` object.</li></ol>|Load session definition from JSON file.|
 
 ### `gazeMapper.session.Session`
+NB: For the below functions, a recording name should be a known recording set in the session's `gazeMapper.session.SessionDefinition` object, it cannot be just any name.
 |member function|inputs|output|description|
 | --- | --- | --- | --- |
-|`__init__`|<ol><li>`definition`: SessionDefinition, `name`: str, `working_directory`: str|pathlib.Path|None = None, `recordings`: dict[str,Recording]|None = None):
-|`create_working_directory`|<ol><li>`parent_directory`: str|pathlib.Path):
-|`import_recording`|<ol><li>`which`: str, `cam_cal_file`: str|pathlib.Path=None, `**kwargs`):
-|`add_recording_and_import`|<ol><li>`which`: str, `rec_info`: EyeTrackerRecording|CameraRecording, `cam_cal_file`: str|pathlib.Path=None, |`load_existing_recordings`||||
-|`load_recording_info`|<ol><li>`which`: Name of recording.</li></ol>|EyeTrackerRecording|CameraRecording:
-|`add_existing_recording`|<ol><li>`which`: Name of recording.</li></ol>Recording:
-|`check_recording_info`|<ol><li>`which`: Name of recording.</li><li>`rec_info`: EyeTrackerRecording|CameraRecording):
-|`update_recording_info`|<ol><li>`which`: Name of recording.</li><li>`rec_info`: EyeTrackerRecording|CameraRecording):
-|`add_recording_from_info`|<ol><li>`which`: Name of recording.</li><li>`rec_info:` EyeTrackerRecording|CameraRecording) -> Recording:
-|`num_present_recordings`||int||:
-|`has_all_recordings`||bool||:
-|`missing_recordings`|<ol><li>`rec_type`: a [`gazeMapper.session.RecordingType`](#gazemapper-sessions) (optional).</li></ol>|list[str]||
-|`load_action_states`|<ol><li>`create_if_missing`.</li></ol>|bool||
-|`is_action_completed`|<ol><li>`action`: process.Action.</li></ol>|bool||
-|`action_completed_num_recordings`|<ol><li>`action`: process.Action.</li></ol>|list[str]||
-|`from_definition` (static)|<ol><li>`definition`: SessionDefinition or None, path.</li></ol>|||
+|`__init__`|<ol><li>`definition`: a `gazeMapper.session.SessionDefinition` object.</li><li>`name`: Name of the session.</li><li>`working_directory`: Optional, path in which the session is stored.</li><li>`recordings`: Optional, list of `gazeMapper.session.Recording` objects to attach to the session.|||
+|`create_working_directory`|<ol><li>`parent_directory`: Directory in which to create the session's working directory. Typically a gazeMapper project folder.</li></ol>||Creates a working directory (if it doesn't already exists) for the session based on a parent directory and the session's name.|
+|`import_recording`|<ol><li>`which`: Name of recording to import.</li><li>`cam_cal_file`: Optional, camera calibration XML file to use for this recording.</li><li>`**kwargs`: additional setting overrides passed to [`gazeMapper.config.read_study_config_with_overrides`](#gazemapperconfig) when loading settings for the session.||Triggers the import of a recording that is already registered with the session.|
+|`add_recording_and_import`|<ol><li>`which`: Name of recording to import.</li><li>`rec_info`: a [`glassesTools.recording.Recording`](https://github.com/dcnieho/glassesTools/blob/master/README.md#recording-info) or `glassesTools.camera_recording.Recording` object describing the recording to import.</li><li>`cam_cal_file`: Optional, camera calibration XML file to use for this recording.</li></ol>|<ol><li>A `gazeMapper.session.Recording` object.</li></ol>|Register a recording with the session and import it.|
+|`load_existing_recordings`|||Loads known recordings (if present) from the session's working directory.|
+|`load_recording_info`|<ol><li>`which`: Name of recording.</li></ol>|<ol><li>A [`glassesTools.recording.Recording`](https://github.com/dcnieho/glassesTools/blob/master/README.md#recording-info) or `glassesTools.camera_recording.Recording` object describing the recording.</li></ol>|Get info object describing the recording by loading it from the JSON file.|
+|`add_existing_recording`|<ol><li>`which`: Name of recording.</li></ol>|<ol><li>A `gazeMapper.session.Recording` object.</li></ol>|Load a recording from its working directory inside the session working directory.|
+|`check_recording_info`|<ol><li>`which`: Name of recording.</li><li>`rec_info`: a [`glassesTools.recording.Recording`](https://github.com/dcnieho/glassesTools/blob/master/README.md#recording-info) or `glassesTools.camera_recording.Recording` object describing the recording.</li></ol>||Check that the type of info provided matches the defined recording type (e.g. `glassesTools.recording.Recording` for a `gazeMapper.session.RecordingType.Eye_Tracker`).|
+|`update_recording_info`|<ol><li>`which`: Name of recording.</li><li>`rec_info`: a [`glassesTools.recording.Recording`](https://github.com/dcnieho/glassesTools/blob/master/README.md#recording-info) or `glassesTools.camera_recording.Recording` object describing the recording.</li></ol>||Updates the recording info registered with the session for the specified recording.|
+|`add_recording_from_info`|<ol><li>`which`: Name of recording.</li><li>`rec_info:` a [`glassesTools.recording.Recording`](https://github.com/dcnieho/glassesTools/blob/master/README.md#recording-info) or `glassesTools.camera_recording.Recording` object describing the recording.</li></ol>|<ol><li>A `gazeMapper.session.Recording` object.</li></ol>|Register recording with the session from its info, does not trigger an import.|
+|`num_present_recordings`||<ol><li>The number of known recordings that are present.</li></ol>|Get the number of present recordings (recording is registered with the session, the working directory doesn't necessarily exists) for a session.|
+|`has_all_recordings`||<ol><li>Boolean indicating if all known recordings are present.</li></ol>|Get whether all recordings are present (recording is registered with the session, the working directory doesn't necessarily exists) for a session.|:
+|`missing_recordings`|<ol><li>`rec_type`: a [`gazeMapper.session.RecordingType`](#gazemapper-sessions) (optional). If specified, only report missing recordings of the specified type.</li></ol>|<ol><li>List of missing recording names.</li></ol>|Get which recordings are missing (not registered with the session) for a session.|
+|`load_action_states`|<ol><li>`create_if_missing`: Boolean indicating whether the action states file should be created for the session if its missing.</li></ol>|||
+|`is_action_completed`|<ol><li>`action`: a [`gazeMapper.process.Action`](#actions).</li></ol>|<ol><li>Boolean indicating whether the action is completed.</li></ol>|Get whether the indicated is completed for the session. If the action is a recording-level action, returns `True` only when it has been completed for all recordings.|
+|`action_completed_num_recordings`|<ol><li>`action`: a [`gazeMapper.process.Action`](#actions). Should be a recording-level action.</li></ol>|<ol><li>The number of recordings for which the action has completed.</li></ol>|Get the number of recordings for which the action has completed.|
+|`from_definition` (static)|<ol><li>`definition`: a `gazeMapper.session.SessionDefinition` object. Can be `None`, in which case the session definition is loaded from the gazeMapper project's configuration.</li><li>`path`: Path pointing to the working directory of a session. If the `definition` argument is not provided, this working directory should be part of a gazeMapper project so that the project's configuration direction can be found.</li></ol>|<ol><li>A `gazeMapper.session.Session` object.</li></ol>|Create a session object from a session definition and working directory.|
 
 ### Free functions
 |function|inputs|output|description|
@@ -576,15 +577,6 @@ Enumeration
 |`get_action_states`|<ol><li>`working_dir`: path to a direction containing a gazeMapper session or recording.</li><li>`for_recording`: Boolean indicating whether the path contains a gazeMapper session (`False`) or recording (`True`).</li><li>`create_if_missing`: Boolean indicating whether the status file should be created if it doesn't exist in the working directory (default `False`).</li><li>`skip_if_missing`: Boolean indicating whether the function should throw (`False`) or silently ignore when the status file doesn't exist in the working directory.</li></ol>|<ol><li>Dict with a `State` per `Action`.</li></ol>|Read the session's/recording's status file.|
 |`update_action_states`|<ol><li>`working_dir`: path to a direction containing a gazeMapper session or recording.</li><li>a [`gazeMapper.process.Action`](#actions).</li><li>`state`: the new `gazeMapper.process.State`.</li><li>`study_config`: a [`gazeMapper.config.Study`](#gazemapperconfigstudy) object.</li><li>`skip_if_missing`: Boolean indicating whether the function should throw (`False`) or silently ignore when the status file doesn't exist in the working directory.</li></ol>|<ol><li>Dict with a `State` per `Action`.</li></ol>|Update the state of the specified action and store to the status file.|
 
-
-### Common input arguments
-|argument|description|
-| --- | --- |
-|`config_dir`|Path to directory containing a gazeMapper configuration setup. If `None`, gazeMapper attempts to find a configuration folder named `config` at the same level as the gazeMapper session folder(s).|
-|`source_dir`|Path to directory containing one (or for some eye trackers potentially multiple) eye tracker recording(s), or an external camera recording.|
-|`output_dir`|Path to the directory to which recordings will be imported. Each recording will be placed in a subdirectory of the specified path.|
-|`working_dir`|Path to a gazeMapper session or recording directory.|
-|`rec_info`|Recording info ([`glassesTools.recording.Recording`](https://github.com/dcnieho/glassesTools/blob/master/README.md#recording-info) or `glassesTools.camera_recording.Recording`) or list of recording info specifying what is expected to be found in the specified `source_dir`, so that this does not have to be rediscovered and changes can be made e.g. to the recording name that is used for auto-generating the recording's `working_dir`, or even directly specifying the `working_dir` by filling the `working_directory` field before import.|
 
 # Citation
 If you use this tool or any of the code in this repository, please cite:<br>
