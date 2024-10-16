@@ -21,7 +21,7 @@ __pycache__/
 
 # virtual environment
 .venv/
-.build_venv/
+.venv_build/
 
 # Distribution / packaging
 .Python
