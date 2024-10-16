@@ -2,8 +2,6 @@
 import sys
 import os
 import multiprocessing
-import argparse
-import ctypes
 
 
 if getattr(sys, "frozen", False):
