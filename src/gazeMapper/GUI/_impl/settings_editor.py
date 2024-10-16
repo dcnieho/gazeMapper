@@ -4,6 +4,7 @@ import inspect
 import pathlib
 import enum
 
+import glassesTools.annotation
 from imgui_bundle import imgui, imgui_md, icons_fontawesome_6 as ifa6
 
 import glassesTools
@@ -321,9 +322,9 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
                     imgui.set_next_item_width(-1)
                     if missing_fields:
                         items = sorted(list(missing_fields), key=lambda x: x.value if isinstance(x, enum.Enum) else x)
-                        items_str = [x.value if isinstance(x, enum.Enum) else str(x) for x in items]
+                        items_str, tooltips = _get_str_values(items, type(items[0]), documentation)
                         idx = items.index(new_item_name) if new_item_name else -1
-                        _,idx = imgui.combo("##item_selector", idx, items_str)
+                        _,idx = glassesTools.gui.utils.tooltip_combo("##item_selector", idx, items_str, tooltips)
                         new_item_name = None if idx==-1 else items[idx]
                     else:
                         _,new_item_name = imgui.input_text("##new_item_name",new_item_name)
@@ -489,7 +490,7 @@ def draw_value(field_lbl: str, val: _T, f_type: typing.Type, nullable: bool, def
                 values.insert(0,f'*unknown value: {val}*')
             str_values, tooltips = _get_str_values(values, f_type, documentation)
             imgui.set_next_item_width(get_fields_text_width(str_values,{})+imgui.get_frame_height()+2*imgui.get_style().frame_padding.x)
-            changed,p_idx = imgui.combo(f"##{field_lbl}", p_idx, str_values, popup_max_height_in_items=min(10,len(values)))
+            changed,p_idx = glassesTools.gui.utils.tooltip_combo(f"##{field_lbl}", p_idx, str_values, tooltips, popup_max_height_in_items=min(10,len(values)))
             if tooltips[p_idx]:
                 glassesTools.gui.utils.draw_hover_text(tooltips[p_idx],'')
             if is_known_value or (changed and p_idx>0):
@@ -659,7 +660,7 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, documenta
                 if line>1:
                     imgui.set_cursor_screen_pos(imgui.get_cursor_screen_pos()-(0, imgui.get_style().frame_padding.y))
             imgui.set_next_item_width(adder_width)
-            selected,p_idx = imgui.combo(f"##{field_lbl}", -1, str_values, popup_max_height_in_items=min(10,len(str_values)))
+            selected,p_idx = glassesTools.gui.utils.tooltip_combo(f"##{field_lbl}", -1, str_values, tooltips, popup_max_height_in_items=min(10,len(str_values)))
             if selected:
                 to_add = miss_values[p_idx]
 
