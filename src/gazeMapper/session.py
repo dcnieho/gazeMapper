@@ -239,7 +239,7 @@ class Session:
         else:
             return all((self.recordings[r].state[action]==process.State.Completed for r in self.recordings))
 
-    def action_completed_num_recordings(self, action: process.Action) -> list[str]:
+    def action_completed_num_recordings(self, action: process.Action) -> int:
         if process.is_session_level_action(action):
             raise ValueError('The status of session-level actions cannot be listed per recording')
 
