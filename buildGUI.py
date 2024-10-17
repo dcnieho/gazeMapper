@@ -2,7 +2,7 @@ import cx_Freeze
 import pathlib
 import sys
 import site
-from distutils.util import convert_path
+import os
 
 path = pathlib.Path(__file__).absolute().parent
 sys.path.append(str(path/'src'))
@@ -12,17 +12,15 @@ def get_include_files():
 
     # ffpyplayer bin deps
     for d in site.getsitepackages():
-        d=pathlib.Path(d)/'share'/'ffpyplayer'
+        d = pathlib.Path(d) / 'share' / 'ffpyplayer'
         for lib in ('ffmpeg', 'sdl'):
-            d2 = d/lib/'bin'
-            if d2.is_dir():
-                for f in d2.iterdir():
-                    if f.is_file() and f.suffix=='' or f.suffix in ['.dll', '.exe']:
-                        files.append((f,pathlib.Path('lib')/f.name))
+            for f in (d/lib/'bin').glob('*'):
+                if f.is_file() and f.suffix=='' or f.suffix in ['.dll', '.exe']:
+                    files.append((f,pathlib.Path('lib')/f.name))
     return files
 
 main_ns = {}
-ver_path = convert_path('src/gazeMapper/version.py')
+ver_path = pathlib.Path('src/gazeMapper/version.py')
 with open(ver_path) as ver_file:
     exec(ver_file.read(), main_ns)
 
