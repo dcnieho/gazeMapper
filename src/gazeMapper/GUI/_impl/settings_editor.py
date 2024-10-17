@@ -124,7 +124,7 @@ def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_get
 
 def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[], set[typing.Any]]], parent_obj: _C2|None, problems: type_utils.ProblemDict, documentation: dict[str,type_utils.GUIDocInfo], fixed: type_utils.NestedDict, level=0, table_is_started=False, has_remove=False) -> tuple[bool,bool,bool,_C,str|None]:
     changed = False
-    max_fields_width = get_fields_text_width(fields, documentation)*1.02    # little bit of extra space for bold font
+    max_fields_width = get_fields_text_width(fields, documentation)*1.08    # little bit of extra space for bold font
     ret_new_obj = False
     removed_field = None
     for f in fields:
@@ -259,7 +259,7 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
     if defaults is None:
         defaults = {}
 
-    first_column_width = max([get_fields_text_width(fields, documentation, backup_str='xadd itemx'), get_fields_text_width(['xadd itemx'],{})])*1.02    # little bit of extra space for bold font
+    first_column_width = max([get_fields_text_width(fields, documentation, backup_str='xadd itemx'), get_fields_text_width(['xadd itemx'],{})])*1.08    # little bit of extra space for bold font
     table_is_started = _start_table(level, first_column_width)
     if not table_is_started:
         return False, made_or_replaced_obj, obj, False
