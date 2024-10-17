@@ -19,6 +19,17 @@ def get_include_files():
                     files.append((f,pathlib.Path('lib')/f.name))
     return files
 
+def get_zip_include_files():
+    files = []
+    for d in site.getsitepackages():
+        base = pathlib.Path(d)
+        p = base / 'glassesValidator' / 'config'
+
+        for f in p.rglob('*'):
+            if f.is_file() and f.suffix not in ['.py','.pyc']:
+                files.append((f, pathlib.Path(os.path.relpath(f,base))))
+    return files
+
 main_ns = {}
 ver_path = pathlib.Path('src/gazeMapper/version.py')
 with open(ver_path) as ver_file:
@@ -32,6 +43,7 @@ build_options = {
             'imgui_bundle._imgui_bundle'
         ],
         "excludes":["tkinter"],
+        "zip_includes": get_zip_include_files(),
         "zip_include_packages": "*",
         "zip_exclude_packages": [
             "OpenGL_accelerate",
