@@ -549,6 +549,10 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, documenta
     has_order = isinstance(val,list)
     if not has_order:
         disp_val= [v for v in all_values if v in val]    # preserve order
+        # make sure this doesn't filter out any values however
+        for v in val:
+            if v not in disp_val:
+                disp_val.append(v)
     # get width of drawing space
     item_w = imgui.calc_item_width()
     h_edge_spacing = imgui.get_style().item_spacing.x
