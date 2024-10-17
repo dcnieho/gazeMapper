@@ -26,11 +26,12 @@ GazeMapper is available from `https://github.com/dcnieho/gazeMapper`, and suppor
 
 For Windows users who wish to use the gazeMapper GUI, the easiest way to acquire gazeMapper is to [download
 a standalone executable](https://github.com/dcnieho/gazeMapper/releases/latest). The standalone executable is not
-available for MacOS or Linux.
+available for MacOS or Linux. Complete installation instruction for [MacOS](#complete-install-instructions-for-macos) and [Linux](#complete-install-instructions-for-linux) users are available below.
 
-For users on Windows, Mac or Linux who wish to use gazeMapper in their Python code, the easiest way to acquire
+For users on Windows, Mac or Linux who wish to use gazeMapper *in their Python code*, the easiest way to acquire
 gazeMapper is to install it directly into your Python distribution using the command
-`python -m pip install gazeMapper`. If you run into problems on MacOS to install the `imgui_bundle` package, you can
+`python -m pip install gazeMapper`.
+If you run into problems on MacOS to install the `imgui_bundle` package, you can
 try to install it first with the command `SYSTEM_VERSION_COMPAT=0 pip install --only-binary=:all: imgui_bundle`. Note that this repository is pip-installable as well:
 `python -m pip install git+https://github.com/dcnieho/gazeMapper.git#egg=gazeMapper`. NB: on some platforms you may have
 to replace `python` with `python3` in the above command lines.
@@ -48,6 +49,57 @@ Once pip-installed in your Python distribution, there are three ways to run the 
         import gazeMapper.GUI
         gazeMapper.GUI.run()
     ```
+
+## Complete install instructions for MacOS
+Installing and running gazeMapper on a Mac will involve some use of the terminal. In this section we will show you step by step how to install, and then what to do every time you want to run gazeMapper.
+### Installing gazeMapper
+1. To acquire and manage Python, install Anaconda by following [these instructions](https://docs.anaconda.com/anaconda/install/mac-os/). Additional notes:
+   a. Choose the graphical installer.
+   b. When clicking the installer link provided in these instructions, you may first be shown a user registration page. You can click "skip registration" there to directly go to the download files.
+   c. Ensure that you choose the correct installer for your system (Intel or Apple Silicon). If you are not sure what kind of system you have, consult [this page](https://support.apple.com/en-us/116943) to learn how to find out.
+2. Once anaconda is installed, open the Terminal application.
+3. You now first need to make an environment with the correct Python version in which you can then install gazeMapper. To do so, type `conda create -n gazeMapper-env python=3.11 pip` and run the command. `gazeMapper-env` is the name of the environment you create with this comment.
+4. Activate the environment you have just created: `conda activate gazeMapper-env`.
+5. Now you need to install gazeMapper. Do the following in the below order:
+   a. Type and run `SYSTEM_VERSION_COMPAT=0 pip install --only-binary=:all: imgui_bundle==1.5.2`
+   b. Type and run `pip install gazeMapper`.
+
+### Updating gazeMapper
+If you already have gazeMapper installed but want to update it to the latest version, do the following:
+1. Open the Terminal application.
+2. Activate the environment in which you have gazeMapper installed: type and run `conda activate gazeMapper-env`, where `gazeMapper-env` is the name of the environment you created using the above instructions. If you use an environment with a different name, replace the name in the command.
+3. Type and run `SYSTEM_VERSION_COMPAT=0 pip install --only-binary=:all: imgui_bundle==1.5.2`
+4. Type and run `pip install gazeMapper --upgrade`.
+
+### Running gazeMapper
+If you have followed the above instructions to install gazeMapper, do the following each time you want to run gazeMapper:
+1. Open the Terminal application.
+2. Activate the environment in which you have gazeMapper installed: type and run `conda activate gazeMapper-env`, where `gazeMapper-env` is the name of the environment you created using the above instructions. If you use an environment with a different name, replace the name in the command.
+3. Start the Python interpreter: type and run `python`.
+4. Type and run `import gazeMapper`.
+5. Type and run `gazeMapper.GUI.run()`.
+
+## Complete install instructions for Linux
+Installing and running gazeMapper on Linux will involve some use of the terminal. In this section we will show you step by step how to install, and then what to do every time you want to run gazeMapper.
+### Installing gazeMapper
+1. You may well already have Python installed on your machine. To check, type and run `python3 --version` in a terminal. If this command completes successfully and shows you have Python 3.10 or later, you can skip to step 3.
+2. To install Python, check what is the appropriate command for your Linux distribution. Examples would be `sudo apt-get update && sudo apt-get install python3.11` for Ubuntu and its derivatives, and `sudo dnf install python3.11` for Fedora. You can replace `python3.11` in this command with a different version (minimum 3.10).
+3. Make a new folder from where you want to run gazeMapper, e.g. `mkdir gazeMapper`. Enter this folder: `cd gazeMapper`.
+4. You now first need to make an environment in which you can then install gazeMapper. To do so, type `python3 -m venv .venv` and run the command.
+4. Activate the environment you have just created: `source .venv/bin/activate`.
+5. Now you need to install gazeMapper. To do so, type and run `pip install gazeMapper`.
+
+### Updating gazeMapper
+If you already have gazeMapper installed but want to update it to the latest version, do the following:
+1. Open the Terminal application.
+2. Navigate to the gazeMapper install location and activate the environment in which you have gazeMapper installed: type and run `source .venv/bin/activate` in the location where you installed gazeMapper.
+3. Type and run `pip install gazeMapper --upgrade`.
+
+### Running gazeMapper
+If you have followed the above instructions to install gazeMapper, do the following each time you want to run gazeMapper:
+1. Open the Terminal application.
+2. Navigate to the gazeMapper install location and activate the environment in which you have gazeMapper installed: type and run `source .venv/bin/activate` in the location where you installed gazeMapper.
+3. Type and run `gazeMapper`.
 
 # Usage
 To use gazeMapper, first a recording session needs to be defined for the project. This entails telling gazeMapper which eye tracker and external camera recording(s) to expect, and what planes to map gaze to. The very simplest setup consists of a single eye tracker recording per session and a single plane to map gaze to, but multiple planes and any number of eye tracker and external camera recordings per session is supported. Sessions consisting of only a single external camera recording are not supported, at least one eye tracker recording should be included. Once this setup has been performed, new sessions can be created and recordings imported to the defined eye tracker and external camera recording slots of these new sessions. Once imported, further processing can commence.
