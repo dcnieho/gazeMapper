@@ -4,7 +4,7 @@ import sys
 
 from glassesTools import async_thread, platform
 
-from ._impl.gui import GUI as _GUI
+from ._impl import gui
 
 
 def run():
@@ -25,7 +25,7 @@ def run():
         except Exception:
             pass
 
-    gui = _GUI()
+    g = gui.GUI()
     async_thread.setup()
-    gui.run()
+    g.run()
     async_thread.cleanup()
