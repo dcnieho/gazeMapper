@@ -728,6 +728,12 @@ class GUI:
                 self.process_pool.set_num_workers(self.study_config.gui_num_workers)
 
     def _action_list_pane_drawer(self):
+        changed, new_config = settings_editor.draw(copy.deepcopy(self.study_config), ['gui_num_workers'], config.study_parameter_types, config.study_defaults, self._possible_value_getters, None, self._problems_cache, config.study_parameter_doc)
+        if changed:
+            self.study_config = new_config
+            self.study_config.store_as_json()
+            self.process_pool.set_num_workers(self.study_config.gui_num_workers)
+
         if not self.job_scheduler.jobs:
             imgui.text('No actions have been enqueued or performed')
             return
@@ -990,10 +996,6 @@ class GUI:
             gt_gui.utils.push_popup(self, lambda: gt_gui.utils.popup("Add plane", _add_plane_popup, buttons = buttons, outside=False))
 
     def _episode_setup_pane_drawer(self):
-        if not self.study_config.episodes_to_code:
-            imgui.text_colored(colors.error,'*At minimum one episode should be selected to be coded')
-        if not self.study_config.planes_per_episode:
-            imgui.text_colored(colors.error,'*At minimum one plane should be linked to at minimum one episode')
         if not self.study_config.planes:
             imgui.align_text_to_frame_padding()
             imgui.text_colored(colors.error,'*At minimum one plane should be defined.')

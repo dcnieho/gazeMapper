@@ -220,6 +220,8 @@ class Study:
 
     def _check_planes_per_episode(self, strict_check) -> type_utils.ProblemDict:
         problems: type_utils.ProblemDict = {}
+        if not self.planes_per_episode:
+            type_utils.merge_problem_dicts(problems, {'planes_per_episode': 'At minimum one episode should have a corresponding plane defined'})
         for e in self.planes_per_episode:
             missing_planes: list[str] = []
             for p in self.planes_per_episode[e]:
@@ -229,32 +231,58 @@ class Study:
                     else:
                         missing_planes.append(p)
             if missing_planes:
-                if 'planes_per_episode' not in problems:
-                    problems['planes_per_episode'] = {}
-                problems['planes_per_episode'][e] = f'Plane(s) {missing_planes[0] if len(missing_planes)==1 else missing_planes} not known.'
+                mp = '", "'.join(missing_planes)
+                type_utils.merge_problem_dicts(problems, {'planes_per_episode': {e: f'Plane(s) "{mp}" not known.'}})
 
-        if annotation.Event.Validate in self.episodes_to_code and annotation.Event.Validate not in self.planes_per_episode:
-            if strict_check:
-                raise ValueError('Validation episodes are set up to be coded for this study, but no planes are set up to be used for validation in planes_per_episode')
-            else:
-                type_utils.merge_problem_dicts(problems, {'planes_per_episode': 'Validation episodes are set up to be coded for this study, but no planes are set up to be used for validation'})
+            # check correct number of planes is defined for the episode
+            match e:
+                case annotation.Event.Sync_Camera:
+                    allow_one_plane = allow_more_than_one = False
+                case annotation.Event.Validate:
+                    allow_one_plane = True
+                    allow_more_than_one = False
+                case annotation.Event.Sync_Camera | annotation.Event.Trial:
+                    allow_one_plane = allow_more_than_one = True
+            if not allow_one_plane:
+                msg = f'No planes should be defined for a {e.value} episode'
+                if strict_check:
+                    raise ValueError(msg)
+                else:
+                    type_utils.merge_problem_dicts(problems, {'planes_per_episode': {e: msg}})
+            elif not self.planes_per_episode[e]:
+                msg = ('At least one' if allow_more_than_one else 'One')+f' plane should be defined for a {e.value} episode'
+                if strict_check:
+                    raise ValueError(msg)
+                else:
+                    type_utils.merge_problem_dicts(problems, {'planes_per_episode': {e: msg}})
+            if not allow_more_than_one and len(self.planes_per_episode[e])>1:
+                msg = f'Only one plane should be defined for a {e.value} episode'
+                if strict_check:
+                    raise ValueError(msg)
+                else:
+                    type_utils.merge_problem_dicts(problems, {'planes_per_episode': {e: msg}})
+
+        for e in self.episodes_to_code:
+            if e not in self.planes_per_episode and e not in [annotation.Event.Sync_Camera]:
+                msg = f'{e.value} episodes are set up to be coded and require an associated plane, but no plane(s) are defined in planes_per_episode for {e.value} episodes'
+                if strict_check:
+                    raise ValueError(msg)
+                else:
+                    type_utils.merge_problem_dicts(problems, {'planes_per_episode': msg})
         return problems
 
     def _check_episodes_to_code(self, strict_check) -> type_utils.ProblemDict:
         problems: type_utils.ProblemDict = {}
+        if not self.episodes_to_code:
+            type_utils.merge_problem_dicts(problems, {'episodes_to_code': 'At minimum one episode should be selected to be coded'})
+
         for e in self.planes_per_episode:
             if e not in self.episodes_to_code:
                 if strict_check:
-                    raise ValueError(f'Plane(s) are defined in planes_per_episode for {e.name} events, but {e.name} events are not set up to be coded in episodes_to_code. Fix episodes_to_code.')
+                    raise ValueError(f'Plane(s) are defined in planes_per_episode for {e.name} episodes, but {e.name} episodes are not set up to be coded in episodes_to_code. Fix episodes_to_code.')
                 else:
-                    msg = f'Plane(s) are defined in planes_per_episode for {e.value} events, but {e.value} events are not set up to be coded.'
-                    if 'episodes_to_code' in problems:
-                        problems['episodes_to_code'] = '\n'.join([problems['episodes_to_code'], msg])
-                    else:
-                        problems['episodes_to_code'] = msg
-                    if 'planes_per_episode' not in problems:
-                        problems['planes_per_episode'] = {}
-                    problems['planes_per_episode'][e] = f'Plane(s) are defined in planes_per_episode for {e.value} events, but {e.value} events are not set up to be coded. Remove {e.value} from planes_per_episode.'
+                    type_utils.merge_problem_dicts(problems, {'episodes_to_code': f'Plane(s) are defined in planes_per_episode for {e.value} episodes, but {e.value} episodes are not set up to be coded'})
+                    type_utils.merge_problem_dicts(problems, {'planes_per_episode': {e: f'{e.value} episodes are not set up to be coded in episodes_to_code, so no plane(s) should be set up for {e.value} episodes.'}})
         return problems
 
     def _check_auto_coding_setup(self, strict_check) -> type_utils.ProblemDict:
@@ -302,9 +330,7 @@ class Study:
                     if strict_check:
                         raise ValueError(f'auto_code_trial_episodes.{f} cannot be empty or unspecified')
                     else:
-                        if 'auto_code_trial_episodes' not in problems:
-                            problems['auto_code_trial_episodes'] = {}
-                        problems['auto_code_trial_episodes'][f] = f'auto_code_trial_episodes.{f} cannot be empty or unspecified'
+                        type_utils.merge_problem_dicts(problems, {'auto_code_trial_episodes': {f: f'auto_code_trial_episodes.{f} cannot be empty or unspecified'}})
                 else:
                     missing_markers: list[int] = []
                     for i in self.auto_code_trial_episodes[f]:
@@ -314,9 +340,7 @@ class Study:
                             else:
                                 missing_markers.append(i)
                     if missing_markers:
-                        if 'auto_code_trial_episodes' not in problems:
-                            problems['auto_code_trial_episodes'] = {}
-                        problems['auto_code_trial_episodes'][f] = f'The marker(s) {missing_markers[0] if len(missing_markers)==1 else missing_markers} are not defined in individual_markers'
+                        type_utils.merge_problem_dicts(problems, {'auto_code_trial_episodes': {f: f'The marker(s) {missing_markers[0] if len(missing_markers)==1 else missing_markers} are not defined in individual_markers'}})
         return problems
 
     def _check_sync_ref(self, strict_check):
