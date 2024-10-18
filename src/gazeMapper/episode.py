@@ -45,7 +45,7 @@ def get_empty_marker_dict(episodes: list[annotation.Event]=None) -> dict[annotat
     if not episodes:
         return {e:[] for e in annotation.Event}
     else:
-        return {e:[] for e in episodes}
+        return {e:[] for e in annotation.Event if e in episodes}    # ensure return always has the same order
 
 def list_to_marker_dict(episodes: list[Episode], expected_types: list[annotation.Event]=None) -> dict[annotation.Event,list[list[int]]]:
     e_dict = get_empty_marker_dict(expected_types)
