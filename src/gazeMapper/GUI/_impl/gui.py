@@ -1125,42 +1125,63 @@ class GUI:
             }
             gt_gui.utils.push_popup(self, lambda: gt_gui.utils.popup("Add marker", _add_rec_popup, buttons = buttons, outside=False))
 
-    def _get_pending_running_job_list(self) -> set[utils.JobInfo]:
-        active_jobs: set[utils.JobInfo] = set()
+    def _get_pending_running_job_list(self) -> dict[utils.JobInfo, int]:
+        active_jobs: dict[utils.JobInfo, int] = {}
         for job_id in self.job_scheduler.jobs:
             if self.job_scheduler.jobs[job_id].get_state() in [process.State.Pending, process.State.Running]:
-                active_jobs.add(self.job_scheduler.jobs[job_id].user_data)
+                active_jobs[self.job_scheduler.jobs[job_id].user_data] = job_id
         return active_jobs
 
     def _session_context_menu(self, session_name: str) -> bool:
         # ignore input session name, get selected sessions
         sess = [self.sessions[s] for s in self.sessions if self._selected_sessions.get(s,False)]
         actions: dict[str, dict[process.Action, bool|list[str]]] = {}
+        actions_running: dict[str, dict[process.Action, bool|list[str]]] = {}
         for s in sess:
             actions[s.name] = process.get_possible_actions(s.state, {r:s.recordings[r].state for r in s.recordings}, {a for a in process.Action if a!=process.Action.IMPORT}, self.study_config)
-            actions[s.name] = self._filter_session_context_menu_actions(s.name, None, actions[s.name])
+            actions[s.name], actions_running[s.name] = self._filter_session_context_menu_actions(s.name, None, actions[s.name])
         # draw actions that can be run
         all_actions = {a for s in actions for a in actions[s]}
+        all_actions |= {a for r in actions_running for a in actions_running[r]}
         all_actions = [a for a in process.Action if a in all_actions]   # ensure order
         for a in all_actions:
-            if process.is_session_level_action(a):
-                to_run = [(s,None) for s in actions if a in actions[s] and actions[s][a]]
-                hover_text = f'Run {a.displayable_name} for session(s):\n- '+'\n- '.join([s for s in actions if a in actions[s] and actions[s][a]])
-                status = max([self.sessions[s].state[a] for s in actions])
+            running = [r for r in actions_running if a in actions_running[r]]
+            if running:
+                if process.is_session_level_action(a):
+                    running = [(s,None) for s in actions_running if a in actions_running[s]]
+                    hover_text = f'Cancel running {a.displayable_name} for session(s):\n- '+'\n- '.join([s for s in actions_running if a in actions_running[s]])
+                else:
+                    running = [(s,r) for s in actions_running for r in actions_running[s][a]]
+                    hover_text = f'Cancel running {a.displayable_name} for session(s):\n- '+'\n- '.join([f'{s}, recording(s):\n  - '+'\n  - '.join(actions_running[s][a]) for s in actions_running if a in actions_running[s]])
+                hover_text = hover_text.replace('running Run','Run')    # deal with task called "Run Validation"
+                icon = ifa6.ICON_FA_HAND
             else:
-                to_run = [(s,r) for s in actions for r in actions[s][a]]
-                hover_text = f'Run {a.displayable_name} for session(s):\n- '+'\n- '.join([f'{s}, recording(s):\n  - '+'\n  - '.join(actions[s][a]) for s in actions if a in actions[s] and actions[s][a]])
-                status = max([self.sessions[s].recordings[r].state[a] for s in actions for r in actions[s][a]])
-            hover_text = hover_text.replace('Run Run','Run')    # deal with task called "Run Validation"
-            if a.has_options:
-                hover_text += '\nShift-click to bring up a popup with configuration options for this run.'
-            icon = ifa6.ICON_FA_PLAY if status<process.State.Completed else ifa6.ICON_FA_ARROW_ROTATE_RIGHT
+                if process.is_session_level_action(a):
+                    to_run = [(s,None) for s in actions if a in actions[s] and actions[s][a]]
+                    hover_text = f'Run {a.displayable_name} for session(s):\n- '+'\n- '.join([s for s in actions if a in actions[s] and actions[s][a]])
+                    status = max([self.sessions[s].state[a] for s in actions])
+                else:
+                    to_run = [(s,r) for s in actions for r in actions[s][a]]
+                    hover_text = f'Run {a.displayable_name} for session(s):\n- '+'\n- '.join([f'{s}, recording(s):\n  - '+'\n  - '.join(actions[s][a]) for s in actions if a in actions[s] and actions[s][a]])
+                    status = max([self.sessions[s].recordings[r].state[a] for s in actions for r in actions[s][a]])
+                hover_text = hover_text.replace('Run Run','Run')    # deal with task called "Run Validation"
+                if a.has_options:
+                    hover_text += '\nShift-click to bring up a popup with configuration options for this run.'
+                icon = ifa6.ICON_FA_PLAY if status<process.State.Completed else ifa6.ICON_FA_ARROW_ROTATE_RIGHT
             if imgui.selectable(icon+f" {a.displayable_name}", False)[0]:
-                for s,r in to_run:
-                    if a.has_options and imgui.get_io().key_shift:
-                        callbacks.show_action_options(self, s, r, a)
-                    else:
-                        self.launch_task(s, r, a)
+                if running:
+                    for s,r in running:
+                        if r is None:
+                            job_id = actions_running[s][a]
+                        else:
+                            job_id = actions_running[s][a][r]
+                        self.job_scheduler.cancel_job(job_id)
+                else:
+                    for s,r in to_run:
+                        if a.has_options and imgui.get_io().key_shift:
+                            callbacks.show_action_options(self, s, r, a)
+                        else:
+                            self.launch_task(s, r, a)
             gt_gui.utils.draw_hover_text(hover_text, '')
         # draw working folder interactions
         changed = False
@@ -1177,26 +1198,38 @@ class GUI:
         sess = self.sessions[session_name]
         recs = [r for r in sess.recordings if self._selected_recordings[session_name].get(r,False)]
         actions: dict[str, dict[process.Action, bool|list[str]]] = {}
+        actions_running: dict[str, dict[process.Action, bool|list[str]]] = {}
         for r in recs:
             actions[r] = process.get_possible_actions(sess.state, {r:sess.recordings[r].state}, {a for a in process.Action if a!=process.Action.IMPORT and not process.is_session_level_action(a)}, self.study_config)
-            actions[r] = self._filter_session_context_menu_actions(sess.name, r, actions[r])
+            actions[r], actions_running[r] = self._filter_session_context_menu_actions(sess.name, r, actions[r])
         # draw actions that can be run
         all_actions = {a for r in actions for a in actions[r]}
+        all_actions |= {a for r in actions_running for a in actions_running[r]}
         all_actions = [a for a in process.Action if a in all_actions]   # ensure order
         for a in all_actions:
             to_run = [r for r in actions if a in actions[r]]
-            hover_text = f'Run {a.displayable_name} for recordings:\n- '+'\n- '.join(to_run)
-            status = max([sess.recordings[r].state[a] for r in to_run])
-            hover_text = hover_text.replace('Run Run','Run')    # deal with task called "Run Validation"
-            if a.has_options:
-                hover_text += '\nShift-click to bring up a popup with configuration options for this run.'
-            icon = ifa6.ICON_FA_PLAY if status<process.State.Completed else ifa6.ICON_FA_ARROW_ROTATE_RIGHT
+            running= [r for r in actions_running if a in actions_running[r]]
+            if running:
+                hover_text = f'Cancel running {a.displayable_name} for recordings:\n- '+'\n- '.join(running)
+                hover_text = hover_text.replace('running Run','Run')    # deal with task called "Run Validation"
+                icon = ifa6.ICON_FA_HAND
+            else:
+                hover_text = f'Run {a.displayable_name} for recordings:\n- '+'\n- '.join(to_run)
+                hover_text = hover_text.replace('Run Run','Run')        # deal with task called "Run Validation"
+                status = max([sess.recordings[r].state[a] for r in to_run])
+                if a.has_options:
+                    hover_text += '\nShift-click to bring up a popup with configuration options for this run.'
+                icon = ifa6.ICON_FA_PLAY if status<process.State.Completed else ifa6.ICON_FA_ARROW_ROTATE_RIGHT
             if imgui.selectable(icon+f" {a.displayable_name}##{session_name}", False)[0]:
-                for r in to_run:
-                    if a.has_options and imgui.get_io().key_shift:
-                        callbacks.show_action_options(self, session_name, r, a)
-                    else:
-                        self.launch_task(session_name, r, a)
+                if running:
+                    for r in running:
+                        self.job_scheduler.cancel_job(actions_running[r][a])
+                else:
+                    for r in to_run:
+                        if a.has_options and imgui.get_io().key_shift:
+                            callbacks.show_action_options(self, session_name, r, a)
+                        else:
+                            self.launch_task(session_name, r, a)
             gt_gui.utils.draw_hover_text(hover_text, '')
         # draw source/working folder interactions
         source_directories = [sd for r in recs if (sd:=sess.recordings[r].info.source_directory).is_dir()]
@@ -1223,27 +1256,47 @@ class GUI:
                 callbacks.remove_folder(sess.recordings[r].info.working_directory)
             changed = True
         return changed
-    def _filter_session_context_menu_actions(self, session_name: str, rec_name: str|None, actions: dict[process.Action,bool|list[str]]) -> dict[process.Action,bool|list[str]]:
+    def _filter_session_context_menu_actions(self, session_name: str, rec_name: str|None, actions: dict[process.Action,bool|list[str]]) -> tuple[dict[process.Action,bool|list[str]], dict[process.Action,int|dict[str,int]]]:
         # filter out running and pending tasks
         if not actions:
-            return {}
+            return {}, {}
 
-        actions_filt: dict[process.Action,bool|list[str]] = {}
+        # first get list of scheduled actions for this session/recordings
         active_jobs = self._get_pending_running_job_list()
-        for a in actions:
+        actions_running : dict[process.Action,int|dict[str,int]] = {}
+        for a in process.Action:
             if process.is_session_level_action(a):
-                if utils.JobInfo(a, session_name) not in active_jobs:
-                    actions_filt[a] = actions[a]
+                if (j:=utils.JobInfo(a, session_name)) in active_jobs:
+                    actions_running[a]  = active_jobs[j]
             else:
                 if rec_name:
-                    if utils.JobInfo(a, session_name, rec_name) not in active_jobs:
-                        actions_filt[a] = actions[a]
+                    if (j:=utils.JobInfo(a, session_name, rec_name)) in active_jobs:
+                        actions_running[a] = active_jobs[j]
                 else:
                     # check each recording
-                    recs = [r for r in actions[a] if utils.JobInfo(a, session_name, r) not in active_jobs]
+                    recs = {r.name:active_jobs[j] for r in self.study_config.session_def.recordings if (j:=utils.JobInfo(a, session_name, r.name)) in active_jobs}
                     if recs:
-                        actions_filt[a] = recs
-        return actions_filt
+                        actions_running[a] = recs
+
+        # filter out running actions from possible actions
+        actions_possible: dict[process.Action,bool|list[str]] = {}
+        for a in actions:
+            if process.is_session_level_action(a):
+                if a not in actions_running:
+                    actions_possible[a] = actions[a]
+            else:
+                if rec_name:
+                    if a not in actions_running:
+                        actions_possible[a] = actions[a]
+                else:
+                    # check each recording
+                    if a not in actions_running:
+                        actions_possible[a] = actions[a]
+                    else:
+                        recs = [r for r in actions[a] if r not in actions_running[a]]
+                        if recs:
+                            actions_possible[a] = recs
+        return actions_possible, actions_running
 
     def _open_session_detail(self, sess: session.Session):
         win_name = f'{sess.name}##session_view'
@@ -1285,24 +1338,31 @@ class GUI:
                 gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='add_cam_recordings', sessions=[sess.name]))
         session_level_actions = [a for a in self._session_actions if process.is_session_level_action(a)]
         possible_actions = process.get_possible_actions(sess.state, {r:sess.recordings[r].state for r in sess.recordings}, set(session_level_actions), self.study_config)
-        menu_actions = self._filter_session_context_menu_actions(sess.name, None, possible_actions)
+        menu_actions,menu_actions_running = self._filter_session_context_menu_actions(sess.name, None, possible_actions)
         if session_level_actions and imgui.begin_table(f'##{sess.name}_session_level', 2, imgui.TableFlags_.sizing_fixed_fit):
             for a in session_level_actions:
                 imgui.table_next_column()
                 session_lister.draw_process_state(sess.state[a])
                 imgui.table_next_column()
                 imgui.selectable(a.displayable_name, False, imgui.SelectableFlags_.span_all_columns|imgui.SelectableFlags_.allow_overlap)
-                if a in menu_actions and imgui.begin_popup_context_item(f"##{sess.name}_{a}_context"):
-                    hover_text = f'Run {a.displayable_name} for session: {sess.name}'
-                    if a.has_options:
-                        hover_text += '\nShift-click to bring up a popup with configuration options for this run.'
-                    status = self.sessions[sess.name].state[a]
-                    icon = ifa6.ICON_FA_PLAY if status<process.State.Completed else ifa6.ICON_FA_ARROW_ROTATE_RIGHT
+                if (a in menu_actions or a in menu_actions_running) and imgui.begin_popup_context_item(f"##{sess.name}_{a}_context"):
+                    if a in menu_actions_running:
+                        hover_text = f'Cancel running {a.displayable_name} for session: {sess.name}'
+                        icon = ifa6.ICON_FA_HAND
+                    else:
+                        hover_text = f'Run {a.displayable_name} for session: {sess.name}'
+                        if a.has_options:
+                            hover_text += '\nShift-click to bring up a popup with configuration options for this run.'
+                        status = self.sessions[sess.name].state[a]
+                        icon = ifa6.ICON_FA_PLAY if status<process.State.Completed else ifa6.ICON_FA_ARROW_ROTATE_RIGHT
                     if imgui.selectable(icon+f" {a.displayable_name}##{sess.name}", False)[0]:
-                        if a.has_options and imgui.get_io().key_shift:
-                            callbacks.show_action_options(self, sess.name, None, a)
+                        if a in menu_actions_running:
+                            self.job_scheduler.cancel_job(menu_actions_running[a])
                         else:
-                            self.launch_task(sess.name, None, a)
+                            if a.has_options and imgui.get_io().key_shift:
+                                callbacks.show_action_options(self, sess.name, None, a)
+                            else:
+                                self.launch_task(sess.name, None, a)
                     gt_gui.utils.draw_hover_text(hover_text, '')
                     imgui.end_popup()
             imgui.end_table()
