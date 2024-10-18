@@ -46,20 +46,8 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
     session_info = session.Session.from_definition(study_config.session_def, working_dir)
 
     # get info from reference recording
-    ref_episodes = synchronization.get_coding_file(working_dir / study_config.sync_ref_recording)
     ref_vid_ts_file = working_dir / study_config.sync_ref_recording / naming.frame_timestamps_fname
     video_ts_ref = timestamps.VideoTimestamps(ref_vid_ts_file)
-
-    # check input
-    if study_config.sync_ref_do_time_stretch:
-        if len(ref_episodes)<2:
-            raise ValueError(f"You requested to do time stretching when syncing the recordings, but there is only one camera sync point. At least two sync points are required for time stretching")
-        if study_config.sync_ref_average_recordings:
-            for r in study_config.sync_ref_average_recordings:
-                if r not in session_info.recordings:
-                    raise ValueError(f'Recording {r} not found for session {session_info.name}')
-                if r==study_config.sync_ref_recording:
-                    raise ValueError(f'Recording {r} is the reference recording for sync, should not be specified in study_config.sync_average_recordings')
 
     # prep for sync info
     recs = [r for r in session_info.recordings if r!=study_config.sync_ref_recording]

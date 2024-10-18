@@ -18,9 +18,17 @@ def get_sync_for_recs(working_dir: str|pathlib.Path, recs: str|list[str], ref_re
     working_dir  = pathlib.Path(working_dir)
     if isinstance(recs,str):
         recs = [recs]
-    recs = [r for r in recs if r!=ref_rec]
     ref_episodes = get_coding_file(working_dir / ref_rec)
     video_ts_ref = timestamps.VideoTimestamps(working_dir / ref_rec / gt_naming.frame_timestamps_fname)
+
+    if do_time_stretch:
+        if len(ref_episodes)<2:
+            raise ValueError(f"You requested to do time stretching when syncing the recordings, but there is only one camera sync point in the reference recording. At least two sync points are required for time stretching")
+        for r in average_recordings:
+            if r not in recs:
+                raise ValueError(f'Recording {r} not found')
+            if r==ref_rec:
+                raise ValueError(f'Recording {r} is the reference recording for sync, should not be specified in study_config.sync_average_recordings')
 
     index = pd.MultiIndex.from_product([recs, range(len(ref_episodes))], names=['recording','interval'])
     sync  = pd.DataFrame(columns=get_cols(do_time_stretch), dtype=float, index=index)
