@@ -14,7 +14,7 @@ from glassesTools import annotation, drawing, gaze_headref, gaze_worldref, namin
 from glassesTools.gui.video_player import GUI
 
 
-from .. import config, episode, naming, process, session
+from .. import config, episode, naming, process, session, synchronization
 
 # This script shows a video player that is used to indicate the interval(s)
 # during which the poster should be found in the video and in later
@@ -94,13 +94,25 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     # get previous interval coding, if available
     coding_file = working_dir / naming.coding_file
     if coding_file.is_file():
-        episodes = annotation.flatten_annotation_dict(episode.list_to_marker_dict(episode.read_list_from_file(coding_file), study_config.episodes_to_code))
+        episodes = episode.list_to_marker_dict(episode.read_list_from_file(coding_file), study_config.episodes_to_code)
     else:
         episodes = episode.get_empty_marker_dict(study_config.episodes_to_code)
-    # trial episodes are gotten from the reference recording if there is one. Check there is one and that this is not the reference recording
+    episodes_to_code = {e for e in episodes}
+    # trial episodes are gotten from the reference recording if there is one and this is not the reference recording
     if study_config.sync_ref_recording and rec_def.name!=study_config.sync_ref_recording:
-        episodes.pop(annotation.Event.Trial)
-    episodes = {e:episodes[e] for e in annotation.Event if e in episodes}   # consistent ordering
+        # any trial coding there is should be discarded
+        episodes.pop(annotation.Event.Trial, None)
+        # mark trial as not codable
+        if annotation.Event.Trial in episodes_to_code:
+            episodes_to_code.remove(annotation.Event.Trial)
+        # if there is trial coding for the reference recording, get them and show them (read only)
+        if annotation.Event.Trial in study_config.episodes_to_code:
+            all_recs = [r.name for r in study_config.session_def.recordings]
+            episodes[annotation.Event.Trial] = synchronization.get_episode_frame_indices_from_ref(working_dir, annotation.Event.Trial, rec_def.name, study_config.sync_ref_recording, all_recs, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings, study_config.sync_ref_stretch_which, missing_ref_coding_ok=True)
+            # if nothing found, remove again so we don't have a useless empty track
+            if not episodes[annotation.Event.Trial]:
+                episodes.pop(annotation.Event.Trial, None)
+    episodes = annotation.flatten_annotation_dict(episodes) # NB: also ensures ordering is consistent
 
     # set up video playback
     # 1. timestamp info for relating audio to video frames
@@ -115,7 +127,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     gui.set_allow_seek(True)
     gui.set_allow_timeline_zoom(True)
     gui.set_show_controls(True, gui.main_window_id)
-    gui.set_allow_annotate(True, {e:_event_type_to_key_map[e] for e in episodes})
+    gui.set_allow_annotate(episodes_to_code, {e:_event_type_to_key_map[e] for e in episodes})
     gui.set_show_timeline(True, video_ts, episodes, gui.main_window_id)
     gui.set_show_annotation_label(True, gui.main_window_id)
     gui.set_show_action_tooltip(True, gui.main_window_id)
