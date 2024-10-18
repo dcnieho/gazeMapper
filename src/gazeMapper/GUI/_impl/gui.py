@@ -418,21 +418,26 @@ class GUI:
         self.process_pool.cleanup_if_no_jobs()
 
     def _check_job_valid(self, job: utils.JobInfo) -> bool:
-        # NB: triggered for each job by _update_jobs_and_process_pool() above
-        # _update_jobs_and_process_pool() already holds the lock, so not needed here
-        if job.session not in self.sessions:
+        sess = self.sessions.get(job.session,None)
+        if sess is None:
             return False
-        if job.recording and job.recording not in self.sessions[job.session].recordings:
+        if job.recording and job.recording not in sess.recordings:
             return False
         return True
 
     def _update_job_states_impl(self, job: utils.JobInfo, job_state: process.State):
-        # NB: self._sessions_lock should be acquired, and check should have been
-        # performed that job.session and job.recording exist
+        sess = self.sessions.get(job.session,None)
+        if sess is None:
+            return
+        if job.recording and job.recording not in sess.recordings:
+            return
         if job.recording:
-            self.sessions[job.session].recordings[job.recording].state[job.action] = job_state
+            rec = sess.recordings.get(job.recording,None)
+            if rec is None:
+                return
+            rec.state[job.action] = job_state
         else:
-            self.sessions[job.session].state[job.action] = job_state
+            sess.state[job.action] = job_state
 
     def _action_done_callback(self, future: process_pool.ProcessFuture, job_id: int, job: utils.JobInfo, state: process.State):
         # if process failed, notify error
@@ -456,21 +461,22 @@ class GUI:
             return
         # get final task state when completed, load from file. Need to do this because change listener may fire before task
         # completes, and its output is then overwritten in _update_jobs_and_process_pool()
-        with self._sessions_lock:
-            if job.session not in self.sessions:
+        sess = self.sessions.get(job.session,None)
+        if sess is None:
+            return
+        if job.recording:
+            rec = sess.recordings.get(job.recording,None)
+            if rec is None:
                 return
-            if job.recording and job.recording not in self.sessions[job.session].recordings:
-                return
-            if job.recording:
-                if job.action==process.Action.IMPORT:
-                    # the import call has created a working directory for the recording, and may have updated the info in other
-                    # ways (e.g. filled in recording length that wasn't known from metadata). Read from file and update what we
-                    # hold in memory. NB: must be loaded from file as recording update is run in a different process
-                    rec_info = self.sessions[job.session].load_recording_info(job.recording)
-                    self.sessions[job.session].update_recording_info(job.recording, rec_info)
-                self.sessions[job.session].recordings[job.recording].load_action_states(False)
-            else:
-                self.sessions[job.session].load_action_states(False)
+            if job.action==process.Action.IMPORT:
+                # the import call has created a working directory for the recording, and may have updated the info in other
+                # ways (e.g. filled in recording length that wasn't known from metadata). Read from file and update what we
+                # hold in memory. NB: must be loaded from file as recording update is run in a different process
+                rec_info = sess.load_recording_info(job.recording)
+                sess.update_recording_info(job.recording, rec_info)
+            rec.load_action_states(False)
+        else:
+            sess.load_action_states(False)
 
     def load_project(self, path: pathlib.Path):
         self.project_dir = path
