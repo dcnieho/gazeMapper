@@ -103,6 +103,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     # trial episodes are gotten from the reference recording if there is one. Check there is one and that this is not the reference recording
     if study_config.sync_ref_recording and rec_def.name!=study_config.sync_ref_recording:
         episodes.pop(annotation.Event.Trial)
+    episodes = {e:episodes[e] for e in annotation.Event if e in episodes}   # consistent ordering
 
     # set up video playback
     # 1. timestamp info for relating audio to video frames
