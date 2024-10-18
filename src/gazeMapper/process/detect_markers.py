@@ -67,7 +67,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
         estimator.register_extra_processing_fun('sync', *sync_target_function)
     estimator.attach_gui(gui)
     if gui is not None:
-        gui.set_show_timeline(True, timestamps.VideoTimestamps(working_dir / gt_naming.frame_timestamps_fname), episode.flatten_marker_dict(episodes), window_id=gui.main_window_id)
+        gui.set_show_timeline(True, timestamps.VideoTimestamps(working_dir / gt_naming.frame_timestamps_fname), annotation.flatten_annotation_dict(episodes), window_id=gui.main_window_id)
         estimator.show_rejected_markers = visualization_show_rejected_markers
 
     poses, individual_markers, sync_target_signal = estimator.process_video()

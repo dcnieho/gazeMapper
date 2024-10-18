@@ -94,10 +94,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     # get previous interval coding, if available
     coding_file = working_dir / naming.coding_file
     if coding_file.is_file():
-        episodes = episode.list_to_marker_dict(episode.read_list_from_file(coding_file), study_config.episodes_to_code)
-        # flatten
-        for e in episodes:
-            episodes[e] = [i for iv in episodes[e] for i in iv]
+        episodes = annotation.flatten_annotation_dict(episode.list_to_marker_dict(episode.read_list_from_file(coding_file), study_config.episodes_to_code))
     else:
         episodes = episode.get_empty_marker_dict(study_config.episodes_to_code)
     # trial episodes are gotten from the reference recording if there is one. Check there is one and that this is not the reference recording
