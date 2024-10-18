@@ -92,7 +92,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
 
     # get frame sync info, and recording's episodes expressed in the reference video's frame indices
     if study_config.sync_ref_recording:
-        sync = synchronization.get_sync_for_recs(working_dir, list(recs), study_config.sync_ref_recording, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings)
+        sync = synchronization.get_sync_for_recs(working_dir, [r for r in recs if r!=study_config.sync_ref_recording], study_config.sync_ref_recording, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings)
         ref_frame_idxs: dict[str, list[int]] = {}
         episodes_as_ref[study_config.sync_ref_recording] = copy.deepcopy(episodes[study_config.sync_ref_recording])
         for r in sync.index.get_level_values('recording').unique():
