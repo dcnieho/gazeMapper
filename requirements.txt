@@ -1,5 +1,5 @@
 glassesTools[GUI]==1.12.2   # pulls in various other dependencies such as imgui_bundle, matplotlib, numpy, opencv, pandas, polars
-glassesValidator==2.0.2
+glassesValidator==2.0.3
 typeguard
 uvloop ; sys_platform != "win32"
 watchfiles
