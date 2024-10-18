@@ -449,10 +449,8 @@ class GUI:
             if not session_level:
                 lbl += f', recording "{job.recording}"'
             lbl += f' (work item {job_id}, action {job.action.displayable_name})'
-            if isinstance(exc, concurrent.futures.TimeoutError):
-                gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Processing error", f"A worker process has failed for {lbl}:\n{type(exc).__name__}: {str(exc) or 'No further details'}\n\nPossible causes include:\n - You are running with too many workers, try lowering them in settings", gt_gui.msg_box.MsgBox.warn, more=tb)
-                return
             gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Processing error", f"Something went wrong in a worker process for {lbl}:\n\n{tb}", gt_gui.msg_box.MsgBox.error)
+            self.job_scheduler.jobs[job_id].error = tb
 
         # clean up, if needed, when a task failed or was canceled
         if job.action==process.Action.IMPORT and state in [process.State.Canceled, process.State.Failed]:
@@ -809,9 +807,15 @@ class GUI:
                         case 1:
                             # Status
                             session_lister.draw_process_state((job_state:=jobs[job_id].get_state()))
+                            if jobs[job_id].error:
+                                gt_gui.utils.draw_hover_text(jobs[job_id].error, text='')
+                                imgui.same_line()
+                                if imgui.small_button(ifa6.ICON_FA_COPY+f'##{job_id}_copy_error'):
+                                    imgui.set_clipboard_text(jobs[job_id].error)
+                                gt_gui.utils.draw_hover_text('Copy error to clipboard', text='')
                             if job_state in [process.State.Pending, process.State.Running]:
                                 imgui.same_line()
-                                if imgui.button(ifa6.ICON_FA_HAND+f' Cancel##{job_id}'):
+                                if imgui.small_button(ifa6.ICON_FA_HAND+f' Cancel##{job_id}'):
                                     self.job_scheduler.cancel_job(job_id)
                         case 2:
                             # Session

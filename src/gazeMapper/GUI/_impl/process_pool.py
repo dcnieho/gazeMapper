@@ -160,6 +160,7 @@ class JobDescription(typing.Generic[_UserDataT]):
     _pool_job_id:       typing.Optional[int]           = None
     _future:            typing.Optional[ProcessFuture] = dataclasses.field(init=False, default = None)
     _final_state:       typing.Optional[process.State] = dataclasses.field(init=False, default = None)
+    error:              typing.Optional[str]           = None
 
     def get_state(self) -> process.State:
         if self._final_state is not None:
