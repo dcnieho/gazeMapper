@@ -73,6 +73,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
         for e in [annotation.Event.Validate, annotation.Event.Trial]:
             if e in study_config.planes_per_episode:
                 planes.update(study_config.planes_per_episode[e])
+        if study_config.get_cam_movement_for_et_sync_method=='plane' and annotation.Event.Sync_ET_Data in study_config.planes_per_episode:
+            planes.update(study_config.planes_per_episode[annotation.Event.Sync_ET_Data])
 
         # Read gaze on poster data, if available
         plane_files = [working_dir/f'{naming.world_gaze_prefix}{p}.tsv' for p in planes]
