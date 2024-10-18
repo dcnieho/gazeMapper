@@ -206,6 +206,8 @@ def _is_recording_action_possible(action_states: dict[Action, State], study_conf
                 preconditions.add(Action.CODE_EPISODES)
         case Action.GAZE_TO_PLANE:
             preconditions.update([Action.CODE_EPISODES, Action.DETECT_MARKERS])
+            if study_config.sync_ref_recording:
+                preconditions.add(Action.SYNC_TO_REFERENCE)
         case Action.AUTO_CODE_SYNC:
             preconditions.update([Action.DETECT_MARKERS])
         case Action.AUTO_CODE_TRIALS:
