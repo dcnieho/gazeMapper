@@ -56,7 +56,18 @@ def list_to_marker_dict(episodes: list[Episode], expected_types: list[annotation
             e_dict[e.event].append([e.start_frame, e.end_frame])
         else:
             e_dict[e.event].append([e.start_frame])
-    return e_dict
+    return {e:e_dict[e] for e in annotation.Event if e in e_dict} # ensure return always has the same order
+
+def flatten_marker_dict(episodes: dict[annotation.Event, list[list[int]]]):
+    episodes_flat: dict[annotation.Event, list[int]] = {}
+    for e in annotation.Event:  # iterate over this for consistent ordering
+        if e not in episodes:
+            continue
+        if episodes[e] and isinstance(episodes[e][0],list):
+            episodes_flat[e] = [i for iv in episodes[e] for i in iv]
+        else:
+            episodes_flat[e] = episodes[e].copy()
+    return episodes_flat
 
 def marker_dict_to_list(episodes: dict[annotation.Event,list[int]|list[list[int]]]) -> list[Episode]:
     e_list: list[Episode] = []
