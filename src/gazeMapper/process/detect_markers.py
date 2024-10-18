@@ -51,8 +51,10 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
     if study_config.sync_ref_recording and rec_def.name!=study_config.sync_ref_recording:
         if annotation.Event.Trial in episodes and episodes[annotation.Event.Trial]:
             raise ValueError(f'Trial episodes are gotten from the reference recording ({study_config.sync_ref_recording}) and should not be coded for this recording ({rec_def.name})')
-        all_recs = [r.name for r in study_config.session_def.recordings]
-        episodes[annotation.Event.Trial] = synchronization.get_episode_frame_indices_from_ref(working_dir, annotation.Event.Trial, rec_def.name, study_config.sync_ref_recording, all_recs, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings, study_config.sync_ref_stretch_which)
+        if annotation.Event.Trial in study_config.episodes_to_code:
+            all_recs = [r.name for r in study_config.session_def.recordings]
+            # NB: don't error if we don't need trial episodes for coding. We don't need them if they would be ignored because the whole video would be processed. The whole video is processed when study_config.auto_code_sync_points or study_config.auto_code_trial_episodes are set
+            episodes[annotation.Event.Trial] = synchronization.get_episode_frame_indices_from_ref(working_dir, annotation.Event.Trial, rec_def.name, study_config.sync_ref_recording, all_recs, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings, study_config.sync_ref_stretch_which, missing_ref_coding_ok=study_config.auto_code_sync_points or study_config.auto_code_trial_episodes)
 
     sync_target_function         = _get_sync_function(study_config, rec_def, None if annotation.Event.Sync_ET_Data not in episodes else episodes[annotation.Event.Sync_ET_Data])
     planes_setup, analyze_frames = _get_plane_setup(study_config, config_dir, episodes)
