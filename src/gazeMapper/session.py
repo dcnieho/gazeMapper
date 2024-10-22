@@ -327,7 +327,7 @@ def _read_action_states(file: pathlib.Path) -> dict[process.Action, process.Stat
 
     with open(file, 'r') as f:
         action_states = json.load(f, object_hook=utils.json_reconstitute)
-        return {getattr(process.Action, k.split('.')[1]): process.State(action_states[k]) for k in action_states}  # turn key from string back into enum instance, and same for state value
+        return {getattr(process.Action, k.split('.')[-1]): process.State(action_states[k]) for k in action_states}  # turn key from string back into enum instance, and same for state value
 
 def get_action_states(working_dir: str|pathlib.Path, for_recording: bool, create_if_missing = False, skip_if_missing=False) -> dict[process.Action, process.State]:
     working_dir = pathlib.Path(working_dir)
