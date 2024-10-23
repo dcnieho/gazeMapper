@@ -14,7 +14,7 @@ class State(enum.IntEnum):
     @property
     def displayable_name(self):
         return self.name.replace("_", " ")
-utils.register_type(utils.CustomTypeEntry(State,'__enum.process.State__',str, lambda x: getattr(State, x.split('.')[1])))
+utils.register_type(utils.CustomTypeEntry(State,'__enum.process.State__', utils.enum_val_2_str, lambda x: getattr(State, x.split('.')[1])))
 
 class Action(enum.IntEnum):
     IMPORT = enum.auto()
@@ -59,7 +59,7 @@ class Action(enum.IntEnum):
         except StopIteration:
             pass    # we're done
         return vals
-utils.register_type(utils.CustomTypeEntry(Action,'__enum.process.Action__',str, lambda x: getattr(Action, x.split('.')[1])))
+utils.register_type(utils.CustomTypeEntry(Action, '__enum.process.Action__', utils.enum_val_2_str, lambda x: getattr(Action, x.split('.')[1])))
 
 def action_to_func(action: Action) -> typing.Callable[..., None]:
     # Returns function to perform the provided action. NB: not for Action.IMPORT,

@@ -14,7 +14,7 @@ from . import process
 class RecordingType(utils.AutoName):
     Eye_Tracker = auto()
     Camera      = auto()
-utils.register_type(utils.CustomTypeEntry(RecordingType,'__enum.session.RecordingType__',str, lambda x: getattr(RecordingType, x.split('.')[1])))
+utils.register_type(utils.CustomTypeEntry(RecordingType,'__enum.session.RecordingType__', utils.enum_val_2_str, lambda x: getattr(RecordingType, x.split('.')[1])))
 recording_types = [r for r in RecordingType]
 
 
@@ -317,7 +317,7 @@ def _create_action_states_file(file: pathlib.Path, for_recording: bool):
     _write_action_states_to_file(file, action_states)
 
 def _write_action_states_to_file(file: pathlib.Path, action_states: dict[process.Action, process.State]):
-    action_states = {str(k):action_states[k] for k in action_states}    # turn key into string so it can be stored in a json file
+    action_states = {utils.enum_val_2_str(k):action_states[k] for k in action_states}    # turn key into string so it can be stored in a json file
     with open(file, 'w') as f:
         json.dump(action_states, f, cls=utils.CustomTypeEncoder, indent=2)
 

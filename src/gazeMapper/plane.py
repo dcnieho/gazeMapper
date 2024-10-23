@@ -16,7 +16,7 @@ from . import type_utils
 class Type(utils.AutoName):
     GlassesValidator= auto()
     Plane_2D        = auto()
-utils.register_type(utils.CustomTypeEntry(Type,'__enum.plane.Type__',str, lambda x: getattr(Type, x.split('.')[1])))
+utils.register_type(utils.CustomTypeEntry(Type,'__enum.plane.Type__', utils.enum_val_2_str, lambda x: getattr(Type, x.split('.')[1])))
 types = [p for p in Type]
 
 class Definition:
