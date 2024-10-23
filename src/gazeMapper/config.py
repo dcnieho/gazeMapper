@@ -685,22 +685,41 @@ class StudyOverride:
     def __init__(self, level: OverrideLevel, recording_type: session.RecordingType|None = None, **kwargs):
         self.override_level = level
         self.recording_type = recording_type
-        self._allowed_params, exclude = self.get_allowed_parameters(level, recording_type)
+        self._allowed_params, self._excluded_parameters = self.get_allowed_parameters(level, recording_type)
         self._overridden_params: list[str] = []
         for p in self._allowed_params:
-            setattr(self,p,None)
+            self.clear_override(p)
         def typecheck_exception_handler(exc: typeguard.TypeCheckError, key: str):
             e = typeguard.TypeCheckError(*exc.args)
-            e.append_path_element(f'argument "{key}" {self.get_err_msg()} ({exc._path[0]})')
+            e.append_path_element(f'argument "{key}" {self._get_err_msg()} ({exc._path[0]})')
             raise e from None
         for p in kwargs:
-            if p in exclude:
-                raise TypeError(f"{StudyOverride.__name__}.__init__(): you are not allowed to override the '{p}' parameter of a {Study.__name__} class {self.get_err_msg()}")
-            if p not in self._allowed_params:
-                raise TypeError(f"{StudyOverride.__name__}.__init__(): got an unknown parameter '{p}'")
+            self._check_parameter(p, f"{StudyOverride.__name__}.__init__(): ")
             typeguard.check_type(kwargs[p], study_parameter_types[p], typecheck_fail_callback=lambda x,_: typecheck_exception_handler(x,p), collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
             setattr(self,p,kwargs[p])
             self._overridden_params.append(p)
+
+    def __setattr__(self, name, value):
+        if name.startswith('_') or name in {'override_level', 'recording_type'}:
+            super(StudyOverride, self).__setattr__(name, value)
+            return
+
+        self._check_parameter(name)
+        super(StudyOverride, self).__setattr__(name, value)
+        if name not in self._overridden_params:
+            self._overridden_params.append(name)
+
+    def clear_override(self, name):
+        self._check_parameter(name)
+        setattr(self,name,None)
+        if name in self._overridden_params:
+            self._overridden_params.remove(name)
+
+    def _check_parameter(self, name: str, error_prefix=''):
+        if name in self._excluded_parameters:
+            raise ValueError(f"{error_prefix}You are not allowed to override the '{name}' parameter of a {Study.__name__} class {self._get_err_msg()}")
+        if name not in self._allowed_params:
+            raise ValueError(f"{error_prefix}Got an unknown parameter '{name}'")
 
     def _get_err_msg(self):
         if self.override_level==OverrideLevel.FunctionArgs:
