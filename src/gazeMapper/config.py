@@ -104,6 +104,7 @@ class Study:
                  video_show_sync_func_output                    : bool                              = True,
                  video_show_unexpected_markers                  : bool                              = False,
                  video_show_rejected_markers                    : bool                              = False,
+                 video_show_gaze_on_plane                       : bool                              = True,
                  video_show_camera_in_ref                       : bool                              = True,
                  video_show_camera_in_other                     : bool                              = True,
                  video_show_gaze_vec_in_ref                     : bool                              = True,
@@ -159,6 +160,7 @@ class Study:
         self.video_show_sync_func_output                    = video_show_sync_func_output
         self.video_show_unexpected_markers                  = video_show_unexpected_markers
         self.video_show_rejected_markers                    = video_show_rejected_markers
+        self.video_show_gaze_on_plane                       = video_show_gaze_on_plane
         self.video_show_camera_in_ref                       = video_show_camera_in_ref
         self.video_show_camera_in_other                     = video_show_camera_in_other
         self.video_show_gaze_vec_in_ref                     = video_show_gaze_vec_in_ref
@@ -619,6 +621,7 @@ study_parameter_doc = {
     'video_show_sync_func_output': type_utils.GUIDocInfo('Video export: Show sync function output?', 'If enabled, draw the output of the function on the output video. Applies if the "Gaze data synchronization: Function for camera movement" setting is set to "function".'),
     'video_show_unexpected_markers': type_utils.GUIDocInfo('Video export: Show unexpected markers?', 'If not enabled, only markers that are part of defined planes or configured individual markers will be drawn on the video. If enabled, also other, unexpected markers will be drawn.'),
     'video_show_rejected_markers': type_utils.GUIDocInfo('Video export: Show rejected markers?', 'If enabled, all shapes that potentially are markers but were rejected by OpenCV\'s ArUco detector are shown. For debug purposes.'),
+    'video_show_gaze_on_plane':  type_utils.GUIDocInfo('Video export: Show gaze projected to plane?', 'If enabled, gaze projected to the plane (both the gaze point on the video, and the left and right eye\'s gaze vectors if available) is drawn on the video for eye tracker recordings.'),
     'video_show_camera_in_ref': type_utils.GUIDocInfo('Video export: Show camera position(s) in reference recording\'s video?', 'If enabled, the position of other cameras is marked in the generated video of the reference recording.'),
     'video_show_camera_in_other': type_utils.GUIDocInfo('Video export: Show camera position(s) in other recordings\' video?', 'If enabled, the position of other cameras is marked in the generated video of recordings other than the reference recording.'),
     'video_show_gaze_vec_in_ref': type_utils.GUIDocInfo('Video export: Show gaze vectors(s) in reference recording\'s video?', 'If enabled, a line is drawn for each eye tracker recording between the gaze position and the position of the eye tracker\'s camera in the generated video of the reference recording.'),

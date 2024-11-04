@@ -334,8 +334,13 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
                     for g in gazes_head[v][frame_idx[lead_vid]]:
                         if v in all_vids:
                             g.draw(frame[v], sub_pixel_fac=sub_pixel_fac, clr=clr, draw_3d_gaze_point=False)
+                        if study_config.video_show_gaze_on_plane and pose[v]:
+                            for pl in pose[v]:
+                                if pl in pose[v] and pose[v][pl].pose_successful():
+                                    gaze_world = gaze_worldref.from_head(pose[v][pl], g, camera_params[v])
+                                    gaze_world.draw_on_world_video(frame[v], camera_params[v], sub_pixel_fac)
 
-                        # if we have a reference recording and camera pose for both, we can also draw the gaze in the reference recording, and possible on other recordings
+                        # if we have a reference recording and camera pose for both, we can also draw the gaze in the reference recording, and possibly on other recordings
                         if study_config.sync_ref_recording and pose[lead_vid] is not None:
                             # collect gaze on all planes for which pose is available
                             plane_gazes: dict[str, tuple[float,float,float,gaze_worldref.Gaze]] = {}
