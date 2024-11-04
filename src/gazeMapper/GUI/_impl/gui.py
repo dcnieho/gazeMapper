@@ -1155,7 +1155,7 @@ class GUI:
                     running = [(s,None) for s in actions_running if a in actions_running[s]]
                     hover_text = f'Cancel running {a.displayable_name} for session(s):\n- '+'\n- '.join([s for s in actions_running if a in actions_running[s]])
                 else:
-                    running = [(s,r) for s in actions_running for r in actions_running[s][a]]
+                    running = [(s,r) for s in actions_running if a in actions_running[s] for r in actions_running[s][a]]
                     hover_text = f'Cancel running {a.displayable_name} for session(s):\n- '+'\n- '.join([f'{s}, recording(s):\n  - '+'\n  - '.join(actions_running[s][a]) for s in actions_running if a in actions_running[s]])
                 hover_text = hover_text.replace('running Run','Run')    # deal with task called "Run Validation"
                 icon = ifa6.ICON_FA_HAND
@@ -1165,9 +1165,9 @@ class GUI:
                     hover_text = f'Run {a.displayable_name} for session(s):\n- '+'\n- '.join([s for s in actions if a in actions[s] and actions[s][a]])
                     status = max([self.sessions[s].state[a] for s in actions])
                 else:
-                    to_run = [(s,r) for s in actions for r in actions[s][a]]
+                    to_run = [(s,r) for s in actions if a in actions[s] for r in actions[s][a]]
                     hover_text = f'Run {a.displayable_name} for session(s):\n- '+'\n- '.join([f'{s}, recording(s):\n  - '+'\n  - '.join(actions[s][a]) for s in actions if a in actions[s] and actions[s][a]])
-                    status = max([self.sessions[s].recordings[r].state[a] for s in actions for r in actions[s][a]])
+                    status = max([self.sessions[s].recordings[r].state[a] for s in actions if a in actions[s] for r in actions[s][a]])
                 hover_text = hover_text.replace('Run Run','Run')    # deal with task called "Run Validation"
                 if a.has_options:
                     hover_text += '\nShift-click to bring up a popup with configuration options for this run.'
