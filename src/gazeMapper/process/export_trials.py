@@ -1,4 +1,5 @@
 import pathlib
+import shutil
 import numpy as np
 import pandas as pd
 import polars as pl
@@ -9,8 +10,9 @@ from glassesTools import annotation, gaze_worldref, naming as gt_naming
 from .. import config, episode, marker, naming, process, session
 
 
-def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **study_settings):
+def run(working_dir: str|pathlib.Path, export_path: str|pathlib.Path, to_export: list[str], config_dir: str|pathlib.Path = None, **study_settings):
     working_dir = pathlib.Path(working_dir) # working directory of a session, not of a recording
+    export_path = pathlib.Path(export_path)
     if config_dir is None:
         config_dir = config.guess_config_dir(working_dir)
     config_dir  = pathlib.Path(config_dir)
@@ -27,6 +29,17 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
     session_info = session.Session.from_definition(study_config.session_def, working_dir)
     recs    = [r for r in session_info.recordings if session_info.recordings[r].definition.type==session.RecordingType.Eye_Tracker]
 
+    if 'planeGaze' in to_export:
+        export_plane_gaze(export_path, working_dir, study_config, recs, planes)
+
+    if 'video' in to_export:
+        export_detectOutput_video(export_path, working_dir, recs)
+
+    # update state
+    session.update_action_states(working_dir, process.Action.EXPORT_TRIALS, process.State.Completed, study_config)
+
+
+def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, study_config: config.Study, recs: list[str], planes: list[str]):
     # per recording, read the relevant files and put them all together
     for r in recs:
         # get trial coding
@@ -112,7 +125,11 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
         # store
         # write into df (use polars as that library saves to file waaay faster)
         plane_gazes = pl.from_pandas(plane_gazes)
-        plane_gazes.write_csv(working_dir / f'{naming.export_prefix}{r}.tsv', separator='\t', null_value='nan', float_precision=8)
+        plane_gazes.write_csv(export_path / f'{working_dir.name}_{r}_{naming.gaze_export_name}.tsv', separator='\t', null_value='nan', float_precision=8)
 
-    # update state
-    session.update_action_states(working_dir, process.Action.EXPORT_TRIALS, process.State.Completed, study_config)
+def export_detectOutput_video(export_path: pathlib.Path, working_dir: pathlib.Path, recs: list[str]):
+    for r in recs:
+        inFile = working_dir/r/naming.process_video
+        if not inFile.is_file():
+            continue
+        shutil.copy2(inFile, export_path / f'{working_dir.name}_{r}.mp4')

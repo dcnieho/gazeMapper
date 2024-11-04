@@ -7,4 +7,4 @@ target_sync_file    = 'et_sync_target_file.tsv'
 VOR_sync_file       = 'VOR_sync.tsv'
 validation_prefix   = 'validate_'
 process_video       = 'detectOutput.mp4'
-export_prefix       = world_gaze_prefix
+gaze_export_name    = 'planeGaze'

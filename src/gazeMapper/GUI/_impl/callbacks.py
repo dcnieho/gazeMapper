@@ -31,6 +31,8 @@ def get_folder_picker(g, reason: str, *args, **kwargs):
                 set_cam_cal(selected[0], *args, **kwargs)
             case 'deploy_aruco':
                 aruco.deploy_marker_images(selected[0], 1000, *args, **kwargs)
+            case 'export':
+                show_export_config(g, selected[0], *args, **kwargs)
             case _:
                 raise ValueError(f'reason "{reason}" not understood')
 
@@ -53,6 +55,10 @@ def get_folder_picker(g, reason: str, *args, **kwargs):
             picker_type = gt_gui.file_picker.FilePicker
         case 'deploy_aruco':
             header = "Select folder to store ArUco marker images"
+            allow_multiple = False
+            picker_type = gt_gui.file_picker.DirPicker
+        case 'export':
+            header = "Select folder to store results export"
             allow_multiple = False
             picker_type = gt_gui.file_picker.DirPicker
         case _:
@@ -311,8 +317,63 @@ def show_action_options(g, session_name: str, rec_name: str|None, action: proces
         ifa6.ICON_FA_CIRCLE_XMARK+f" Cancel##{session_name}_{rec_name}": None
     }
 
-    # ask what type of device recordings we want to import
+    # show configurable options for action
     gt_gui.utils.push_popup(g, lambda: gt_gui.utils.popup(f"Set options##{session_name}_{rec_name}", set_action_options_popup, buttons = buttons, closable=True, outside=False))
+
+
+def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
+    from . import gui
+    g = typing.cast(gui.GUI,g)  # indicate type to typechecker
+
+    # for the sessions, see what we have to export
+    to_export: dict[str,bool] = {}
+    for s_name in sessions:
+        s = g.sessions.get(s_name,None)
+        if s is None:
+            continue
+        if 'plane gaze' not in to_export:
+            if any((s.recordings[r].state[process.Action.GAZE_TO_PLANE]==process.State.Completed for r in s.recordings)):
+                to_export['plane gaze'] = True
+        if 'video' not in to_export:
+            if s.state[process.Action.MAKE_VIDEO]==process.State.Completed:
+                to_export['video'] = True
+
+    def set_export_config_popup():
+        nonlocal to_export
+        spacing = 2 * imgui.get_style().item_spacing.x
+        color = (0.45, 0.09, 1.00, 1.00)
+        imgui.push_font(g._icon_font)
+        imgui.text_colored(color, ifa6.ICON_FA_CIRCLE_INFO)
+        imgui.pop_font()
+        imgui.same_line(spacing=spacing)
+
+        imgui.begin_group()
+        imgui.dummy((0,2*imgui.get_style().item_spacing.y))
+        imgui.text_unformatted(f'Select what you wish to export to the folder\n{path}\nfrom the below:')
+        imgui.dummy((0,1.5*imgui.get_style().item_spacing.y))
+        for e in to_export:
+            _, to_export[e] = imgui.checkbox(e, to_export[e])
+
+        imgui.end_group()
+        imgui.same_line(spacing=spacing)
+        imgui.dummy((0, 0))
+
+    def launch_export():
+        exp = []
+        if 'plane gaze' in to_export and to_export['plane gaze']:
+            exp.append('planeGaze')
+        if 'video' in to_export and to_export['video']:
+            exp.append('video')
+        for s in sessions:
+            g.launch_task(s, None, process.Action.EXPORT_TRIALS, export_path=path, to_export=exp)
+
+    buttons = {
+        ifa6.ICON_FA_CHECK+f" Continue": launch_export,
+        ifa6.ICON_FA_CIRCLE_XMARK+f" Cancel": None
+    }
+
+    # ask what to export
+    gt_gui.utils.push_popup(g, lambda: gt_gui.utils.popup(f"Set what to export", set_export_config_popup, buttons = buttons, closable=True, outside=False))
 
 
 async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[recording.Recording|camera_recording.Recording]], dev_lbl: str, dev_type: session.RecordingType, sessions: list[str]):

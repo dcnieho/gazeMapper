@@ -1181,11 +1181,16 @@ class GUI:
                             job_id = actions_running[s][a][r]
                         self.job_scheduler.cancel_job(job_id)
                 else:
-                    for s,r in to_run:
-                        if a.has_options and imgui.get_io().key_shift:
-                            callbacks.show_action_options(self, s, r, a)
-                        else:
-                            self.launch_task(s, r, a)
+                    if a==process.Action.EXPORT_TRIALS:
+                        # for export, need to select destination folder
+                        # and what to export
+                        gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='export', sessions=[s for s,_ in to_run]))
+                    else:
+                        for s,r in to_run:
+                            if a.has_options and imgui.get_io().key_shift:
+                                callbacks.show_action_options(self, s, r, a)
+                            else:
+                                self.launch_task(s, r, a)
             gt_gui.utils.draw_hover_text(hover_text, '')
         # draw working folder interactions
         changed = False
