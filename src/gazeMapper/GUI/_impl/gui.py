@@ -1368,10 +1368,15 @@ class GUI:
                         if a in menu_actions_running:
                             self.job_scheduler.cancel_job(menu_actions_running[a])
                         else:
-                            if a.has_options and imgui.get_io().key_shift:
-                                callbacks.show_action_options(self, sess.name, None, a)
+                            if a==process.Action.EXPORT_TRIALS:
+                                # for export, need to select destination folder
+                                # and what to export
+                                gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='export', sessions=[sess.name]))
                             else:
-                                self.launch_task(sess.name, None, a)
+                                if a.has_options and imgui.get_io().key_shift:
+                                    callbacks.show_action_options(self, sess.name, None, a)
+                                else:
+                                    self.launch_task(sess.name, None, a)
                     gt_gui.utils.draw_hover_text(hover_text, '')
                     imgui.end_popup()
             imgui.end_table()
