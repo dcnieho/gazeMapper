@@ -454,6 +454,8 @@ def draw_value(field_lbl: str, val: _T, f_type: typing.Type, nullable: bool, def
     if val is None and draw_value.should_edit_id and draw_value.should_edit_id==imgui.get_id(field_lbl):
         if base_type==typing.Literal:
             val = typing.get_args(f_type)[0]
+        elif base_type==typing.Union and f_type==typing.Union[str, pathlib.Path]:
+            val = ''
         else:
             val = f_type()
         draw_value.should_edit_id = None
