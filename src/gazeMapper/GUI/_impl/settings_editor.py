@@ -578,7 +578,7 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, documenta
         if i>0:
             w += h_edge_spacing
         w += w_sizes[i].x
-        if w+imgui.get_style().item_spacing.x > item_w:
+        if i>0 and w+imgui.get_style().item_spacing.x > item_w:
             line_break_idxs.append(i)
             w = h_edge_spacing + w_sizes[i].x
     if val and adder_width is not None:
