@@ -109,7 +109,7 @@ def is_action_possible_given_config(action: Action, study_config: 'config.Study'
         case Action.AUTO_CODE_SYNC:
             return not not study_config.auto_code_sync_points
         case Action.AUTO_CODE_TRIALS:
-            return study_config.auto_code_trial_episodes and study_config.sync_ref_recording
+            return study_config.auto_code_trial_episodes
         case Action.SYNC_ET_TO_CAM:
             return study_config.get_cam_movement_for_et_sync_method in ['plane', 'function']
         case Action.SYNC_TO_REFERENCE:
