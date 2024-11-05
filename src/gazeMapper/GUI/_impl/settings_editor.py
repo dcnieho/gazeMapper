@@ -616,7 +616,7 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, documenta
             t_bb    = imgui.internal.ImRect(t_pos, t_pos+w_sizes[i])
             bbs.append(t_bb)
 
-            imgui.internal.item_size(w_sizes[i], 0)
+            imgui.internal.item_size(w_sizes[i])
             # if visible
             iid = imgui.get_id(f'{val_txt[i]}##{field_lbl}')
             if imgui.internal.item_add(t_bb, iid):
