@@ -860,6 +860,7 @@ class GUI:
             cal_path = r.get_default_cal_file(config_path)
             if cal_path is None:
                 imgui.text('Default camera calibration not set')
+                gt_gui.utils.draw_hover_text('This is not a problem for most eye trackers, as the recording contains the calibration', '')
             else:
                 imgui.text('Default camera calibration set')
                 imgui.same_line()
