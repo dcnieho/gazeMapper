@@ -596,15 +596,14 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, documenta
         imgui.internal.render_frame(bb.min,bb.max,frame_col,True,imgui.get_style().frame_rounding)
 
         # draw items
-        imgui.set_cursor_screen_pos(pos+(h_edge_spacing, 0))
         to_remove = None
         to_add    = None
-        line = 1
+        line = 0
         bbs = []
         for i,v in enumerate(disp_val):
             if i>0 and i not in line_break_idxs:
                 imgui.same_line()
-            elif i>0:
+            else:
                 line += 1
                 imgui.set_cursor_screen_pos(imgui.get_cursor_screen_pos()+(h_edge_spacing, 0))
             imgui.push_style_var(imgui.StyleVar_.frame_border_size, 0)
