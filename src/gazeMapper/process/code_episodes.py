@@ -215,6 +215,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     gui.stop()
 
     # store coded intervals to file
+    if study_config.sync_ref_recording and rec_def.name!=study_config.sync_ref_recording:
+        # any (read only) trial coding there is should not be written to file
+        episodes.pop(annotation.Event.Trial, None)
     episode.write_list_to_file(episode.marker_dict_to_list(episodes), coding_file)
 
     # update state
