@@ -240,10 +240,10 @@ class Study:
             match e:
                 case annotation.Event.Sync_Camera:
                     allow_one_plane = allow_more_than_one = False
-                case annotation.Event.Validate:
+                case annotation.Event.Validate | annotation.Event.Sync_ET_Data:
                     allow_one_plane = True
                     allow_more_than_one = False
-                case annotation.Event.Sync_Camera | annotation.Event.Trial:
+                case annotation.Event.Trial:
                     allow_one_plane = allow_more_than_one = True
             if not allow_one_plane:
                 msg = f'No planes should be defined for a {e.value} episode'
