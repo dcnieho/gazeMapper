@@ -38,7 +38,7 @@ class GUI:
         self.session_config_overrides: dict[str, config.StudyOverride]  = {}
         self._sessions_lock: threading.Lock                             = threading.Lock()
         self._selected_sessions: dict[str, bool]                        = {}
-        self._session_lister = session_lister.List(self.sessions, self._sessions_lock, self._selected_sessions, info_callback=self._open_session_detail, item_context_callback=self._session_context_menu)
+        self._session_lister = session_lister.List(self.sessions, self._sessions_lock, self._selected_sessions, info_callback=self._open_session_detail, draw_action_status_callback=self._session_action_status, item_context_callback=self._session_context_menu)
 
         self.recording_config_overrides: dict[str, dict[str, config.StudyOverride]]   = {}
         self._recording_listers  : dict[str, gt_gui.recording_table.RecordingTable]   = {}
@@ -561,14 +561,18 @@ class GUI:
         config = self.session_config_overrides[sess].apply(self.study_config, strict_check=False)
         actions = process.get_actions_for_config(config, exclude_session_level=True)
         def _draw_status(action: process.Action, item: session.Recording):
-            if process.is_action_possible_for_recording_type(action, item.definition.type):
+            if process.is_action_possible_for_recording(item.definition.name, item.definition.type, action, config):
                 session_lister.draw_process_state(item.state[action])
             else:
                 imgui.text('-')
-                gt_gui.utils.draw_hover_text(f'Not applicable to a {item.definition.type.value} recording','')
+                if action==process.Action.AUTO_CODE_TRIALS and config.sync_ref_recording and item.definition.name!=config.sync_ref_recording:
+                    msg = f'Not applicable to a recording that is not the sync_ref_recording'
+                else:
+                    msg = f'Not applicable to a {item.definition.type.value} recording'
+                gt_gui.utils.draw_hover_text(msg,'')
         def _get_sort_value(action: process.Action, iid: int):
             item = self.sessions[sess].recordings[iid]
-            if process.is_action_possible_for_recording_type(action, item.definition.type):
+            if process.is_action_possible_for_recording(item.definition.name, item.definition.type, action, config):
                 return item.state[action]
             else:
                 return 999
@@ -1137,13 +1141,38 @@ class GUI:
                 active_jobs[self.job_scheduler.jobs[job_id].user_data] = job_id
         return active_jobs
 
+    def _session_action_status(self, item: session.Session, action: process.Action):
+        if not item.has_all_recordings():
+            imgui.text_colored(colors.error, '-')
+        else:
+            if process.is_session_level_action(action):
+                session_lister.draw_process_state(item.state[action])
+            else:
+                config = self.session_config_overrides[item.name].apply(self.study_config, strict_check=False) if item.name in self.session_config_overrides else self.study_config
+                states = {r:item.recordings[r].state[action] for r in item.recordings if process.is_action_possible_for_recording(r, item.definition.get_recording_def(r).type, action, config)}
+                not_completed = [r for r in states if states[r]!=process.State.Completed]
+                if any(st:=[s for r in states if (s:=states[r]) in [process.State.Pending, process.State.Running]]):
+                    # progress marker
+                    session_lister.draw_process_state(process.State.Running if process.State.Running in st else process.State.Pending, have_hover_popup=False)
+                else:
+                    n_rec = len(states)
+                    clr = colors.error if not_completed else colors.ok
+                    imgui.text_colored(clr, f'{n_rec-len(not_completed)}/{n_rec}')
+                if not_completed:
+                    rec_strs = [f'{r} ({states[r].displayable_name})' for r in not_completed]
+                    glassesTools.gui.utils.draw_hover_text('not completed for recordings:\n'+'\n'.join(rec_strs),'')
+        if imgui.begin_popup_context_item(f"##{item.name}_{action}_context"):
+            self._session_context_menu(item.name)
+            imgui.end_popup()
+
     def _session_context_menu(self, session_name: str) -> bool:
         # ignore input session name, get selected sessions
         sess = [self.sessions[s] for s in self.sessions if self._selected_sessions.get(s,False)]
         actions: dict[str, dict[process.Action, bool|list[str]]] = {}
         actions_running: dict[str, dict[process.Action, bool|list[str]]] = {}
         for s in sess:
-            actions[s.name] = process.get_possible_actions(s.state, {r:s.recordings[r].state for r in s.recordings}, {a for a in process.Action if a!=process.Action.IMPORT}, self.study_config)
+            config = self.session_config_overrides[s.name].apply(self.study_config, strict_check=False) if s.name in self.session_config_overrides else self.study_config
+            actions[s.name] = process.get_possible_actions(s.state, {r:s.recordings[r].state for r in s.recordings}, {a for a in process.Action if a!=process.Action.IMPORT}, config)
             actions[s.name], actions_running[s.name] = self._filter_session_context_menu_actions(s.name, None, actions[s.name])
         # draw actions that can be run
         all_actions = {a for s in actions for a in actions[s]}
@@ -1210,7 +1239,8 @@ class GUI:
         actions: dict[str, dict[process.Action, bool|list[str]]] = {}
         actions_running: dict[str, dict[process.Action, bool|list[str]]] = {}
         for r in recs:
-            actions[r] = process.get_possible_actions(sess.state, {r:sess.recordings[r].state}, {a for a in process.Action if a!=process.Action.IMPORT and not process.is_session_level_action(a)}, self.study_config)
+            config = self.session_config_overrides[session_name].apply(self.study_config, strict_check=False) if session_name in self.session_config_overrides else self.study_config
+            actions[r] = process.get_possible_actions(sess.state, {r:sess.recordings[r].state}, {a for a in process.Action if a!=process.Action.IMPORT and not process.is_session_level_action(a)}, config)
             actions[r], actions_running[r] = self._filter_session_context_menu_actions(sess.name, r, actions[r])
         # draw actions that can be run
         all_actions = {a for r in actions for a in actions[r]}
@@ -1347,7 +1377,8 @@ class GUI:
             if imgui.button(ifa6.ICON_FA_FILE_IMPORT+' import camera recordings'):
                 gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='add_cam_recordings', sessions=[sess.name]))
         session_level_actions = [a for a in self._session_actions if process.is_session_level_action(a)]
-        possible_actions = process.get_possible_actions(sess.state, {r:sess.recordings[r].state for r in sess.recordings}, set(session_level_actions), self.study_config)
+        config = self.session_config_overrides[sess.name].apply(self.study_config, strict_check=False) if sess.name in self.session_config_overrides else self.study_config
+        possible_actions = process.get_possible_actions(sess.state, {r:sess.recordings[r].state for r in sess.recordings}, set(session_level_actions), config)
         menu_actions,menu_actions_running = self._filter_session_context_menu_actions(sess.name, None, possible_actions)
         if session_level_actions and imgui.begin_table(f'##{sess.name}_session_level', 2, imgui.TableFlags_.sizing_fixed_fit):
             for a in session_level_actions:

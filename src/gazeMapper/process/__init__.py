@@ -125,9 +125,12 @@ def is_action_possible_given_config(action: Action, study_config: 'config.Study'
             # no config preconditions for the other actions
             return True
 
-def is_action_possible_for_recording_type(action: Action, rec_type: 'session.RecordingType') -> bool:
+def is_action_possible_for_recording(rec: str, rec_type: 'session.RecordingType', action: Action, study_config: 'config.Study') -> bool:
     from .. import session
     if rec_type==session.RecordingType.Camera and action in [Action.GAZE_TO_PLANE, Action.SYNC_ET_TO_CAM, Action.RUN_VALIDATION]:
+        return False
+    elif action==Action.AUTO_CODE_TRIALS and study_config.sync_ref_recording and rec!=study_config.sync_ref_recording:
+        # if we have a sync_ref_recording, automatic coding of trials is only possible for the sync_ref_recording, not the other recordings
         return False
     return True
 
@@ -189,10 +192,10 @@ def action_update_and_invalidate(action: Action, state: State, study_config: 'co
 
     return action_state_mutations
 
-def _is_recording_action_possible(action_states: dict[Action, State], study_config: 'config.Study', rec_type: 'session.RecordingType', action: Action):
+def _is_recording_action_possible(rec: str, action_states: dict[Action, State], study_config: 'config.Study', rec_type: 'session.RecordingType', action: Action):
     if not is_action_possible_given_config(action, study_config):
         return False
-    elif not is_action_possible_for_recording_type(action, rec_type):
+    elif not is_action_possible_for_recording(rec, rec_type, action, study_config):
         return False
 
     preconditions = {Action.IMPORT} # IMPORT is a precondition for all actions except IMPORT itself
@@ -256,7 +259,7 @@ def _is_session_action_possible(session_action_states: dict[Action, State], reco
         if is_session_level_action(p):
             precond_met.append(session_action_states[p]==State.Completed)
         else:
-            precond_met.append(all(((not is_action_possible_for_recording_type(p, rec_types[r])) or recording_action_states[r][p]==State.Completed for r in recording_action_states)))
+            precond_met.append(all(((not is_action_possible_for_recording(r, rec_types[r], p, study_config)) or recording_action_states[r][p]==State.Completed for r in recording_action_states)))
 
     return all(precond_met)
 
@@ -274,7 +277,7 @@ def get_possible_actions(session_action_states: dict[Action, State], recording_a
             if _is_session_action_possible(session_action_states, recording_action_states, study_config, rec_types, a):
                 possible_actions[a] = True
         else:
-            possible_recs = [r for r in merged_states if _is_recording_action_possible(merged_states[r], study_config, rec_types[r], a)]
+            possible_recs = [r for r in merged_states if _is_recording_action_possible(r, merged_states[r], study_config, rec_types[r], a)]
             if possible_recs:
                 possible_actions[a] = possible_recs
 

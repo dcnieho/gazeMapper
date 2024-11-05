@@ -14,6 +14,7 @@ class List:
             items_lock: threading.Lock,
         selected_items: dict[int|str, bool],
         info_callback: typing.Callable = None,
+        draw_action_status_callback: typing.Callable = None,
         item_context_callback: typing.Callable = None):
 
         self.items = items
@@ -21,6 +22,7 @@ class List:
         self.items_lock     = items_lock
 
         self.info_callback  = info_callback
+        self.draw_action_status_callback = draw_action_status_callback
         self.item_context_callback  = item_context_callback
 
         self.sorted_ids: list[int|str] = []
@@ -188,7 +190,7 @@ class List:
                                     glassesTools.gui.utils.draw_hover_text('missing recordings:\n'+'\n'.join(missing_recs), '')
                             case _:
                                 # task status columns
-                                self._draw_status_widget(item,self.display_actions[ri-self._view_column_count_base])
+                                self.draw_action_status_callback(item, self.display_actions[ri-self._view_column_count_base])
                         num_columns_drawn+=1
 
                     # handle selection logic
@@ -220,29 +222,6 @@ class List:
 
             # show menu when right-clicking the empty space
             # TODO
-
-    def _draw_status_widget(self, item: session.Session, action: process.Action):
-        if not item.has_all_recordings():
-            imgui.text_colored(colors.error, '-')
-        else:
-            if process.is_session_level_action(action):
-                draw_process_state(item.state[action])
-            else:
-                states = {r:item.recordings[r].state[action] for r in item.recordings if process.is_action_possible_for_recording_type(action, item.definition.get_recording_def(r).type)}
-                not_completed = [r for r in states if states[r]!=process.State.Completed]
-                if any(st:=[s for r in states if (s:=states[r]) in [process.State.Pending, process.State.Running]]):
-                    # progress marker
-                    draw_process_state(process.State.Running if process.State.Running in st else process.State.Pending, have_hover_popup=False)
-                else:
-                    n_rec = len(states)
-                    clr = colors.error if not_completed else colors.ok
-                    imgui.text_colored(clr, f'{n_rec-len(not_completed)}/{n_rec}')
-                if not_completed:
-                    rec_strs = [f'{r} ({states[r].displayable_name})' for r in not_completed]
-                    glassesTools.gui.utils.draw_hover_text('not completed for recordings:\n'+'\n'.join(rec_strs),'')
-        if self.item_context_callback and imgui.begin_popup_context_item(f"##{item.name}_{action}_context"):
-            self.item_context_callback(item.name)
-            imgui.end_popup()
 
     def _show_item_info(self, iid):
         if self.info_callback:
