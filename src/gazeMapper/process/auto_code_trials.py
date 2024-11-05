@@ -24,7 +24,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
 
     if not study_config.sync_ref_recording:
         raise RuntimeError(f'Nothing to do, auto_code_trials_episodes is defined, but you do not have a sync_ref_recording')
-    if rec_def.name==study_config.sync_ref_recording:
+    if rec_def.name!=study_config.sync_ref_recording:
         raise RuntimeError(f'Nothing to do, auto_code_trials_episodes is defined and you have a sync_ref_recording ({study_config.sync_ref_recording}), but this recording ({rec_def.name}) is another one')
 
     # get already coded interval(s), if any
