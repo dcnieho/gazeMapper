@@ -656,14 +656,17 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, documenta
 
         # draw value adder, if needed
         if miss_values:
+            same_line = False
             if val:
-                if t_bb.max.x+imgui.get_style().item_spacing.x+adder_width+h_edge_spacing <= bb.max.x:
+                same_line = t_bb.max.x+imgui.get_style().item_spacing.x+adder_width+h_edge_spacing <= bb.max.x
+                if same_line:
                     imgui.same_line()
                 else:
-                    imgui.set_cursor_screen_pos(imgui.get_cursor_screen_pos()+(h_edge_spacing, 0))
                     line += 1
                 if line>1:
                     imgui.set_cursor_screen_pos(imgui.get_cursor_screen_pos()-(0, imgui.get_style().frame_padding.y))
+            if not same_line:   # NB: also true when no values
+                imgui.set_cursor_screen_pos(imgui.get_cursor_screen_pos()+(h_edge_spacing, 0))
             imgui.set_next_item_width(adder_width)
             selected,p_idx = glassesTools.gui.utils.tooltip_combo(f"##{field_lbl}", -1, str_values, tooltips, popup_max_height_in_items=min(10,len(str_values)))
             if selected:
