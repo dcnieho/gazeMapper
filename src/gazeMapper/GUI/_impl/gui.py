@@ -1377,8 +1377,8 @@ class GUI:
             if imgui.button(ifa6.ICON_FA_FILE_IMPORT+' import camera recordings'):
                 gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='add_cam_recordings', sessions=[sess.name]))
         session_level_actions = [a for a in self._session_actions if process.is_session_level_action(a)]
-        cfg = self.session_config_overrides[sess.name].apply(self.study_config, strict_check=False) if sess.name in self.session_config_overrides else self.study_config
-        possible_actions = process.get_possible_actions(sess.state, {r:sess.recordings[r].state for r in sess.recordings}, set(session_level_actions), cfg)
+        effective_config = self.session_config_overrides[sess.name].apply(self.study_config, strict_check=False)
+        possible_actions = process.get_possible_actions(sess.state, {r:sess.recordings[r].state for r in sess.recordings}, set(session_level_actions), effective_config)
         menu_actions,menu_actions_running = self._filter_session_context_menu_actions(sess.name, None, possible_actions)
         if session_level_actions and imgui.begin_table(f'##{sess.name}_session_level', 2, imgui.TableFlags_.sizing_fixed_fit):
             for a in session_level_actions:
@@ -1416,7 +1416,6 @@ class GUI:
         sess_changed = False
         if imgui.tree_node_ex('Setting overrides for this session',imgui.TreeNodeFlags_.framed):
             fields = config.StudyOverride.get_allowed_parameters(config.OverrideLevel.Session)[0]
-            effective_config = self.session_config_overrides[sess.name].apply(self.study_config, strict_check=False)
             sess_changed, new_config = settings_editor.draw(effective_config, fields, config.study_parameter_types, config.study_defaults, self._possible_value_getters, self.study_config, effective_config.field_problems(), config.study_parameter_doc)
             if sess_changed:
                 try:
