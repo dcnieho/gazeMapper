@@ -364,6 +364,13 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
             imgui.same_line()
         if imgui.button(ifa6.ICON_FA_TRASH_CAN+f' remove group'):
             removed = True
+    if parent_obj is not None and obj!=parent_obj:
+        if has_add or (nullable and not made_or_replaced_obj) or removable:
+            imgui.same_line()
+        if imgui.button(f' parent'):
+            changed = True
+            made_or_replaced_obj = True
+            obj = parent_obj
 
     return changed, made_or_replaced_obj, obj, removed
 draw_dict_editor.new_item = None
