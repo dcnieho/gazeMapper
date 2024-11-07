@@ -751,7 +751,7 @@ class StudyOverride:
         return err_text
 
     def apply(self, study: Study, strict_check=True) -> Study:
-        study = copy.copy(study)
+        study = copy.deepcopy(study)
         for p in self._overridden_params:
             val = getattr(self,p)
             if isinstance(val,dict):
