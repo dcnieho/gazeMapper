@@ -456,6 +456,7 @@ def draw_value(field_lbl: str, val: _T, f_type: typing.Type, nullable: bool, def
     is_parent  = val==parent_val
     new_edit = False
     removed = False
+    field_lbl = field_lbl.translate({ord("#"): None})   # ensure there are no # in the lbl that would confuse imgui internals
     if val is None and draw_value.should_edit_id and draw_value.should_edit_id==imgui.get_id(field_lbl):
         if default is not None:
             val = default
@@ -551,6 +552,7 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, documenta
         return val
 
     # prep
+    field_lbl = field_lbl.translate({ord("#"): None})   # ensure there are no # in the lbl that would confuse imgui internals
     # get possible values and their order
     v_type = typing.get_args(f_type)[0]
     all_values = []
