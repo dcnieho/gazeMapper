@@ -772,6 +772,8 @@ class StudyOverride:
             path = path / self.default_json_file_name
         with open(path, 'w') as f:
             to_dump = {p:getattr(self,p) for p in self._overridden_params}
+            if 'planes_per_episode' in to_dump:
+                to_dump['planes_per_episode'] = [(k, to_dump['planes_per_episode'][k]) for k in to_dump['planes_per_episode']]   # pack as list of tuples for storage
             json.dump(to_dump, f, cls=utils.CustomTypeEncoder, indent=2)
 
     @staticmethod
@@ -781,6 +783,12 @@ class StudyOverride:
             path = path / StudyOverride.default_json_file_name
         with open(path, 'r') as f:
             kwds = json.load(f, object_hook=utils.json_reconstitute)
+        if 'planes_per_episode' in kwds:
+            # stored as list of tuples, unpack
+            kwds['planes_per_episode'] = {k:v for k,v in kwds['planes_per_episode']}
+        if 'video_recording_colors' in kwds:
+            # help with named tuple roundtrip
+            kwds['video_recording_colors'] = {k: RgbColor(*kwds['video_recording_colors'][k]) for k in kwds['video_recording_colors']}
         return StudyOverride(level, recording_type, **kwds)
 
     @staticmethod
