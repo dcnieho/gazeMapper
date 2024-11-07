@@ -803,7 +803,7 @@ def _study_diff_impl(config: Study, parent_config: Study, fields: list[str]) -> 
         val        =        config.get(f) if isinstance(       config,dict) else getattr(       config,f)
         parent_val = parent_config.get(f) if isinstance(parent_config,dict) else getattr(parent_config,f)
         if val!=parent_val:
-            if isinstance(val,dict) or typing.is_typeddict(val) or typed_dict_defaults.is_typeddictdefault(val) or type_utils.is_NamedTuple_type(val):
+            if parent_val is not None and (isinstance(val,dict) or typing.is_typeddict(val) or typed_dict_defaults.is_typeddictdefault(val) or type_utils.is_NamedTuple_type(val)):
                 # need to recurse into object
                 val = _study_diff_impl(val, parent_val, type_utils.get_fields(val))
             kwds[f] = val
