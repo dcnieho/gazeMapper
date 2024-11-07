@@ -763,10 +763,11 @@ class StudyOverride:
         for p in self._overridden_params:
             val = getattr(self,p)
             # special case: for dict-like object we can unset specific fields, so allow those by skipping check for them
-            if getattr(study,p) is not None and isinstance(val,dict) or typing.is_typeddict(val) or typed_dict_defaults.is_typeddictdefault(val) or type_utils.is_NamedTuple_type(val):
+            if getattr(study,p) is not None and (isinstance(val,dict) or typing.is_typeddict(val) or typed_dict_defaults.is_typeddictdefault(val) or type_utils.is_NamedTuple_type(val)):
                 handled = set()
                 for k in val:
-                    if val[k] is None:
+                    ann = type_utils.get_annotations(val)
+                    if val[k] is None and (k not in ann or not utils.unpack_none_union(ann[k])[1]):
                         if isinstance(val,dict):
                             del getattr(study,p)[k]
                         else:
