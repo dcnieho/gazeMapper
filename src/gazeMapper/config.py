@@ -44,10 +44,10 @@ class I2MCSettings(typed_dict_defaults.TypedDictDefault, total=False):
     maxMergeTime    : float         = 81        # ms
     minFixDur       : float         = 50        # ms
 
-class CamMovementForEtSyncFunction(TypedDict):
+class CamMovementForEtSyncFunction(typed_dict_defaults.TypedDictDefault, total=False):
     module_or_file  : str
     function        : str
-    parameters      : dict[str,Any]
+    parameters      : dict[str,Any]|None = None
 
 class RgbColor(typing.NamedTuple):
     r: int = 0
@@ -416,7 +416,8 @@ class Study:
                     raise ValueError('if get_cam_movement_for_et_sync_method is set to "function", get_cam_movement_for_et_sync_function should be a dict specifying "module_or_file", "function", and "parameters"')
             else:
                 t = utils.unpack_none_union(study_parameter_types['get_cam_movement_for_et_sync_function'])[0]
-                problems['get_cam_movement_for_et_sync_function'] = {k:f'{k} should be set when get_cam_movement_for_et_sync_function is set to "function"' for k in t.__required_keys__ if not self.get_cam_movement_for_et_sync_function or k not in self.get_cam_movement_for_et_sync_function or (k!='parameters' and not self.get_cam_movement_for_et_sync_function[k])}
+                keys = t.__required_keys__|t.__optional_keys__
+                problems['get_cam_movement_for_et_sync_function'] = {k:f'{k} should be set when get_cam_movement_for_et_sync_function is set to "function"' for k in keys if not self.get_cam_movement_for_et_sync_function or (k not in t._field_defaults and (k not in self.get_cam_movement_for_et_sync_function or not self.get_cam_movement_for_et_sync_function[k]))}
         elif self.get_cam_movement_for_et_sync_method=='plane':
             if annotation.Event.Sync_ET_Data not in self.planes_per_episode:
                 if strict_check:
