@@ -546,6 +546,7 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, documenta
     # prep
     # get possible values and their order
     v_type = typing.get_args(f_type)[0]
+    all_values = []
     if typing.get_origin(v_type)==typing.Literal:
         all_values = typing.get_args(v_type)
     elif issubclass(v_type, enum.Enum):
@@ -554,11 +555,13 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, documenta
     disp_val = val
     has_order = isinstance(val,list)
     if not has_order:
-        disp_val= [v for v in all_values if v in val]    # preserve order
-        # make sure this doesn't filter out any values however
-        for v in val:
-            if v not in disp_val:
-                disp_val.append(v)
+        if all_values:
+            # preserve order
+            disp_val= [v for v in all_values if v in val]
+            # make sure this doesn't filter out any values however
+            for v in val:
+                if v not in disp_val:
+                    disp_val.append(v)
     # get width of drawing space
     item_w = imgui.calc_item_width()
     h_edge_spacing = imgui.get_style().cell_padding.x
