@@ -70,7 +70,9 @@ class _TypedDictDefaultMeta(type):
         return tp_dict
 
     def __call__(self, *args, **kwargs):
-        return super().__call__(*args, **kwargs)
+        val = super().__call__(*args, **kwargs)
+        val.apply_defaults()
+        return val
 
     def __subclasscheck__(cls, other):
         # Typed dicts are only for static structural subtyping.
