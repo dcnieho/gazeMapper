@@ -54,6 +54,8 @@ def is_NamedTuple_type(x):
           getattr(x, '_fields', None) is not None)
 
 def get_fields(obj) -> list[str]|None:
+    if not isinstance(obj, typing.Type):
+        obj = type(obj)
     if typing.is_typeddict(obj):
         return list(obj.__annotations__.keys())
     elif typed_dict_defaults.is_typeddictdefault(obj):
@@ -62,4 +64,17 @@ def get_fields(obj) -> list[str]|None:
         return list(obj._fields)
     elif isinstance(obj, dict):
         return list(obj.keys())
+    return None
+
+def get_annotations(obj) -> dict[str, typing.Type]|None:
+    if not isinstance(obj, typing.Type):
+        obj = type(obj)
+    if typing.is_typeddict(obj):
+        return obj.__annotations__.copy()
+    elif typed_dict_defaults.is_typeddictdefault(obj):
+        return obj.__annotations__.copy()
+    elif is_NamedTuple_type(obj):
+        return obj.__annotations__.copy()
+    elif isinstance(obj, dict):
+        return {k:type(obj[k]) for k in obj}
     return None
