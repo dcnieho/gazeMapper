@@ -716,7 +716,11 @@ class StudyOverride:
             raise e from None
         for p in kwargs:
             self._check_parameter(p, f"{StudyOverride.__name__}.__init__(): ")
-            typeguard.check_type(kwargs[p], study_parameter_types[p], typecheck_fail_callback=lambda x,_: typecheck_exception_handler(x,p), collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
+            # special case: for dict-like object we can unset specific fields, so allow those by skipping check for them
+            check_val = kwargs[p]
+            if isinstance(check_val,dict) or typing.is_typeddict(check_val) or typed_dict_defaults.is_typeddictdefault(check_val) or type_utils.is_NamedTuple_type(check_val):
+                check_val = {k:check_val[k] for k in check_val if check_val[k] is not None}
+            typeguard.check_type(check_val, study_parameter_types[p], typecheck_fail_callback=lambda x,_: typecheck_exception_handler(x,p), collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
             setattr(self,p,kwargs[p])
 
     def __setattr__(self, name, value):
@@ -754,6 +758,18 @@ class StudyOverride:
         study = copy.deepcopy(study)
         for p in self._overridden_params:
             val = getattr(self,p)
+            # special case: for dict-like object we can unset specific fields, so allow those by skipping check for them
+            if getattr(study,p) is not None and isinstance(val,dict) or typing.is_typeddict(val) or typed_dict_defaults.is_typeddictdefault(val) or type_utils.is_NamedTuple_type(val):
+                handled = set()
+                for k in val:
+                    if val[k] is None:
+                        if isinstance(val,dict):
+                            del getattr(study,p)[k]
+                        else:
+                            delattr(getattr(study,p),k)
+                        handled.add(k)
+                # remove handled
+                val = {k:val[k] for k in val if k not in handled}
             if isinstance(val,dict):
                 # overwrite existing and add new dict keys
                 setattr(study,p,current|val if (current:=getattr(study,p)) is not None else val)
@@ -788,7 +804,7 @@ class StudyOverride:
             kwds['planes_per_episode'] = {k:v for k,v in kwds['planes_per_episode']}
         if 'video_recording_colors' in kwds:
             # help with named tuple roundtrip
-            kwds['video_recording_colors'] = {k: RgbColor(*kwds['video_recording_colors'][k]) for k in kwds['video_recording_colors']}
+            kwds['video_recording_colors'] = {k: None if kwds['video_recording_colors'][k] is None else RgbColor(*kwds['video_recording_colors'][k]) for k in kwds['video_recording_colors']}
         return StudyOverride(level, recording_type, **kwds)
 
     @staticmethod
@@ -805,7 +821,7 @@ def _study_diff_impl(config: Study, parent_config: Study, fields: list[str]) -> 
         if val!=parent_val:
             if parent_val is not None and (isinstance(val,dict) or typing.is_typeddict(val) or typed_dict_defaults.is_typeddictdefault(val) or type_utils.is_NamedTuple_type(val)):
                 # need to recurse into object
-                val = _study_diff_impl(val, parent_val, type_utils.get_fields(val))
+                val = _study_diff_impl(val, parent_val, list(set(type_utils.get_fields(val))|set(type_utils.get_fields(parent_val))))
             kwds[f] = val
     return kwds
 
