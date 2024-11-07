@@ -138,15 +138,11 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
         this_obj = obj.get(f,None) if isinstance(obj,dict) else getattr(obj,f)
         if is_dict and this_obj is not None:
             this_parent = None
-            this_nullable = nullable
-            this_has_remove = has_remove
             if parent_obj is not None:
                 this_parent = parent_obj.get(f,None) if isinstance(parent_obj,dict) else getattr(parent_obj,f)
                 if this_obj is None:
                     # don't draw, can't overwrite group if it isn't set at all in parent
                     continue
-                # if in an override editor, should not be able to unset or remove groups
-                this_nullable = this_has_remove = False
             if table_is_started:
                 imgui.end_table()
                 table_is_started = False
@@ -160,7 +156,7 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
                     imgui.pop_style_color()
                 if this_explanation:
                     glassesTools.gui.utils.draw_hover_text(this_explanation, text='')
-                this_changed, made_obj, new_sub_obj, removed = draw_dict_editor(this_obj, f_type, level+1, defaults=defaults.get(f,None) if defaults else None, possible_value_getters=possible_value_getters.get(f,None) if possible_value_getters else None, parent_obj=this_parent, problems=problems.get(f,None) if isinstance(problems, dict) else {}, documentation=this_child_doc, fixed=fixed.get(f,None), nullable=this_nullable, removable=this_has_remove)
+                this_changed, made_obj, new_sub_obj, removed = draw_dict_editor(this_obj, f_type, level+1, defaults=defaults.get(f,None) if defaults else None, possible_value_getters=possible_value_getters.get(f,None) if possible_value_getters else None, parent_obj=this_parent, problems=problems.get(f,None) if isinstance(problems, dict) else {}, documentation=this_child_doc, fixed=fixed.get(f,None), nullable=nullable, removable=has_remove)
                 if removed:
                     removed_field = f
                 changed |= this_changed
@@ -240,7 +236,7 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
                 else:
                     all_type = kv_type[1]
 
-        has_add = has_remove = fields is None and parent_obj is None    # no add item for override editor
+        has_add = has_remove = fields is None
         if fields is None:
             fields = list(obj.keys())
             if all_fields is not None:
