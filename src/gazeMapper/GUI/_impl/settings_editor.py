@@ -135,8 +135,8 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
         this_explanation = doc.doc_str if doc is not None and not isinstance(doc,dict) else None
         this_child_doc = doc.children if isinstance(doc,type_utils.GUIDocInfo) else doc if doc is not None else {}
 
-        if is_dict:
-            this_obj = obj.get(f,None) if isinstance(obj,dict) else getattr(obj,f)
+        this_obj = obj.get(f,None) if isinstance(obj,dict) else getattr(obj,f)
+        if is_dict and this_obj is not None:
             this_parent = None
             this_nullable = nullable
             this_has_remove = has_remove
@@ -503,8 +503,11 @@ def draw_value(field_lbl: str, val: _T, f_type: typing.Type, nullable: bool, def
             else:
                 new_val = val
         case _:
-            imgui.text(f'type {f_type} not handled')
-            new_val = None
+            if new_edit:
+                new_val = val
+            else:
+                imgui.text(f'type {f_type} not handled')
+                new_val = None
     if fixed:
         imgui.end_disabled()
     else:
