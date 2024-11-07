@@ -192,6 +192,9 @@ class Study:
             self._check_make_video(strict_check)
 
         # ensure some members are of the right class, and apply defaults
+        if self.get_cam_movement_for_et_sync_function:
+            self.get_cam_movement_for_et_sync_function = CamMovementForEtSyncFunction(self.get_cam_movement_for_et_sync_function)
+            self.get_cam_movement_for_et_sync_function.apply_defaults()
         if self.auto_code_sync_points:
             self.auto_code_sync_points = AutoCodeSyncPoints(self.auto_code_sync_points)
             self.auto_code_sync_points.apply_defaults()
