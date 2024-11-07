@@ -714,6 +714,7 @@ class StudyOverride:
             e = typeguard.TypeCheckError(*exc.args)
             e.append_path_element(f'argument "{key}" {self._get_err_msg()} ({exc._path[0]})')
             raise e from None
+        kwargs = StudyOverride._fix_typing(kwargs)
         for p in kwargs:
             self._check_parameter(p, f"{StudyOverride.__name__}.__init__(): ")
             # special case: for dict-like object we can unset specific fields, so allow those by skipping check for them
@@ -802,9 +803,6 @@ class StudyOverride:
         if 'planes_per_episode' in kwds:
             # stored as list of tuples, unpack
             kwds['planes_per_episode'] = {k:v for k,v in kwds['planes_per_episode']}
-        if 'video_recording_colors' in kwds:
-            # help with named tuple roundtrip
-            kwds['video_recording_colors'] = {k: None if kwds['video_recording_colors'][k] is None else RgbColor(*kwds['video_recording_colors'][k]) for k in kwds['video_recording_colors']}
         return StudyOverride(level, recording_type, **kwds)
 
     @staticmethod
@@ -812,6 +810,23 @@ class StudyOverride:
         fields = StudyOverride.get_allowed_parameters(level, recording_type)[0]
         kwds = _study_diff_impl(config, parent_config, fields)
         return StudyOverride(level, recording_type, **kwds)
+
+    @staticmethod
+    def _fix_typing(kwds: dict[str,Any]) -> dict[str,Any]:
+        if 'get_cam_movement_for_et_sync_function' in kwds and kwds['get_cam_movement_for_et_sync_function'] is not None:
+            kwds['get_cam_movement_for_et_sync_function'] = CamMovementForEtSyncFunction(**kwds['get_cam_movement_for_et_sync_function'])
+        if 'auto_code_sync_points' in kwds and kwds['auto_code_sync_points'] is not None:
+            kwds['auto_code_sync_points'] = AutoCodeSyncPoints(**kwds['auto_code_sync_points'])
+        if 'auto_code_trial_episodes' in kwds and kwds['auto_code_trial_episodes'] is not None:
+            kwds['auto_code_trial_episodes'] = AutoCodeTrialEpisodes(**kwds['auto_code_trial_episodes'])
+        if 'validate_I2MC_settings' in kwds and kwds['validate_I2MC_settings'] is not None:
+            kwds['validate_I2MC_settings'] = I2MCSettings(**kwds['validate_I2MC_settings'])
+        if 'video_recording_colors' in kwds and kwds['video_recording_colors'] is not None:
+            kwds['video_recording_colors'] = {k: None if kwds['video_recording_colors'][k] is None else RgbColor(*kwds['video_recording_colors'][k]) for k in kwds['video_recording_colors']}
+        for k in ['video_projected_vidPos_ray_color','video_projected_world_pos_color','video_projected_left_ray_color','video_projected_right_ray_color','video_projected_average_ray_color']:
+            if k in kwds and kwds[k] is not None:
+                kwds[k] = RgbColor(**kwds[k])
+        return kwds
 
 def _study_diff_impl(config: Study, parent_config: Study, fields: list[str]) -> dict[str,Any]:
     kwds: dict[str,Any] = {}
