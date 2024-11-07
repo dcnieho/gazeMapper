@@ -475,7 +475,7 @@ class Study:
             for k in ['auto_code_sync_points','auto_code_trial_episodes','validate_I2MC_settings']:
                 if k in to_dump:
                     to_dump[k] = {kk:to_dump[k][kk] for kk in to_dump[k] if kk not in to_dump[k]._field_defaults or to_dump[k]._field_defaults[kk]!=to_dump[k][kk]}
-                    if not to_dump[k]:
+                    if not to_dump[k] and k in study_defaults and study_defaults[k] is not None:
                         to_dump.pop(k)
             # dump to file
             json.dump(to_dump, f, cls=utils.CustomTypeEncoder, indent=2)
