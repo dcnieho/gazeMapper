@@ -718,7 +718,6 @@ class StudyOverride:
             self._check_parameter(p, f"{StudyOverride.__name__}.__init__(): ")
             typeguard.check_type(kwargs[p], study_parameter_types[p], typecheck_fail_callback=lambda x,_: typecheck_exception_handler(x,p), collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
             setattr(self,p,kwargs[p])
-            self._overridden_params.append(p)
 
     def __setattr__(self, name, value):
         if name.startswith('_') or name in {'override_level', 'recording_type'}:
