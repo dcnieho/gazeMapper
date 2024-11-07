@@ -271,13 +271,10 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
         obj.pop(removed_field)
         changed = True
     made_or_replaced_obj |= ret_new_obj
-    if not table_is_started and has_add:
-        table_is_started = _start_table(level, first_column_width)
-        if not table_is_started:
-            return changed, made_or_replaced_obj, obj, False
+    if table_is_started:
+        table_is_started = False
+        imgui.end_table()
     if has_add:
-        imgui.table_next_row()
-        imgui.table_next_column()
         iid = imgui.get_id('##adder')
         if draw_dict_editor.new_item and iid==draw_dict_editor.new_item[0]:
             obj = draw_dict_editor.new_item[1]
@@ -354,8 +351,6 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
                 ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
             }
             glassesTools.gui.utils.push_popup(_gui_instance, lambda: glassesTools.gui.utils.popup("Add item", _add_item_popup, buttons = buttons, outside=False))
-    if table_is_started:
-        imgui.end_table()
     if nullable and not made_or_replaced_obj:
         if has_add:
             imgui.same_line()
