@@ -683,7 +683,7 @@ class StudyOverride:
     def get_allowed_parameters(level: OverrideLevel, recording_type: session.RecordingType|None = None) -> tuple[list[str],set[str]]:
         # NB: list instead of set as want to keep ordering
         all_params = list(study_parameter_types.keys())
-        exclude = {'self', 'session_def', 'planes', 'individual_markers', 'working_directory', 'planes_per_episode'}
+        exclude = {'self', 'session_def', 'planes', 'individual_markers', 'working_directory'}
         # above is Session-level disallowed parameters. Depending on level, disallow more
         if level in [OverrideLevel.Recording, OverrideLevel.FunctionArgs]:
             # these make no sense on a recording level as they are settings for
