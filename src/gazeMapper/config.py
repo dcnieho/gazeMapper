@@ -760,7 +760,7 @@ class StudyOverride:
 
     def apply(self, study: Study, strict_check=True) -> Study:
         study = copy.deepcopy(study)
-        study = _apply_impl(study, {p: getattr(self,p) for p in self._overridden_params})
+        study = _apply_impl(study, {p: getattr(self,p) for p in self._overridden_params}, study_parameter_types)
         # check resulting study is valid
         try:
             study.check_valid(strict_check)
@@ -813,16 +813,17 @@ class StudyOverride:
                 kwds[k] = RgbColor(**kwds[k])
         return kwds
 
-def _apply_impl(obj, overrides: dict[str,Any]):
-    ann = type_utils.get_annotations(obj)
+def _apply_impl(obj, overrides: dict[str,Any], annotations: dict[str,typing.Type]|None):
     for p in overrides:
+        ori_val = obj[p] if isinstance(obj,dict) else getattr(obj,p)
         val = overrides[p]
-        if isinstance(val,dict) or type_utils.is_NamedTuple_type(type(val)):
+        just_set = ori_val is None
+        if not just_set and (isinstance(val,dict) or type_utils.is_NamedTuple_type(type(val))):
             # dict-like object: recurse
-            val = _apply_impl(obj[p] if isinstance(obj,dict) else getattr(obj,p), {p2: val[p2] if isinstance(val,dict) else getattr(val,p2) for p2 in type_utils.get_fields(val) if (isinstance(val,dict) and p2 in val) or hasattr(val,p2)})
+            val = _apply_impl(ori_val, {p2: val[p2] if isinstance(val,dict) else getattr(val,p2) for p2 in type_utils.get_fields(val) if (isinstance(val,dict) and p2 in val) or hasattr(val,p2)}, type_utils.get_annotations(ori_val))
 
         # special case: for dict-like object we can unset specific fields, so allow those by skipping check for them
-        if val is None and (p not in ann or not utils.unpack_none_union(ann[p])[1]):
+        if not just_set and val is None and (annotations is None or p not in annotations or not utils.unpack_none_union(annotations[p])[1]):
             if isinstance(obj,dict):
                 del obj[p]
             else:
