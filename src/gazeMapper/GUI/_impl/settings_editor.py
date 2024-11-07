@@ -561,7 +561,7 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, documenta
                 disp_val.append(v)
     # get width of drawing space
     item_w = imgui.calc_item_width()
-    h_edge_spacing = imgui.get_style().item_spacing.x
+    h_edge_spacing = imgui.get_style().cell_padding.x
     # determine items to show
     tsx = imgui.calc_text_size('x')
     x_padding = imgui.get_style().frame_padding.x
