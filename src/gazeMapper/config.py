@@ -95,6 +95,11 @@ class Study:
 
                  video_make_which                               : set[str]|None                     = None,
                  video_recording_colors                         : dict[str,RgbColor]|None           = None,
+                 video_projected_vidPos_ray_color               : RgbColor|None                     = RgbColor(255,255,  0),
+                 video_projected_world_pos_color                : RgbColor|None                     = RgbColor(255,  0,255),
+                 video_projected_left_ray_color                 : RgbColor|None                     = RgbColor(  0,  0,255),
+                 video_projected_right_ray_color                : RgbColor|None                     = RgbColor(255,  0,  0),
+                 video_projected_average_ray_color              : RgbColor|None                     = RgbColor(255,  0,255),
                  video_process_planes_for_all_frames            : bool                              = False,
                  video_process_annotations_for_all_recordings   : bool                              = True,
                  video_show_detected_markers                    : bool                              = True,
@@ -151,6 +156,11 @@ class Study:
 
         self.video_make_which                               = video_make_which
         self.video_recording_colors                         = video_recording_colors
+        self.video_projected_vidPos_ray_color               = video_projected_vidPos_ray_color
+        self.video_projected_world_pos_color                = video_projected_world_pos_color
+        self.video_projected_left_ray_color                 = video_projected_left_ray_color
+        self.video_projected_right_ray_color                = video_projected_right_ray_color
+        self.video_projected_average_ray_color              = video_projected_average_ray_color
         self.video_process_planes_for_all_frames            = video_process_planes_for_all_frames   # if True, all planes are processed for all frames, if False, only according to the planes_per_episode setup and the coding
         self.video_process_annotations_for_all_recordings   = video_process_annotations_for_all_recordings   # if True, all coded episodes for all planes of all recordings are processed (so e.g. if validation coded for one recording in the session, that plane is processed for all)
         self.video_show_detected_markers                    = video_show_detected_markers
@@ -534,6 +544,11 @@ def _get_annotation_event_doc(a: annotation.Event):
         annotation.Event.Sync_ET_Data: 'Episode to be used for synchronization of eye tracker data to scene camera (e.g. using VOR).'
     }.get(a)
     return (a, type_utils.GUIDocInfo(t,doc))
+_rgb_doc = {
+    'r': type_utils.GUIDocInfo('Red', 'Intensity of the red channel (0-255).'),
+    'g': type_utils.GUIDocInfo('Green', 'Intensity of the green channel (0-255).'),
+    'b': type_utils.GUIDocInfo('Blue', 'Intensity of the blue channel (0-255).')
+}
 study_parameter_doc = {
     'planes_per_episode': type_utils.GUIDocInfo('Planes per episode', 'For each episode that is enabled to be coded in the project, sets which planes will be looked for and gaze mapped to during the episode.',dict([_get_annotation_event_doc(a) for a in annotation.Event])),
     'episodes_to_code': type_utils.GUIDocInfo('Episodes to code', 'Sets which episodes can be coded for this project.',{
@@ -606,12 +621,13 @@ study_parameter_doc = {
     }),
     'video_make_which': type_utils.GUIDocInfo('Video export: Which recordings', 'Indicates one or multiple recordings for which to make videos of the eye tracker scene camera or external camera (synchronized to one of the recordings if there are multiple) showing detected plane origins, detected individual markers and gaze from any other recordings eye tracker recordings. Also shown for eye tracker recordings are gaze on the scene video from the eye tracker, gaze projected to the detected planes. Each only if available, and enabled in the below video generation settings.'),
     'video_recording_colors': type_utils.GUIDocInfo('Video export: Recording colors', 'Colors used for drawing each recording\'s gaze point, scene camera and gaze vector (depending on settings).',{
-        None: {     # indicates the doc specification applies to the contained values
-            'r': type_utils.GUIDocInfo('Red', 'Intensity of the red channel (0-255).'),
-            'g': type_utils.GUIDocInfo('Green', 'Intensity of the green channel (0-255).'),
-            'b': type_utils.GUIDocInfo('Blue', 'Intensity of the blue channel (0-255).')
-        }
+        None: _rgb_doc      # None indicates the doc specification applies to the contained values
     }),
+    'video_projected_vidPos_ray_color': type_utils.GUIDocInfo('Video export: Color for gaze position on plane', 'Color used for drawing the projection on a plane of the recorded gaze position on the scene video. Not drawn if value is not set.', _rgb_doc),
+    'video_projected_world_pos_color': type_utils.GUIDocInfo('Video export: Color for 3D gaze position on plane', 'Color used for drawing the projection on a plane of the recorded 3D gaze position in the world. Not drawn if value is not set.', _rgb_doc),
+    'video_projected_left_ray_color': type_utils.GUIDocInfo('Video export: Color for left eye gaze vector projected to plane', 'Color used for drawing the projection to a plane of the recorded left eye\'s gaze vector. Not drawn if value is not set.', _rgb_doc),
+    'video_projected_right_ray_color': type_utils.GUIDocInfo('Video export: Color for right eye gaze vector projected to plane', 'Color used for drawing the projection to a plane of the recorded right eye\'s gaze vector. Not drawn if value is not set.', _rgb_doc),
+    'video_projected_average_ray_color': type_utils.GUIDocInfo('Video export: Color for average of gaze vectors projected to plane', 'Color used for drawing the average projection to a plane of the recorded left and right eyes\' gaze vectors. Not drawn if value is not set.', _rgb_doc),
     'video_process_planes_for_all_frames': type_utils.GUIDocInfo('Video export: Process all planes for all frames?', 'If enabled, shows detection results for all planes for all frames. If not enabled, detection of each plane is only shown during the episode(s) to which it is assigned.'),
     'video_process_annotations_for_all_recordings': type_utils.GUIDocInfo('Video export: Process all annotations for all recordings?', 'Episode annotations are shown in a bar on the bottom of the screen. If enabled, annotations for not only the recording for which the video is made, but also for the other recordings are shown in this bar.'),
     'video_show_detected_markers': type_utils.GUIDocInfo('Video export: Show detected markers?', 'If enabled, known detected markers are indicated in the output video.'),
