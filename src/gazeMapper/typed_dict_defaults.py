@@ -115,7 +115,7 @@ def TypedDictDefault(typename, fields=None, /, *, total=True, **kwargs):
             x: int
             y: int
 
-    This means that a point2D TypedDictDefault can have any of the keys omitted.A type
+    This means that a point2D TypedDictDefault can have any of the keys omitted. A type
     checker is only expected to support a literal False or True as the value of
     the total argument. True is the default, and makes all items defined in the
     class body be required.
