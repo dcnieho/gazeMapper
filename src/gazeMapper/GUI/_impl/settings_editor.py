@@ -160,7 +160,7 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
                     imgui.pop_style_color()
                 if this_explanation:
                     glassesTools.gui.utils.draw_hover_text(this_explanation, text='')
-                this_changed, made_obj, new_sub_obj, removed = draw_dict_editor(this_obj, f_type, level+1, possible_value_getters=possible_value_getters.get(f,None) if possible_value_getters else None, parent_obj=this_parent, problems=problems.get(f,None) if isinstance(problems, dict) else {}, documentation=this_child_doc, fixed=fixed.get(f,None), nullable=this_nullable, removable=this_has_remove)
+                this_changed, made_obj, new_sub_obj, removed = draw_dict_editor(this_obj, f_type, level+1, defaults=defaults.get(f,None) if defaults else None, possible_value_getters=possible_value_getters.get(f,None) if possible_value_getters else None, parent_obj=this_parent, problems=problems.get(f,None) if isinstance(problems, dict) else {}, documentation=this_child_doc, fixed=fixed.get(f,None), nullable=this_nullable, removable=this_has_remove)
                 if removed:
                     removed_field = f
                 changed |= this_changed
@@ -213,13 +213,11 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
     elif typed_dict_defaults.is_typeddictdefault(o_type):
         types = o_type.__annotations__.copy()
         fields = list(types.keys())
-        defaults = o_type._field_defaults.copy()
         if not problems and not made_or_replaced_obj:   # don't mark as problem if the obj was unset (None)
             problems = {k:f'{k} is required' for k in o_type.__required_keys__ if k not in obj}
     elif type_utils.is_NamedTuple_type(o_type):
         types = o_type.__annotations__.copy()
         fields= list(o_type._fields)
-        defaults = o_type._field_defaults.copy()
     else:
         all_fields = None
         all_type = None
@@ -257,7 +255,16 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
                 else:
                     types = {k:type(obj[k]) for k in obj}
     if defaults is None:
-        defaults = {}
+        if typed_dict_defaults.is_typeddictdefault(o_type):
+            defaults = o_type._field_defaults.copy()
+        elif type_utils.is_NamedTuple_type(o_type):
+            defaults = o_type._field_defaults.copy()
+        else:
+            defaults = {}
+    else:
+        # ensure dict
+        if not isinstance(defaults, dict):
+            defaults = {f: getattr(defaults,f) for f in fields}
 
     first_column_width = max([get_fields_text_width(fields, documentation, backup_str='xadd itemx'), get_fields_text_width(['xadd itemx'],{})])*1.08    # little bit of extra space for bold font
     table_is_started = _start_table(level, first_column_width)
