@@ -91,7 +91,7 @@ class Study:
                  validate_dq_types                              : set[gv_process.DataQualityType]|None = None,
                  validate_allow_dq_fallback                     : bool                              = False,
                  validate_include_data_loss                     : bool                              = False,
-                 validate_I2MC_settings                         : I2MCSettings                      = I2MCSettings(),
+                 validate_I2MC_settings                         : I2MCSettings|None                 = None,
 
                  video_make_which                               : set[str]|None                     = None,
                  video_recording_colors                         : dict[str,RgbColor]|None           = None,
@@ -198,8 +198,9 @@ class Study:
         if self.auto_code_trial_episodes:
             self.auto_code_trial_episodes = AutoCodeTrialEpisodes(self.auto_code_trial_episodes)
             self.auto_code_trial_episodes.apply_defaults()
-        self.validate_I2MC_settings = I2MCSettings(self.validate_I2MC_settings)
-        self.validate_I2MC_settings.apply_defaults()
+        if self.validate_I2MC_settings:
+            self.validate_I2MC_settings = I2MCSettings(self.validate_I2MC_settings)
+            self.validate_I2MC_settings.apply_defaults()
 
     def _check_recordings(self, which: list[str]|None, field: str, strict_check) -> type_utils.ProblemDict:
         problems: type_utils.ProblemDict = {}
