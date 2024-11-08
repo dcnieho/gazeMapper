@@ -200,16 +200,16 @@ class Study:
             self._check_make_video(strict_check)
 
         # ensure some members are of the right class, and apply defaults
-        if self.get_cam_movement_for_et_sync_function:
+        if self.get_cam_movement_for_et_sync_function is not None:
             self.get_cam_movement_for_et_sync_function = CamMovementForEtSyncFunction(self.get_cam_movement_for_et_sync_function)
             self.get_cam_movement_for_et_sync_function.apply_defaults()
-        if self.auto_code_sync_points:
+        if self.auto_code_sync_points is not None:
             self.auto_code_sync_points = AutoCodeSyncPoints(self.auto_code_sync_points)
             self.auto_code_sync_points.apply_defaults()
-        if self.auto_code_trial_episodes:
+        if self.auto_code_trial_episodes is not None:
             self.auto_code_trial_episodes = AutoCodeTrialEpisodes(self.auto_code_trial_episodes)
             self.auto_code_trial_episodes.apply_defaults()
-        if self.validate_I2MC_settings:
+        if self.validate_I2MC_settings is not None:
             self.validate_I2MC_settings = I2MCSettings(self.validate_I2MC_settings)
             self.validate_I2MC_settings.apply_defaults()
 
