@@ -560,11 +560,15 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, documenta
     field_lbl = field_lbl.translate({ord("#"): None})   # ensure there are no # in the lbl that would confuse imgui internals
     # get possible values and their order
     v_type = typing.get_args(f_type)[0]
-    all_values = []
+    fixed_value_set = True
     if typing.get_origin(v_type)==typing.Literal:
         all_values = typing.get_args(v_type)
     elif issubclass(v_type, enum.Enum):
         all_values = tuple(e for e in v_type)
+    else:
+        all_values = []
+        fixed_value_set = False
+
     # for sets, make sure they are consistently (and logically) ordered, same order as the drop-down
     disp_val = val
     has_order = isinstance(val,list)
@@ -591,6 +595,10 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, documenta
         miss_values = [v for v in all_values if v in miss_values]   # preserve order
         str_values, tooltips  = _get_str_values(miss_values,f_type,documentation)
         adder_width = get_fields_text_width(str_values,{})+imgui.get_frame_height()+2*imgui.get_style().frame_padding.x
+    # prep value entry box, if needed
+    inputter_width = None
+    if not fixed_value_set:
+        inputter_width = imgui.calc_text_size('x'*10).x + 2*imgui.get_style().cell_padding.x
 
     # determine size of editor: how many lines we need to fit all elements
     line_break_idxs = []    # codes *before* which element we need to move to the next line
@@ -607,6 +615,12 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, documenta
             w = h_edge_spacing+adder_width
         else:
             w += adder_width + imgui.get_style().item_spacing.x
+    if (val or adder_width is not None) and inputter_width is not None:
+        if w+inputter_width+h_edge_spacing > item_w:
+            line_break_idxs.append(i+1)
+            w = h_edge_spacing+inputter_width
+        else:
+            w += inputter_width + imgui.get_style().item_spacing.x
 
     pos = imgui.get_cursor_screen_pos()
     n_lines = 1+len(line_break_idxs)
@@ -694,6 +708,37 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, documenta
             selected,p_idx = glassesTools.gui.utils.tooltip_combo(f"##{field_lbl}", -1, str_values, tooltips, popup_max_height_in_items=min(10,len(str_values)))
             if selected:
                 to_add = miss_values[p_idx]
+        if not fixed_value_set:
+            if draw_list_set_editor.inputter_temp is None:
+                draw_list_set_editor.inputter_temp = v_type()
+            kwargs = {}
+            flags = imgui.InputTextFlags_.escape_clears_all
+            match v_type:
+                case builtins.int:
+                    fun = imgui.input_int
+                    kwargs['step'] = 0
+                case builtins.float:
+                    fun = imgui.input_float
+                    kwargs['step'] = 0.
+                case _:
+                    fun = imgui.input_text
+            same_line = False
+            if val or miss_values:
+                last = t_bb.max.x if not miss_values else imgui.get_cursor_screen_pos()
+                same_line = last+imgui.get_style().item_spacing.x+inputter_width+h_edge_spacing <= bb.max.x
+                if same_line:
+                    imgui.same_line()
+                else:
+                    line += 1
+                if line>1:
+                    imgui.set_cursor_screen_pos(imgui.get_cursor_screen_pos()-(0, imgui.get_style().frame_padding.y))
+            if not same_line:   # NB: also true when no values
+                imgui.set_cursor_screen_pos(imgui.get_cursor_screen_pos()+(h_edge_spacing, 0))
+            imgui.set_next_item_width(inputter_width)
+            _,draw_list_set_editor.inputter_temp = fun(f'##inputter_{field_lbl}', draw_list_set_editor.inputter_temp, flags=flags, **kwargs)
+            if imgui.is_item_deactivated_after_edit():
+                to_add = draw_list_set_editor.inputter_temp
+                draw_list_set_editor.inputter_temp = None
 
         # deal with drag-drop
         if has_order and len(val)>1:
@@ -738,3 +783,4 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, documenta
                 val.add(to_add)
 
     return val
+draw_list_set_editor.inputter_temp = None
