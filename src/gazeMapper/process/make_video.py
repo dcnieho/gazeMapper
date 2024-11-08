@@ -338,7 +338,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
                             for pl in pose[v]:
                                 if pl in pose[v] and pose[v][pl].pose_successful():
                                     gaze_world = gaze_worldref.from_head(pose[v][pl], g, camera_params[v])
-                                    gaze_world.draw_on_world_video(frame[v], camera_params[v], sub_pixel_fac)
+                                    gaze_world.draw_on_world_video(frame[v], camera_params[v], sub_pixel_fac, study_config.video_projected_vidPos_ray_color, study_config.video_projected_world_pos_color, study_config.video_projected_left_ray_color, study_config.video_projected_right_ray_color, study_config.video_projected_average_ray_color)
 
                         # if we have a reference recording and camera pose for both, we can also draw the gaze in the reference recording, and possibly on other recordings
                         if study_config.sync_ref_recording and pose[lead_vid] is not None:
@@ -360,14 +360,14 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
                                 continue
                             # draw gaze point, camera and gaze vector between the two on the reference video
                             if study_config.sync_ref_recording!=v and lead_vid in write_vids:  # if this is the reference video, its own gaze is already drawn
-                                draw_gaze_on_other_video(frame[lead_vid], pose[v][pl], pose[lead_vid][pl], plane_gaze, camera_params[lead_vid], clr, study_config.video_show_camera_in_ref, study_config.video_show_gaze_vec_in_ref, sub_pixel_fac)
+                                draw_gaze_on_other_video(frame[lead_vid], pose[v][pl], pose[lead_vid][pl], plane_gaze, camera_params[lead_vid], clr, study_config.video_which_gaze_on_plane_in_ref, study_config.video_which_gaze_on_plane_ref_allow_fallback, study_config.video_show_camera_in_ref, study_config.video_show_gaze_vec_in_ref, sub_pixel_fac)
 
                             # also draw on other videos
                             for vo in write_vids-set([v, study_config.sync_ref_recording]):
                                 if pose[vo] is None or pl not in pose[vo] or not pose[vo][pl].pose_successful():
                                     continue
                                 # draw gaze point and camera on the other video, and possibly gaze vector between them
-                                draw_gaze_on_other_video(frame[vo], pose[v][pl], pose[vo][pl], plane_gaze, camera_params[vo], clr, study_config.video_show_camera_in_other, study_config.video_show_gaze_vec_in_other or (study_config.video_show_gaze_vec_in_ref and v==study_config.sync_ref_recording), sub_pixel_fac)
+                                draw_gaze_on_other_video(frame[vo], pose[v][pl], pose[vo][pl], plane_gaze, camera_params[vo], clr, study_config.video_which_gaze_on_plane_in_other, study_config.video_which_gaze_on_plane_other_allow_fallback, study_config.video_show_camera_in_other, study_config.video_show_gaze_vec_in_other or (study_config.video_show_gaze_vec_in_ref and v==study_config.sync_ref_recording), sub_pixel_fac)
 
 
             # print info on frame
@@ -471,8 +471,14 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     # update state
     session.update_action_states(working_dir, process.Action.MAKE_VIDEO, process.State.Completed, study_config)
 
-def draw_gaze_on_other_video(frame_other, pose_this, pose_other, plane_gaze, camera_params_other, clr, do_draw_camera, do_draw_gaze_vec, sub_pixel_fac):
-    gaze_point = np.append(plane_gaze.gazePosPlane2D_vidPos_ray,0.).reshape(1,3)
+def draw_gaze_on_other_video(frame_other, pose_this, pose_other, plane_gaze, camera_params_other, clr, which_gaze_on_plane, which_gaze_on_plane_allow_fallback, do_draw_camera, do_draw_gaze_vec, sub_pixel_fac):
+    gaze_point = plane_gaze.get_gaze_point(which_gaze_on_plane)
+    if gaze_point is None:
+        if which_gaze_on_plane_allow_fallback:
+            gaze_point = plane_gaze.get_gaze_point(gaze_worldref.Type.Scene_Video_Position)
+        else:
+            raise RuntimeError(f'Gaze of type {which_gaze_on_plane.value} was requested, but is not available. Select a different gaze type or set allow_fallback to True.')
+    gaze_point = np.append(gaze_point,0.).reshape(1,3)
     # draw on the other video
     if pose_other.world_frame_to_cam(gaze_point)[2]<=0:
         # other recording's gaze point is behind this camera, won't be visible
