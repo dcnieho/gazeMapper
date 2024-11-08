@@ -118,6 +118,8 @@ def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_get
                     f_type = _replace_type_arg(f_type, base_type, vt, nt)
         case typing.Union if f_type==typing.Union[str, pathlib.Path]:
             is_dict = False
+        case _ if issubclass(f_type, enum.Enum):
+            is_dict = False
         case _:
             raise ValueError(f'type of {field} ({f_type}) not handled')
     return is_dict, base_type, f_type, nullable
@@ -434,7 +436,7 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
     if documentation and documentation.doc_str:
         glassesTools.gui.utils.draw_hover_text(documentation.doc_str, text='')
     imgui.table_next_column()
-    value_documentation = documentation.children.get(None,{}) if documentation is not None else {}
+    value_documentation = documentation.children.get(None,{}) or documentation.children if documentation is not None else {}
     new_val, new_edit, removed = draw_value(field_lbl, val, f_type, nullable, default, parent_val, fixed, value_documentation, has_remove, is_none, base_type)
 
     new_obj = None
@@ -489,8 +491,11 @@ def draw_value(field_lbl: str, val: _T, f_type: typing.Type, nullable: bool, def
             new_val = imgui.input_double(f'##{field_lbl}', val)[1]
         case builtins.list | builtins.set:
             new_val = draw_list_set_editor(field_lbl, val, f_type, documentation)
-        case typing.Literal:
-            values = list(typing.get_args(f_type))
+        case _ if base_type==typing.Literal or (inspect.isclass(base_type) and issubclass(base_type, enum.Enum)):
+            if base_type == typing.Literal:
+                values = list(typing.get_args(f_type))
+            else:
+                values = [x for x in base_type]
             if val is None:
                 values.insert(0,None)
             is_known_value = val in values
@@ -541,7 +546,7 @@ def _get_str_values(values: list[typing.Any], f_type: typing.Type, documentation
     if f_type in val_to_str_registry:
         str_values = ['' if v is None else val_to_str_registry[f_type][v] for v in values]
     else:
-        str_values = ['' if v is None else str(documentation[v].display_string if v in documentation else v) for v in values]
+        str_values = ['' if v is None else str(documentation[v].display_string if v in documentation else v.value if issubclass(type(v), enum.Enum) and isinstance(v.value,str) else v) for v in values]
     tooltips = [documentation[v].doc_str if v in documentation else None for v in values]
     return str_values, tooltips
 
