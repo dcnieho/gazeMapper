@@ -196,6 +196,7 @@ software before they can be imported into gazeMapper. These are:
     If you do not do so, a generic calibration will be used by Pupil Capture during data recording, by Pupil Player during data
     analysis and by the glassesTools processing functions, which may result in incorrect accuracy values.
 - *SMI ETG*: For SMI ETG recordings, access to BeGaze is required and the following steps should be performed:
+  - **NB**: Note that it is critical that a [`SYNC_ET_TO_CAM` action](#actions) is performed for SMI ETG recordings. This is required because the gaze timestamps in the export file created below have an unknown zero that is not related to the scene video clock, and no info about offset between these clocks is available. The gaze signal and video feed have to be manually aligned (synchronized).
   - Export gaze data: `Export` -> `Legacy: Export Raw Data to File`.
     - In the `General` tab, make sure you select the following:
       - `Channel`: enable both eyes
