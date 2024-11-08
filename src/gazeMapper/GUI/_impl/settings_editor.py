@@ -596,15 +596,17 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, documenta
     line_break_idxs = []    # codes *before* which element we need to move to the next line
     w = h_edge_spacing
     for i in range(len(disp_val)):
-        if i>0:
-            w += h_edge_spacing
-        w += w_sizes[i].x
-        if i>0 and w+imgui.get_style().item_spacing.x > item_w:
+        if i>0 and w+w_sizes[i].x+h_edge_spacing > item_w:
             line_break_idxs.append(i)
             w = h_edge_spacing + w_sizes[i].x
+        else:
+            w += w_sizes[i].x + imgui.get_style().item_spacing.x
     if val and adder_width is not None:
-        if w+imgui.get_style().item_spacing.x+adder_width+h_edge_spacing > item_w:
+        if w+adder_width+h_edge_spacing > item_w:
             line_break_idxs.append(i+1)
+            w = h_edge_spacing+adder_width
+        else:
+            w += adder_width + imgui.get_style().item_spacing.x
 
     pos = imgui.get_cursor_screen_pos()
     n_lines = 1+len(line_break_idxs)
