@@ -128,13 +128,22 @@ Example 1 is a minimum example, showing a short recording where a participant lo
     1. You will be greeted by the following screen, go to the `Project settings` pane.
     1. First we have to tell gazeMapper what recordings to expect for a session, click on `Edit session definition` to do so.
     1. Click `+ new recording` to define a recording. Call it anything you wish, for instance `eye tracker`, and select `` as recording type. The screen will now look as follows.
-    1. Back on the `Project settings` pane, click on `Edit planes`.
-    1. Here we need to add both the glassesValidator poster and the stimulus screen as planes.
+    1. Back on the `Project settings` pane, click on `Edit planes`. Here we need to add both the glassesValidator poster and the stimulus screen as planes.
         1. Click on `+ new plane` and call it `validate`. Select `GlassesValidator` as plane type.
         1. Since the example did not use the default glassesValidator poster printed on A2 format but instead presented the glassesValidator poster on screen, a custom glassesValidator setup is needed. To set this up, uncheck the `Use default setup` button for the validate plane. Press the `Open plane configuration folder` button to open the plane's configuration folder. The files there will have to be edited outside of gazeMapper to reflect the glassesValidator poster as presented on the computer screen. For this example, use the files available [here](), which were created based on calculations in the Excel sheet provided [here](). Besides custom `markerPositions.csv` and `targetPositions.csv` files to correctly specify the location of validation targets and ArUco markers on the screen, also the `validationSetup.txt` file was edited to set the correct size for the ArUco markers (`markerSide` variable), the validation targets' diameter (`targetDiameter`) and the size of the plane (`gridCols` and `gridRows`, which were set to the size of the monitor). Note that for glassesValidator, these sizes and positions are specified in cm, not mm.
         1. Click on `+ new plane` again and call it `screen`. Select `Plane 2D` as plane type.
-        1. 
-4. processing.
+        1. Place the [`markerPositions_screen.csv` file]() in the screen plane's setup folder (again use the `Open plane configuration folder` button if needed). In the GUI, provide the name of this file for the `Marker file` parameter. This file was also created using the calculations in the Excel sheet provided [here](), for more information about such plane definition files, [see below](#gazemapper-planes).
+        1. Further configure the plane: set the `Marker size` to `41.25`, the `Unit` to `mm`, and the plane size to `X`: `528` and `Y`: `296.9997`. See the below image for the final plane configuration.
+    1. Back on the `Project settings` pane, click on `Episode setup`. Here we configure what [episodes](#coding-analysis-synchronization-and-validation-episodes) can be coded, and what plane(s) are associated with each episode.
+        1. For the `Episodes to code`, add the `Validation episode`, `Eye tracker synchronization episode` and `Trial`.
+        1. Under `Planes per episode`, add all three above items. Set the `validate` plane for the `Validation episode` and `Eye tracker synchronization episode`, and the `screen` plane for the `Trial` episode. This indicates that for episode in the recording coded as validation or synchronization episodes only the `validate` plane will be searched for and processed, while for trials the `screen` plane will be used.
+    1. Next, detection of the markers to delineate trials needs to be configured. On the `Project settings` pane, click on `Edit individual markers` to configure these.
+        1. Add two individual markers, using the `+ new individual marker` button. Add markers 80 and 81, both with a size of `110.0`. It should look like the image below.
+    1. Some settings also need to be configured on the `Project settings` page itself. Specifically, we need to set:
+        1. `Gaze data synchronization: Method to get camera movement` to `Plane` as we'll use the glassesValidator plane for synchronizing gaze data and the scene camera.
+        1. Set up `Automated coding of trial episodes` by clicking on `click to set`. Expand the created settings. Set `Start marker(s)` to `80 81` and `End marker(s)` to `81 80`, since these are the markers used in the example in that order to denote trial starts and ends. For the rest of the settings the defaults are ok. Note that also different markers or marker sequences can be used for starts and ends.
+        1. When processing the recording, we want to output a scene video with detected markers and gaze projected to the validation and screen planes. To set this up, set `Video export: which recordings` to `eye tracker`, the name of the recording we defined in the session definition. Furthermore, set up a color with which to draw gaze in the `Video export: recording colors` field, using the color `Red`: `255`, `Green`: `127` and `Blue`: `0`. Finally, open `Video export: Color for 3D gaze position on the plane` and click `Unset group` to unset that color, which means that that gaze type will not be drawn on the video.
+4. Import recordings and processing.
 
 ### Example 2: Two participants and two planes
 
