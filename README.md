@@ -174,9 +174,19 @@ Example 1 is a minimum example, showing a short recording where a participant lo
     1. Use the seek functionality in the coder (you can press on the timeline underneath the video at the same height as the orange triangle, or use the video player controls) to find the start of the validation episode. Code the validation interval as described in [step 5 in the glassesValidator manual](https://github.com/dcnieho/glassesValidator?tab=readme-ov-file#workflow-and-example-data). Furthermore, code the eye tracker synchronization episode as the beginning of the fixation on the center validation target before the participant starts nodding no and yes, and the end of the epidose as the end of the fixation on the center validation target after the nodding:
 
         ![Episode coder final](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/episode_coder_final_1.png?raw=true)
+
         Press `Done` to close the episode coding GUI.
     1. Next, run the `Sync et to cam` action. This will open the following window:
+
         ![Episode coder final](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/et_sync_1.png?raw=true)
+
+        To align the two signals in time with each other, drag the green dot in the middle of either plot. The horizontal offset is the applied time shift (indicated by the value in the lower-right corner of the upper plot). When done aligning the two signals, press done atop the window.
+
+    1. Next, run the `Gaze to plane` action.
+    1. Next, run the `Validation` action.
+    1. Finally, run the `Make video` action, which draws the detected markers, the participant's and the projection of that gaze to the plane on the scene video, along with information about the episode annotations.
+    1. Now, you can export the gaze data projected to the plane, the created video and the glassesValidator data quality measures to a folder of your choosing using the `Export trials` action.
+
 
 
 ### Example 2: Two participants and two planes
