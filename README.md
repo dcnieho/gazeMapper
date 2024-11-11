@@ -154,8 +154,16 @@ Example 1 is a minimum example, showing a short recording where a participant lo
         1. Set up `Automated coding of trial episodes` by clicking on `click to set`. Expand the created settings. Set `Start marker(s)` to `80 81` and `End marker(s)` to `81 80`, since these are the markers used in the example in that order to denote trial starts and ends. For the rest of the settings the defaults are ok. Note that also different markers or marker sequences can be used for starts and ends.
         1. When processing the recording, we want to output a scene video with detected markers and gaze projected to the validation and screen planes. To set this up, set `Video export: which recordings` to `eye tracker`, the name of the recording we defined in the session definition. Furthermore, set up a color with which to draw gaze in the `Video export: recording colors` field, using the color `Red`: `255`, `Green`: `127` and `Blue`: `0`. Finally, open `Video export: Color for 3D gaze position on the plane` and click `Unset group` to unset that color, which means that that gaze type will not be drawn on the video.
 
-    ![Project config](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/project_config_1.png?raw=true)
-4. Import recordings and processing.
+        ![Project config](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/project_config_1.png?raw=true)
+4. Now that the project is set up, we are ready to import and process recordings.
+    1. On the `Session` pane, click `import eye tracker recordings`. There, select the [folder containing the example data]() and indicate its an `SMI ETG` recording. Note that you could also trigger import by drag-dropping a data folder onto gazeMapper.
+    1. On the window that pops up, click `+ new session`, and name the session `1` (or any name you like). Expand session `1`. You should now see the following:
+        ![Add recording 1](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/add_recording_1_1.png?raw=true)
+    1. Assign the recording to the session by dragging it from the right, and dropping it on the left where it says `drop recording here`.
+        ![Add recording 2](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/add_recording_1_2.png?raw=true)
+    1. Click `Continue`. The recording will now be imported. When this is done, you should see the following:
+        ![Recording imported](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/recording_imported_1.png?raw=true)
+
 
 ### Example 2: Two participants and two planes
 
