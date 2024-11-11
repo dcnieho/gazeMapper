@@ -126,9 +126,11 @@ Example 1 is a minimum example, showing a short recording where a participant lo
 3. To start processing a recording with gazeMapper, a gazeMapper project first needs to be created and configured. To do so:
     1. Run gazeMapper and make a new gazeMapper project.
     1. You will be greeted by the following screen, go to the `Project settings` pane.
+
         ![New project screen](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/new_project.png?raw=true)
     1. First we have to tell gazeMapper what recordings to expect for a session, click on `Edit session definition` to do so.
     1. Click `+ new recording` to define a recording. Call it anything you wish, for instance `eye tracker`, and select `Eye Tracker` as recording type. The screen will now look as follows.
+
         ![Session definition](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/session_editor_1.png?raw=true)
     1. Back on the `Project settings` pane, click on `Edit planes`. Here we need to add both the glassesValidator poster and the stimulus screen as planes.
         1. Click on `+ new plane` and call it `validate`. Select `GlassesValidator` as plane type.
@@ -136,6 +138,7 @@ Example 1 is a minimum example, showing a short recording where a participant lo
         1. Click on `+ new plane` again and call it `screen`. Select `Plane 2D` as plane type.
         1. Place the [`markerPositions_screen.csv` file]() in the screen plane's setup folder (again use the `Open plane configuration folder` button if needed). In the GUI, provide the name of this file for the `Marker file` parameter. This file was also created using the calculations in the Excel sheet provided [here](), for more information about such plane definition files, [see below](#gazemapper-planes).
         1. Further configure the plane: set the `Marker size` to `41.25`, the `Unit` to `mm`, and the plane size to `X`: `528` and `Y`: `296.9997`. See the below image for the final plane configuration.
+        
         ![Plane editor](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/plane_editor_1.png?raw=true)
     1. Back on the `Project settings` pane, click on `Episode setup`. Here we configure what [episodes](#coding-analysis-synchronization-and-validation-episodes) can be coded, and what plane(s) are associated with each episode.
         1. For the `Episodes to code`, add the `Validation episode`, `Eye tracker synchronization episode` and `Trial`.
