@@ -126,6 +126,7 @@ Example 1 is a minimum example, showing a short recording where a participant lo
 3. To start processing a recording with gazeMapper, a gazeMapper project first needs to be created and configured. To do so:
     1. Run gazeMapper and make a new gazeMapper project.
     1. You will be greeted by the following screen, go to the `Project settings` pane.
+        ![New project screen](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/new_project.png?raw=true)
     1. First we have to tell gazeMapper what recordings to expect for a session, click on `Edit session definition` to do so.
     1. Click `+ new recording` to define a recording. Call it anything you wish, for instance `eye tracker`, and select `` as recording type. The screen will now look as follows.
     1. Back on the `Project settings` pane, click on `Edit planes`. Here we need to add both the glassesValidator poster and the stimulus screen as planes.
