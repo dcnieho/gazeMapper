@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<GazeCorrectionChronicle Version="1.0">
+  <GazeCorrectionData ApplyAtFrame="8727" EyeId="EYEID_RIGHTEYE" CalibrationType="CALIBRATIONTYPE_NONE" Type="none">  </GazeCorrectionData>
+  <GazeCorrectionData ApplyAtFrame="8727" EyeId="EYEID_LEFTEYE" CalibrationType="CALIBRATIONTYPE_NONE" Type="none">  </GazeCorrectionData>
+</GazeCorrectionChronicle>

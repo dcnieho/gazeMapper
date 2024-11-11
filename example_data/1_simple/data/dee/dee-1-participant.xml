@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ParticipantData>
+  <ExperimentDefinition>
+    <Version>1.1</Version>
+    <ClientVersion>2.0.0.13366</ClientVersion>
+    <ExperimentName>gazeMapper</ExperimentName>
+    <ExperimentId>e0578d71-3752-46be-8d20-0e9b4d52c354</ExperimentId>
+    <Date>11/04/2024 13:48:35</Date>
+    <EyeCameraFirmwareVersion>10</EyeCameraFirmwareVersion>
+    <SceneCameraSoftwareVersion>20140215</SceneCameraSoftwareVersion>
+    <IsDirectGazeExperiment>False</IsDirectGazeExperiment>
+    <ExperimentSettings>
+      <DefaultCalibrationMode>Calibration3Point</DefaultCalibrationMode>
+      <IsCalibrationRequired>False</IsCalibrationRequired>
+      <IsCalibrationMandatory>True</IsCalibrationMandatory>
+      <IsCustomCalibrationModeAllowed>True</IsCustomCalibrationModeAllowed>
+      <PasswordDigestForUnlockingExperiment />
+      <FilterGazeCursorForLiveView>True</FilterGazeCursorForLiveView>
+      <DataAcquisitionWithRecodingUnit>False</DataAcquisitionWithRecodingUnit>
+      <ShowEventLog>False</ShowEventLog>
+      <CalibrationArea>1280x960</CalibrationArea>
+    </ExperimentSettings>
+    <HardwareConfiguration>
+      <EyeVideoResolution>QVGA320x240</EyeVideoResolution>
+      <IsMicrophoneOn>True</IsMicrophoneOn>
+      <IsEegOn>False</IsEegOn>
+      <EyeCameraMode>Binocular</EyeCameraMode>
+      <SampleRate>60</SampleRate>
+      <SceneCameraMode>SceneMode_1280x960_24FPS</SceneCameraMode>
+      <DefaultSceneCameraWhiteBalance>DayLightOutdoor</DefaultSceneCameraWhiteBalance>
+      <EyeCamExposureMode>Normal</EyeCamExposureMode>
+    </HardwareConfiguration>
+    <ParticipantPropertyDefinitions />
+    <VideoOverlaySettings />
+    <AnnotationDefinition Version="1.0" />
+  </ExperimentDefinition>
+  <Version>1.1</Version>
+  <ClientVersion>2.7.304.13366</ClientVersion>
+  <ServerVersion>2.7.1.226</ServerVersion>
+  <ParticipantId>ca73753a-291a-476c-9a91-bc41248a0c36</ParticipantId>
+  <SceneCameraSoftwareVersion>20140215</SceneCameraSoftwareVersion>
+  <EyeCameraFirmwareVersion>10</EyeCameraFirmwareVersion>
+  <EtgSerialNumber>ETG-2.0-1407-615</EtgSerialNumber>
+  <ProductEdition>ETG-1.9/2.0</ProductEdition>
+  <ParticipantProperties>
+    <ParticipantProperty>
+      <Name>Name</Name>
+      <Value>dee</Value>
+    </ParticipantProperty>
+    <RecordingDevice>
+      <RecordingDeviceName>ThinkPad X230</RecordingDeviceName>
+      <RecordingDeviceManucaturer>LENOVO</RecordingDeviceManucaturer>
+      <RecordingDeviceModel>2325V6K</RecordingDeviceModel>
+      <HostName>ETX0906701-1409</HostName>
+      <CPU>Intel(R) Core(TM) i7-3520M CPU . 2.90GHz</CPU>
+      <CpuFamily>198</CpuFamily>
+      <CpuFrequencyMax>2901</CpuFrequencyMax>
+      <SMIOpt>True</SMIOpt>
+      <SMICert>True</SMICert>
+      <OperatingSystem>Microsoft Windows 7 Professional </OperatingSystem>
+      <OperatingSystemVersion>6.1.7601</OperatingSystemVersion>
+      <OperatingSystemArch>64-bit</OperatingSystemArch>
+      <OperatingSystemUser>ETX0906701-1409.iView X</OperatingSystemUser>
+      <OperatingSystemDescription>ETX0906701-1409SG</OperatingSystemDescription>
+      <OperatingSystemOrganisation>SensoMotoric Instruments GmbH</OperatingSystemOrganisation>
+      <OperatingSystemLanguage>1033</OperatingSystemLanguage>
+      <OperatingSystemSerial>55041-034-1707794-86356</OperatingSystemSerial>
+      <OperatingSystemServicePack>1.0</OperatingSystemServicePack>
+      <PowerSchemeGuid>4e7b197b-577c-4fe6-8533-340336525984</PowerSchemeGuid>
+    </RecordingDevice>
+  </ParticipantProperties>
+</ParticipantData>
