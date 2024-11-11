@@ -138,17 +138,23 @@ Example 1 is a minimum example, showing a short recording where a participant lo
         1. Click on `+ new plane` again and call it `screen`. Select `Plane 2D` as plane type.
         1. Place the [`markerPositions_screen.csv` file]() in the screen plane's setup folder (again use the `Open plane configuration folder` button if needed). In the GUI, provide the name of this file for the `Marker file` parameter. This file was also created using the calculations in the Excel sheet provided [here](), for more information about such plane definition files, [see below](#gazemapper-planes).
         1. Further configure the plane: set the `Marker size` to `41.25`, the `Unit` to `mm`, and the plane size to `X`: `528` and `Y`: `296.9997`. See the below image for the final plane configuration.
-        
+
         ![Plane editor](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/plane_editor_1.png?raw=true)
     1. Back on the `Project settings` pane, click on `Episode setup`. Here we configure what [episodes](#coding-analysis-synchronization-and-validation-episodes) can be coded, and what plane(s) are associated with each episode.
         1. For the `Episodes to code`, add the `Validation episode`, `Eye tracker synchronization episode` and `Trial`.
         1. Under `Planes per episode`, add all three above items. Set the `validate` plane for the `Validation episode` and `Eye tracker synchronization episode`, and the `screen` plane for the `Trial` episode. This indicates that for episode in the recording coded as validation or synchronization episodes only the `validate` plane will be searched for and processed, while for trials the `screen` plane will be used.
+
+        ![Episodes editor](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/episodes_editor_1.png?raw=true)
     1. Next, detection of the markers to delineate trials needs to be configured. On the `Project settings` pane, click on `Edit individual markers` to configure these.
         1. Add two individual markers, using the `+ new individual marker` button. Add markers 80 and 81, both with a size of `110.0`. It should look like the image below.
+
+            ![Individual marker editor](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/indiv_marker_editor_1.png?raw=true)
     1. Some settings also need to be configured on the `Project settings` page itself. Specifically, we need to set:
         1. `Gaze data synchronization: Method to get camera movement` to `Plane` as we'll use the glassesValidator plane for synchronizing gaze data and the scene camera.
         1. Set up `Automated coding of trial episodes` by clicking on `click to set`. Expand the created settings. Set `Start marker(s)` to `80 81` and `End marker(s)` to `81 80`, since these are the markers used in the example in that order to denote trial starts and ends. For the rest of the settings the defaults are ok. Note that also different markers or marker sequences can be used for starts and ends.
         1. When processing the recording, we want to output a scene video with detected markers and gaze projected to the validation and screen planes. To set this up, set `Video export: which recordings` to `eye tracker`, the name of the recording we defined in the session definition. Furthermore, set up a color with which to draw gaze in the `Video export: recording colors` field, using the color `Red`: `255`, `Green`: `127` and `Blue`: `0`. Finally, open `Video export: Color for 3D gaze position on the plane` and click `Unset group` to unset that color, which means that that gaze type will not be drawn on the video.
+
+    ![Project config](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/project_config_1.png?raw=true)
 4. Import recordings and processing.
 
 ### Example 2: Two participants and two planes
