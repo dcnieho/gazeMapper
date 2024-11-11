@@ -934,6 +934,7 @@ class GUI:
                 extra = '*'
                 imgui.push_style_color(imgui.Col_.text, colors.error)
             if imgui.tree_node_ex(f'{extra}{lbl}###{lbl}', imgui.TreeNodeFlags_.framed):
+                plane_dir = config.guess_config_dir(self.study_config.working_directory)/p.name
                 if problem_fields:
                     imgui.pop_style_color()
                 if p.type==plane.Type.Plane_2D and imgui.button(ifa6.ICON_FA_BARCODE+f' deploy ArUco markers'):
@@ -941,13 +942,15 @@ class GUI:
                 changed, _, new_p, _ = settings_editor.draw_dict_editor(copy.deepcopy(p), type(p), 0, list(plane.definition_parameter_types[p.type].keys()), plane.definition_parameter_types[p.type], plane.definition_defaults[p.type], problems=problem_fields, fixed=fixed_fields, documentation=plane.definition_parameter_doc)
                 if changed:
                     # persist changed config
-                    plane_dir = config.guess_config_dir(self.study_config.working_directory)/p.name
                     new_p.store_as_json(plane_dir)
                     if new_p.type==plane.Type.GlassesValidator and not new_p.use_default:
                         callbacks.glasses_validator_plane_check_config(self.study_config, new_p)
                     # recreate plane so any settings changes (e.g. applied defaults) are reflected in the gui
                     self.study_config.planes[i] = plane.Definition.load_from_json(plane_dir)
                     self._plane_preview_cache.pop(p.name, None)
+                if imgui.button(ifa6.ICON_FA_FOLDER_OPEN+' Open plane configuration folder'):
+                    callbacks.open_folder(plane_dir)
+                imgui.same_line()
                 if imgui.button(ifa6.ICON_FA_IMAGE+' generate reference image'):
                     p_dir = config.guess_config_dir(self.study_config.working_directory) / p.name
                     plane.get_plane_from_definition(p, p_dir)   # constructing the plane triggers generation of the reference image
