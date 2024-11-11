@@ -158,11 +158,25 @@ Example 1 is a minimum example, showing a short recording where a participant lo
 4. Now that the project is set up, we are ready to import and process recordings.
     1. On the `Session` pane, click `import eye tracker recordings`. There, select the [folder containing the example data]() and indicate its an `SMI ETG` recording. Note that you could also trigger import by drag-dropping a data folder onto gazeMapper.
     1. On the window that pops up, click `+ new session`, and name the session `1` (or any name you like). Expand session `1`. You should now see the following:
+
         ![Add recording 1](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/add_recording_1_1.png?raw=true)
     1. Assign the recording to the session by dragging it from the right, and dropping it on the left where it says `drop recording here`.
+
         ![Add recording 2](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/add_recording_1_2.png?raw=true)
     1. Click `Continue`. The recording will now be imported. When this is done, you should see the following:
+
         ![Recording imported](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/recording_imported_1.png?raw=true)
+    1. Next, run the `Detect markers` action by right-clicking on session `1` and selecting the action from the menu. This will detect all markers in the video, including those needed for automatic trial coding.
+    1. When the `Detect markers` action is finished, run the `Auto code trials` action.
+    1. Next, run the `Code episodes` action. This will bring up a coding GUI used for annotating where the episodes of interest are in the recording. `Trial` should already have been coded (see image below), use the GUI to check if trial starts and end have been accurately determined.
+
+        ![Episode coder initial](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/episode_coder_initial_1.png?raw=true)
+    1. Use the seek functionality in the coder (you can press on the timeline underneath the video at the same height as the orange triangle, or use the video player controls) to find the start of the validation episode. Code the validation interval as described in [step 5 in the glassesValidator manual](https://github.com/dcnieho/glassesValidator?tab=readme-ov-file#workflow-and-example-data). Furthermore, code the eye tracker synchronization episode as the beginning of the fixation on the center validation target before the participant starts nodding no and yes, and the end of the epidose as the end of the fixation on the center validation target after the nodding:
+
+        ![Episode coder final](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/episode_coder_final_1.png?raw=true)
+        Press `Done` to close the episode coding GUI.
+    1. Next, run the `Sync et to cam` action. This will open the following window:
+        ![Episode coder final](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/et_sync_1.png?raw=true)
 
 
 ### Example 2: Two participants and two planes
