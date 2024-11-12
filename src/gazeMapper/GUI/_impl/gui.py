@@ -258,10 +258,10 @@ class GUI:
             imgui.begin_disabled()
         if imgui.menu_item(ifa6.ICON_FA_CIRCLE_XMARK+" Close project", "", False)[0]:
             self.close_project()
-        if imgui.menu_item(ifa6.ICON_FA_FOLDER_OPEN+" Open project folder", "", False)[0]:
-            callbacks.open_folder(self.project_dir)
         if disabled:
             imgui.end_disabled()
+        if imgui.menu_item(ifa6.ICON_FA_FOLDER_OPEN+" Open project folder", "", False)[0]:
+            callbacks.open_folder(self.project_dir)
 
     def _show_menu_gui(self):
         # this is always called, so we handle popups and other state here
