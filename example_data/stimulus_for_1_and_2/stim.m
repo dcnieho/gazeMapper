@@ -1,7 +1,7 @@
 sync_marker_size    = 400;
 sync_marker_margin  = 40;
 sync_marker_dur     = .5;
-sync_marker_qshow   = true;
+sync_marker_qshow   = false;
 trial_marker_size   = 400;
 trial_marker_margin = 40;
 trial_marker_dur    = .5;
