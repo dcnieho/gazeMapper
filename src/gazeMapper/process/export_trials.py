@@ -20,17 +20,12 @@ def run(working_dir: str|pathlib.Path, export_path: str|pathlib.Path, to_export:
 
     # get settings for the study
     study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir}, **study_settings)
-    if annotation.Event.Trial not in study_config.planes_per_episode:
-        raise ValueError('No planes are specified for mapping gaze to during trials, nothing to export')
-
-    planes = list(study_config.planes_per_episode[annotation.Event.Trial])
-
     # get session info
     session_info = session.Session.from_definition(study_config.session_def, working_dir)
     recs    = [r for r in session_info.recordings if session_info.recordings[r].definition.type==session.RecordingType.Eye_Tracker]
 
     if 'planeGaze' in to_export:
-        export_plane_gaze(export_path, working_dir, study_config, recs, planes)
+        export_plane_gaze(export_path, working_dir, study_config, recs)
 
     if 'video' in to_export:
         export_detectOutput_video(export_path, working_dir, recs)
@@ -39,7 +34,12 @@ def run(working_dir: str|pathlib.Path, export_path: str|pathlib.Path, to_export:
     session.update_action_states(working_dir, process.Action.EXPORT_TRIALS, process.State.Completed, study_config)
 
 
-def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, study_config: config.Study, recs: list[str], planes: list[str]):
+def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, study_config: config.Study, recs: list[str]):
+    if annotation.Event.Trial not in study_config.planes_per_episode:
+        raise ValueError('No planes are specified for mapping gaze to during trials, no gaze-on-plane data to export')
+
+    planes = list(study_config.planes_per_episode[annotation.Event.Trial])
+
     # per recording, read the relevant files and put them all together
     for r in recs:
         # get trial coding
