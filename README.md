@@ -193,10 +193,15 @@ Example 1 is a minimum example, showing a short recording where a participant lo
     1. Now, you can export the gaze data projected to the plane, the created video and the glassesValidator data quality measures to a folder of your choosing using the `Export trials` action.
 
 ### Example 2: Two participants and two planes
+Example 2 is an extension of example 1, scaling it up to recording two participants who are simultaneously recorded while viewing both their own and each others' screens on which three images are shown in sequence. At the start of the recording, like in example 1, both participants are furthermore asked to look at a [glassesValidator](https://github.com/dcnieho/glassesValidator) poster ([Niehorster et al., 2023](https://doi.org/10.3758/s13428-023-02105-5)), to make it possible to determine data quality measures for the recording. Finally, the glassesValidator poster is also used for synchronizing the eye tracker's gaze data with its scene camera. We strongly recommend collecting data for both synchronization and data quality determination for all wearable eye tracker recordings.
+
+[Example data](https://github.com/dcnieho/gazeMapper/tree/master/example_data/1_simple/data), the [configuration](https://github.com/dcnieho/gazeMapper/tree/master/example_data/1_simple/configuration/) and the [coding](https://github.com/dcnieho/gazeMapper/tree/master/example_data/1_simple/coding/) files needed for exactly recreating the below steps are provided. The [stimulus presentation code](https://github.com/dcnieho/gazeMapper/tree/master/example_data/stimulus_for_1_and_2) is the same example 1, except that for one of the stimulus presentation computers `sync_marker_qshow` should be set to `true`, and for the other computers `plane_which` should be set to `2`. Note that to keep the example simple, image presentation on the two systems was not synchronized other than by the two participants attempting to have their key presses coincide. Any real experiment would likely synchronize stimulus presentation on the two computers, e.g. using [Lab Streaming Layer](https://labstreaminglayer.org/).
 
 Steps 1 and 2 are mostly the same as for [Example 1](#example-1-single-participant-and-single-plane), with the following additional points to note:
 1. do validation one after the other, not at the same time.
 2. sync markers are shown to synchronize the two recordings together. Using the ArUco these markers can be automatically detected, but any transient visible to all cameras can be used and the moment at which it occurs manually coded.
+
+Nonetheless, below we provide a full description of how recording preparation, data recording, and data analysis for this example were performed:
 
 ## gazeMapper projects
 The gazeMapper GUI organizes recordings into a project folder. Each session to be processed is represented by a folder in this project folder, and one or multiple recordings are stored in subfolders of a session folder. After importing recordings, all further processing is done inside these session and recording folders. The source directories containing the original recordings remain
