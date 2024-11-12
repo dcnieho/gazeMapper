@@ -379,12 +379,18 @@ class Study:
 
         type_utils.merge_problem_dicts(problems, self._check_recordings([self.sync_ref_recording], 'sync_ref_recording', False))
         type_utils.merge_problem_dicts(problems, self._check_recordings(self.sync_ref_average_recordings, 'sync_average_recordings', False))
-        for a in ['sync_ref_do_time_stretch', 'sync_ref_stretch_which', 'sync_ref_average_recordings']:
-            if getattr(self,a) is None:
-                if strict_check:
-                    raise ValueError(f'{a} should be set in the study setup when sync_ref_recording is set')
-                else:
-                    problems[a] = f'{a} should be set when sync_ref_recording is set'
+        if self.sync_ref_do_time_stretch is None:
+            if strict_check:
+                raise ValueError(f'sync_ref_do_time_stretch should be set in the study setup when sync_ref_recording is set')
+            else:
+                problems[a] = f'sync_ref_do_time_stretch should be set when sync_ref_recording is set'
+        if self.sync_ref_do_time_stretch:
+            for a in ['sync_ref_stretch_which', 'sync_ref_average_recordings']:
+                if getattr(self,a) is None:
+                    if strict_check:
+                        raise ValueError(f'{a} should be set in the study setup when sync_ref_recording is set and sync_ref_do_time_stretch is enabled')
+                    else:
+                        problems[a] = f'{a} should be set when sync_ref_recording is set and sync_ref_do_time_stretch is enabled'
         if self.sync_ref_average_recordings and self.sync_ref_recording in self.sync_ref_average_recordings:
             if strict_check:
                 raise ValueError(f'Recording {self.sync_ref_recording} is the reference recording for sync, should not be specified in sync_average_recordings')
@@ -600,7 +606,7 @@ study_parameter_doc = {
     }),
     'sync_et_to_cam_use_average': type_utils.GUIDocInfo('Gaze data synchronization: Use average?', 'Whether to use the average offset of multiple sync episodes. If not enabled, the offset for the first sync episode is used, the rest are ignored.'),
     'auto_code_sync_points': type_utils.GUIDocInfo('Automated coding of synchronization points','Setup for automatic coding of synchronization timepoints.',{
-        'markers': type_utils.GUIDocInfo('Markers', 'Set of marker IDs whose appearance indicates a synchronization timepoint.'),
+        'markers': type_utils.GUIDocInfo('Marker(s)', 'Set of marker IDs whose appearance indicates a synchronization timepoint.'),
         'max_gap_duration': type_utils.GUIDocInfo('Maximum gap duration', 'Maximum gap (number of frames) to be filled in sequences of marker detections.'),
         'min_duration': type_utils.GUIDocInfo('Minimum duration', 'Minimum length (number of frames) of a sequence of marker detections. Shorter runs are removed.')
     }),
