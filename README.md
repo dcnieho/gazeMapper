@@ -215,7 +215,7 @@ Nonetheless, below we provide a full description of how recording preparation, d
    It is important that the exact positions, sizes and orientations of the individual ArUco markers are known. This is required for gazeMapper to be able to correctly determine the observer's position and orientation with respect to the plane, allowing for gaze to be projected to the plane. This information has to be provided to gazeMapper. For more information, see [gazeMapper planes](#gazemapper-planes).
 2. A recording then proceeds as follows.
     1. Both participants are positioned in front of the stimulus screens. One participant is designated the `lead`, the other the `follower` (they could for instance be teacher and student, and also the names used could of course be anything).
-    1. Both participants look at the screen of the lead participant, where an ArUco marker is shown for automatic [synchronization](#automatic-coding-of-synchronization-timepoints).
+    1. Both participants look at the screen of the lead participant, where an ArUco marker is shown for [automatic synchronization](#automatic-coding-of-synchronization-timepoints).
     1. One participant is first presented with the glassesValidator poster and completes a glassesValidator data collection ([see step 3 here](https://github.com/dcnieho/glassesValidator?tab=readme-ov-file#workflow-and-example-data)). Note that in the example, the validation is not performed at arm's length, but at the distance at which the rest of the task will be completed. If a single distance is predominant during an experiment, using a specific distance for the validation data collection is recommended.
     1. After this, while the participant remains at the same position, they are instructed to continuously fixate the fixation target at the center of the validation poster while slowly nodding no with their head five times, and then slowly nodding yes five times.
     1. When the first participant is done, the other participant performs the same validation and synchronization procedure from the last two steps.
@@ -260,12 +260,12 @@ Nonetheless, below we provide a full description of how recording preparation, d
 
         ![Project config](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/project_config_2.png?raw=true)
 4. Now that the project is set up, we are ready to import and process recordings.
-    1. On the `Session` pane, click `import eye tracker recordings`. There, select the [folder containing the example data](https://github.com/dcnieho/gazeMapper/tree/master/example_data/1_simple/data) and indicate you're looking for `Tobii Glasses 2` recordings. Note that you could also trigger import by drag-dropping a data folder onto gazeMapper.
+    1. On the `Session` pane, click `import eye tracker recordings`. There, select the [folder containing the example data](https://github.com/dcnieho/gazeMapper/tree/master/example_data/2_two_participants_two_planes/data) and indicate you're looking for `Tobii Glasses 2` recordings. Note that you could also trigger import by drag-dropping a data folder onto gazeMapper.
     1. On the window that pops up, click `+ new session`, and name the session `1` (or any name you like). Expand session `1`. You should now see the following:
 
         ![Add recording 1](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/add_recording_2_1.png?raw=true)
     1. Assign the recording to the session by dragging it from the right, and dropping it on the left for the `lead` recording where it says `drop recording here`. Click `Continue`. The recording will now be imported.
-    1. Again click `import eye tracker recordings`, select the [folder containing the example data](https://github.com/dcnieho/gazeMapper/tree/master/example_data/1_simple/data) and this time indicate you're looking for `Pupil Invisible` recordings. Assign the found Pupil Invisible recording to the `follow` recording.
+    1. Again click `import eye tracker recordings`, select the [folder containing the example data](https://github.com/dcnieho/gazeMapper/tree/master/example_data/2_two_participants_two_planes/data) and this time indicate you're looking for `Pupil Invisible` recordings. Assign the found Pupil Invisible recording to the `follow` recording.
 
         ![Add recording 2](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/add_recording_2_2.png?raw=true)
 
@@ -291,10 +291,11 @@ Nonetheless, below we provide a full description of how recording preparation, d
         Press `Done` to close the episode coding GUI. The coding files for this example can be found [here](https://github.com/dcnieho/gazeMapper/tree/master/example_data/2_two_participants_two_planes/coding/).
     1. Next, run the `Sync et to cam` action. This will open the following window:
 
-        ![Episode coder final](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/et_sync_1.png?raw=true)
+        ![Episode coder final](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/et_sync_2.png?raw=true)
 
         To align the two signals in time with each other, drag the green dot in the middle of either plot. The horizontal offset is the applied time shift (indicated by the value in the lower-right corner of the upper plot). Any vertical shift is not stored, but can be useful when aligning the two signals. When done aligning the two signals, press done atop the window.
 
+    1. Next, run the `Sync to reference` action to synchronize the two recordings together.
     1. Next, run the `Gaze to plane` action.
     1. Next, run the `Validation` action.
     1. Finally, run the `Make video` action, which draws the detected markers, the participant's and the projection of that gaze to the plane on the scene video, along with information about the episode annotations.
