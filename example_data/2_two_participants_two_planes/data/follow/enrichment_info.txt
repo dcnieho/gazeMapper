@@ -1,0 +1,3 @@
+raw-data-exporter export
+Find detailed documentation here: https://docs.pupil-labs.com/neon/data-collection/data-format/ 
+Version 2

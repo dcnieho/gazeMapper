@@ -1,0 +1,26 @@
+{
+    "rec_id": "t6z7udz",
+    "rec_info": {
+        "EagleId": "2f49a6fb-c14e-41c3-aa38-1670d2f73918",
+        "Name": "Recording003",
+        "Notes": ""
+    },
+    "rec_participant": "7mw3daq",
+    "rec_project": "ixinraw",
+    "rec_state": "done",
+    "rec_segments": 1,
+    "rec_length": 124,
+    "rec_calibration": "hunvlmk",
+    "rec_created": "2024-11-08T10:25:05+0000",
+    "rec_et_samples": 6225,
+    "rec_et_valid_samples": 5912,
+    "ts_right_x": -32.5,
+    "ts_right_y": -27.0,
+    "ts_right_z": -19.0,
+    "ts_left_x": 32.5,
+    "ts_left_y": -27.0,
+    "ts_left_z": -19.0,
+    "ts_green_limit_radius": 10.0,
+    "ts_yellow_limit_radius": 12.5
+}
+

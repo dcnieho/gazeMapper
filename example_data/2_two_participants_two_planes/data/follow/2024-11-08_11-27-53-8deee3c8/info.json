@@ -1,0 +1,32 @@
+{
+    "android_device_id": "9e69b219866454ee",
+    "android_device_model": "OnePlus8T_EEA",
+    "android_device_name": "OnePlus 8T",
+    "app_version": "1.4.30-prod",
+    "calib_version": 1,
+    "data_format_version": "1.4",
+    "duration": 121747000000,
+    "gaze_offset": [
+        -3.3710327,
+        50.962646
+    ],
+    "glasses_serial_number": "mwbzd",
+    "os_version": "13",
+    "pipeline_version": "1.10.0",
+    "recording_id": "8deee3c8-ac61-43a0-8b3b-7f17a41179af",
+    "scene_camera_serial_number": "rx7vp",
+    "start_time": 1731061673794000000,
+    "template_data": {
+        "data": {
+            "7215cb7c-c111-4d0c-8ad4-9d95b59bc419": [
+                ""
+            ]
+        },
+        "id": "04a21594-a69d-4043-a523-620c07fbf6fd",
+        "recording_name": "2024-11-08_11:27:53",
+        "version": "2022-03-10T12:56:10.829495Z"
+    },
+    "wearer_id": "2564262f-3b7f-4fe7-9418-d55d1e764ef1",
+    "wearer_name": "001",
+    "workspace_id": "20d557ff-da87-4eb0-bf4f-97e59c1dc26c"
+}
