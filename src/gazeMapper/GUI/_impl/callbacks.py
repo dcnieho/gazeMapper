@@ -8,11 +8,12 @@ import pathvalidate
 import threading
 from imgui_bundle import imgui, imspinner, hello_imgui, icons_fontawesome_6 as ifa6
 
-from glassesTools import aruco, async_thread, camera_recording, eyetracker, gui as gt_gui, naming, platform, recording, video_utils
+from glassesTools import annotation, aruco, async_thread, camera_recording, eyetracker, gui as gt_gui, naming as gt_naming, platform, recording, video_utils
 from glassesValidator.config import deploy_validation_config, get_validation_setup
+from glassesValidator import process as gv_process
 
 from . import colors, utils
-from ... import config, marker, plane, process, session
+from ... import config, marker, naming, plane, process, session
 
 def get_folder_picker(g, reason: str, *args, **kwargs):
     from . import gui
@@ -118,10 +119,10 @@ def set_default_cam_cal(cal_path: str|pathlib.Path, rec_def: session.RecordingDe
 def set_cam_cal(cal_path: str|pathlib.Path, working_directory: str|pathlib.Path):
     cal_path = pathlib.Path(cal_path)
     working_directory = pathlib.Path(working_directory)
-    shutil.copyfile(str(cal_path), str(working_directory / naming.scene_camera_calibration_fname))
+    shutil.copyfile(str(cal_path), str(working_directory / gt_naming.scene_camera_calibration_fname))
 
 def delete_cam_cal(working_directory: str|pathlib.Path):
-    pathlib.Path(working_directory / naming.scene_camera_calibration_fname).unlink(missing_ok=True)
+    pathlib.Path(working_directory / gt_naming.scene_camera_calibration_fname).unlink(missing_ok=True)
 
 def make_plane(study_config: config.Study, p_type: plane.Type, name: str):
     path = config.guess_config_dir(study_config.working_directory)
@@ -327,6 +328,7 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
 
     # for the sessions, see what we have to export
     to_export: dict[str,bool] = {}
+    rec_dirs: list[pathlib.Path] = []
     for s_name in sessions:
         s = g.sessions.get(s_name,None)
         if s is None:
@@ -334,12 +336,40 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
         if 'plane gaze' not in to_export:
             if any((s.recordings[r].state[process.Action.GAZE_TO_PLANE]==process.State.Completed for r in s.recordings)):
                 to_export['plane gaze'] = True
+        if recs:=[s.recordings[r].info.working_directory for r in s.recordings if s.recordings[r].state[process.Action.RUN_VALIDATION]==process.State.Completed]:
+            to_export['validation'] = True
+            rec_dirs.extend(recs)
         if 'video' not in to_export:
             if s.state[process.Action.MAKE_VIDEO]==process.State.Completed:
                 to_export['video'] = True
 
+    dq_df, dq_set = None, None
+    if rec_dirs:
+        dq_df, default_dq_type, dq_targets = gv_process.collect_data_quality(rec_dirs, {p:f'{naming.validation_prefix}{p}_data_quality.tsv' for p in g.study_config.planes_per_episode[annotation.Event.Validate]}, col_for_parent='session')
+        if dq_df is None:
+            to_export.pop('validation', None)
+        else:
+            # prep config for validation export
+            dq_set = {}
+
+            # data quality type
+            type_idx = dq_df.index.names.index('type')
+            dq_set['dq_types'] = {k:False for k in sorted(list(dq_df.index.levels[type_idx]), key=lambda dq: dq.value)}
+            for dq in gv_process.DataQualityType:
+                if g.study_config.validate_dq_types is not None and dq in g.study_config.validate_dq_types and dq in dq_set['dq_types']:
+                    dq_set['dq_types'][dq] = True
+            if not any(dq_set['dq_types'].values()):
+                dq_set['dq_types'][default_dq_type] = True
+
+            # targets
+            dq_set['targets']     = {t:True for t in dq_targets}
+            dq_set['targets_avg'] = False
+
+            # other settings
+            dq_set['include_data_loss'] = g.study_config.validate_include_data_loss
+
     def set_export_config_popup():
-        nonlocal to_export
+        nonlocal to_export, dq_set
         spacing = 2 * imgui.get_style().item_spacing.x
         color = (0.45, 0.09, 1.00, 1.00)
         imgui.push_font(g._icon_font)
@@ -354,6 +384,76 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
         for e in to_export:
             _, to_export[e] = imgui.checkbox(e, to_export[e])
 
+        if 'validation' in to_export and to_export['validation'] and imgui.tree_node('Validation export settings'):
+            right_width = hello_imgui.dpi_window_size_factor()*90
+            if len(dq_set['dq_types'])>1:
+                if imgui.tree_node('Data quality types'):
+                    imgui.text_unformatted("Indicate which type(s) of\ndata quality to export.")
+                    if imgui.begin_table("##export_popup_validation", columns=2, flags=imgui.TableFlags_.no_clip):
+                        imgui.table_setup_column("##settings_validation_left", imgui.TableColumnFlags_.width_stretch)
+                        imgui.table_setup_column("##settings_validation_right", imgui.TableColumnFlags_.width_fixed)
+                        imgui.table_next_row()
+                        imgui.table_set_column_index(1)  # Right
+                        imgui.dummy((right_width, 1))
+                        imgui.push_item_width(right_width)
+
+                        for dq in dq_set['dq_types']:
+                            imgui.table_next_row()
+                            imgui.table_next_column()
+                            imgui.align_text_to_frame_padding()
+                            t,ht = gv_process.get_DataQualityType_explanation(dq)
+                            imgui.text(t)
+                            gt_gui.utils.draw_hover_text(ht, text="")
+                            imgui.table_next_column()
+                            _, dq_set['dq_types'][dq] = imgui.checkbox(f"##{dq.name}", dq_set['dq_types'][dq])
+
+                        imgui.end_table()
+                        imgui.spacing()
+                    imgui.tree_pop()
+
+            if imgui.tree_node('Targets'):
+                imgui.text_unformatted("Indicate for which target(s) you\nwant to export data quality metrics.")
+                if imgui.begin_table("##export_popup_targets", columns=2, flags=imgui.TableFlags_.no_clip):
+                    imgui.table_setup_column("##settings_targets_left", imgui.TableColumnFlags_.width_stretch)
+                    imgui.table_setup_column("##settings_targets_right", imgui.TableColumnFlags_.width_fixed)
+                    imgui.table_next_row()
+                    imgui.table_set_column_index(1)  # Right
+                    imgui.dummy((right_width, 1))
+                    imgui.push_item_width(right_width)
+
+                    for t in dq_set['targets']:
+                        imgui.table_next_row()
+                        imgui.table_next_column()
+                        imgui.align_text_to_frame_padding()
+                        imgui.text(f"target {t}:")
+                        imgui.table_next_column()
+                        _, dq_set['targets'][t] = imgui.checkbox(f"##target_{t}", dq_set['targets'][t])
+
+
+                    imgui.end_table()
+                    imgui.spacing()
+                imgui.tree_pop()
+
+            if imgui.begin_table("##export_popup_targets_avg", columns=2, flags=imgui.TableFlags_.no_clip):
+                imgui.table_setup_column("##settings_targets_avg_left", imgui.TableColumnFlags_.width_stretch)
+                imgui.table_setup_column("##settings_targets_avg_right", imgui.TableColumnFlags_.width_fixed)
+                imgui.table_next_row()
+                imgui.table_set_column_index(1)  # Right
+                imgui.dummy((right_width, 1))
+                imgui.push_item_width(right_width)
+
+                imgui.table_next_row()
+                imgui.table_next_column()
+                imgui.align_text_to_frame_padding()
+                imgui.text("Average over selected targets:")
+                imgui.table_next_column()
+                _, dq_set['targets_avg'] = imgui.checkbox("##average_over_targets", dq_set['targets_avg'])
+
+                imgui.end_table()
+                imgui.spacing()
+
+            imgui.tree_pop()
+
         imgui.end_group()
         imgui.same_line(spacing=spacing)
         imgui.dummy((0, 0))
@@ -366,6 +466,12 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
             exp.append('video')
         for s in sessions:
             g.launch_task(s, None, process.Action.EXPORT_TRIALS, export_path=path, to_export=exp)
+
+        # export data quality for all recordings in all sessions
+        if 'validation' in to_export and to_export['validation']:
+            dq_types = [dq for dq in dq_set['dq_types'] if dq_set['dq_types'][dq]]
+            targets  = [t for t in dq_set['targets'] if dq_set['targets'][t]]
+            gv_process.summarize_and_store_data_quality(dq_df, path/'data_quality.tsv', dq_types, targets, dq_set['targets_avg'], dq_set['include_data_loss'])
 
     buttons = {
         ifa6.ICON_FA_CHECK+f" Continue": launch_export,
