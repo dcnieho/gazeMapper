@@ -46,7 +46,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
 
     # get interval(s) coded to be analyzed, if any
     # We don't need them if they would be ignored because the whole video would be processed. The whole video is processed when study_config.auto_code_sync_points or study_config.auto_code_trial_episodes are set
-    missing_coding_ok = study_config.auto_code_sync_points or study_config.auto_code_trial_episodes
+    missing_coding_ok = not not study_config.auto_code_sync_points or not not study_config.auto_code_trial_episodes
     episode_file = working_dir / naming.coding_file
     if episode_file.is_file():
         episodes = episode.list_to_marker_dict(episode.read_list_from_file(), study_config.episodes_to_code)
