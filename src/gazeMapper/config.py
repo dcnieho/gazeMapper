@@ -383,7 +383,7 @@ class Study:
             if strict_check:
                 raise ValueError(f'sync_ref_do_time_stretch should be set in the study setup when sync_ref_recording is set')
             else:
-                problems[a] = f'sync_ref_do_time_stretch should be set when sync_ref_recording is set'
+                problems['sync_ref_do_time_stretch'] = f'sync_ref_do_time_stretch should be set when sync_ref_recording is set'
         if self.sync_ref_do_time_stretch:
             for a in ['sync_ref_stretch_which', 'sync_ref_average_recordings']:
                 if getattr(self,a) is None:
