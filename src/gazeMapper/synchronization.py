@@ -40,7 +40,9 @@ def get_sync_for_recs(working_dir: str|pathlib.Path, recs: str|list[str], ref_re
     # collect timestamps for the recordings
     for r in recs:
         # get interval coding for this recording
-        episodes = get_coding_file(working_dir / r)
+        episodes = get_coding_file(working_dir / r, missing_ref_coding_ok)
+        if episodes is None and missing_ref_coding_ok:
+            return None
 
         # check intervals
         if len(episodes)!=len(ref_episodes):
