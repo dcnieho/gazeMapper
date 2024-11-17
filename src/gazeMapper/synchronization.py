@@ -83,13 +83,17 @@ def get_sync_for_recs(working_dir: str|pathlib.Path, recs: str|list[str], ref_re
 
 def apply_sync(rec: str,
                sync: pd.DataFrame,
-               data_timestamps: np.ndarray,
+               data_timestamps: np.ndarray|None,
                reference_video_timestamps: np.ndarray,
                do_time_stretch,
                stretch_which: str):
     reference_video_timestamps  = np.array(reference_video_timestamps).copy()
-    data_timestamps             = np.array(data_timestamps).copy()
-    t_start, t_end              = data_timestamps.min(), data_timestamps.max()
+    rt_start, rt_end            = reference_video_timestamps.min(), reference_video_timestamps.max()
+    if has_data_ts := data_timestamps is not None:
+        data_timestamps     = np.array(data_timestamps).copy()
+        dt_start, dt_end    = data_timestamps.min(), data_timestamps.max()
+    else:
+        dt_start, dt_end    = None, None
     num_reference_episodes      = sync.loc[rec].shape[0]
     if do_time_stretch:
         for ival in range(num_reference_episodes-1):
@@ -100,27 +104,34 @@ def apply_sync(rec: str,
             # 2. determine data range to apply stretch for this interval to
             if ival==0:
                 # first interval, apply all the way from start of data
-                start = t_start
+                d_start = dt_start
+                r_start = rt_start
             else:
-                start = sync.loc[(rec,ival),'t_ref']
+                d_start = r_start = sync.loc[(rec,ival),'t_ref']
             if ival==num_reference_episodes-2:  # NB: zero-based indexing
                 # last interval, apply all the way to end of data
-                end = t_end
+                d_end = dt_end
+                r_end = rt_end
             else:
-                end = sync.loc[(rec,ival+1),'t_ref']
-            data_sel = (data_timestamps >= start) & (data_timestamps <= end)
+                d_end = r_end = sync.loc[(rec,ival+1),'t_ref']
             # calculate new timestamps
             # 1. first translate gaze ts to reference timestamps
-            data_timestamps[data_sel] += sync.loc[(rec,ival),'offset']*1000.   # s -> ms
+            if has_data_ts:
+                data_sel = (data_timestamps >= d_start) & (data_timestamps <= d_end)
+                data_timestamps[data_sel] += sync.loc[(rec,ival),'offset']*1000.   # s -> ms
             # 2. apply scaling
             if stretch_which=='ref':
-                data_sel = (reference_video_timestamps >= start) & (reference_video_timestamps <= end)
+                data_sel = (reference_video_timestamps >= r_start) & (reference_video_timestamps <= r_end)
                 reference_video_timestamps[data_sel] = (reference_video_timestamps[data_sel]-pivot)*(1-stretch_fac)+pivot
             elif stretch_which=='other':
                 raise NotImplementedError()
     else:
-        data_timestamps += sync.loc[(rec,0),'mean_off']*1000.   # s -> ms
-    fr_ref = video_utils.timestamps_to_frame_number(data_timestamps,reference_video_timestamps,trim=True)['frame_idx'].to_numpy()
+        if has_data_ts:
+            data_timestamps += sync.loc[(rec,0),'mean_off']*1000.   # s -> ms
+    if has_data_ts:
+        fr_ref = video_utils.timestamps_to_frame_number(data_timestamps,reference_video_timestamps,trim=True)['frame_idx'].to_numpy()
+    else:
+        fr_ref = None
     return data_timestamps, reference_video_timestamps, fr_ref
 
 def get_coding_file(working_dir: str|pathlib.Path, missing_ref_coding_ok=False):
