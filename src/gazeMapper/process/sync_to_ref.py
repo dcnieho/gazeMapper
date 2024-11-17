@@ -58,14 +58,21 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
 
     # now that we have determined how to sync, apply
     for r in recs:
+        rec_def = study_config.session_def.get_recording_def(r)
+        has_gaze_data = rec_def.type==session.RecordingType.Eye_Tracker
+
         # just read whole gaze dataframe so we can apply things vectorized
-        df = pd.read_csv(working_dir / r / naming.gaze_data_fname, delimiter='\t', index_col=False)
-        ts_col = 'timestamp_VOR' if 'timestamp_VOR' in df else 'timestamp'
+        if has_gaze_data:
+            df = pd.read_csv(working_dir / r / naming.gaze_data_fname, delimiter='\t', index_col=False)
+            ts_col = 'timestamp_VOR' if 'timestamp_VOR' in df else 'timestamp'
+            gaze_ts = df[ts_col].to_numpy()
+        else:
+            gaze_ts = None
         # get gaze timestamps and camera frame numbers _in reference video timeline_
-        ts_ref, ref_vid_ts, fr_ref = synchronization.apply_sync(r, sync, df[ts_col].to_numpy(), video_ts_ref.timestamps,
+        ts_ref, ref_vid_ts, fr_ref = synchronization.apply_sync(r, sync, gaze_ts, video_ts_ref.timestamps,
                                                                 study_config.sync_ref_do_time_stretch, study_config.sync_ref_stretch_which)
 
-        # store new video time signal if one was made
+        # make and store new video time signal
         if study_config.sync_ref_do_time_stretch and study_config.sync_ref_stretch_which=='ref':
             vid_ts_df = pd.read_csv(ref_vid_ts_file, delimiter='\t', index_col='frame_idx')
             should_store = False
@@ -81,9 +88,10 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
                 vid_ts_df.to_csv(ref_vid_ts_file, sep='\t', float_format="%.8f")
 
         # write into df (use polars as that library saves to file waaay faster)
-        df = _utils.insert_ts_fridx_in_df(df, gaze_headref.Gaze, 'ref', ts_ref, fr_ref)
-        df = pl.from_pandas(df)
-        df.write_csv(working_dir / r / naming.gaze_data_fname, separator='\t', null_value='nan', float_precision=8)
+        if has_gaze_data:
+            df = _utils.insert_ts_fridx_in_df(df, gaze_headref.Gaze, 'ref', ts_ref, fr_ref)
+            df = pl.from_pandas(df)
+            df.write_csv(working_dir / r / naming.gaze_data_fname, separator='\t', null_value='nan', float_precision=8)
 
     # update state
     session.update_action_states(working_dir, process.Action.SYNC_TO_REFERENCE, process.State.Completed, study_config)
