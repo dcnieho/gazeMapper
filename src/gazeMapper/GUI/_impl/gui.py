@@ -491,13 +491,17 @@ class GUI:
         self.config_watcher_stop_event = asyncio.Event()
         self.config_watcher = async_thread.run(project_watcher.watch_and_report_changes(self.project_dir, self._config_change_callback, self.config_watcher_stop_event, watch_filter=project_watcher.ProjectFilter(('.gazeMapper',), True, {config_dir}, True, True)))
 
-        def _get_known_recordings(filter_ref=False) -> set[str]:
+        def _get_known_recordings(filter_ref=False, dev_types:list[session.RecordingType]|None=None) -> set[str]:
             recs = {r.name for r in self.study_config.session_def.recordings}
             if filter_ref and self.study_config.sync_ref_recording:
                 recs = {r for r in recs if r!=self.study_config.sync_ref_recording}
+            if dev_types:
+                recs = {r for r in recs if self.study_config.session_def.get_recording_def(r).type in dev_types}
             return recs
-        def _get_known_recordings_filtered() -> set[str]:
+        def _get_known_recordings_no_ref() -> set[str]:
             return _get_known_recordings(filter_ref=True)
+        def _get_known_recordings_only_eye_tracker() -> set[str]:
+            return _get_known_recordings(dev_types=[session.RecordingType.Eye_Tracker])
         def _get_known_individual_markers() -> set[str]:
             return {m.id for m in self.study_config.individual_markers}
         def _get_known_planes() -> set[str]:
@@ -506,9 +510,9 @@ class GUI:
             return {e for e in self.study_config.episodes_to_code if e!=annotation.Event.Sync_Camera}
         self._possible_value_getters = {
             'video_make_which': _get_known_recordings,
-            'video_recording_colors': _get_known_recordings,
+            'video_recording_colors': _get_known_recordings_only_eye_tracker,
             'sync_ref_recording': _get_known_recordings,
-            'sync_ref_average_recordings': _get_known_recordings_filtered,
+            'sync_ref_average_recordings': _get_known_recordings_no_ref,
             'planes_per_episode': [_get_episodes_to_code_for_planes, _get_known_planes],
             'auto_code_sync_points': {'markers': _get_known_individual_markers},
             'auto_code_trial_episodes': {'start_markers': _get_known_individual_markers, 'end_markers': _get_known_individual_markers}
