@@ -38,7 +38,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
     # get marker files
     markers = {m.id: marker.load_file(m.id, working_dir) for m in study_config.individual_markers if m.id in study_config.auto_code_trial_episodes['start_markers']+study_config.auto_code_trial_episodes['end_markers']}
     # recode so we have a boolean with when markers are present
-    markers = {i: marker.code_marker_for_presence(markers[i]) for i in markers}
+    markers = {i: marker.code_marker_for_presence(markers[i], allow_failed=True) for i in markers}
     # fill gaps in marker detection
     for i in markers:
         markers[i] = marker.fill_gaps_in_marker_detection(markers[i], fill_value=False)

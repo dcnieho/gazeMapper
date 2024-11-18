@@ -82,7 +82,7 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
         markers = {m.id: marker.load_file(m.id, working_dir / r) for m in study_config.individual_markers}
         # recode to presence/absence if wanted
         if study_config.export_only_code_marker_presence:
-            markers = marker.code_marker_for_presence(markers)
+            markers = marker.code_marker_for_presence(markers, allow_failed=True)
         else:
             # rename columns to unique names
             for i in markers:
