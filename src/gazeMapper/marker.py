@@ -50,21 +50,21 @@ def load_file(marker_id: int, folder: str|pathlib.Path) -> pd.DataFrame:
     return pd.read_csv(file,sep='\t', dtype=defaultdict(lambda: float, **gt_marker.Pose._non_float))
 
 @overload
-def code_marker_for_presence(markers: pd.DataFrame) -> pd.DataFrame: ...
-def code_marker_for_presence(markers: dict[Any, pd.DataFrame]) -> dict[Any, pd.DataFrame]: ...
-def code_marker_for_presence(markers: pd.DataFrame|dict[Any, pd.DataFrame]) -> pd.DataFrame|dict[Any, pd.DataFrame]:
+def code_marker_for_presence(markers: pd.DataFrame, allow_failed=False) -> pd.DataFrame: ...
+def code_marker_for_presence(markers: dict[Any, pd.DataFrame], allow_failed=False) -> dict[Any, pd.DataFrame]: ...
+def code_marker_for_presence(markers: pd.DataFrame|dict[Any, pd.DataFrame], allow_failed=False) -> pd.DataFrame|dict[Any, pd.DataFrame]:
     if isinstance(markers,dict):
         for i in markers:
-            markers[i] = _code_marker_for_presence_impl(markers[i], f'{i}_')
+            markers[i] = _code_marker_for_presence_impl(markers[i], f'{i}_', allow_failed)
     else:
-        markers = _code_marker_for_presence_impl(markers,'')
+        markers = _code_marker_for_presence_impl(markers,'', allow_failed)
     return markers
 
-def _code_marker_for_presence_impl(markers: pd.DataFrame, lbl_extra:str) -> pd.DataFrame:
+def _code_marker_for_presence_impl(markers: pd.DataFrame, lbl_extra:str, allow_failed=False) -> pd.DataFrame:
     new_col_lbl = f'marker_{lbl_extra}presence'
     markers.insert(len(markers.columns),
         new_col_lbl,
-        markers[[c for c in markers.columns if c not in ['frame_idx']]].notnull().all(axis='columns')
+        True if allow_failed else markers[[c for c in markers.columns if c not in ['frame_idx']]].notnull().all(axis='columns')
     )
     markers = markers[['frame_idx',new_col_lbl]]
     markers = markers.astype({new_col_lbl: bool}) # ensure the new column is bool
