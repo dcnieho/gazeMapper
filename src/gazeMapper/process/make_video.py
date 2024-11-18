@@ -217,7 +217,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
             pose_estimators[rec].sub_pixel_fac                      = sub_pixel_fac
             pose_estimators[rec].show_detected_markers              = study_config.video_show_detected_markers
             pose_estimators[rec].show_plane_axes                    = study_config.video_show_plane_axes
-            pose_estimators[rec].proc_individial_markers_all_frames = study_config.video_process_individual_markers_for_all_frames
+            pose_estimators[rec].proc_individual_markers_all_frames = study_config.video_process_individual_markers_for_all_frames
             pose_estimators[rec].show_individual_marker_axes        = study_config.video_show_individual_marker_axes
             pose_estimators[rec].show_sync_func_output              = study_config.video_show_sync_func_output
             pose_estimators[rec].show_unexpected_markers            = study_config.video_show_unexpected_markers
