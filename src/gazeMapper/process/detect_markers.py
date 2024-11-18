@@ -73,6 +73,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
         estimator.add_plane(p, planes_setup[p], analyze_frames[p])
     for i in (markers:=marker.get_marker_dict_from_list(study_config.individual_markers)):
         estimator.add_individual_marker(i, markers[i])
+    if markers and has_auto_code:
+        # if auto coding is set up, ensure individual markers are processed for all frames
+        estimator.proc_individual_markers_all_frames = True
     if sync_target_function is not None:
         estimator.register_extra_processing_fun('sync', *sync_target_function)
     estimator.attach_gui(gui)
