@@ -34,7 +34,9 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
     # get marker files
     markers = [marker.load_file(m.id, working_dir) for m in study_config.individual_markers if m.id in study_config.auto_code_sync_points['markers']]
     # recode so we have a boolean with when markers are present
-    markers = [marker.code_marker_for_presence(m) for m in markers]
+    markers = [marker.code_marker_for_presence(m) for m in markers if not m.dropna().empty]
+    if not markers:
+        raise RuntimeError(f'No markers found in the marker detection files for session "{working_dir.parent.name}", recording "{working_dir.name}"')
     # fill gaps in marker detection
     for i in range(len(markers)):
         markers[i] = marker.fill_gaps_in_marker_detection(markers[i], fill_value=False)
