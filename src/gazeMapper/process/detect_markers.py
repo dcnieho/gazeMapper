@@ -49,7 +49,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
     has_auto_code = not not study_config.auto_code_sync_points or not not study_config.auto_code_trial_episodes
     episode_file = working_dir / naming.coding_file
     if episode_file.is_file():
-        episodes = episode.list_to_marker_dict(episode.read_list_from_file(), study_config.episodes_to_code)
+        episodes = episode.list_to_marker_dict(episode.read_list_from_file(episode_file), study_config.episodes_to_code)
     else:
         if not has_auto_code:   # missing coding is ok when auto coding is set up, as then we process all frames anyway
             raise RuntimeError(f'Coding is missing, cannot run Detect Markers\n{episode_file}')
