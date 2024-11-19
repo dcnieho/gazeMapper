@@ -110,7 +110,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
             episodes_to_code.remove(annotation.Event.Trial)
         # if there is trial coding for the reference recording, get them and show them (read only)
         if annotation.Event.Trial in study_config.episodes_to_code:
-            all_recs = [r.name for r in study_config.session_def.recordings]
+            all_recs = [r.name for r in study_config.session_def.recordings if r.name!=study_config.sync_ref_recording]
             episodes[annotation.Event.Trial] = synchronization.get_episode_frame_indices_from_ref(working_dir, annotation.Event.Trial, rec_def.name, study_config.sync_ref_recording, all_recs, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings, study_config.sync_ref_stretch_which, missing_ref_coding_ok=True)
             # if nothing found, remove again so we don't have a useless empty track
             if not episodes[annotation.Event.Trial]:
