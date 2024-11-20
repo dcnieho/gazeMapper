@@ -952,7 +952,7 @@ class GUI:
                     # recreate plane so any settings changes (e.g. applied defaults) are reflected in the gui
                     self.study_config.planes[i] = plane.Definition.load_from_json(plane_dir)
                     self._plane_preview_cache.pop(p.name, None)
-                if imgui.button(ifa6.ICON_FA_FOLDER_OPEN+' Open plane configuration folder'):
+                if imgui.button(ifa6.ICON_FA_FOLDER_OPEN+' open plane configuration folder'):
                     callbacks.open_folder(plane_dir)
                 imgui.same_line()
                 if imgui.button(ifa6.ICON_FA_IMAGE+' generate reference image'):
