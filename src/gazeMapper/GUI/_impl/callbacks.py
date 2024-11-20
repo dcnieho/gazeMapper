@@ -801,7 +801,7 @@ def add_recordings(g, paths: list[pathlib.Path], sessions: list[str]):
         return
     combo_value = 0
     dev_type = options[combo_value]
-    glob_filter = '*.mp4,*.avi'
+    glob_filter = '*.mp4,*.mov,*.avi'
 
     def choose_dev_popup():
         nonlocal combo_value, dev_type, glob_filter
