@@ -29,9 +29,9 @@ def init_project_folder(path: str | pathlib.Path):
     study_config.store_as_json(config_dir)
 
 
-def get_aruco_marker_image(sz: int, id:int, dictionary_id: int, marker_border_bits: int):
+def get_aruco_marker_image(sz: int, m_id: int, dictionary_id: int, marker_border_bits: int):
     marker_image = np.zeros((sz, sz), dtype=np.uint8)
-    marker_image = cv2.aruco.generateImageMarker(cv2.aruco.getPredefinedDictionary(dictionary_id), id, sz, marker_image, marker_border_bits)
+    marker_image = cv2.aruco.generateImageMarker(cv2.aruco.getPredefinedDictionary(dictionary_id), m_id, sz, marker_image, marker_border_bits)
     return image_helper.ImageHelper(marker_image)
 
 def load_image_with_helper(path: pathlib.Path):
