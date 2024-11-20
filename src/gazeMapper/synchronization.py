@@ -231,6 +231,10 @@ def smooth_video_frames_indices(fr_idxs: list[int]):
     d2      = np.diff(vals)
     starts  = np.nonzero(d2 == 1)[0]
     ends    = np.nonzero(d2 == -1)[0]
+    # ensure we're not out of bounds
+    if ends[-1]==len(d):
+        starts = starts[:-1]
+        ends   = ends[:-1]
 
     # for each plateau, see how long it is, and what the step to the next value after it is
     plateau_len = ends-starts+1
