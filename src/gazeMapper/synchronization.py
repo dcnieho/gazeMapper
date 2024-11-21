@@ -232,7 +232,7 @@ def smooth_video_frames_indices(fr_idxs: list[int]):
     starts  = np.nonzero(d2 == 1)[0]
     ends    = np.nonzero(d2 == -1)[0]
     # ensure we're not out of bounds
-    if ends[-1]==len(d):
+    if ends.size>0 and ends[-1]==len(d):
         starts = starts[:-1]
         ends   = ends[:-1]
 
