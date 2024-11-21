@@ -76,7 +76,7 @@ def get_sync_for_recs(working_dir: str|pathlib.Path, recs: str|list[str], ref_re
                 if not isinstance(t_ref,float) and 'interval' in t_ref.index.names:
                     t_ref = t_ref .droplevel('interval')
                     offset= offset.droplevel('interval')
-                sync.loc[(r,ival),'t_ref_elapsed'] = t_ref-sync.loc[(r,ival),'t_ref' ]
+                sync.loc[(r,ival),'t_ref_elapsed'] = t_ref-sync.loc[(r,ival),'t_ref']
                 sync.loc[(r,ival),'diff_offset']   = offset-sync.loc[(r,ival),'offset']
                 sync.loc[(r,ival),'stretch_fac']   = sync.loc[(r,ival),'diff_offset'].mean()/sync.loc[(r,ival),'t_ref_elapsed'].mean()
     return sync
@@ -88,10 +88,12 @@ def apply_sync(rec: str,
                do_time_stretch,
                stretch_which: str):
     reference_video_timestamps  = np.array(reference_video_timestamps).copy()
+    new_reference_video_timestamps = reference_video_timestamps.copy()
     rt_start, rt_end            = reference_video_timestamps.min(), reference_video_timestamps.max()
     if has_data_ts := data_timestamps is not None:
         data_timestamps     = np.array(data_timestamps).copy()
         dt_start, dt_end    = data_timestamps.min(), data_timestamps.max()
+        new_data_timestamps = data_timestamps.copy()
     else:
         dt_start, dt_end    = None, None
     num_reference_episodes      = sync.loc[rec].shape[0]
@@ -99,7 +101,7 @@ def apply_sync(rec: str,
         for ival in range(num_reference_episodes-1):
             # set up the problem - piecewise linear scale
             # 1. get known good location for this interval, and the stretch factor
-            pivot       = sync.loc[(rec,ival),'t_ref']
+            pivot       = (sync.loc[(rec,ival),'t_ref'] if stretch_which=='ref' else sync.loc[(rec,ival),'t_this'])*1000.   # s -> ms
             stretch_fac = sync.loc[(rec,ival),'stretch_fac']
             # 2. determine data range to apply stretch for this interval to
             if ival==0:
@@ -115,24 +117,28 @@ def apply_sync(rec: str,
             else:
                 d_end = r_end = sync.loc[(rec,ival+1),'t_ref']
             # calculate new timestamps
-            # 1. first translate gaze ts to reference timestamps
-            if has_data_ts:
-                data_sel = (data_timestamps >= d_start) & (data_timestamps <= d_end)
-                data_timestamps[data_sel] += sync.loc[(rec,ival),'offset']*1000.   # s -> ms
-            # 2. apply scaling
             if stretch_which=='ref':
+                # 1. first translate gaze ts to reference timestamps
+                if has_data_ts:
+                    data_sel = (data_timestamps >= d_start) & (data_timestamps <= d_end)
+                    new_data_timestamps[data_sel] += sync.loc[(rec,ival),'offset']*1000.   # s -> ms
+                # 2. apply scaling
                 data_sel = (reference_video_timestamps >= r_start) & (reference_video_timestamps <= r_end)
-                reference_video_timestamps[data_sel] = (reference_video_timestamps[data_sel]-pivot)*(1-stretch_fac)+pivot
+                new_reference_video_timestamps[data_sel] = (reference_video_timestamps[data_sel]-pivot)*(1-stretch_fac)+pivot
             elif stretch_which=='other':
-                raise NotImplementedError()
+                if has_data_ts:
+                    data_sel = (data_timestamps >= d_start) & (data_timestamps <= d_end)
+                    new_data_timestamps[data_sel] = (data_timestamps[data_sel]-pivot)*(1+stretch_fac)+pivot
+                    new_data_timestamps[data_sel] += sync.loc[(rec,ival),'offset']*1000.   # s -> ms
+                # else nothing to do...
     else:
         if has_data_ts:
-            data_timestamps += sync.loc[(rec,0),'mean_off']*1000.   # s -> ms
+            new_data_timestamps += sync.loc[(rec,0),'mean_off']*1000.   # s -> ms
     if has_data_ts:
-        fr_ref = video_utils.timestamps_to_frame_number(data_timestamps,reference_video_timestamps,trim=True)['frame_idx'].to_numpy()
+        fr_ref = video_utils.timestamps_to_frame_number(new_data_timestamps,new_reference_video_timestamps,trim=True)['frame_idx'].to_numpy()
     else:
         fr_ref = None
-    return data_timestamps, reference_video_timestamps, fr_ref
+    return new_data_timestamps, new_reference_video_timestamps, fr_ref
 
 def get_coding_file(working_dir: str|pathlib.Path, missing_ref_coding_ok=False):
     working_dir  = pathlib.Path(working_dir)
