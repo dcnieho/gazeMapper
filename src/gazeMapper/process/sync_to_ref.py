@@ -65,11 +65,13 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
         if has_gaze_data:
             df = pd.read_csv(working_dir / r / naming.gaze_data_fname, delimiter='\t', index_col=False)
             ts_col = 'timestamp_VOR' if 'timestamp_VOR' in df else 'timestamp'
-            gaze_ts = df[ts_col].to_numpy()
         else:
-            gaze_ts = None
+            # stretch video timestamps instead
+            ts_file = working_dir / r / naming.frame_timestamps_fname
+            df = pd.read_csv(ts_file, delimiter='\t', index_col='frame_idx')
+            ts_col = 'timestamp'
         # get gaze timestamps and camera frame numbers _in reference video timeline_
-        ts_ref, ref_vid_ts, fr_ref = synchronization.apply_sync(r, sync, gaze_ts, video_ts_ref.timestamps,
+        ts_ref, ref_vid_ts, fr_ref = synchronization.apply_sync(r, sync, df[ts_col].to_numpy(), video_ts_ref.timestamps,
                                                                 study_config.sync_ref_do_time_stretch, study_config.sync_ref_stretch_which)
 
         # make and store new video time signal
@@ -92,6 +94,13 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
             df = _utils.insert_ts_fridx_in_df(df, gaze_headref.Gaze, 'ref', ts_ref, fr_ref)
             df = pl.from_pandas(df)
             df.write_csv(working_dir / r / naming.gaze_data_fname, separator='\t', null_value='nan', float_precision=8)
+        else:
+            if 'timestamp_ref' not in df.columns:
+                # doesn't exist, insert
+                df.insert(1,'timestamp_ref', ts_ref)
+            else:
+                df['timestamp_ref'] = ts_ref
+            df.to_csv(ts_file, sep='\t', float_format="%.8f")
 
     # update state
     session.update_action_states(working_dir, process.Action.SYNC_TO_REFERENCE, process.State.Completed, study_config)
