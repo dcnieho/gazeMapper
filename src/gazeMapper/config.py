@@ -109,15 +109,11 @@ class Study:
                  video_show_sync_func_output                    : bool                              = True,
                  video_show_unexpected_markers                  : bool                              = False,
                  video_show_rejected_markers                    : bool                              = False,
-                 video_show_gaze_on_plane                       : bool                              = True,
-                 video_which_gaze_on_plane_in_ref               : gaze_worldref.Type                = gaze_worldref.Type.Scene_Video_Position,
-                 video_which_gaze_on_plane_ref_allow_fallback   : bool                              = True,
-                 video_which_gaze_on_plane_in_other             : gaze_worldref.Type                = gaze_worldref.Type.Scene_Video_Position,
-                 video_which_gaze_on_plane_other_allow_fallback : bool                              = True,
-                 video_show_camera_in_ref                       : bool                              = True,
-                 video_show_camera_in_other                     : bool                              = True,
-                 video_show_gaze_vec_in_ref                     : bool                              = True,
-                 video_show_gaze_vec_in_other                   : bool                              = False,
+                 video_show_gaze_on_plane_in_which              : set[str]|None                     = None,
+                 video_show_gaze_vec_in_which                   : set[str]|None                     = None,
+                 video_show_camera_in_which                     : set[str]|None                     = None,
+                 video_which_gaze_type_on_plane                 : gaze_worldref.Type                = gaze_worldref.Type.Scene_Video_Position,
+                 video_which_gaze_type_on_plane_allow_fallback  : bool                              = True,
                  video_gaze_to_plane_margin                     : float                             = 0.25,
 
                  gui_num_workers                                : int                               = 2,
@@ -174,15 +170,11 @@ class Study:
         self.video_show_sync_func_output                    = video_show_sync_func_output
         self.video_show_unexpected_markers                  = video_show_unexpected_markers
         self.video_show_rejected_markers                    = video_show_rejected_markers
-        self.video_show_gaze_on_plane                       = video_show_gaze_on_plane
-        self.video_which_gaze_on_plane_in_ref               = video_which_gaze_on_plane_in_ref
-        self.video_which_gaze_on_plane_ref_allow_fallback   = video_which_gaze_on_plane_ref_allow_fallback
-        self.video_which_gaze_on_plane_in_other             = video_which_gaze_on_plane_in_other
-        self.video_which_gaze_on_plane_other_allow_fallback = video_which_gaze_on_plane_other_allow_fallback
-        self.video_show_camera_in_ref                       = video_show_camera_in_ref
-        self.video_show_camera_in_other                     = video_show_camera_in_other
-        self.video_show_gaze_vec_in_ref                     = video_show_gaze_vec_in_ref
-        self.video_show_gaze_vec_in_other                   = video_show_gaze_vec_in_other
+        self.video_show_gaze_on_plane_in_which              = video_show_gaze_on_plane_in_which
+        self.video_show_gaze_vec_in_which                   = video_show_gaze_vec_in_which
+        self.video_show_camera_in_which                     = video_show_camera_in_which
+        self.video_which_gaze_type_on_plane                 = video_which_gaze_type_on_plane
+        self.video_which_gaze_type_on_plane_allow_fallback  = video_which_gaze_type_on_plane_allow_fallback
         self.video_gaze_to_plane_margin                     = video_gaze_to_plane_margin    # fraction of plane size, added to each side of the plane
 
         self.gui_num_workers                                = gui_num_workers
@@ -448,6 +440,10 @@ class Study:
         problems = self._check_recordings(self.video_make_which, 'video_make_which', strict_check)
         type_utils.merge_problem_dicts(problems,
                    self._check_recordings(self.video_recording_colors, 'video_recording_colors', strict_check))
+        type_utils.merge_problem_dicts(problems,
+                   self._check_recordings(self.video_show_camera_in_which, 'video_show_camera_in_which', strict_check))
+        type_utils.merge_problem_dicts(problems,
+                   self._check_recordings(self.video_show_gaze_vec_in_which, 'video_show_gaze_vec_in_which', strict_check))
         if self.video_make_which:
             # check have colors for all eye tracker recordings
             all_recs = {r.name for r in self.session_def.recordings if r.type==session.RecordingType.Eye_Tracker}
@@ -663,15 +659,11 @@ study_parameter_doc = {
     'video_show_sync_func_output': type_utils.GUIDocInfo('Video export: Show sync function output?', 'If enabled, draw the output of the function on the output video. Applies if the "Gaze data synchronization: Function for camera movement" setting is set to "function".'),
     'video_show_unexpected_markers': type_utils.GUIDocInfo('Video export: Show unexpected markers?', 'If not enabled, only markers that are part of defined planes or configured individual markers will be drawn on the video. If enabled, also other, unexpected markers will be drawn.'),
     'video_show_rejected_markers': type_utils.GUIDocInfo('Video export: Show rejected markers?', 'If enabled, all shapes that potentially are markers but were rejected by OpenCV\'s ArUco detector are shown. For debug purposes.'),
-    'video_show_gaze_on_plane': type_utils.GUIDocInfo('Video export: Show gaze projected to plane?', 'If enabled, gaze projected to the plane (both the gaze point on the scene video, and the left and right eye\'s gaze vectors if available) is drawn on the video for eye tracker recordings.'),
-    'video_which_gaze_on_plane_in_ref': type_utils.GUIDocInfo('Video export: Which gaze on plane to show in reference recording\'s video?', 'Sets which gaze-on-plane (e.g. from gaze position on the scene video or from gaze vectors projected to the plane) is used for the gaze positions shown in the generated video of the reference recording.', _gaze_type_doc),
-    'video_which_gaze_on_plane_ref_allow_fallback': type_utils.GUIDocInfo('Video export: Allow fallback to show scene video gaze in reference recording\'s video?', 'Sets if it is allowed to fall back to using the projection of the gaze position on the plane if the gaze-on-plane type specified in the "Video export: Which gaze on plane to show in reference recording\'s video?" setting is not available.'),
-    'video_which_gaze_on_plane_in_other': type_utils.GUIDocInfo('Video export: Which gaze on plane to show in other recordings\' videos?', 'Sets which gaze-on-plane (e.g. from gaze position on the scene video or from gaze vectors projected to the plane) is used for the gaze positions shown in the generated videos of recordings other than the reference recording.', _gaze_type_doc),
-    'video_which_gaze_on_plane_other_allow_fallback': type_utils.GUIDocInfo('Video export: Allow fallback to show scene video gaze in other recordings\' videos?', 'Sets if it is allowed to fall back to using the projection of the gaze position on the plane if the gaze-on-plane type specified in the "Video export: Which gaze on plane to show in other recordings\' videos?" setting is not available.'),
-    'video_show_camera_in_ref': type_utils.GUIDocInfo('Video export: Show camera position(s) in reference recording\'s video?', 'If enabled, the position of other cameras is marked in the generated video of the reference recording.'),
-    'video_show_camera_in_other': type_utils.GUIDocInfo('Video export: Show camera position(s) in other recordings\' videos?', 'If enabled, the position of other cameras is marked in the generated videos of recordings other than the reference recording.'),
-    'video_show_gaze_vec_in_ref': type_utils.GUIDocInfo('Video export: Show gaze vectors(s) in reference recording\'s video?', 'If enabled, a line is drawn for each eye tracker recording between the gaze position and the position of the eye tracker\'s camera in the generated video of the reference recording.'),
-    'video_show_gaze_vec_in_other': type_utils.GUIDocInfo('Video export: Show gaze vectors(s) in other recordings\' videos?', 'If enabled, a line is drawn for each eye tracker recording between the gaze position and the position of the eye tracker\'s camera in the generated videos of recordings other than the reference recording.'),
+    'video_show_gaze_on_plane_in_which': type_utils.GUIDocInfo('Video export: Videos on which to draw gaze projected to plane', 'For the listed recordings, gaze projected to the plane (both the gaze point on the scene video, and the left and right eyes\' gaze vectors if available) is drawn on the video for eye tracker recordings. If there are multiple recordings in a session, gaze positions for the other recordings (if available) will also be drawn on the indicated video(s).'),
+    'video_show_gaze_vec_in_which': type_utils.GUIDocInfo('Video export: Videos on which to draw gaze vectors(s)', 'For the listed recordings, a line is drawn between the positions of the cameras of other recordings and the gaze position of these recordings projected to the plane in the generated video. Only for eye tracker recordings.'),
+    'video_show_camera_in_which': type_utils.GUIDocInfo('Video export: Videos on which to draw camera position(s)', 'For the listed recordings, the position of the cameras of other recordings is marked in the generated video.'),
+    'video_which_gaze_type_on_plane': type_utils.GUIDocInfo('Video export: Which gaze on plane to show?', 'Sets which gaze-on-plane (e.g. from gaze position on the scene video or from gaze vectors projected to the plane) is used for the gaze positions shown in the generated videos.', _gaze_type_doc),
+    'video_which_gaze_type_on_plane_allow_fallback': type_utils.GUIDocInfo('Video export: Allow fallback to showing gaze on plane based on scene video gaze?', 'Sets if it is allowed to fall back to using the projection of the gaze position on the plane derived from the gaze position on the video if the gaze-on-plane type specified in the "Video export: Which gaze on plane to show?" setting is not available.'),
     'video_gaze_to_plane_margin': type_utils.GUIDocInfo('Video export: Gaze position margin','Gaze position more than this factor outside a defined plane will not be drawn.'),
     'gui_num_workers': type_utils.GUIDocInfo('Number of workers','Each action is processed by a worker and each worker can handle one action at a time. Having more workers means more actions are processed simultaneously, but having too many will not provide any gain and might freeze the program and your whole computer. Since much of the processing utilizes more than one processor thread, set this value to significantly less than the number of threads available in your system. NB: If you currently have running or enqueued jobs, the number of workers will only be changed once all have completed or are cancelled.'),
 }

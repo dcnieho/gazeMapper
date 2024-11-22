@@ -334,40 +334,52 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
                     for g in gazes_head[v][frame_idx[lead_vid]]:
                         if v in all_vids:
                             g.draw(frame[v], sub_pixel_fac=sub_pixel_fac, clr=clr, draw_3d_gaze_point=False)
-                        if study_config.video_show_gaze_on_plane and pose[v]:
-                            for pl in pose[v]:
-                                if pl in pose[v] and pose[v][pl].pose_successful():
-                                    gaze_world = gaze_worldref.from_head(pose[v][pl], g, camera_params[v])
-                                    gaze_world.draw_on_world_video(frame[v], camera_params[v], sub_pixel_fac, study_config.video_projected_vidPos_ray_color, study_config.video_projected_world_pos_color, study_config.video_projected_left_ray_color, study_config.video_projected_right_ray_color, study_config.video_projected_average_ray_color)
 
-                        # if we have a reference recording and camera pose for both, we can also draw the gaze in the reference recording, and possibly on other recordings
-                        if study_config.sync_ref_recording and pose[lead_vid] is not None:
-                            # collect gaze on all planes for which pose is available
-                            plane_gazes: dict[str, tuple[float,float,float,gaze_worldref.Gaze]] = {}
-                            for pl in pose[lead_vid]:
-                                if pose[lead_vid][pl].pose_successful() and pose[v] is not None and pl in pose[v] and pose[v][pl].pose_successful():
-                                    # turn into position on board
-                                    plane_gaze = gaze_worldref.from_head(pose[v][pl], g, camera_params[v])
-                                    plane_gazes[pl] = (transforms.dist_from_bbox(*plane_gaze.gazePosPlane2D_vidPos_ray, planes[pl].bbox), pose[lead_vid][pl].pose_reprojection_error, pose[v][pl].pose_reprojection_error, plane_gaze)
+                        # check if we need gaze on plane for drawing on any of the videos
+                        plane_gaze_on_this_video = v in study_config.video_show_gaze_on_plane_in_which
+                        plane_gaze_or_pose_on_other_video = any((vo!=v for vo in study_config.video_show_gaze_on_plane_in_which)) or any((vo!=v for vo in study_config.video_show_gaze_vec_in_which)) or any((vo!=v for vo in study_config.video_show_camera_in_which))
+                        if not pose[v] or not (plane_gaze_on_this_video or plane_gaze_or_pose_on_other_video):
+                            continue
 
-                            # find the plane to which gaze is closest
-                            best = None if not plane_gazes else min(plane_gazes, key=lambda d: sum(plane_gazes[d][1:3])/2 if plane_gazes[d][0]<=study_config.video_gaze_to_plane_margin else math.inf)
-                            # check if gaze is not too far outside that plane
-                            if best is not None and plane_gazes[best][0]<=study_config.video_gaze_to_plane_margin:
-                                pl = best
-                                plane_gaze = plane_gazes[best][3]
-                            else:
+                        # collect gaze on all planes for which pose is available
+                        plane_gazes: dict[str, tuple[float,float,gaze_worldref.Gaze]] = {}
+                        for pl in pose[v]:
+                            if pl in pose[v] and pose[v][pl].pose_successful():
+                                # turn into position on board
+                                plane_gaze = gaze_worldref.from_head(pose[v][pl], g, camera_params[v])
+                                plane_gazes[pl] = (transforms.dist_from_bbox(*plane_gaze.gazePosPlane2D_vidPos_ray, planes[pl].bbox), pose[v][pl].pose_reprojection_error, plane_gaze)
+
+                        # find the plane to which gaze is closest
+                        best = None if not plane_gazes else sorted(plane_gazes.keys(), key=lambda d: sum(plane_gazes[d][1:2])/2 if plane_gazes[d][0]<=study_config.video_gaze_to_plane_margin else math.inf)
+                        # check if gaze is not too far outside that plane
+                        if best is None:
+                            continue
+
+                        # draw on current video
+                        if v in study_config.video_show_gaze_on_plane_in_which:
+                            plane_gazes[best[0]][2].draw_on_world_video(frame[v], camera_params[v], sub_pixel_fac, study_config.video_projected_vidPos_ray_color, study_config.video_projected_world_pos_color, study_config.video_projected_left_ray_color, study_config.video_projected_right_ray_color, study_config.video_projected_average_ray_color)
+
+                        # also draw on other recordings, if so configured
+                        # depending on configuration also includes camera and gaze vector between the two
+                        for vo in write_vids-set([v]):
+                            if pose[vo] is None:
                                 continue
-                            # draw gaze point, camera and gaze vector between the two on the reference video
-                            if study_config.sync_ref_recording!=v and lead_vid in write_vids:  # if this is the reference video, its own gaze is already drawn
-                                draw_gaze_on_other_video(frame[lead_vid], pose[v][pl], pose[lead_vid][pl], plane_gaze, camera_params[lead_vid], clr, study_config.video_which_gaze_on_plane_in_ref, study_config.video_which_gaze_on_plane_ref_allow_fallback, study_config.video_show_camera_in_ref, study_config.video_show_gaze_vec_in_ref, sub_pixel_fac)
-
-                            # also draw on other videos
-                            for vo in write_vids-set([v, study_config.sync_ref_recording]):
-                                if pose[vo] is None or pl not in pose[vo] or not pose[vo][pl].pose_successful():
-                                    continue
-                                # draw gaze point and camera on the other video, and possibly gaze vector between them
-                                draw_gaze_on_other_video(frame[vo], pose[v][pl], pose[vo][pl], plane_gaze, camera_params[vo], clr, study_config.video_which_gaze_on_plane_in_other, study_config.video_which_gaze_on_plane_other_allow_fallback, study_config.video_show_camera_in_other, study_config.video_show_gaze_vec_in_other or (study_config.video_show_gaze_vec_in_ref and v==study_config.sync_ref_recording), sub_pixel_fac)
+                            for pl in best:
+                                if pl in pose[vo] and pose[vo][pl].pose_successful():
+                                    break
+                            if pl not in pose[vo] or not pose[vo][pl].pose_successful():
+                                continue
+                            # draw gaze point and camera on the other video, and possibly gaze vector between them
+                            draw_gaze_on_other_video(frame[vo],
+                                                     pose[v][pl], pose[vo][pl],
+                                                     plane_gazes[pl][2],
+                                                     camera_params[vo], clr,
+                                                     study_config.video_which_gaze_type_on_plane,
+                                                     study_config.video_which_gaze_type_on_plane_allow_fallback,
+                                                     vo in study_config.video_show_gaze_on_plane_in_which,
+                                                     vo in study_config.video_show_gaze_vec_in_which,
+                                                     vo in study_config.video_show_camera_in_which,
+                                                     sub_pixel_fac)
 
 
             # print info on frame
@@ -471,23 +483,28 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     # update state
     session.update_action_states(working_dir, process.Action.MAKE_VIDEO, process.State.Completed, study_config)
 
-def draw_gaze_on_other_video(frame_other, pose_this, pose_other, plane_gaze, camera_params_other, clr, which_gaze_on_plane, which_gaze_on_plane_allow_fallback, do_draw_camera, do_draw_gaze_vec, sub_pixel_fac):
-    gaze_point = plane_gaze.get_gaze_point(which_gaze_on_plane)
-    if gaze_point is None:
+def draw_gaze_on_other_video(frame_other, pose_this: plane.Pose, pose_other: plane.Pose, plane_gaze: gaze_worldref.Gaze, camera_params_other, clr, which_gaze_on_plane, which_gaze_on_plane_allow_fallback, do_draw_gaze, do_draw_gaze_vec, do_draw_camera, sub_pixel_fac):
+    if not do_draw_gaze and not do_draw_gaze_vec and not do_draw_camera:
+        # nothing to do
+        return
+
+    gaze_point_plane = plane_gaze.get_gaze_point(which_gaze_on_plane)
+    if gaze_point_plane is None:
         if which_gaze_on_plane_allow_fallback:
-            gaze_point = plane_gaze.get_gaze_point(gaze_worldref.Type.Scene_Video_Position)
+            gaze_point_plane = plane_gaze.get_gaze_point(gaze_worldref.Type.Scene_Video_Position)
         else:
             raise RuntimeError(f'Gaze of type {which_gaze_on_plane.value} was requested, but is not available. Select a different gaze type or set allow_fallback to True.')
-    gaze_point = np.append(gaze_point,0.).reshape(1,3)
-    # draw on the other video
-    if pose_other.world_frame_to_cam(gaze_point)[2]<=0:
-        # other recording's gaze point is behind this camera, won't be visible
-        # and projecting it anyway yields a nonsensical result
-        return
-    gaze_pos_other = pose_other.plane_to_cam_pose(gaze_point, camera_params_other)
-    drawing.openCVCircle(frame_other, gaze_pos_other, 8, clr, 2, sub_pixel_fac)
+    gaze_point_plane = np.append(gaze_point_plane,0.).reshape(1,3)
+    # check if gaze position in camera frame is ok. If gaze point is behind this camera,
+    # it won't be visible and projecting it anyway yields a nonsensical result
+    if gaze_ok := pose_other.world_frame_to_cam(gaze_point_plane)[2]>0:
+        # project from plane to camera
+        gaze_pos_other = pose_other.plane_to_cam_pose(gaze_point_plane, camera_params_other)
+        # draw on the other video
+        if do_draw_gaze:
+            drawing.openCVCircle(frame_other, gaze_pos_other, 8, clr, 2, sub_pixel_fac)
 
-    # also draw position of this video's camera on the other video, and possibly gaze vector
+    # also draw position of this camera on the other video, and possibly gaze vector
     if do_draw_camera or do_draw_gaze_vec:
         # take point 0,0,0 in this camera's space (i.e. camera position) and transform to the plane's world space
         cam_pos_world_this = pose_this.cam_frame_to_world((0.,0.,0.))
@@ -500,5 +517,5 @@ def draw_gaze_on_other_video(frame_other, pose_this, pose_other, plane_gaze, cam
         if do_draw_camera:
             drawing.openCVCircle(frame_other, cam_pos_other, 3, clr, 1, sub_pixel_fac)
         # and draw line connecting the camera and the gaze point
-        if do_draw_gaze_vec:
+        if gaze_ok and do_draw_gaze_vec:
             drawing.openCVLine(frame_other, gaze_pos_other, cam_pos_other, clr, 5, sub_pixel_fac)
