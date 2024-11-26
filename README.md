@@ -114,8 +114,8 @@ Here we first present example workflows using the GUI. More detailed information
 
 Examples:
 1. [Example 1](#example-1-single-participant-and-single-plane) is a minimum example, using a single eye tracker recording per session and a single plane to map gaze to, along with a glassesValidator setup for determining data quality.
-1. [Example 2](#example-2-two-participants-and-two-planes) is a a more elaborate version of example 1, using two eye trackers recording per session that have to be synchronized and two planes to map gaze to (again along with a glassesValidator setup for determining data quality).
-1. Example 3
+1. [Example 2](#example-2-two-participants-and-two-planes) is a more elaborate version of example 1, using two eye trackers recording per session that have to be synchronized and two planes to map gaze to (again along with a glassesValidator setup for determining data quality).
+1. [Example 3](#example-3-one-participant-multiple-planes-and-an-overview-camera) is a recording where a participants looks at and interacts with multiple planes, including a moving plane, and is furthermore observed with an external overview camera. As with the other examples, a glassesValidator setup is used for determining data quality.
 
 ### Example 1: Single participant and single plane
 [Example data](https://github.com/dcnieho/gazeMapper/tree/master/example_data/1_simple/data), [stimulus presentation code](https://github.com/dcnieho/gazeMapper/tree/master/example_data/stimulus_for_1_and_2) and the [configuration](https://github.com/dcnieho/gazeMapper/tree/master/example_data/1_simple/configuration/) and [coding](https://github.com/dcnieho/gazeMapper/tree/master/example_data/1_simple/coding/) files needed for exactly recreating the below steps are provided.
@@ -284,7 +284,7 @@ Nonetheless, below we provide a full description of how recording preparation, d
 
         Press `Done` to close the episode coding GUI.
 
-    1. The coding GUI for the other recording of the session will not appear. Also code the validation and eye tracker synchronization episode for this recording. Once done it should look as follows:
+    1. The coding GUI for the other recording of the session will now appear. Also code the validation and eye tracker synchronization episode for this recording. Once done it should look as follows:
 
         ![Episode coder final](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/episode_coder_final_2_2.png?raw=true)
 
@@ -292,6 +292,100 @@ Nonetheless, below we provide a full description of how recording preparation, d
     1. Next, run the `Sync et to cam` action. This will open the following window:
 
         ![Episode coder final](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/et_sync_2.png?raw=true)
+
+        To align the two signals in time with each other, drag the green dot in the middle of either plot. The horizontal offset is the applied time shift (indicated by the value in the lower-right corner of the upper plot). Any vertical shift is not stored, but can be useful when aligning the two signals. When done aligning the two signals, press done atop the window.
+
+    1. Next, run the `Sync to reference` action to synchronize the two recordings together.
+    1. Next, run the `Gaze to plane` action.
+    1. Next, run the `Validation` action.
+    1. Finally, run the `Make video` action, which draws the detected markers, the participant's and the projection of that gaze to the plane on the scene video, along with information about the episode annotations.
+    1. Now, you can export the gaze data projected to the plane, the created video and the glassesValidator data quality measures to a folder of your choosing using the `Export trials` action.
+
+### Example 3: One participant, multiple planes and an overview camera
+[Example data](https://github.com/dcnieho/gazeMapper/tree/master/example_data/3_external_camera_moving_plane/data), the [configuration](https://github.com/dcnieho/gazeMapper/tree/master/example_data/3_external_camera_moving_plane/configuration/) and the [coding](https://github.com/dcnieho/gazeMapper/tree/master/example_data/3_external_camera_moving_plane/coding/) files needed for exactly recreating the below steps are provided. The stimulus material and used planes are [also available](https://github.com/dcnieho/gazeMapper/tree/master/example_data/3_external_camera_moving_plane/materials).
+
+Example 3 is a more advanced example, showing a recording of a participant looking at and interacting with multiple planes while also being filmed with an external overview camera. The participant is performing a super simplified stock counting task, where they count how many apples, pear and mangos are on images on an iPad and then report their counts on papers spread across the scene. At the start of the recording, the participant is furthermore asked to look at a [glassesValidator](https://github.com/dcnieho/glassesValidator) poster ([Niehorster et al., 2023](https://doi.org/10.3758/s13428-023-02105-5)), to make it possible to determine data quality measures for the recording. Finally, the glassesValidator poster is also used at both the start and the end of the recording for synchronizing the eye tracker's gaze data with its scene camera. The preparation, data recording, and data analysis for this example were performed as follows:
+
+1. The researcher prepares the recording space. This involves
+    1. Printing a glassesValidator poster ([see steps 1 and 2 here](https://github.com/dcnieho/glassesValidator?tab=readme-ov-file#workflow-and-example-data)) and hanging it on the wall.
+    1. Preparing the stimulus material on the iPad, including ArUco markers to define the stimulus plane, and ArUco markers for [automatic delineation of trials](#automatic-coding-of-analysis-episodes) and [automatic synchronization of the eye tracker and the overview camera](#automatic-coding-of-synchronization-timepoints).
+    1. Multiple further planes for the fruit counts have to be printed and distributed around the recording space.
+    1. Set up an external camera. Set it up such that both the observer and the various planes are in view during the whole recording, such that a sufficient number of markers is visible in each recording, and use that reflections of the environment on the tablet do not cause issues with later processing of the recording. Note here that during pilot recordings of this example, we ran into issues with ArUco markers being reflected in the tablet and being detected by gazeMapper, and with the lighting in the room making part of the tablet screen illegible. We have adjusted camera positions and decided to hide the glassesValidator poster after use to prevent these issues.
+
+   As in the previous examples, it is important that the exact positions, sizes and orientations of the individual ArUco markers are known. This is required for gazeMapper to be able to correctly determine the observer's position and orientation with respect to each plane, allowing for gaze to be projected to these planes. This information has to be provided to gazeMapper. For more information, see [gazeMapper planes](#gazemapper-planes).
+2. A recording then proceeds as follows.
+    1. First the participant holds up the iPad so that the overview camera can see the contents of its screen, and also looks at the iPad. They then activate the PowerPoint presentation on the iPad, which flashes a synchronization marker on the screen, which will be used in analysis to synchronize the overview camera to the eye tracker recording.
+    1. Then, the participant is positioned in front of the glassesValidator poster and completes a glassesValidator data collection ([see step 3 here](https://github.com/dcnieho/glassesValidator?tab=readme-ov-file#workflow-and-example-data)).
+    1. After this, while the participant remains at the same position, they are instructed to continuously fixate the fixation target at the center of the validation poster while slowly nodding no with their head five times, and then slowly nodding yes five times.
+    1. Next, the main task commences. The participant again picks up the iPad and continues the PowerPoint presentation. Next in the presentation is a two ArUco markers shown in sequence that allows to [automatically delineate the trials in the recording](#automatic-coding-of-analysis-episodes). Then, a stimulus image is shown. The participant counts the number of apples, pear and mangos in the image, and writes their count on the paper for the respective fruit. Once done, they continue the presentation. A sequence of ArUco markers is shown signalling the end of the trial, and thereafter another sequence signalling the start of the next trial. The participant again writes down their fruit count and advances the presentation, upon which the trial end ArUco marker sequence is again shown.
+    1. They then stand in front of the glassesValidator poster and again slowly nod no with their head five times, and then slowly nod yes five times while maintaining fixation of the fixation target at the center of the validation poster.
+    1. Finally, the participant holds up the iPad to the overview camera and advances the presentation, upon which another ArUco marker for synchronization is shown.
+3. To start processing a recording with gazeMapper, a gazeMapper project first needs to be created and configured. If you want to skip the configuration and just quickly test out gazeMapper, you can create a new gazeMapper project following the first step below, and then simply replace the content of this project's config folder with the [configuration provided here](https://github.com/dcnieho/gazeMapper/tree/master/example_data/3_external_camera_moving_plane/configuration). Reopen the project in gazeMapper after replacing the configuration and skip to step 4.
+    1. Run gazeMapper and make a new gazeMapper project.
+    1. You will be greeted by the following screen, go to the `Project settings` pane.
+
+        ![New project screen](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/new_project.png?raw=true)
+    1. First we have to tell gazeMapper what recordings to expect for a session, click on `Edit session definition` to do so.
+    1. Click `+ new recording` to define two recordings. We'll call one `eye tracker` and the other `overview`. Select `Eye Tracker` as recording type for the eye tracker recording, and Camera as the type for the overview recording. Next, add a camera calibration file for the camera recording (this is not needed for the eye tracker recordings, as the used eye tracker provides a calibration for the scene camera). To do so, click the `select calibration xml` button, and load [this file](https://github.com/dcnieho/gazeMapper/tree/master/example_data/3_external_camera_moving_plane/configuration/overview_calibration.xml). The screen will now look as follows.
+
+        ![Session definition](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/todo.png?raw=true)
+    1. Back on the `Project settings` pane, click on `Edit planes`. Here we need to add the glassesValidator poster, the iPad screen and the three answer sheets as planes.
+        1. Click on `+ new plane` and call it `validate`. Select `GlassesValidator` as plane type. Since the default A2 glassesValidator poster was used, this plane requires no further configuration.
+        1. Add four more planes using the `+ new plane` button. Call them `tablet` and `apples`, `pears` and `mangos`. Select `Plane 2D` as plane type for all four.
+        1. Place the `markerPositions.csv` files [found here](https://github.com/dcnieho/gazeMapper/tree/master/example_data/3_external_camera_moving_plane/configuration/) for the four planes in the respective plane's setup folders (use the `Open plane configuration folder` button in gazeMapper to find the plane's folder, if needed). In the GUI, provide the names of these files for the `Marker file` parameter. These files were created using the calculations in the Excel sheet provided [here](https://github.com/dcnieho/gazeMapper/tree/master/example_data/3_external_camera_moving_plane/materials/layout_calc.xlsx). For more information about such plane definition files, [see below](#gazemapper-planes).
+        1. Further configure the planes: for the tablet plane, set the `Marker size` to `20.47309`, set it to `42.586052` for the other three planes. For the tablet plane, set the plane size to `X`: `261` and `Y`: `148`, for the other three planes set it to `X`: `189` and `Y`: `162`. For all four planes, set the `Unit` to `mm`. See the below image for part of the final plane configuration.
+
+        ![Plane editor](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/todo.png?raw=true)
+    1. Back on the `Project settings` pane, click on `Episode setup`. Here we configure what [episodes](#coding-analysis-synchronization-and-validation-episodes) can be coded, and what plane(s) are associated with each episode.
+        1. For the `Episodes to code`, add the `Validation episode`, `Camera sync point`, `Eye tracker synchronization episode` and `Trial`.
+        1. Under `Planes per episode`, add the `Validation episode`, `Eye tracker synchronization episode` and `Trial` items. Set the `validate` plane for the `Validation episode` and `Eye tracker synchronization episode`, and the four other planes for the `Trial` episode. This indicates that for episodes in the recording coded as validation or synchronization episodes only the `validate` plane will be searched for and processed, while for trials the other four planes will be used.
+
+        ![Episodes editor](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/todo.png?raw=true)
+    1. Next, detection of the markers to delineate trials needs to be configured. On the `Project settings` pane, click on `Edit individual markers` to configure these.
+        1. Add three individual markers, using the `+ new individual marker` button. Add markers 50, 80 and 81, all with a size of `69.237908`. It should look like the image below.
+
+            ![Individual marker editor](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/todo.png?raw=true)
+    1. Some settings also need to be configured on the `Project settings` page itself. Specifically, we need to set:
+        1. `Synchronization: Reference recording` to `eye tracker`.
+        1. `Synchronization: Do time stretch?` to True (checked/enabled).
+        1. `Synchronization: Stretch which recording?` to `Other recording(s)`.
+        1. Click `Synchronization: Average recordings?` to create the setting, but do not assign any recording, since we do not want to use this functionality.
+        1. `Gaze data synchronization: Method to get camera movement` to `Plane` as we'll use the glassesValidator plane for synchronizing gaze data and the scene camera.
+        1. Set up `Automated coding of synchronization episodes` by clicking on `click to set`. Expand the created settings. Set `Marker(s)` to `50`. For the rest of the settings the defaults are ok. Note also that multiple markers could be used as synchronization points.
+        1. Set up `Automated coding of trial episodes` by clicking on `click to set`. Expand the created settings. Set `Start marker(s)` to `80 81` and `End marker(s)` to `81 80`, since these are the markers used in the example in that order to denote trial starts and ends. For the rest of the settings the defaults are ok. Note that also different markers or marker sequences can be used for starts and ends.
+        1. When processing the recording, we want to output scene videos for both with detected markers and gaze of both participants projected to the validation and screen planes. To set this up, set both `eye tracker` and `overview` (the names of the recordings we defined in the session definition) for `Video export: which recordings`.
+        1. Furthermore, set up the colors with which to draw gaze in the `Video export: recording colors` field. Press `Add item` and add the `eye tracker` recording (the overview recording cannot be added as it has no gaze data). For the `eye tracker` recording, use the color `Red`: `255`, `Green`: `127` and `Blue`: `0`.
+
+        ![Project config](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/todo.png?raw=true)
+4. Now that the project is set up, we are ready to import and process recordings.
+    1. On the `Session` pane, click `import eye tracker recordings`. There, select the [folder containing the example data](https://github.com/dcnieho/gazeMapper/tree/master/example_data/3_external_camera_moving_plane/data) and indicate you're looking for `Pupil Invisible` recordings. Note that you could also trigger import by drag-dropping a data folder onto gazeMapper.
+    1. On the window that pops up, click `+ new session`, and name the session `1` (or any name you like). Expand session `1`. You should now see the following:
+
+        ![Add recording 1](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/add_recording_3_1.png?raw=true)
+    1. Assign the recording to the session by dragging it from the right, and dropping it on the left for the `eye tracker` recording where it says `drop recording here`. Click `Continue`. The recording will now be imported.
+    1. Click `import camera recordings`, select the [folder containing the example data](https://github.com/dcnieho/gazeMapper/tree/master/example_data/3_external_camera_moving_plane/data) and click continue. Assign the found camera recording (`cam1_R005_reencode.mp4`) to the `overview` recording.
+
+        ![Add recording 2](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/add_recording_3_2.png?raw=true)
+
+        Note that in real use cases with more recordings that you can assign multiple recordings to one or multiple sessions in one go using these dialogues.
+    1. Click `Continue`. The camera recording will now be imported. When this is done, you should see the following:
+
+        ![Recording imported](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/recording_imported_3.png?raw=true)
+    1. Next, run the `Detect markers` action by right-clicking on session `1` and selecting the action from the menu. This will detect all markers in the video, including those needed for automatic trial coding.
+    1. When the `Detect markers` action is finished, run the `Auto code sync` and `Auto code trials` actions.
+    1. Next, run the `Code episodes` action. This will bring up a coding GUI used for annotating where the episodes of interest are in the recording. `Trial` and `Sync camera` should already have been coded (see image below), use the GUI to check if trial starts and ends and the synchronization timepoints have been accurately determined.
+
+        ![Episode coder initial](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/episode_coder_initial_3.png?raw=true)
+    1. Use the seek functionality in the coder (you can press on the timeline underneath the video at the same height as the orange triangle, or use the video player controls) to find the start of the validation episode. Code the validation interval as described in [step 5 in the glassesValidator manual](https://github.com/dcnieho/glassesValidator?tab=readme-ov-file#workflow-and-example-data). Furthermore, code the eye tracker synchronization episode as the beginning of the fixation on the center validation target before the participant starts nodding no and yes, and the end of the episode as the end of the fixation on the center validation target after the nodding. Code both the episode at the beginning of the recording and the episode near the end of the recording:
+
+        ![Episode coder final](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/episode_coder_final_3_1.png?raw=true)
+
+        Press `Done` to close the episode coding GUI.
+
+    1. The coding GUI for the other recording of the session will now appear. Here too, check that the synchronization timespoints are correctly coded. Press `Done` to close the episode coding GUI. The coding files for this example can be found [here](https://github.com/dcnieho/gazeMapper/tree/master/example_data/3_external_camera_moving_plane/coding/).
+    1. Next, run the `Sync et to cam` action. This will open the following window:
+
+        ![Episode coder final](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/et_sync_3.png?raw=true)
 
         To align the two signals in time with each other, drag the green dot in the middle of either plot. The horizontal offset is the applied time shift (indicated by the value in the lower-right corner of the upper plot). Any vertical shift is not stored, but can be useful when aligning the two signals. When done aligning the two signals, press done atop the window.
 
