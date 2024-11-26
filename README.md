@@ -328,23 +328,23 @@ Example 3 is a more advanced example, showing a recording of a participant looki
     1. First we have to tell gazeMapper what recordings to expect for a session, click on `Edit session definition` to do so.
     1. Click `+ new recording` to define two recordings. We'll call one `eye tracker` and the other `overview`. Select `Eye Tracker` as recording type for the eye tracker recording, and Camera as the type for the overview recording. Next, add a camera calibration file for the camera recording (this is not needed for the eye tracker recordings, as the used eye tracker provides a calibration for the scene camera). To do so, click the `select calibration xml` button, and load [this file](https://github.com/dcnieho/gazeMapper/tree/master/example_data/3_external_camera_moving_plane/configuration/overview_calibration.xml). The screen will now look as follows.
 
-        ![Session definition](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/todo.png?raw=true)
+        ![Session definition](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/session_editor_3.png?raw=true)
     1. Back on the `Project settings` pane, click on `Edit planes`. Here we need to add the glassesValidator poster, the iPad screen and the three answer sheets as planes.
         1. Click on `+ new plane` and call it `validate`. Select `GlassesValidator` as plane type. Since the default A2 glassesValidator poster was used, this plane requires no further configuration.
         1. Add four more planes using the `+ new plane` button. Call them `tablet` and `apples`, `pears` and `mangos`. Select `Plane 2D` as plane type for all four.
         1. Place the `markerPositions.csv` files [found here](https://github.com/dcnieho/gazeMapper/tree/master/example_data/3_external_camera_moving_plane/configuration/) for the four planes in the respective plane's setup folders (use the `Open plane configuration folder` button in gazeMapper to find the plane's folder, if needed). In the GUI, provide the names of these files for the `Marker file` parameter. These files were created using the calculations in the Excel sheet provided [here](https://github.com/dcnieho/gazeMapper/tree/master/example_data/3_external_camera_moving_plane/materials/layout_calc.xlsx). For more information about such plane definition files, [see below](#gazemapper-planes).
         1. Further configure the planes: for the tablet plane, set the `Marker size` to `20.47309`, set it to `42.586052` for the other three planes. For the tablet plane, set the plane size to `X`: `261` and `Y`: `148`, for the other three planes set it to `X`: `189` and `Y`: `162`. For all four planes, set the `Unit` to `mm`. See the below image for part of the final plane configuration.
 
-        ![Plane editor](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/todo.png?raw=true)
+        ![Plane editor](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/plane_editor_3.png?raw=true)
     1. Back on the `Project settings` pane, click on `Episode setup`. Here we configure what [episodes](#coding-analysis-synchronization-and-validation-episodes) can be coded, and what plane(s) are associated with each episode.
         1. For the `Episodes to code`, add the `Validation episode`, `Camera sync point`, `Eye tracker synchronization episode` and `Trial`.
         1. Under `Planes per episode`, add the `Validation episode`, `Eye tracker synchronization episode` and `Trial` items. Set the `validate` plane for the `Validation episode` and `Eye tracker synchronization episode`, and the four other planes for the `Trial` episode. This indicates that for episodes in the recording coded as validation or synchronization episodes only the `validate` plane will be searched for and processed, while for trials the other four planes will be used.
 
-        ![Episodes editor](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/todo.png?raw=true)
+        ![Episodes editor](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/episodes_editor_3.png?raw=true)
     1. Next, detection of the markers to delineate trials needs to be configured. On the `Project settings` pane, click on `Edit individual markers` to configure these.
         1. Add three individual markers, using the `+ new individual marker` button. Add markers 50, 80 and 81, all with a size of `69.237908`. It should look like the image below.
 
-            ![Individual marker editor](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/todo.png?raw=true)
+            ![Individual marker editor](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/indiv_marker_editor_3.png?raw=true)
     1. Some settings also need to be configured on the `Project settings` page itself. Specifically, we need to set:
         1. `Synchronization: Reference recording` to `eye tracker`.
         1. `Synchronization: Do time stretch?` to True (checked/enabled).
@@ -355,8 +355,9 @@ Example 3 is a more advanced example, showing a recording of a participant looki
         1. Set up `Automated coding of trial episodes` by clicking on `click to set`. Expand the created settings. Set `Start marker(s)` to `80 81` and `End marker(s)` to `81 80`, since these are the markers used in the example in that order to denote trial starts and ends. For the rest of the settings the defaults are ok. Note that also different markers or marker sequences can be used for starts and ends.
         1. When processing the recording, we want to output scene videos for both with detected markers and gaze of both participants projected to the validation and screen planes. To set this up, set both `eye tracker` and `overview` (the names of the recordings we defined in the session definition) for `Video export: which recordings`.
         1. Furthermore, set up the colors with which to draw gaze in the `Video export: recording colors` field. Press `Add item` and add the `eye tracker` recording (the overview recording cannot be added as it has no gaze data). For the `eye tracker` recording, use the color `Red`: `255`, `Green`: `127` and `Blue`: `0`.
+        1. Finally set `Video export: Videos on which to draw gaze projected to plane`, `Video export: Videos on which to draw gaze vectors(s)` and `Video export: Videos on which to draw camera position(s)` all to `overview`. For `Video export: Videos on which to draw gaze projected to plane`, also specify `eye tracker`.
 
-        ![Project config](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/todo.png?raw=true)
+        ![Project config](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/project_config_3.png?raw=true)
 4. Now that the project is set up, we are ready to import and process recordings.
     1. On the `Session` pane, click `import eye tracker recordings`. There, select the [folder containing the example data](https://github.com/dcnieho/gazeMapper/tree/master/example_data/3_external_camera_moving_plane/data) and indicate you're looking for `Pupil Invisible` recordings. Note that you could also trigger import by drag-dropping a data folder onto gazeMapper.
     1. On the window that pops up, click `+ new session`, and name the session `1` (or any name you like). Expand session `1`. You should now see the following:

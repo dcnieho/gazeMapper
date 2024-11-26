@@ -1,0 +1,20 @@
+{
+  "recordings": [
+    {
+      "__session.RecordingDefinition__": {
+        "name": "eye tracker",
+        "type": {
+          "__enum.session.RecordingType__": "RecordingType.Eye_Tracker"
+        }
+      }
+    },
+    {
+      "__session.RecordingDefinition__": {
+        "name": "overview",
+        "type": {
+          "__enum.session.RecordingType__": "RecordingType.Camera"
+        }
+      }
+    }
+  ]
+}

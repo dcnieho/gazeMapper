@@ -1,0 +1,12 @@
+{
+  "type": {
+    "__enum.plane.Type__": "Type.Plane_2D"
+  },
+  "marker_file": "markerPositions.csv",
+  "marker_size": 42.58605174,
+  "plane_size": [
+    289.0,
+    162.0
+  ],
+  "unit": "mm"
+}

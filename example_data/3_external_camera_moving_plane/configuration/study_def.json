@@ -1,0 +1,126 @@
+{
+  "planes_per_episode": [
+    [
+      {
+        "__enum.Event__": "Event.Sync_ET_Data"
+      },
+      {
+        "builtin.set": [
+          "validate"
+        ]
+      }
+    ],
+    [
+      {
+        "__enum.Event__": "Event.Trial"
+      },
+      {
+        "builtin.set": [
+          "mangos",
+          "apples",
+          "tablet",
+          "pears"
+        ]
+      }
+    ],
+    [
+      {
+        "__enum.Event__": "Event.Validate"
+      },
+      {
+        "builtin.set": [
+          "validate"
+        ]
+      }
+    ]
+  ],
+  "episodes_to_code": {
+    "builtin.set": [
+      {
+        "__enum.Event__": "Event.Trial"
+      },
+      {
+        "__enum.Event__": "Event.Validate"
+      },
+      {
+        "__enum.Event__": "Event.Sync_Camera"
+      },
+      {
+        "__enum.Event__": "Event.Sync_ET_Data"
+      }
+    ]
+  },
+  "individual_markers": [
+    {
+      "__marker.Marker__": {
+        "id": 50,
+        "size": 69.23790776
+      }
+    },
+    {
+      "__marker.Marker__": {
+        "id": 80,
+        "size": 69.23790776
+      }
+    },
+    {
+      "__marker.Marker__": {
+        "id": 81,
+        "size": 69.23790776
+      }
+    }
+  ],
+  "get_cam_movement_for_et_sync_method": "plane",
+  "sync_ref_recording": "eye tracker",
+  "sync_ref_do_time_stretch": true,
+  "sync_ref_stretch_which": "other",
+  "sync_ref_average_recordings": {
+    "builtin.set": []
+  },
+  "auto_code_sync_points": {
+    "markers": {
+      "builtin.set": [
+        50
+      ]
+    }
+  },
+  "auto_code_trial_episodes": {
+    "start_markers": [
+      80,
+      81
+    ],
+    "end_markers": [
+      81,
+      80
+    ]
+  },
+  "video_make_which": {
+    "builtin.set": [
+      "eye tracker",
+      "overview"
+    ]
+  },
+  "video_recording_colors": {
+    "eye tracker": [
+      255,
+      127,
+      0
+    ]
+  },
+  "video_show_gaze_on_plane_in_which": {
+    "builtin.set": [
+      "eye tracker",
+      "overview"
+    ]
+  },
+  "video_show_gaze_vec_in_which": {
+    "builtin.set": [
+      "overview"
+    ]
+  },
+  "video_show_camera_in_which": {
+    "builtin.set": [
+      "overview"
+    ]
+  }
+}
