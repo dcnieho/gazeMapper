@@ -336,8 +336,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
                             g.draw(frame[v], sub_pixel_fac=sub_pixel_fac, clr=clr, draw_3d_gaze_point=False)
 
                         # check if we need gaze on plane for drawing on any of the videos
-                        plane_gaze_on_this_video = v in study_config.video_show_gaze_on_plane_in_which
-                        plane_gaze_or_pose_on_other_video = any((vo!=v for vo in study_config.video_show_gaze_on_plane_in_which)) or any((vo!=v for vo in study_config.video_show_gaze_vec_in_which)) or any((vo!=v for vo in study_config.video_show_camera_in_which))
+                        plane_gaze_on_this_video = not not study_config.video_show_gaze_on_plane_in_which and v in study_config.video_show_gaze_on_plane_in_which
+                        plane_gaze_or_pose_on_other_video = (not not study_config.video_show_gaze_on_plane_in_which and any((vo!=v for vo in study_config.video_show_gaze_on_plane_in_which))) or (not not study_config.video_show_gaze_vec_in_which and any((vo!=v for vo in study_config.video_show_gaze_vec_in_which))) or (not not study_config.video_show_camera_in_which and any((vo!=v for vo in study_config.video_show_camera_in_which)))
                         if not pose[v] or not (plane_gaze_on_this_video or plane_gaze_or_pose_on_other_video):
                             continue
 
