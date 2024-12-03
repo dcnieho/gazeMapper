@@ -759,9 +759,7 @@ class GUI:
         job_states = {job_id:jobs[job_id].get_state() for job_id in job_ids}
         if any((job_states[i] in [process.State.Pending, process.State.Running] for i in job_states)):
             if imgui.button(ifa6.ICON_FA_HAND+' Cancel all'):
-                for job_id in job_ids:
-                    if job_states[job_id] in [process.State.Pending, process.State.Running]:
-                        self.job_scheduler.cancel_job(job_id)
+                self.job_scheduler.cancel_all_jobs()
 
         table_flags = (
                 imgui.TableFlags_.scroll_x |

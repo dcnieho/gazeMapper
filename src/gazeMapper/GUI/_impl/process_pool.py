@@ -211,6 +211,16 @@ class JobScheduler(typing.Generic[_UserDataT]):
                 self.jobs[job_id].done_callback(None, None, self.jobs[job_id].user_data, process.State.Canceled)
         # TODO: also cancel all jobs that depend on this job
 
+    def cancel_all_jobs(self):
+        # cancel any jobs that may still be running
+        self._pool.cancel_all_jobs()
+        # make double sure they're cancelled
+        for job_id in self.jobs:
+            if self.jobs[job_id]._final_state not in [process.State.Completed, process.State.Canceled, process.State.Failed]:
+                self.cancel_job(job_id)
+        # ensure pool is no longer running
+        self._pool.cleanup()
+
     def update(self):
         # first count how many are scheduled to the pool and whether all tasks are still valid
         num_scheduled_to_pool = 0
