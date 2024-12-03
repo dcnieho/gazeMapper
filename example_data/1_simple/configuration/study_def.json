@@ -34,10 +34,10 @@
   "episodes_to_code": {
     "builtin.set": [
       {
-        "__enum.Event__": "Event.Sync_ET_Data"
+        "__enum.Event__": "Event.Validate"
       },
       {
-        "__enum.Event__": "Event.Validate"
+        "__enum.Event__": "Event.Sync_ET_Data"
       },
       {
         "__enum.Event__": "Event.Trial"
@@ -76,10 +76,15 @@
   },
   "video_recording_colors": {
     "eye tracker": [
-      0,
-      0,
+      255,
+      127,
       0
     ]
   },
-  "video_projected_world_pos_color": null
+  "video_projected_world_pos_color": null,
+  "video_show_gaze_on_plane_in_which": {
+    "builtin.set": [
+      "eye tracker"
+    ]
+  }
 }
