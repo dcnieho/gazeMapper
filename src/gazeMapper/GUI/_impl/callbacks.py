@@ -25,7 +25,7 @@ def get_folder_picker(g, reason: str, *args, **kwargs):
             case 'add_et_recordings':
                 add_eyetracking_recordings(g, selected, *args, **kwargs)
             case 'add_cam_recordings':
-                add_camera_recordings(g, selected, *args, **kwargs)
+                camera_show_glob_filter_config(g, selected, *args, **kwargs)
             case 'set_default_cam_cal':
                 set_default_cam_cal(selected[0], *args, **kwargs)
             case 'set_cam_cal':
@@ -758,6 +758,34 @@ def add_eyetracking_recordings(g, paths: list[pathlib.Path], sessions: list[str]
     # ask what type of eye tracker we should be looking for
     gt_gui.utils.push_popup(g, lambda: gt_gui.utils.popup("Select eye tracker", add_recs_popup, buttons = buttons, closable=True, outside=False))
 
+def camera_show_glob_filter_config(g, paths, sessions):
+    from . import gui
+    g = typing.cast(gui.GUI,g)  # indicate type to typechecker
+    glob_filter = '*.mp4,*.mov,*.avi'
+
+    def setting_popup():
+        nonlocal glob_filter
+        spacing = 2 * imgui.get_style().item_spacing.x
+        color = (0.45, 0.09, 1.00, 1.00)
+        imgui.push_font(g._icon_font)
+        imgui.text_colored(color, ifa6.ICON_FA_CIRCLE_INFO)
+        imgui.pop_font()
+        imgui.same_line(spacing=spacing)
+
+        imgui.begin_group()
+        imgui.dummy((0,2*imgui.get_style().item_spacing.y))
+        glob_filter = _set_glob_filter_for_camera(glob_filter)
+        imgui.end_group()
+
+        imgui.same_line(spacing=spacing)
+        imgui.dummy((0, 0))
+
+    buttons = {
+        ifa6.ICON_FA_CHECK+" Continue": lambda: add_camera_recordings(g, paths, glob_filter, sessions),
+        ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
+    }
+    gt_gui.utils.push_popup(g, lambda: gt_gui.utils.popup("Select device", setting_popup, buttons = buttons, closable=True, outside=False))
+
 def add_camera_recordings(g, paths: list[pathlib.Path], glob_filter: str, sessions: list[str]):
     from . import gui
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
@@ -788,6 +816,18 @@ def get_and_filter_eligible_sessions(g, sessions: list[str], dev_type:session.Re
     else:
         sessions = [s for s in sessions if g.sessions[s].missing_recordings(dev_type)]
     return sessions
+
+def _set_glob_filter_for_camera(glob_filter):
+    imgui.text_unformatted("Extension filter to search for video files in")
+    imgui.text_unformatted("the selected paths (leave empty to not filter)")
+    imgui.dummy((0,1.5*imgui.get_style().item_spacing.y))
+    full_width = imgui.get_content_region_avail().x
+    imgui.push_item_width(full_width*.4)
+    imgui.set_cursor_pos_x(full_width*.3)
+    _, glob_filter = imgui.input_text('##file_filter', glob_filter)
+    imgui.pop_item_width()
+    imgui.dummy((0,2*imgui.get_style().item_spacing.y))
+    return glob_filter
 
 def add_recordings(g, paths: list[pathlib.Path], sessions: list[str]):
     from . import gui
@@ -825,15 +865,7 @@ def add_recordings(g, paths: list[pathlib.Path], sessions: list[str]):
         imgui.pop_item_width()
         imgui.dummy((0,2*imgui.get_style().item_spacing.y))
         if dev_type==session.RecordingType.Camera:
-            imgui.text_unformatted("Extension filter to search for video files in")
-            imgui.text_unformatted("the selected paths (leave empty to not filter)")
-            imgui.dummy((0,1.5*imgui.get_style().item_spacing.y))
-            full_width = imgui.get_content_region_avail().x
-            imgui.push_item_width(full_width*.4)
-            imgui.set_cursor_pos_x(full_width*.3)
-            _, glob_filter = imgui.input_text('##file_filter', glob_filter)
-            imgui.pop_item_width()
-            imgui.dummy((0,2*imgui.get_style().item_spacing.y))
+            glob_filter = _set_glob_filter_for_camera(glob_filter)
 
         imgui.end_group()
         imgui.same_line(spacing=spacing)
