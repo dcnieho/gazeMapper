@@ -117,6 +117,8 @@ Examples:
 1. [Example 2](#example-2-two-participants-and-two-planes) is a more elaborate version of example 1, using two eye trackers recording per session that have to be synchronized and two planes to map gaze to (again along with a glassesValidator setup for determining data quality).
 1. [Example 3](#example-3-one-participant-multiple-planes-and-an-overview-camera) is a recording where a participants looks at and interacts with multiple planes, including a moving plane, and is furthermore observed with an external overview camera. As with the other examples, a glassesValidator setup is used for determining data quality.
 
+The data recordings required for running these examples is [available here](https://lu.box.com/s/kzmbj2i2etrgv1h4azjivg1qwcd48lj5). Output gaze-on-plane, validation and videos resulting from running these examples is [available here](https://lu.box.com/s/oum8tp5joh1z08f4it6sc1zkmyzaa8dz).
+
 ### Example 1: Single participant and single plane
 [Example data](https://github.com/dcnieho/gazeMapper/tree/master/example_data/1_simple/data), [stimulus presentation code](https://github.com/dcnieho/gazeMapper/tree/master/example_data/stimulus_for_1_and_2) and the [configuration](https://github.com/dcnieho/gazeMapper/tree/master/example_data/1_simple/configuration/) and [coding](https://github.com/dcnieho/gazeMapper/tree/master/example_data/1_simple/coding/) files needed for exactly recreating the below steps are provided.
 
@@ -196,7 +198,7 @@ Example 1 is a minimum example, showing a short recording where a participant lo
     1. Next, run the `Gaze to plane` action.
     1. Next, run the `Validation` action.
     1. Finally, run the `Make video` action, which draws the detected markers, the participant's gaze and the projection of that gaze to the plane on the scene video, along with information about the episode annotations.
-    1. Now, you can export the gaze data projected to the plane, the created video and the glassesValidator data quality measures to a folder of your choosing using the `Export trials` action.
+    1. Now, you can export the gaze data projected to the plane, the created video and the glassesValidator data quality measures to a folder of your choosing using the `Export trials` action. An export for this example after following the above steps is [available here](https://lu.box.com/s/oum8tp5joh1z08f4it6sc1zkmyzaa8dz).
 
 ### Example 2: Two participants and two planes
 Example 2 is an extension of example 1, scaling it up to recording two participants who are simultaneously recorded while viewing both their own and each others' screens on which three images are shown in sequence. At the start of the recording, like in example 1, both participants are furthermore asked to look at a [glassesValidator](https://github.com/dcnieho/glassesValidator) poster ([Niehorster et al., 2023](https://doi.org/10.3758/s13428-023-02105-5)), to make it possible to determine data quality measures for the recording. Finally, the glassesValidator poster is also used for synchronizing the eye tracker's gaze data with its scene camera. We strongly recommend collecting data for both synchronization and data quality determination for all wearable eye tracker recordings.
@@ -301,7 +303,7 @@ Nonetheless, below we provide a full description of how recording preparation, d
     1. Next, run the `Gaze to plane` action.
     1. Next, run the `Validation` action.
     1. Finally, run the `Make video` action, which draws the detected markers, the participant's gaze and the projection of that gaze to the plane on the scene video, along with information about the episode annotations.
-    1. Now, you can export the gaze data projected to the plane, the created video and the glassesValidator data quality measures to a folder of your choosing using the `Export trials` action.
+    1. Now, you can export the gaze data projected to the plane, the created video and the glassesValidator data quality measures to a folder of your choosing using the `Export trials` action. An export for this example after following the above steps is [available here](https://lu.box.com/s/oum8tp5joh1z08f4it6sc1zkmyzaa8dz).
 
 ### Example 3: One participant, multiple planes and an overview camera
 [Example data](https://github.com/dcnieho/gazeMapper/tree/master/example_data/3_external_camera_moving_plane/data), the [configuration](https://github.com/dcnieho/gazeMapper/tree/master/example_data/3_external_camera_moving_plane/configuration/) and the [coding](https://github.com/dcnieho/gazeMapper/tree/master/example_data/3_external_camera_moving_plane/coding/) files needed for exactly recreating the below steps are provided. The stimulus material and used planes are [also available](https://github.com/dcnieho/gazeMapper/tree/master/example_data/3_external_camera_moving_plane/materials).
@@ -396,7 +398,7 @@ Example 3 is a more advanced example, showing a recording of a participant looki
     1. Next, run the `Gaze to plane` action.
     1. Next, run the `Validation` action.
     1. Finally, run the `Make video` action, which draws the detected markers, the participant's gaze and the projection of that gaze to the plane on the scene video, along with information about the episode annotations.
-    1. Now, you can export the gaze data projected to the plane, the created video and the glassesValidator data quality measures to a folder of your choosing using the `Export trials` action.
+    1. Now, you can export the gaze data projected to the plane, the created video and the glassesValidator data quality measures to a folder of your choosing using the `Export trials` action. An export for this example after following the above steps is [available here](https://lu.box.com/s/oum8tp5joh1z08f4it6sc1zkmyzaa8dz).
 
 ## gazeMapper projects
 The gazeMapper GUI organizes recordings into a project folder. Each session to be processed is represented by a folder in this project folder, and one or multiple recordings are stored in subfolders of a session folder. After importing recordings, all further processing is done inside these session and recording folders. The source directories containing the original recordings remain
