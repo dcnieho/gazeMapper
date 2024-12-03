@@ -213,11 +213,11 @@ class JobScheduler(typing.Generic[_UserDataT]):
 
     def cancel_all_jobs(self):
         # cancel any jobs that may still be running
-        self._pool.cancel_all_jobs()
-        # make double sure they're cancelled
         for job_id in self.jobs:
             if self.jobs[job_id]._final_state not in [process.State.Completed, process.State.Canceled, process.State.Failed]:
                 self.cancel_job(job_id)
+        # make double sure they're cancelled
+        self._pool.cancel_all_jobs()
         # ensure pool is no longer running
         self._pool.cleanup()
 
