@@ -221,6 +221,15 @@ class JobScheduler(typing.Generic[_UserDataT]):
         # ensure pool is no longer running
         self._pool.cleanup()
 
+    def clear(self):
+        # cancel any jobs that may still be running
+        self.cancel_all_jobs()
+        # clean up
+        self._pending_jobs.clear()
+        self.jobs.clear()
+        # reset job counter
+        self._job_id_provider = CounterContext()
+
     def update(self):
         # first count how many are scheduled to the pool and whether all tasks are still valid
         num_scheduled_to_pool = 0

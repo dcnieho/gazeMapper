@@ -615,6 +615,7 @@ class GUI:
         self._after_window_update_callback = self._finish_unload_project
 
     def _finish_unload_project(self):
+        self.job_scheduler.clear()
         self.project_dir = None
         self._possible_value_getters = {}
         self.study_config = None
