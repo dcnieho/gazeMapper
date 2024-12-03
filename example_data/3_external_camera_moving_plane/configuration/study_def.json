@@ -16,9 +16,9 @@
       },
       {
         "builtin.set": [
-          "mangos",
-          "apples",
           "tablet",
+          "apples",
+          "mangos",
           "pears"
         ]
       }
@@ -122,5 +122,6 @@
     "builtin.set": [
       "overview"
     ]
-  }
+  },
+  "video_gaze_to_plane_margin": 0.1
 }

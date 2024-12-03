@@ -194,7 +194,7 @@ Example 1 is a minimum example, showing a short recording where a participant lo
 
     1. Next, run the `Gaze to plane` action.
     1. Next, run the `Validation` action.
-    1. Finally, run the `Make video` action, which draws the detected markers, the participant's and the projection of that gaze to the plane on the scene video, along with information about the episode annotations.
+    1. Finally, run the `Make video` action, which draws the detected markers, the participant's gaze and the projection of that gaze to the plane on the scene video, along with information about the episode annotations.
     1. Now, you can export the gaze data projected to the plane, the created video and the glassesValidator data quality measures to a folder of your choosing using the `Export trials` action.
 
 ### Example 2: Two participants and two planes
@@ -298,7 +298,7 @@ Nonetheless, below we provide a full description of how recording preparation, d
     1. Next, run the `Sync to reference` action to synchronize the two recordings together.
     1. Next, run the `Gaze to plane` action.
     1. Next, run the `Validation` action.
-    1. Finally, run the `Make video` action, which draws the detected markers, the participant's and the projection of that gaze to the plane on the scene video, along with information about the episode annotations.
+    1. Finally, run the `Make video` action, which draws the detected markers, the participant's gaze and the projection of that gaze to the plane on the scene video, along with information about the episode annotations.
     1. Now, you can export the gaze data projected to the plane, the created video and the glassesValidator data quality measures to a folder of your choosing using the `Export trials` action.
 
 ### Example 3: One participant, multiple planes and an overview camera
@@ -393,7 +393,7 @@ Example 3 is a more advanced example, showing a recording of a participant looki
     1. Next, run the `Sync to reference` action to synchronize the two recordings together.
     1. Next, run the `Gaze to plane` action.
     1. Next, run the `Validation` action.
-    1. Finally, run the `Make video` action, which draws the detected markers, the participant's and the projection of that gaze to the plane on the scene video, along with information about the episode annotations.
+    1. Finally, run the `Make video` action, which draws the detected markers, the participant's gaze and the projection of that gaze to the plane on the scene video, along with information about the episode annotations.
     1. Now, you can export the gaze data projected to the plane, the created video and the glassesValidator data quality measures to a folder of your choosing using the `Export trials` action.
 
 ## gazeMapper projects
