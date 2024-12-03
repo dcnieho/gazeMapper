@@ -364,7 +364,7 @@ Example 3 is a more advanced example, showing a recording of a participant looki
 
         ![Add recording 1](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/add_recording_3_1.png?raw=true)
     1. Assign the recording to the session by dragging it from the right, and dropping it on the left for the `eye tracker` recording where it says `drop recording here`. Click `Continue`. The recording will now be imported.
-    1. Click `import camera recordings`, select the [folder containing the example data](https://github.com/dcnieho/gazeMapper/tree/master/example_data/3_external_camera_moving_plane/data) and click continue. Assign the found camera recording (`cam1_R005_reencode.mp4`) to the `overview` recording.
+    1. Click `import camera recordings`, select the [folder containing the example data](https://github.com/dcnieho/gazeMapper/tree/master/example_data/3_external_camera_moving_plane/data) and click continue. Assign the found camera recording (`cam1_R003_reencode.mp4`) to the `overview` recording.
 
         ![Add recording 2](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/add_recording_3_2.png?raw=true)
 
@@ -379,7 +379,7 @@ Example 3 is a more advanced example, showing a recording of a participant looki
         ![Episode coder initial](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/episode_coder_initial_3.png?raw=true)
     1. Use the seek functionality in the coder (you can press on the timeline underneath the video at the same height as the orange triangle, or use the video player controls) to find the start of the validation episode. Code the validation interval as described in [step 5 in the glassesValidator manual](https://github.com/dcnieho/glassesValidator?tab=readme-ov-file#workflow-and-example-data). Furthermore, code the eye tracker synchronization episode as the beginning of the fixation on the center validation target before the participant starts nodding no and yes, and the end of the episode as the end of the fixation on the center validation target after the nodding. Code both the episode at the beginning of the recording and the episode near the end of the recording:
 
-        ![Episode coder final](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/episode_coder_final_3_1.png?raw=true)
+        ![Episode coder final](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/episode_coder_final_3.png?raw=true)
 
         Press `Done` to close the episode coding GUI.
 
