@@ -26,7 +26,7 @@ GazeMapper is available from `https://github.com/dcnieho/gazeMapper`, and suppor
 
 For Windows users who wish to use the gazeMapper GUI, the easiest way to acquire gazeMapper is to [download
 a standalone executable](https://github.com/dcnieho/gazeMapper/releases/latest). The standalone executable is not
-available for MacOS or Linux. Complete installation instruction for [MacOS](#complete-install-instructions-for-macos) and [Linux](#complete-install-instructions-for-linux) users are available below.
+available for MacOS or Linux. Complete installation instruction for [MacOS](#complete-instructions-for-macos) and [Linux](#complete-instructions-for-linux) users are available below.
 
 For users on Windows, Mac or Linux who wish to use gazeMapper *in their Python code*, the easiest way to acquire
 gazeMapper is to install it directly into your Python distribution using the command
@@ -37,20 +37,20 @@ try to install it first with the command `SYSTEM_VERSION_COMPAT=0 pip install --
 to replace `python` with `python3` in the above command lines.
 
 Once pip-installed in your Python distribution, there are three ways to run the GUI on any of the supported operating systems:
-1. Directly in the terminal of your operating system, type `gazeMapper` and run it.
+1. Directly in the terminal of your operating system, type `gazeMapper` and run it (NB: this does not appear to work in Anaconda environments, use one of the below methods for those).
 2. Open a Python console. From such a console, running the GUI requires only the following two lines of code:
     ```python
-    import gazeMapper.GUI
+    import gazeMapper
     gazeMapper.GUI.run()
     ```
 3. If you run the gazeMapper's GUI from a script, make sure to wrap your script in `if __name__=="__main__"`. This is required for correct operation from a script because the GUI uses multiprocessing functionality. Do as follows:
     ```python
     if __name__=="__main__":
-        import gazeMapper.GUI
+        import gazeMapper
         gazeMapper.GUI.run()
     ```
 
-## Complete install instructions for MacOS
+## Complete instructions for MacOS
 Installing and running gazeMapper on a Mac will involve some use of the terminal. In this section we will show you step by step how to install, and then what to do every time you want to run gazeMapper.
 Note that it is critical on MacOS that gazeMapper is installed natively, and not under Rosetta or Parallels. That will lead to an error when importing the `polars` package, and other unfixable errors.
 ### Installing gazeMapper
@@ -80,7 +80,7 @@ If you have followed the above instructions to install gazeMapper, do the follow
 4. Type and run `import gazeMapper`.
 5. Type and run `gazeMapper.GUI.run()`.
 
-## Complete install instructions for Linux
+## Complete instructions for Linux
 Installing and running gazeMapper on Linux will involve some use of the terminal. In this section we will show you step by step how to install, and then what to do every time you want to run gazeMapper.
 ### Installing gazeMapper
 1. You may well already have Python installed on your machine. To check, type and run `python3 --version` in a terminal. If this command completes successfully and shows you have Python 3.10 or later, you can skip to step 3.
