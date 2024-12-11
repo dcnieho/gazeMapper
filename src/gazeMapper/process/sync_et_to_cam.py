@@ -87,11 +87,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
             # compute target positions
             target_positions: dict[int, TargetPos] = {}
             for frame_idx in poses:
-                if poses[frame_idx].pose_successful():
-                    t_pos = poses[frame_idx].plane_to_cam_pose(np.zeros((3,)), camera_params)
-                elif poses[frame_idx].homography_successful():
-                    t_pos = poses[frame_idx].plane_to_cam_homography(np.zeros((3,)), camera_params)
-                target_positions[frame_idx] = TargetPos(video_ts.get_timestamp(frame_idx), frame_idx, t_pos)
+                t_pos = poses[frame_idx].get_origin_on_image(camera_params)
+                if not np.isnan(t_pos[0]):
+                    target_positions[frame_idx] = TargetPos(video_ts.get_timestamp(frame_idx), frame_idx, t_pos)
         case 'function':
             df = pd.read_csv(working_dir/naming.target_sync_file, delimiter='\t', index_col=False, dtype=defaultdict(lambda: float, frame_idx=int))
             df['cam_pos'] = [x for x in df[['target_x','target_y']].values]
