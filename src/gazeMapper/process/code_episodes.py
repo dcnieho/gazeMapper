@@ -10,11 +10,11 @@ isMacOS = sys.platform.startswith("darwin")
 if isMacOS:
     import AppKit
 
-from glassesTools import annotation, drawing, gaze_headref, gaze_worldref, naming as gt_naming, ocv, plane, propagating_thread, timestamps
+from glassesTools import annotation, drawing, gaze_headref, gaze_worldref, naming as gt_naming, ocv, plane as gt_plane, propagating_thread, timestamps, transforms
 from glassesTools.gui.video_player import GUI
 
 
-from .. import config, episode, naming, process, session, synchronization
+from .. import config, episode, naming, plane, process, session, synchronization
 
 # This script shows a video player that is used to indicate the interval(s)
 # during which the poster should be found in the video and in later
@@ -84,9 +84,15 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
         plane_gazes = {p:gaze_worldref.read_dict_from_file(f) for p,f in zip(planes,plane_files) if f.is_file()}
         has_plane_gaze = not not plane_gazes
 
+        if has_plane_gaze:
+            planes_setup: dict[str, dict[str]] = {}
+            for p in planes:
+                p_def = [pl for pl in study_config.planes if pl.name==p][0]
+                planes_setup[p] = plane.get_plane_from_definition(p_def, config_dir/p)
+
         # Read plane poses, if available
         plane_files = [working_dir/f'{naming.plane_pose_prefix}{p}.tsv' for p in planes]
-        poses = {p:plane.read_dict_from_file(f) for p,f in zip(planes,plane_files) if f.is_file()}
+        poses = {p:gt_plane.read_dict_from_file(f) for p,f in zip(planes,plane_files) if f.is_file()}
         has_plane_pose = not not poses
     else:
         raise ValueError(f'recording type "{rec_def.type}" is not understood')
@@ -170,9 +176,17 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
 
             # if have gaze in world info, draw it too (also only first sample)
             if has_plane_gaze:
+                # first collect for which plane to draw it
+                this_plane_gazes: dict[str, gaze_worldref.Gaze] = {}
                 for p in planes:
                     if p in plane_gazes and frame_idx in plane_gazes[p]:
-                        plane_gazes[p][frame_idx][0].draw_on_world_video(frame, cam_params, sub_pixel_fac)
+                        this_plane_gazes[p] = gaze_worldref.distance_from_plane(plane_gazes[p][frame_idx][0], planes_setup[p])
+                # get best gaze (closest to a plane)
+                best = None if not this_plane_gazes else sorted(this_plane_gazes.keys(), key=lambda d: this_plane_gazes[d] if this_plane_gazes[d]<=study_config.video_gaze_to_plane_margin else np.inf)
+                # check if gaze is not too far outside all planes, draw
+                if best is not None:
+                    p = best[0]
+                    plane_gazes[p][frame_idx][0].draw_on_world_video(frame, cam_params, sub_pixel_fac, None if not p in poses or not frame_idx in poses[p] else poses[p][frame_idx])
 
             if frame is not None:
                 gui.update_image(frame, pts, frame_idx, window_id=gui.main_window_id)
