@@ -357,7 +357,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
 
                         # draw on current video
                         if v in study_config.video_show_gaze_on_plane_in_which:
-                            plane_gazes[best[0]][2].draw_on_world_video(frame[v], camera_params[v], sub_pixel_fac, study_config.video_projected_vidPos_ray_color, study_config.video_projected_world_pos_color, study_config.video_projected_left_ray_color, study_config.video_projected_right_ray_color, study_config.video_projected_average_ray_color)
+                            plane_gazes[best[0]][2].draw_on_world_video(frame[v], camera_params[v], sub_pixel_fac, pose[v][best[0]], study_config.video_projected_vidPos_color, study_config.video_projected_world_pos_color, study_config.video_projected_left_ray_color, study_config.video_projected_right_ray_color, study_config.video_projected_average_ray_color)
 
                         # also draw on other recordings, if so configured
                         # depending on configuration also includes camera and gaze vector between the two

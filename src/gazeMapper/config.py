@@ -95,7 +95,7 @@ class Study:
 
                  video_make_which                               : set[str]|None                     = None,
                  video_recording_colors                         : dict[str,RgbColor]|None           = None,
-                 video_projected_vidPos_ray_color               : RgbColor|None                     = RgbColor(255,255,  0),
+                 video_projected_vidPos_color               : RgbColor|None                     = RgbColor(255,255,  0),
                  video_projected_world_pos_color                : RgbColor|None                     = RgbColor(255,  0,255),
                  video_projected_left_ray_color                 : RgbColor|None                     = RgbColor(  0,  0,255),
                  video_projected_right_ray_color                : RgbColor|None                     = RgbColor(255,  0,  0),
@@ -156,7 +156,7 @@ class Study:
 
         self.video_make_which                               = video_make_which
         self.video_recording_colors                         = video_recording_colors
-        self.video_projected_vidPos_ray_color               = video_projected_vidPos_ray_color
+        self.video_projected_vidPos_color                   = video_projected_vidPos_color
         self.video_projected_world_pos_color                = video_projected_world_pos_color
         self.video_projected_left_ray_color                 = video_projected_left_ray_color
         self.video_projected_right_ray_color                = video_projected_right_ray_color
@@ -645,7 +645,7 @@ study_parameter_doc = {
     'video_recording_colors': type_utils.GUIDocInfo('Video export: Recording colors', 'Colors used for drawing each recording\'s gaze point, scene camera and gaze vector (depending on settings).',{
         None: _rgb_doc      # None indicates the doc specification applies to the contained values
     }),
-    'video_projected_vidPos_ray_color': type_utils.GUIDocInfo('Video export: Color for gaze position on plane', 'Color used for drawing the projection on a plane of the recorded gaze position on the scene video. Not drawn if value is not set.', _rgb_doc),
+    'video_projected_vidPos_color': type_utils.GUIDocInfo('Video export: Color for gaze position on plane', 'Color used for drawing the recorded gaze position on the scene video transformed to the plane. Not drawn if value is not set.', _rgb_doc),
     'video_projected_world_pos_color': type_utils.GUIDocInfo('Video export: Color for 3D gaze position on plane', 'Color used for drawing the projection on a plane of the recorded 3D gaze position in the world. Not drawn if value is not set.', _rgb_doc),
     'video_projected_left_ray_color': type_utils.GUIDocInfo('Video export: Color for left eye gaze vector projected to plane', 'Color used for drawing the projection to a plane of the recorded left eye\'s gaze vector. Not drawn if value is not set.', _rgb_doc),
     'video_projected_right_ray_color': type_utils.GUIDocInfo('Video export: Color for right eye gaze vector projected to plane', 'Color used for drawing the projection to a plane of the recorded right eye\'s gaze vector. Not drawn if value is not set.', _rgb_doc),
