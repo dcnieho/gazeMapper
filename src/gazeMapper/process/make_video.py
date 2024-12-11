@@ -341,17 +341,17 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
                         if not pose[v] or not (plane_gaze_on_this_video or plane_gaze_or_pose_on_other_video):
                             continue
 
-                        # collect gaze on all planes for which pose is available
+                        # collect gaze on all planes for which pose or homography is available
                         plane_gazes: dict[str, tuple[float,float,gaze_worldref.Gaze]] = {}
                         for pl in pose[v]:
-                            if pl in pose[v] and pose[v][pl].pose_successful():
+                            if pl in pose[v] and (pose[v][pl].pose_successful() or pose[v][pl].homography_successful()):
                                 # turn into position on board
                                 plane_gaze = gaze_worldref.from_head(pose[v][pl], g, camera_params[v])
-                                plane_gazes[pl] = (transforms.dist_from_bbox(*plane_gaze.gazePosPlane2D_vidPos_ray, planes[pl].bbox), pose[v][pl].pose_reprojection_error, plane_gaze)
+                                plane_gazes[pl] = (gaze_worldref.distance_from_plane(plane_gaze, planes[pl]), pose[v][pl].pose_reprojection_error if pose[v][pl].pose_successful() else np.nan, plane_gaze)
 
                         # find the plane to which gaze is closest
-                        best = None if not plane_gazes else sorted(plane_gazes.keys(), key=lambda d: sum(plane_gazes[d][1:2])/2 if plane_gazes[d][0]<=study_config.video_gaze_to_plane_margin else math.inf)
-                        # check if gaze is not too far outside that plane
+                        best = None if not plane_gazes else sorted(plane_gazes.keys(), key=lambda d: (sum(plane_gazes[d][0:2])/2 if not np.isnan(plane_gazes[d][1]) else plane_gazes[d][0]) if plane_gazes[d][0]<=study_config.video_gaze_to_plane_margin else math.inf)
+                        # check if gaze is not too far outside all planes
                         if best is None:
                             continue
 
@@ -365,11 +365,12 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
                             if pose[vo] is None:
                                 continue
                             for pl in best:
-                                if pl in pose[vo] and pose[vo][pl].pose_successful():
+                                if pl in pose[vo] and (pose[vo][pl].pose_successful() or pose[vo][pl].homography_successful()):
                                     break
-                            if pl not in pose[vo] or not pose[vo][pl].pose_successful():
+                            if pl not in pose[vo] or not (pose[vo][pl].pose_successful() or pose[vo][pl].homography_successful()):
                                 continue
-                            # draw gaze point and camera on the other video, and possibly gaze vector between them
+                            # draw gaze point, camera position, and gaze vector between them on the other video, as configured
+                            # and as possible (camera position and gaze vector require pose, not only homography)
                             draw_gaze_on_other_video(frame[vo],
                                                      pose[v][pl], pose[vo][pl],
                                                      plane_gazes[pl][2],
@@ -494,6 +495,16 @@ def draw_gaze_on_other_video(frame_other, pose_this: plane.Pose, pose_other: pla
             gaze_point_plane = plane_gaze.get_gaze_point(gaze_worldref.Type.Scene_Video_Position)
         else:
             raise RuntimeError(f'Gaze of type {which_gaze_on_plane.value} was requested, but is not available. Select a different gaze type or set allow_fallback to True.')
+
+    if not pose_this.pose_successful() or not pose_other.pose_successful():
+        if not do_draw_gaze:
+            return
+        # use homography
+        gaze_pos_other = pose_other.plane_to_cam_homography(gaze_point_plane, camera_params_other)
+        drawing.openCVCircle(frame_other, gaze_pos_other, 8, clr, 2, sub_pixel_fac)
+        # can only do gaze position on plane with homography, so, exit
+        return
+
     gaze_point_plane = np.append(gaze_point_plane,0.).reshape(1,3)
     # check if gaze position in camera frame is ok. If gaze point is behind this camera,
     # it won't be visible and projecting it anyway yields a nonsensical result
