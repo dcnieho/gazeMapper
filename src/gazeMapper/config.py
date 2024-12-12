@@ -95,7 +95,7 @@ class Study:
 
                  video_make_which                               : set[str]|None                     = None,
                  video_recording_colors                         : dict[str,RgbColor]|None           = None,
-                 video_projected_vidPos_color               : RgbColor|None                     = RgbColor(255,255,  0),
+                 video_projected_vidPos_color                   : RgbColor|None                     = RgbColor(255,255,  0),
                  video_projected_world_pos_color                : RgbColor|None                     = RgbColor(255,  0,255),
                  video_projected_left_ray_color                 : RgbColor|None                     = RgbColor(  0,  0,255),
                  video_projected_right_ray_color                : RgbColor|None                     = RgbColor(255,  0,  0),
