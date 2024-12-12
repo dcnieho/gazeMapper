@@ -11,7 +11,7 @@ gazeMapper can:
 3) Determine data quality measures, e.g., accuracy and precision using [glassesValidator](https://github.com/dcnieho/glassesValidator) ([Niehorster et al., 2023](https://doi.org/10.3758/s13428-023-02105-5)).
 
 If you use this tool or any of the code in this repository, please cite:<br>
-Niehorster, D.C., Hessels, R.S., Nyström, M., Benjamins, J.S. and Hooge, I.T.C. (in prep). gazeMapper: A tool for automated world-based analysis of wearable eye tracker data ([BibTeX](#bibtex))<br>
+Niehorster, D.C., Hessels, R.S., Nyström, M., Benjamins, J.S. and Hooge, I.T.C. (submitted). gazeMapper: A tool for automated world-based analysis of gaze data from one or multiple wearable eye trackers. Manuscript submitted for publication, 2024 ([BibTeX](#bibtex))<br>
 If you use the functionality for automatic determining the data quality (accuracy and precision) of wearable eye tracker recordings, please additionally cite:<br>
 [Niehorster, D.C., Hessels, R.S., Benjamins, J.S., Nyström, M. and Hooge, I.T.C. (2023). GlassesValidator:
 A data quality tool for eye tracking glasses. Behavior Research Methods. doi: 10.3758/s13428-023-02105-5](https://doi.org/10.3758/s13428-023-02105-5) ([BibTeX](#bibtex))
@@ -19,7 +19,7 @@ A data quality tool for eye tracking glasses. Behavior Research Methods. doi: 10
 ## Example
 ![application example](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/world_data.png?raw=true)
 Example where gazeMapper has been used to map head-centered gaze from two head-worn eye tracker recordings to synchronized world-centered
-gaze data of the pair, drawn on an overview video recording with an additional external camera. From Hessels, R.S., Iwabuchi, T., Niehorster, D.C., Funawatari, R., Benjamins, J.S., Kawakami, S.; Nyström, M., Suda, M., Hooge, I.T.C., Sumiya, M., Heijnen, J., Teunisse, M. & Senju, A. (2024). A setup for the crosscultural study of gaze behavior and eye contact in face-to-face collaboration. ECEM 2024
+gaze data of the pair, drawn on an overview video recording with an additional external camera. From Hessels, R.S., Iwabuchi, T., Niehorster, D.C., Funawatari, R., Benjamins, J.S., Kawakami, S.; Nyström, M., Suda, M., Hooge, I.T.C., Sumiya, M., Heijnen, J., Teunisse, M. & Senju, A. (submitted). Gaze behavior in face-to-face interaction: A cross-cultural investigation between Japan and the Netherlands. Manuscript submitted for publication, 2024
 
 # How to acquire
 GazeMapper is available from `https://github.com/dcnieho/gazeMapper`, and supports Python 3.10 and 3.11 on Windows, MacOS and Linux (newer versions of Python should work fine but are not tested).
@@ -939,16 +939,17 @@ A data quality tool for eye tracking glasses. Behavior Research Methods. doi: 10
               Hooge, I. T. C.},
     Journal = {},
     Number = {},
-    Title = {{gazeMapper}: A tool for automated world-based analysis of wearable eye tracker data},
-    Year = {}
+    Title = {{gazeMapper}: A tool for automated world-based analysis of gaze data from one or multiple wearable eye trackers},
+    Year = {},
+    note = {Manuscript submitted for publication, 2024}
 }
 
 @article{niehorster2023glassesValidator,
     Author = {Niehorster, Diederick C. and
-              Hessels, R. S. and
-              Benjamins, J. S. and
+              Hessels, Roy S. and
+              Benjamins, Jeroen S. and
               Nystr{\"o}m, Marcus and
-              Hooge, I. T. C.},
+              Hooge, Ignace T. C.},
     Journal = {Behavior Research Methods},
     Number = {},
     Title = {{GlassesValidator}: A data quality tool for eye tracking glasses},

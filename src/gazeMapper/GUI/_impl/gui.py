@@ -1529,19 +1529,22 @@ class GUI:
             imgui.text("Reference")
             imgui.pop_font()
             imgui.spacing()
-            reference         = r"Niehorster, D.C., Hessels, R.S., Nyström, M., Benjamins, J.S. & Hooge, I.T.C. (in prep). gazeMapper: A tool for automated world-based analysis of wearable eye tracker data"
+            reference         = r"Niehorster, D.C., Hessels, R.S., Nyström, M., Benjamins, J.S. & Hooge, I.T.C. (submitted). gazeMapper: A tool for automated world-based analysis of gaze data from one or multiple wearable eye trackers. Manuscript submitted for publication, 2024"
             reference_bibtex  = r"""@article{niehorster2025gazeMapper,
-    Author = {Niehorster, Diederick C. and Hessels, R. S. and Nystr{\"o}m, Marcus and Benjamins, J. S. and Hooge, I. T. C.},
+    Author = {Niehorster, Diederick C. and
+              Hessels, Roy S. and
+              Nystr{\"o}m, Marcus and
+              Benjamins, Jeroen S. and
+              Hooge, Ignace T. C.},
     Journal = {},
     Number = {},
-    Pages = {},
-    Title = {gazeMapper: A tool for automated world-based analysis of wearable eye tracker data},
-    Year = {in prep},
-    doi = {}
+    Title = {{gazeMapper}: A tool for automated world-based analysis of gaze data from one or multiple wearable eye trackers},
+    Year = {},
+    note = {Manuscript submitted for publication, 2024}
 }
 """
             imgui.text(reference)
-            if imgui.begin_popup_context_item(f"##reference_context"):
+            if imgui.begin_popup_context_item(f"##reference_context_gazeMapper"):
                 if imgui.selectable("APA", False)[0]:
                     imgui.set_clipboard_text(reference)
                 if imgui.selectable("BibTeX", False)[0]:
@@ -1555,18 +1558,20 @@ class GUI:
             imgui.spacing()
             reference         = r"Niehorster, D.C., Hessels, R.S., Benjamins, J.S., Nyström, M. & Hooge, I.T.C. (2023). GlassesValidator: Data quality tool for eye tracking glasses. Behavior Research Methods. doi: 10.3758/s13428-023-02105-5"
             reference_bibtex  = r"""@article{niehorster2023glassesValidator,
-                Author = {Niehorster, Diederick C. and Hessels, Roy S. and Benjamins, Jeroen S. and Nystr{\"o}m, Marcus and Hooge, Ignace T. C.},
-                Journal = {Behavior Research Methods},
-                Number = {},
-                Pages = {},
-                Title = {GlassesValidator: A data quality tool for eye tracking glasses},
-                Year = {2023},
-                doi = {10.3758/s13428-023-02105-5}
-            }
+    Author = {Niehorster, Diederick C. and
+              Hessels, Roy S. and
+              Benjamins, Jeroen S. and
+              Nystr{\"o}m, Marcus and
+              Hooge, Ignace T. C.},
+    Journal = {Behavior Research Methods},
+    Number = {},
+    Title = {{GlassesValidator}: A data quality tool for eye tracking glasses},
+    Year = {2023},
+    doi = {10.3758/s13428-023-02105-5}
 }
 """
             imgui.text(reference)
-            if imgui.begin_popup_context_item(f"##reference_context"):
+            if imgui.begin_popup_context_item(f"##reference_context_glassesValidator"):
                 if imgui.selectable("APA", False)[0]:
                     imgui.set_clipboard_text(reference)
                 if imgui.selectable("BibTeX", False)[0]:
