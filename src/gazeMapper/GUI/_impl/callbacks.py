@@ -379,7 +379,7 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
 
         imgui.begin_group()
         imgui.dummy((0,2*imgui.get_style().item_spacing.y))
-        imgui.text_unformatted(f'Select what you wish to export to the folder\n{path}\nfrom the below:')
+        imgui.text_unformatted(f'Select below what you wish to export to the folder\n{path}')
         imgui.dummy((0,1.5*imgui.get_style().item_spacing.y))
         for e in to_export:
             _, to_export[e] = imgui.checkbox(e, to_export[e])
