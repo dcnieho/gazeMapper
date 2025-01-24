@@ -659,7 +659,7 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, documenta
             if imgui.internal.item_add(t_bb, iid):
                 # enable interaction
                 if (has_order and len(val)>1) or val_tooltips[i]:
-                    _, hovered, held = imgui.internal.button_behavior(t_bb, iid, False, False, imgui.internal.ButtonFlagsPrivate_.im_gui_button_flags_allow_overlap)
+                    _, hovered, held = imgui.internal.button_behavior(t_bb, iid, False, False, imgui.internal.ButtonFlagsPrivate_.allow_overlap)
                 if val_tooltips[i]:
                     glassesTools.gui.utils.draw_hover_text(val_tooltips[i],'')
                 if has_order and len(val)>1:
@@ -674,7 +674,7 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, documenta
                 # draw frame
                 imgui.internal.render_frame(t_bb.min, t_bb.max, clr, True, imgui.get_style().frame_rounding)
                 # draw text on top
-                imgui.internal.render_text_clipped((t_bb.min.x+x_padding, t_bb.min.y), (t_bb.max.x-x_padding, t_bb.max.y), val_txt[i], None, w_sizes[i], imgui.get_style().button_text_align, t_bb)
+                imgui.internal.render_text_clipped((t_bb.min.x+x_padding, t_bb.min.y), (t_bb.max.x-x_padding, t_bb.max.y), val_txt[i], '', w_sizes[i], imgui.get_style().button_text_align, t_bb)
                 if has_order and len(val)>1:
                     glassesTools.gui.utils.draw_hover_text("Drag to reorder",'')
                     if imgui.begin_drag_drop_source(imgui.DragDropFlags_.payload_auto_expire):

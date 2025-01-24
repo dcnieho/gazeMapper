@@ -108,10 +108,10 @@ class List:
                     multi_selected_state = 0
 
                 if multi_selected_state==0:
-                    imgui.internal.push_item_flag(imgui.internal.ItemFlags_.mixed_value, True)
+                    imgui.push_item_flag(imgui.internal.ItemFlagsPrivate_.mixed_value, True)
                 clicked, new_state = glassesTools.gui.utils.my_checkbox(f"##header_checkbox", multi_selected_state==1, frame_size=(0,0), frame_padding_override=(imgui.get_style().frame_padding.x/2,0), do_vertical_align=False)
                 if multi_selected_state==0:
-                    imgui.internal.pop_item_flag()
+                    imgui.pop_item_flag()
 
                 if clicked:
                     glassesTools.utils.set_all(self.selected_items, new_state, subset = self.sorted_ids)

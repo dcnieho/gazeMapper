@@ -310,8 +310,6 @@ def show_action_options(g, session_name: str, rec_name: str|None, action: proces
                 gt_gui.utils.draw_hover_text(options[o][2])
 
         imgui.end_group()
-        imgui.same_line(spacing=spacing)
-        imgui.dummy((0, 0))
 
     buttons = {
         ifa6.ICON_FA_CHECK+f" Continue##{session_name}_{rec_name}": lambda: g.launch_task(session_name, rec_name, action, **{o:options[o][0] for o in options}),
@@ -395,7 +393,6 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
                         imgui.table_next_row()
                         imgui.table_set_column_index(1)  # Right
                         imgui.dummy((right_width, 1))
-                        imgui.push_item_width(right_width)
 
                         for dq in dq_set['dq_types']:
                             imgui.table_next_row()
@@ -419,7 +416,6 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
                     imgui.table_next_row()
                     imgui.table_set_column_index(1)  # Right
                     imgui.dummy((right_width, 1))
-                    imgui.push_item_width(right_width)
 
                     for t in dq_set['targets']:
                         imgui.table_next_row()
@@ -428,7 +424,6 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
                         imgui.text(f"target {t}:")
                         imgui.table_next_column()
                         _, dq_set['targets'][t] = imgui.checkbox(f"##target_{t}", dq_set['targets'][t])
-
 
                     imgui.end_table()
                     imgui.spacing()
@@ -440,7 +435,6 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
                 imgui.table_next_row()
                 imgui.table_set_column_index(1)  # Right
                 imgui.dummy((right_width, 1))
-                imgui.push_item_width(right_width)
 
                 imgui.table_next_row()
                 imgui.table_next_column()
@@ -455,8 +449,6 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
             imgui.tree_pop()
 
         imgui.end_group()
-        imgui.same_line(spacing=spacing)
-        imgui.dummy((0, 0))
 
     def launch_export():
         exp = []
@@ -507,8 +499,6 @@ async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[record
         imgui.dummy((0,2*imgui.get_style().item_spacing.y))
         imgui.end_group()
 
-        imgui.same_line(spacing=spacing)
-        imgui.dummy((0, 0))
     gt_gui.utils.push_popup(g, lambda: gt_gui.utils.popup("Preparing import", prepping_recs_popup, buttons = None, closable=False, outside=False))
 
     # step 1, find what recordings of this type of eye tracker are in the path
@@ -668,9 +658,6 @@ async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[record
         imgui.end_child()
         imgui.end_child()
 
-        imgui.same_line(spacing=spacing)
-        imgui.dummy((0,6*imgui.get_style().item_spacing.y))
-
     buttons = {
         ifa6.ICON_FA_CHECK+" Continue": lambda: async_thread.run(_import_recordings(g, recordings_to_add, recording_assignment)),
         ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
@@ -742,8 +729,6 @@ def add_eyetracking_recordings(g, paths: list[pathlib.Path], sessions: list[str]
         imgui.dummy((0,2*imgui.get_style().item_spacing.y))
 
         imgui.end_group()
-        imgui.same_line(spacing=spacing)
-        imgui.dummy((0, 0))
 
         if changed:
             eye_tracker = eyetracker.EyeTracker(eyetracker.eye_tracker_names[combo_value])
@@ -776,9 +761,6 @@ def camera_show_glob_filter_config(g, paths, sessions):
         imgui.dummy((0,2*imgui.get_style().item_spacing.y))
         glob_filter = _set_glob_filter_for_camera(glob_filter)
         imgui.end_group()
-
-        imgui.same_line(spacing=spacing)
-        imgui.dummy((0, 0))
 
     buttons = {
         ifa6.ICON_FA_CHECK+" Continue": lambda: add_camera_recordings(g, paths, glob_filter, sessions),
@@ -822,8 +804,7 @@ def _set_glob_filter_for_camera(glob_filter):
     imgui.text_unformatted("the selected paths (leave empty to not filter)")
     imgui.dummy((0,1.5*imgui.get_style().item_spacing.y))
     full_width = imgui.get_content_region_avail().x
-    imgui.push_item_width(full_width*.4)
-    imgui.set_cursor_pos_x(full_width*.3)
+    imgui.push_item_width(full_width*.8)
     _, glob_filter = imgui.input_text('##file_filter', glob_filter)
     imgui.pop_item_width()
     imgui.dummy((0,2*imgui.get_style().item_spacing.y))
@@ -868,8 +849,6 @@ def add_recordings(g, paths: list[pathlib.Path], sessions: list[str]):
             glob_filter = _set_glob_filter_for_camera(glob_filter)
 
         imgui.end_group()
-        imgui.same_line(spacing=spacing)
-        imgui.dummy((0, 0))
 
         return combo_value, dev_type
 
