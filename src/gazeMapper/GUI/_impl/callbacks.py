@@ -474,9 +474,18 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
     gt_gui.utils.push_popup(g, lambda: gt_gui.utils.popup(f"Set what to export", set_export_config_popup, buttons = buttons, closable=True, outside=False))
 
 
-async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[recording.Recording|camera_recording.Recording]], dev_lbl: str, dev_type: session.RecordingType, sessions: list[str]):
+async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[recording.Recording|camera_recording.Recording]], dev_type: session.RecordingType, dev: eyetracker.EyeTracker|None, sessions: list[str], generic_device_name: str=None):
     from . import gui
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
+
+    if dev_type==session.RecordingType.Camera:
+        dev_rec_lbl = 'Camera recordings'
+    else:
+        if dev==eyetracker.EyeTracker.Generic:
+            dev_rec_lbl = f'generic recordings for a {generic_device_name} eye tracker'
+        else:
+            dev_rec_lbl = f'{dev.value} eye tracker recordings'
+
     # notify we're preparing the recordings to be opened
     def prepping_recs_popup():
         spacing = 2 * imgui.get_style().item_spacing.x
@@ -488,7 +497,7 @@ async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[record
 
         imgui.begin_group()
         imgui.dummy((0,2*imgui.get_style().item_spacing.y))
-        text = f'Searching the path(s) you provided for {dev_lbl} recordings.'
+        text = f'Searching the path(s) you provided for {dev_rec_lbl}.'
         imgui.text_unformatted(text)
         imgui.dummy((0,3*imgui.get_style().item_spacing.y))
         text_size = imgui.calc_text_size(text)
@@ -523,10 +532,10 @@ async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[record
     # 2. if nothing importable found, notify
     if not all_recs:
         if dup_recs:
-            msg = f"{dev_lbl} recordings were found in the specified import paths, but could not be imported as they are already part of sessions in this gazeMapper project."
+            msg = f"{dev_rec_lbl} were found in the specified import paths, but could not be imported as they are already part of sessions in this gazeMapper project."
             more= "Duplicates that were not imported:\n"+('\n'.join([str(r.source_directory) for r in dup_recs]))
         else:
-            msg = f"No {dev_lbl} recordings were found among the specified import paths."
+            msg = f"No {dev_rec_lbl} were found among the specified import paths."
             more = None
 
         gt_gui.utils.push_popup(g, gt_gui.msg_box.msgbox, "Nothing to import", msg, gt_gui.msg_box.MsgBox.warn, more=more)
@@ -659,12 +668,12 @@ async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[record
         imgui.end_child()
 
     buttons = {
-        ifa6.ICON_FA_CHECK+" Continue": lambda: async_thread.run(_import_recordings(g, recordings_to_add, recording_assignment)),
+        ifa6.ICON_FA_CHECK+" Continue": lambda: async_thread.run(_import_recordings(g, recordings_to_add, recording_assignment, generic_device_name)),
         ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
     }
     gt_gui.utils.push_popup(g, lambda: gt_gui.utils.popup("Assign and import recordings", list_recs_popup, buttons = buttons, closable=True, outside=False))
 
-async def _import_recordings(g, recordings: list[recording.Recording|camera_recording.Recording], recording_assignment: dict[str, dict[str, int]]):
+async def _import_recordings(g, recordings: list[recording.Recording|camera_recording.Recording], recording_assignment: dict[str, dict[str, int]], generic_device_name: str|None):
     from . import gui
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
     for s in recording_assignment:
@@ -676,7 +685,7 @@ async def _import_recordings(g, recordings: list[recording.Recording|camera_reco
             # first create recording only in memory
             sess.add_recording_from_info(r, rec)
             # then launch import task
-            g.launch_task(s, r, process.Action.IMPORT)
+            g.launch_task(s, r, process.Action.IMPORT, generic_device_name=generic_device_name)
 
 def draw_filterbar(g, filter_box_text: str, require_sort: bool):
     from . import gui
@@ -705,11 +714,14 @@ def add_eyetracking_recordings(g, paths: list[pathlib.Path], sessions: list[str]
     from . import gui
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
     combo_value = 0
+    invalid = False
+    generic_et_idx = -1
+    generic_et_name = ''
     eye_tracker = eyetracker.EyeTracker(eyetracker.eye_tracker_names[combo_value])
     sessions = get_and_filter_eligible_sessions(g, sessions, session.RecordingType.Eye_Tracker)
 
     def add_recs_popup():
-        nonlocal combo_value, eye_tracker
+        nonlocal combo_value, eye_tracker, generic_et_idx, generic_et_name
         spacing = 2 * imgui.get_style().item_spacing.x
         color = (0.45, 0.09, 1.00, 1.00)
         imgui.push_font(g._icon_font)
@@ -725,18 +737,37 @@ def add_eyetracking_recordings(g, paths: list[pathlib.Path], sessions: list[str]
         imgui.push_item_width(full_width*.4)
         imgui.set_cursor_pos_x(full_width*.3)
         changed, combo_value = imgui.combo("##select_eye_tracker", combo_value, eyetracker.eye_tracker_names)
-        imgui.pop_item_width()
-        imgui.dummy((0,2*imgui.get_style().item_spacing.y))
-
-        imgui.end_group()
-
         if changed:
             eye_tracker = eyetracker.EyeTracker(eyetracker.eye_tracker_names[combo_value])
+        imgui.pop_item_width()
+        imgui.dummy((0,2*imgui.get_style().item_spacing.y))
+        if eye_tracker==eyetracker.EyeTracker.Generic:
+            imgui.text_unformatted("Choose which generic eye tracker you want")
+            imgui.text_unformatted("to import data for:")
+            imgui.dummy((0,1.5*imgui.get_style().item_spacing.y))
+            invalid = not g.study_config.import_known_custom_eye_trackers
+            if invalid:
+                imgui.push_style_color(imgui.Col_.text, colors.error)
+                imgui.text("No custom eye trackers configured, fix project settings")
+                imgui.pop_style_color()
+            else:
+                full_width = imgui.get_content_region_avail().x
+                imgui.set_cursor_pos_x(full_width*.3)
+                imgui.push_item_width(full_width*.6)
+                changed, generic_et_idx = imgui.combo('##generic_et_name_selector', generic_et_idx, g.study_config.import_known_custom_eye_trackers)
+                if changed:
+                    generic_et_name = g.study_config.import_known_custom_eye_trackers[generic_et_idx]
+                imgui.pop_item_width()
+            imgui.dummy((0,2*imgui.get_style().item_spacing.y))
+        else:
+            invalid = False
+
+        imgui.end_group()
 
         return combo_value, eye_tracker
 
     buttons = {
-        ifa6.ICON_FA_CHECK+" Continue": lambda: async_thread.run(_show_addable_recordings(g, lambda: recording.find_recordings(paths, eye_tracker), eye_tracker.value, session.RecordingType.Eye_Tracker, sessions)),
+        ifa6.ICON_FA_CHECK+" Continue": (lambda: async_thread.run(_show_addable_recordings(g, lambda: recording.find_recordings(paths, eye_tracker, generic_et_name), session.RecordingType.Eye_Tracker, eye_tracker, sessions, generic_et_name)), lambda: invalid or generic_et_idx==-1),
         ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
     }
 
@@ -772,7 +803,7 @@ def add_camera_recordings(g, paths: list[pathlib.Path], glob_filter: str, sessio
     from . import gui
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
     sessions = get_and_filter_eligible_sessions(g, sessions, session.RecordingType.Camera)
-    async_thread.run(_show_addable_recordings(g, lambda: _find_camera_recordings(paths, glob_filter), 'Camera', session.RecordingType.Camera, sessions))
+    async_thread.run(_show_addable_recordings(g, lambda: _find_camera_recordings(paths, glob_filter), session.RecordingType.Camera, None, sessions))
 
 def _find_camera_recordings(paths: list[pathlib.Path], glob_filter: str) -> list[camera_recording.Recording]:
     extensions = {'.'+x.strip('.* ') for x in glob_filter.split(',')}

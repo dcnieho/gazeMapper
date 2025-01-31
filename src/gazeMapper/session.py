@@ -140,7 +140,7 @@ class Session:
         if not (self.working_directory/Session.status_file_name).is_file():
             _create_action_states_file(self.working_directory, False)
 
-    def import_recording(self, which: str, cam_cal_file: str|pathlib.Path=None, **kwargs):
+    def import_recording(self, which: str, cam_cal_file: str|pathlib.Path=None, generic_device_name: str=None, **kwargs):
         from . import config
         rec_def = self.definition.get_recording_def(which)
         config_dir = config.guess_config_dir(self.working_directory)
@@ -153,7 +153,7 @@ class Session:
             # get default calibration file, if there is one
             cam_cal_file = self.recordings[which].definition.get_default_cal_file(config_dir)
         if rec_def.type==RecordingType.Eye_Tracker:
-            rec_info = importing.do_import(rec_info=rec_info, copy_scene_video=study_config.import_do_copy_video, source_dir_as_relative_path=study_config.import_source_dir_as_relative_path, cam_cal_file=cam_cal_file)
+            rec_info = importing.do_import(rec_info=rec_info, copy_scene_video=study_config.import_do_copy_video, source_dir_as_relative_path=study_config.import_source_dir_as_relative_path, cam_cal_file=cam_cal_file, device_name=generic_device_name)
         else:
             rec_info = camera_recording.do_import(rec_info=rec_info, copy_video=study_config.import_do_copy_video, source_dir_as_relative_path=study_config.import_source_dir_as_relative_path, cam_cal_file=cam_cal_file)
         self.update_recording_info(which, rec_info)    # the import call may have updated the info (e.g. filled in recording length that wasn't known from metadata). Update what we hold in memory

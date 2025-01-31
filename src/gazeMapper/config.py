@@ -69,6 +69,7 @@ class Study:
                  # setup with defaults
                  import_do_copy_video                           : bool                              = True,
                  import_source_dir_as_relative_path             : bool                              = False,
+                 import_known_custom_eye_trackers               : list[str]|None                    = None,
 
                  sync_ref_recording                             : str|None                          = None,
                  sync_ref_do_time_stretch                       : bool|None                         = None,
@@ -130,6 +131,7 @@ class Study:
 
         self.import_do_copy_video                           = import_do_copy_video
         self.import_source_dir_as_relative_path             = import_source_dir_as_relative_path
+        self.import_known_custom_eye_trackers               = import_known_custom_eye_trackers
 
         self.get_cam_movement_for_et_sync_method            = get_cam_movement_for_et_sync_method
         self.get_cam_movement_for_et_sync_function          = get_cam_movement_for_et_sync_function
@@ -579,6 +581,7 @@ study_parameter_doc = {
     }),
     'import_do_copy_video': type_utils.GUIDocInfo('Copy video during import?', 'If not enabled, the scene video of an eye tracker recording, or the video of an external camera is not copied to the gazeMapper recording directory during import. Instead, the video will be loaded from the recording\'s source directory (so do not move it). Ignored when the video must be transcoded to be processed with gazeMapper.'),
     'import_source_dir_as_relative_path': type_utils.GUIDocInfo('Store source directory as relative path?', 'Specifies whether the path to the source directory stored in the recording info file is an absolute path (this option is not enabled) or a relative path (enabled). If a relative path is used, the imported recording and the source directory can be moved to another location, and the source directory can still be found as long as the relative path (e.g., one folder up and in the directory "original recordings": "../original recordings") doesn\'t change.'),
+    'import_known_custom_eye_trackers': type_utils.GUIDocInfo('Registered custom eye trackers', 'gazeMapper allows importing generic eye trackers for which no specific support is implemented, if their recording data is preprocessed to conform to glassesTools\' generic data format. Here you can define specific known generic eye tracker names that you may import.'),
     'sync_ref_recording': type_utils.GUIDocInfo('Synchronization: Reference recording', 'If there are multiple recordings, sets to which recording all other recordings will be synchronized.'),
     'sync_ref_do_time_stretch': type_utils.GUIDocInfo('Synchronization: Do time stretch?', 'If enabled, multiple sync points are used to calculate a time stretch factor to compensate for clock drift when synchronizing multiple recordings.'),
     'sync_ref_stretch_which': type_utils.GUIDocInfo('Synchronization: Stretch which recording', 'Which recording(s) should be corrected for clock drift if "Synchronization: Do time stretch?" is enabled.',{
@@ -704,7 +707,7 @@ class StudyOverride:
     def get_allowed_parameters(level: OverrideLevel, recording_type: session.RecordingType|None = None) -> tuple[list[str],set[str]]:
         # NB: list instead of set as want to keep ordering
         all_params = list(study_parameter_types.keys())
-        exclude = {'self', 'session_def', 'planes', 'individual_markers', 'working_directory'}
+        exclude = {'self', 'session_def', 'planes', 'individual_markers', 'working_directory', 'import_known_custom_eye_trackers'}
         # above is Session-level disallowed parameters. Depending on level, disallow more
         if level in [OverrideLevel.Recording, OverrideLevel.FunctionArgs]:
             # these make no sense on a recording level as they are settings for
