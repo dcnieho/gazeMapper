@@ -367,7 +367,7 @@ class GUI:
                             # some other folder apparently
                             return
                         if change_type=='deleted':
-                            self.sessions[sess].recordings.pop(rec)
+                            self.sessions[sess].recordings.pop(rec, None)
                             if sess in self._selected_recordings:
                                 self._selected_recordings[sess].pop(rec, None)
                         elif rec not in self.sessions[sess].recordings: # don't replace if already present
