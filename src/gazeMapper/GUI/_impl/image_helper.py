@@ -32,11 +32,11 @@ class ImageHelper:
         if largest is not None:
             aspect_ratio = self.width/self.height
             if aspect_ratio>1:
-                width       = largest
-                height      = math.ceil(largest/aspect_ratio)
+                width   = largest
+                height  = math.ceil(largest/aspect_ratio)
             else:
-                width       = math.ceil(largest*aspect_ratio)
-                height      = largest
+                width   = math.ceil(largest*aspect_ratio)
+                height  = largest
         if width is None or height is None:
             raise ValueError()
         if imgui.is_rect_visible((width, height)):
