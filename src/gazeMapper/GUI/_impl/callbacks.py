@@ -739,6 +739,10 @@ def add_eyetracking_recordings(g, paths: list[pathlib.Path], sessions: list[str]
         changed, combo_value = imgui.combo("##select_eye_tracker", combo_value, eyetracker.eye_tracker_names)
         if changed:
             eye_tracker = eyetracker.EyeTracker(eyetracker.eye_tracker_names[combo_value])
+            if eye_tracker!=eyetracker.EyeTracker.Generic:
+                invalid = False
+                generic_et_idx = -1
+                generic_et_name
         imgui.pop_item_width()
         imgui.dummy((0,2*imgui.get_style().item_spacing.y))
         if eye_tracker==eyetracker.EyeTracker.Generic:
@@ -759,15 +763,13 @@ def add_eyetracking_recordings(g, paths: list[pathlib.Path], sessions: list[str]
                     generic_et_name = g.study_config.import_known_custom_eye_trackers[generic_et_idx]
                 imgui.pop_item_width()
             imgui.dummy((0,2*imgui.get_style().item_spacing.y))
-        else:
-            invalid = False
 
         imgui.end_group()
 
         return combo_value, eye_tracker
 
     buttons = {
-        ifa6.ICON_FA_CHECK+" Continue": (lambda: async_thread.run(_show_addable_recordings(g, lambda: recording.find_recordings(paths, eye_tracker, generic_et_name), session.RecordingType.Eye_Tracker, eye_tracker, sessions, generic_et_name)), lambda: invalid or generic_et_idx==-1),
+        ifa6.ICON_FA_CHECK+" Continue": (lambda: async_thread.run(_show_addable_recordings(g, lambda: recording.find_recordings(paths, eye_tracker, generic_et_name), session.RecordingType.Eye_Tracker, eye_tracker, sessions, generic_et_name)), lambda: invalid or (eye_tracker==eyetracker.EyeTracker.Generic and generic_et_idx==-1)),
         ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
     }
 
