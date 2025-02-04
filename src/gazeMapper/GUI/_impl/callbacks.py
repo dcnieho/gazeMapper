@@ -514,12 +514,14 @@ async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[record
     recs = rec_getter()
     all_recs: list[recording.Recording] = []
     dup_recs: list[recording.Recording] = []
+    known_rec_dirs = [g.sessions[s].recordings[r].info.source_directory for s in g.sessions for r in g.sessions[s].recordings if g.sessions[s].recordings[r].definition.type==dev_type]
+    known_rec_names= [g.sessions[s].recordings[r].info.name for s in g.sessions for r in g.sessions[s].recordings if g.sessions[s].recordings[r].definition.type==dev_type]
     for rec in recs:
         # skip duplicates. For eye tracker recordings, this checks for the source folder. For camera recordings, its checks for the full file path
         if dev_type==session.RecordingType.Camera:
             dup = rec.source_directory/rec.video_file in (g.sessions[s].recordings[r].info.source_directory/g.sessions[s].recordings[r].info.video_file for s in g.sessions for r in g.sessions[s].recordings if g.sessions[s].recordings[r].definition.type==dev_type)
         elif dev_type==session.RecordingType.Eye_Tracker:
-            dup = rec.source_directory in (g.sessions[s].recordings[r].info.source_directory for s in g.sessions for r in g.sessions[s].recordings if g.sessions[s].recordings[r].definition.type==dev_type)
+            dup = any([a and b for a,b in zip([rec.source_directory==d for d in known_rec_dirs],[rec.name==n for n in known_rec_names])])
         if dup:
             dup_recs.append(rec)
         else:
