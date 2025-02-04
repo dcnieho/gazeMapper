@@ -55,8 +55,11 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, s
             episodes[annotation.Event.Trial] = synchronization.get_episode_frame_indices_from_ref(working_dir, annotation.Event.Trial, rec_def.name, study_config.sync_ref_recording, all_recs, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings, study_config.sync_ref_stretch_which)
 
     # we transform to map to plane for validate and trial episodes, set it up
+    episodes_to_proc = [annotation.Event.Validate, annotation.Event.Trial]
+    if annotation.Event.Sync_ET_Data in study_config.episodes_to_code and study_config.get_cam_movement_for_et_sync_method=='plane':
+        episodes_to_proc.append(annotation.Event.Sync_ET_Data)
     mapping_setup: dict[str, list[list[int]]] = {}
-    for e in [annotation.Event.Validate, annotation.Event.Trial]:
+    for e in episodes_to_proc:
         if e in study_config.planes_per_episode:
             for p in study_config.planes_per_episode[e]:
                 if p not in mapping_setup:
@@ -95,6 +98,6 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, s
     worldgaze_gui.show_visualization(
         in_video, working_dir / gt_naming.frame_timestamps_fname, working_dir / gt_naming.scene_camera_calibration_fname,
         planes, poses, head_gazes, plane_gazes,
-        {e:episodes[e] for e in [annotation.Event.Validate, annotation.Event.Trial] if e in episodes},
+        {e:episodes[e] for e in episodes_to_proc if e in episodes},
         gui, show_planes, show_only_intervals, 8
     )
