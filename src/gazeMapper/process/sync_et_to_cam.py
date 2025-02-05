@@ -1,5 +1,4 @@
 import pathlib
-import time
 import numpy as np
 import pandas as pd
 import polars as pl
@@ -111,8 +110,6 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     has_requested_focus = not isMacOS # False only if on Mac OS, else True since its a no-op
     ival = 0
     need_to_load = True
-    while not gui.is_started:
-        time.sleep(0.01)
     while True:
         if not has_requested_focus:
             AppKit.NSApplication.sharedApplication().activateIgnoringOtherApps_(1)
