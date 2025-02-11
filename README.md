@@ -32,7 +32,7 @@ For users on Windows, Mac or Linux who wish to use gazeMapper *in their Python c
 gazeMapper is to install it directly into your Python distribution using the command
 `python -m pip install gazeMapper`.
 If you run into problems on MacOS to install the `imgui_bundle` package, you can
-try to install it first with the command `SYSTEM_VERSION_COMPAT=0 pip install --only-binary=:all: imgui_bundle`. Note that this repository is pip-installable as well:
+try to install it first with the command `SYSTEM_VERSION_COMPAT=0 pip install --only-binary=:all: imgui_bundle==1.6.2`. Note that this repository itself is pip-installable as well:
 `python -m pip install git+https://github.com/dcnieho/gazeMapper.git#egg=gazeMapper`. NB: on some platforms you may have
 to replace `python` with `python3` in the above command lines.
 
