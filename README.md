@@ -62,14 +62,14 @@ Note that it is critical on MacOS that gazeMapper is installed natively, and not
 3. You now first need to make an environment with the correct Python version in which you can then install gazeMapper. To do so, type `conda create -n gazeMapper-env python=3.11 pip` and run the command. `gazeMapper-env` is the name of the environment you create with this comment.
 4. Activate the environment you have just created: `conda activate gazeMapper-env`.
 5. Now you need to install gazeMapper. Do the following in the below order:
-   a. Type and run `SYSTEM_VERSION_COMPAT=0 pip install --only-binary=:all: imgui_bundle==1.5.2`
+   a. Type and run `SYSTEM_VERSION_COMPAT=0 pip install --only-binary=:all: imgui_bundle==1.6.2`
    b. Type and run `pip install gazeMapper`.
 
 ### Updating gazeMapper
 If you already have gazeMapper installed but want to update it to the latest version, do the following:
 1. Open the Terminal application.
 2. Activate the environment in which you have gazeMapper installed: type and run `conda activate gazeMapper-env`, where `gazeMapper-env` is the name of the environment you created using the above instructions. If you use an environment with a different name, replace the name in the command.
-3. Type and run `SYSTEM_VERSION_COMPAT=0 pip install --only-binary=:all: imgui_bundle==1.5.2`
+3. Type and run `SYSTEM_VERSION_COMPAT=0 pip install --only-binary=:all: imgui_bundle==1.6.2`
 4. Type and run `pip install gazeMapper --upgrade`.
 
 ### Running gazeMapper
