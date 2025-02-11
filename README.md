@@ -52,18 +52,18 @@ Once pip-installed in your Python distribution, there are three ways to run the 
 
 ## Complete instructions for MacOS
 Installing and running gazeMapper on a Mac will involve some use of the terminal. In this section we will show you step by step how to install, and then what to do every time you want to run gazeMapper.
-Note that it is critical on MacOS that gazeMapper is installed natively, and not under Rosetta or Parallels. That will lead to an error when importing the `polars` package, and other unfixable errors.
+Note that it is critical on MacOS that gazeMapper is installed natively, and not under Rosetta or Parallels. That will lead to an error when importing the `polars` package, and other unfixable errors. If you are not sure what kind of system you have, consult [this page](https://support.apple.com/en-us/116943) to learn how to find out.
 ### Installing gazeMapper
 1. To acquire and manage Python, install Anaconda by following [these instructions](https://docs.anaconda.com/anaconda/install/mac-os/). Additional notes:
-   a. Choose the graphical installer.
-   b. When clicking the installer link provided in these instructions, you may first be shown a user registration page. You can click "skip registration" there to directly go to the download files.
-   c. Ensure that you choose the correct installer for your system (Intel or Apple Silicon). If you are not sure what kind of system you have, consult [this page](https://support.apple.com/en-us/116943) to learn how to find out.
-2. Once anaconda is installed, open the Terminal application.
-3. You now first need to make an environment with the correct Python version in which you can then install gazeMapper. To do so, type `conda create -n gazeMapper-env python=3.11 pip` and run the command. `gazeMapper-env` is the name of the environment you create with this comment.
-4. Activate the environment you have just created: `conda activate gazeMapper-env`.
-5. Now you need to install gazeMapper. Do the following in the below order:
-   a. Type and run `SYSTEM_VERSION_COMPAT=0 pip install --only-binary=:all: imgui_bundle==1.6.2`
-   b. Type and run `pip install gazeMapper`.
+   1. Choose the graphical installer.
+   1. When clicking the installer link provided in these instructions, you may first be shown a user registration page. You can click "skip registration" there to directly go to the download files.
+   1. Ensure that you choose the correct installer for your system (Intel or Apple Silicon). If you are not sure what kind of system you have, consult [this page](https://support.apple.com/en-us/116943) to learn how to find out.
+3. Once anaconda is installed, open the Terminal application.
+4. You now first need to make an environment with the correct Python version in which you can then install gazeMapper. To do so, type `conda create -n gazeMapper-env python=3.11 pip` and run the command. `gazeMapper-env` is the name of the environment you create with this comment.
+5. Activate the environment you have just created: `conda activate gazeMapper-env`.
+6. Now you need to install gazeMapper. Do the following in the below order:
+   1. Type and run `SYSTEM_VERSION_COMPAT=0 pip install --only-binary=:all: imgui_bundle==1.6.2`
+   1. Type and run `pip install gazeMapper`.
 
 ### Updating gazeMapper
 If you already have gazeMapper installed but want to update it to the latest version, do the following:
