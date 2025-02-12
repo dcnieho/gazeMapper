@@ -781,7 +781,7 @@ def add_eyetracking_recordings(g, paths: list[pathlib.Path], sessions: list[str]
 def camera_show_glob_filter_config(g, paths, sessions):
     from . import gui
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
-    glob_filter = '*.mp4,*.mov,*.avi'
+    glob_filter = '*.mp4,*.mov,*.avi,*.mkv'
 
     def setting_popup():
         nonlocal glob_filter
@@ -857,7 +857,7 @@ def add_recordings(g, paths: list[pathlib.Path], sessions: list[str]):
         return
     combo_value = 0
     dev_type = options[combo_value]
-    glob_filter = '*.mp4,*.mov,*.avi'
+    glob_filter = '*.mp4,*.mov,*.avi,*.mkv'
 
     def choose_dev_popup():
         nonlocal combo_value, dev_type, glob_filter
