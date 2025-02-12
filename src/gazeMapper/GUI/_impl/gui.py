@@ -448,8 +448,8 @@ class GUI:
             lbl = f'session "{job.session}"'
             if not session_level:
                 lbl += f', recording "{job.recording}"'
-            lbl += f' (work item {job_id}, action {job.action.displayable_name})'
-            gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Processing error", f"Something went wrong in a worker process for {lbl}:\n\n{tb}", gt_gui.msg_box.MsgBox.error)
+            lbl_complete = lbl + f' (work item {job_id}, action {job.action.displayable_name})'
+            gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Processing error", f"An error occurred when processing {lbl}:\n\n{exc}", gt_gui.msg_box.MsgBox.error, more=f'{lbl_complete}\n\n{tb}')
             self.job_scheduler.jobs[job_id].error = tb
 
         # clean up, if needed, when a task failed or was canceled
