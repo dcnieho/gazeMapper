@@ -99,7 +99,7 @@ def action_to_func(action: Action) -> typing.Callable[..., None]:
         case Action.MAKE_VIDEO:
             return make_video
         case _:
-            raise NotImplementedError(f'Logic is not implemented for {action}, major developer oversight! Let him know.')
+            raise NotImplementedError(f'Logic is not implemented for {action.displayable_name} ({action}), major developer oversight! Let him know.')
 
 def is_session_level_action(action: Action) -> bool:
     return action in [Action.SYNC_TO_REFERENCE, Action.EXPORT_TRIALS, Action.MAKE_VIDEO]
@@ -178,7 +178,7 @@ def _determine_to_invalidate(action: Action, study_config: 'config.Study') -> se
         case Action.MAKE_VIDEO:
             return set()
         case _:
-            raise NotImplementedError(f'Logic is not implemented for {action}, major developer oversight! Let him know.')
+            raise NotImplementedError(f'Logic is not implemented for {action.displayable_name} ({action}), major developer oversight! Let him know.')
 
 def action_update_and_invalidate(action: Action, state: State, study_config: 'config.Study') -> dict[Action, State]:
     # set status of indicated task
@@ -220,7 +220,7 @@ def _is_recording_action_possible(rec: str, action_states: dict[Action, State], 
         case Action.RUN_VALIDATION:
             preconditions.update([Action.CODE_EPISODES, Action.GAZE_TO_PLANE])
         case _:
-            raise NotImplementedError(f'Logic is not implemented for {action}, major developer oversight! Let him know.')
+            raise NotImplementedError(f'Logic is not implemented for {action.displayable_name} ({action}), major developer oversight! Let him know.')
 
     # check that preconditions are met
     return all((action_states[p]==State.Completed for p in preconditions))
@@ -252,7 +252,7 @@ def _is_session_action_possible(session_action_states: dict[Action, State], reco
             elif study_config.get_cam_movement_for_et_sync_method in ['plane', 'function']:
                 preconditions.add(Action.SYNC_ET_TO_CAM)
         case _:
-            raise NotImplementedError(f'Logic is not implemented for {action}, major developer oversight! Let him know.')
+            raise NotImplementedError(f'Logic is not implemented for {action.displayable_name} ({action}), major developer oversight! Let him know.')
 
     precond_met = []
     for p in preconditions:
