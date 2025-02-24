@@ -264,6 +264,10 @@ def show_action_options(g, session_name: str, rec_name: str|None, action: proces
     # NB: `show_visualization` is always an option, the others below are
     # shown when `show_visualization` is true (else they don't apply)
     match action:
+        case process.Action.GAZE_OVERLAY_VIDEO:
+            options = {'show_visualization': [
+                    False, 'Show visualization', 'Show a viewer that allows to follow the generation of the video. Each frame is shown with gaze overlaid as it is written into the video file.'
+                ]}
         case process.Action.DETECT_MARKERS:
             options = {'show_visualization': [
                     False, 'Show visualization', 'Show a viewer that allows to follow the processing of the video. Each frame is shown overlaid with info about detected markers and planes.'

@@ -18,6 +18,7 @@ utils.register_type(utils.CustomTypeEntry(State,'__enum.process.State__', utils.
 
 class Action(enum.IntEnum):
     IMPORT = enum.auto()
+    GAZE_OVERLAY_VIDEO = enum.auto()
     CODE_EPISODES = enum.auto()
     DETECT_MARKERS = enum.auto()
     GAZE_TO_PLANE = enum.auto()
@@ -36,7 +37,7 @@ class Action(enum.IntEnum):
         return self in [Action.CODE_EPISODES, Action.SYNC_ET_TO_CAM]
     @property
     def has_options(self):
-        return self in [Action.DETECT_MARKERS, Action.GAZE_TO_PLANE, Action.MAKE_VIDEO]
+        return self in [Action.GAZE_OVERLAY_VIDEO, Action.DETECT_MARKERS, Action.GAZE_TO_PLANE, Action.MAKE_VIDEO]
     def succ(self):
         v = self.value+1
         if v > Action.MAKE_VIDEO.value:
@@ -64,6 +65,7 @@ utils.register_type(utils.CustomTypeEntry(Action, '__enum.process.Action__', uti
 def action_to_func(action: Action) -> typing.Callable[..., None]:
     # Returns function to perform the provided action. NB: not for Action.IMPORT,
     # needs its own special handling by caller instead
+    from .gaze_overlay_video import run as gaze_overlay_video
     from .code_episodes import run as do_coding
     from .detect_markers import run as detect_markers
     from .sync_et_to_cam import run as sync_et_to_cam
@@ -78,6 +80,8 @@ def action_to_func(action: Action) -> typing.Callable[..., None]:
     match action:
         case Action.IMPORT:
             return None # Needs a special case handled by the caller
+        case Action.GAZE_OVERLAY_VIDEO:
+            return gaze_overlay_video
         case Action.CODE_EPISODES:
             return do_coding
         case Action.DETECT_MARKERS:
@@ -127,7 +131,7 @@ def is_action_possible_given_config(action: Action, study_config: 'config.Study'
 
 def is_action_possible_for_recording(rec: str, rec_type: 'session.RecordingType', action: Action, study_config: 'config.Study') -> bool:
     from .. import session
-    if rec_type==session.RecordingType.Camera and action in [Action.GAZE_TO_PLANE, Action.SYNC_ET_TO_CAM, Action.RUN_VALIDATION]:
+    if rec_type==session.RecordingType.Camera and action in [Action.GAZE_OVERLAY_VIDEO, Action.GAZE_TO_PLANE, Action.SYNC_ET_TO_CAM, Action.RUN_VALIDATION]:
         return False
     elif action==Action.AUTO_CODE_TRIALS and study_config.sync_ref_recording and rec!=study_config.sync_ref_recording:
         # if we have a sync_ref_recording, automatic coding of trials is only possible for the sync_ref_recording, not the other recordings
@@ -144,6 +148,8 @@ def _determine_to_invalidate(action: Action, study_config: 'config.Study') -> se
     match action:
         case Action.IMPORT:
             return action.next_values()
+        case Action.GAZE_OVERLAY_VIDEO:
+            return set()
         case Action.CODE_EPISODES:
             actions = {a for a in action.next_values() if a not in [Action.AUTO_CODE_SYNC, Action.AUTO_CODE_TRIALS]}
             if study_config.auto_code_sync_points or study_config.auto_code_trial_episodes:
@@ -202,6 +208,8 @@ def _is_recording_action_possible(rec: str, action_states: dict[Action, State], 
     match action:
         case Action.IMPORT:
             return action_states[Action.IMPORT]==State.Not_Run  # possible if not already imported
+        case Action.GAZE_OVERLAY_VIDEO:
+            pass    # nothing besides import
         case Action.CODE_EPISODES:
             pass    # nothing besides import
         case Action.DETECT_MARKERS:
