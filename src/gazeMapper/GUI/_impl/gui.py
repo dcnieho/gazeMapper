@@ -299,12 +299,12 @@ class GUI:
         # NB watcher filter is configured such that all adds and deletes are folder and all modifies are files of interest
         if change_type=='modified':
             # file: deal with status changes
-            def status_file_reloader(loader: Callable[[bool], None]):
+            def status_file_reloader(loader: Callable[[bool, bool], None]):
                 n_try=0
                 while n_try<3:
                     try:
                         n_try+=1
-                        loader(False)
+                        loader(False, False)
                     except:
                         time.sleep(.1)  # file possibly not fully written yet
                     else:
@@ -475,9 +475,9 @@ class GUI:
                 # hold in memory. NB: must be loaded from file as recording update is run in a different process
                 rec_info = sess.load_recording_info(job.recording)
                 sess.update_recording_info(job.recording, rec_info)
-            rec.load_action_states(False)
+            rec.load_action_states(False, False)
         else:
-            sess.load_action_states(False)
+            sess.load_action_states(False, False)
 
     def load_project(self, path: pathlib.Path):
         self.project_dir = path

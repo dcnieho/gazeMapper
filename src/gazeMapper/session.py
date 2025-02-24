@@ -56,10 +56,10 @@ class Recording:
             # don't create action states file if this recording only exists in memory (still needs to be imported)
             self.state = _get_not_run_action_states(True)
         else:
-            self.load_action_states(True)
+            self.load_action_states(True, True)
 
-    def load_action_states(self, create_if_missing: bool):
-        self.state |= get_action_states(self.info.working_directory, for_recording=True, create_if_missing=create_if_missing)
+    def load_action_states(self, create_if_missing: bool, upgrade_if_needed: bool):
+        self.state |= get_action_states(self.info.working_directory, for_recording=True, create_if_missing=create_if_missing, upgrade_if_needed=upgrade_if_needed)
 utils.register_type(utils.CustomTypeEntry(Recording,'__session.Recording__',lambda x: {'defition': x.defition, 'info': x.info}, lambda x: Recording(**x)))
 
 def read_recording_info(working_dir: pathlib.Path, rec_type: RecordingType) -> tuple[EyeTrackerRecording|CameraRecording, pathlib.Path]:
@@ -131,7 +131,7 @@ class Session:
         self.recordings = recordings
 
         self.state: dict[process.Action, process.State] = {}
-        self.load_action_states(True)
+        self.load_action_states(True, True)
 
     def create_working_directory(self, parent_directory: str|pathlib.Path):
         self.working_directory = pathlib.Path(parent_directory) / self.name
@@ -160,7 +160,7 @@ class Session:
         # denote import finished
         _create_action_states_file(rec_info.working_directory, True)
         update_action_states(rec_info.working_directory, process.Action.IMPORT, process.State.Completed, study_config)
-        self.recordings[which].load_action_states(False)
+        self.recordings[which].load_action_states(False, False)
 
     def add_recording_and_import(self, which: str, rec_info: EyeTrackerRecording|CameraRecording, cam_cal_file: str|pathlib.Path=None, **kwargs) -> Recording:
         rec = self.add_recording_from_info(which, rec_info)
@@ -229,9 +229,9 @@ class Session:
         return [r.name for r in self.definition.recordings if r.name not in self.recordings and (rec_type is None or r.type==rec_type)]
 
     # state of processing actions on recordings in a session
-    def load_action_states(self, create_if_missing: bool):
+    def load_action_states(self, create_if_missing: bool, upgrade_if_needed: bool):
         if self.working_directory.is_dir():
-            self.state |= get_action_states(self.working_directory, for_recording=False, create_if_missing=create_if_missing)
+            self.state |= get_action_states(self.working_directory, for_recording=False, create_if_missing=create_if_missing, upgrade_if_needed=upgrade_if_needed)
 
     def is_action_completed(self, action: process.Action) -> bool:
         if process.is_session_level_action(action):
@@ -329,12 +329,28 @@ def _read_action_states(file: pathlib.Path) -> dict[process.Action, process.Stat
         action_states = json.load(f, object_hook=utils.json_reconstitute)
         return {getattr(process.Action, k.split('.')[-1]): process.State(action_states[k]) for k in action_states}  # turn key from string back into enum instance, and same for state value
 
-def get_action_states(working_dir: str|pathlib.Path, for_recording: bool, create_if_missing = False, skip_if_missing=False) -> dict[process.Action, process.State]:
+def _upgrade_action_states(file: pathlib.Path, action_states: dict[process.Action, process.State], for_recording: bool) -> dict[process.Action, process.State]:
+    if file.is_dir():
+        file /= _get_action_status_fname(for_recording)
+    expected_action_states = _get_not_run_action_states(for_recording)
+    # remove no longer available action_states
+    upgraded_action_states = {a:action_states[a] for a in action_states if a in expected_action_states}
+    # add missing action_states
+    upgraded_action_states |= {a:expected_action_states[a] for a in expected_action_states if a not in upgraded_action_states}
+    # store if anything has changed
+    if set(upgraded_action_states.keys())!=set(action_states.keys()):
+        _write_action_states_to_file(file, upgraded_action_states)
+    return upgraded_action_states
+
+def get_action_states(working_dir: str|pathlib.Path, for_recording: bool, create_if_missing = False, skip_if_missing=False, upgrade_if_needed=False) -> dict[process.Action, process.State]:
     working_dir = pathlib.Path(working_dir)
     file = working_dir / _get_action_status_fname(for_recording)
     action_states = _read_action_states(file)
 
-    if action_states is None:
+    if action_states is not None:
+        if upgrade_if_needed:
+            action_states = _upgrade_action_states(file, action_states, for_recording)
+    else:
         if create_if_missing:
             _create_action_states_file(file, for_recording)
             return _read_action_states(file)
