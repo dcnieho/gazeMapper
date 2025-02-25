@@ -1180,7 +1180,7 @@ class GUI:
     def _session_context_menu(self, session_name: str) -> bool:
         # ignore input session name, get selected sessions
         sess = [self.sessions[s] for s in self.sessions if self._selected_sessions.get(s,False)]
-        actions: dict[str, dict[process.Action, bool|list[str]]] = {}
+        actions: dict[str, dict[process.Action,tuple[bool|list[str],dict[process.Action,list[str]]]]] = {}
         actions_running: dict[str, dict[process.Action, bool|list[str]]] = {}
         for s in sess:
             cfg = self.session_config_overrides[s.name].apply(self.study_config, strict_check=False) if s.name in self.session_config_overrides else self.study_config
@@ -1193,6 +1193,7 @@ class GUI:
         for a in all_actions:
             running = [r for r in actions_running if a in actions_running[r]]
             if running:
+                possible = True
                 if process.is_session_level_action(a):
                     running = [(s,None) for s in actions_running if a in actions_running[s]]
                     hover_text = f'Cancel running {a.displayable_name} for session(s):\n- '+'\n- '.join([s for s in actions_running if a in actions_running[s]])
@@ -1203,17 +1204,29 @@ class GUI:
                 icon = ifa6.ICON_FA_HAND
             else:
                 if process.is_session_level_action(a):
-                    to_run = [(s,None) for s in actions if a in actions[s] and actions[s][a]]
-                    hover_text = f'Run {a.displayable_name} for session(s):\n- '+'\n- '.join([s for s in actions if a in actions[s] and actions[s][a]])
+                    to_run = [(s,None) for s in actions if a in actions[s] and actions[s][a][0]]
+                    possible = not not to_run
+                    if possible:
+                        hover_text = f'Run {a.displayable_name} for session(s):\n- '+'\n- '.join([s for s in actions if a in actions[s] and actions[s][a][0]])
+                    else:
+                        hover_text = process.get_impossible_reason_text(a, actions)
                     status = max([self.sessions[s].state[a] for s in actions])
                 else:
-                    to_run = [(s,r) for s in actions if a in actions[s] for r in actions[s][a]]
-                    hover_text = f'Run {a.displayable_name} for session(s):\n- '+'\n- '.join([f'{s}, recording(s):\n  - '+'\n  - '.join(actions[s][a]) for s in actions if a in actions[s] and actions[s][a]])
-                    status = max([self.sessions[s].recordings[r].state[a] for s in actions if a in actions[s] for r in actions[s][a]])
+                    to_run = [(s,r) for s in actions if a in actions[s] for r in actions[s][a][0]]
+                    possible = not not to_run
+                    if possible:
+                        hover_text = f'Run {a.displayable_name} for session(s):\n- '+'\n- '.join([f'{s}, recording(s):\n  - '+'\n  - '.join(actions[s][a][0]) for s in actions if a in actions[s] and actions[s][a][0]])
+                    else:
+                        hover_text = process.get_impossible_reason_text(a, actions)
+                    status = [self.sessions[s].recordings[r].state[a] for s in actions if a in actions[s] for r in actions[s][a][0]]
+                    status = max(status) if status else process.State.Not_Run
                 hover_text = hover_text.replace('Run Run','Run')    # deal with task called "Run Validation"
-                if a.has_options:
+                hover_text = hover_text.replace('run Run','run')    # deal with task called "Run Validation"
+                if a.has_options and possible:
                     hover_text += '\nShift-click to bring up a popup with configuration options for this run.'
                 icon = ifa6.ICON_FA_PLAY if status<process.State.Completed else ifa6.ICON_FA_ARROW_ROTATE_RIGHT
+            if not possible:
+                imgui.begin_disabled()
             if imgui.selectable(icon+f" {a.displayable_name}", False)[0]:
                 if running:
                     for s,r in running:
@@ -1233,6 +1246,8 @@ class GUI:
                                 callbacks.show_action_options(self, s, r, a)
                             else:
                                 self.launch_task(s, r, a)
+            if not possible:
+                imgui.end_disabled()
             gt_gui.utils.draw_hover_text(hover_text, '')
         # draw working folder interactions
         changed = False
@@ -1259,19 +1274,28 @@ class GUI:
         all_actions |= {a for r in actions_running for a in actions_running[r]}
         all_actions = [a for a in process.Action if a in all_actions]   # ensure order
         for a in all_actions:
-            to_run = [r for r in actions if a in actions[r]]
             running= [r for r in actions_running if a in actions_running[r]]
             if running:
+                possible = True
                 hover_text = f'Cancel running {a.displayable_name} for recordings:\n- '+'\n- '.join(running)
                 hover_text = hover_text.replace('running Run','Run')    # deal with task called "Run Validation"
                 icon = ifa6.ICON_FA_HAND
             else:
-                hover_text = f'Run {a.displayable_name} for recordings:\n- '+'\n- '.join(to_run)
-                hover_text = hover_text.replace('Run Run','Run')        # deal with task called "Run Validation"
-                status = max([sess.recordings[r].state[a] for r in to_run])
-                if a.has_options:
+                to_run = [r for r in actions if a in actions[r] and actions[r][a][0]]
+                possible = not not to_run
+                if possible:
+                    hover_text = f'Run {a.displayable_name} for recordings:\n- '+'\n- '.join(to_run)
+                    hover_text = hover_text.replace('Run Run','Run')        # deal with task called "Run Validation"
+                else:
+                    hover_text = process.get_impossible_reason_text(a, actions, for_recording=True)
+                    hover_text = hover_text.replace('run Run','run')    # deal with task called "Run Validation"
+                status = [sess.recordings[r].state[a] for r in to_run]
+                status = max(status) if status else process.State.Not_Run
+                if a.has_options and possible:
                     hover_text += '\nShift-click to bring up a popup with configuration options for this run.'
                 icon = ifa6.ICON_FA_PLAY if status<process.State.Completed else ifa6.ICON_FA_ARROW_ROTATE_RIGHT
+            if not possible:
+                imgui.begin_disabled()
             if imgui.selectable(icon+f" {a.displayable_name}##{session_name}", False)[0]:
                 if running:
                     for r in running:
@@ -1282,6 +1306,8 @@ class GUI:
                             callbacks.show_action_options(self, session_name, r, a)
                         else:
                             self.launch_task(session_name, r, a)
+            if not possible:
+                imgui.end_disabled()
             gt_gui.utils.draw_hover_text(hover_text, '')
         # draw source/working folder interactions
         source_directories = [sd for r in recs if (sd:=sess.recordings[r].info.source_directory).is_dir()]
@@ -1403,11 +1429,17 @@ class GUI:
                         hover_text = f'Cancel running {a.displayable_name} for session: {sess.name}'
                         icon = ifa6.ICON_FA_HAND
                     else:
-                        hover_text = f'Run {a.displayable_name} for session: {sess.name}'
-                        if a.has_options:
+                        possible = menu_actions[a][0]
+                        if possible:
+                            hover_text = f'Run {a.displayable_name} for session: {sess.name}'
+                        else:
+                            hover_text = process.get_impossible_reason_text(a, menu_actions, for_single=True)
+                        if a.has_options and possible:
                             hover_text += '\nShift-click to bring up a popup with configuration options for this run.'
                         status = self.sessions[sess.name].state[a]
                         icon = ifa6.ICON_FA_PLAY if status<process.State.Completed else ifa6.ICON_FA_ARROW_ROTATE_RIGHT
+                    if not possible:
+                        imgui.begin_disabled()
                     if imgui.selectable(icon+f" {a.displayable_name}##{sess.name}", False)[0]:
                         if a in menu_actions_running:
                             self.job_scheduler.cancel_job(menu_actions_running[a])
@@ -1421,6 +1453,8 @@ class GUI:
                                     callbacks.show_action_options(self, sess.name, None, a)
                                 else:
                                     self.launch_task(sess.name, None, a)
+                    if not possible:
+                        imgui.end_disabled()
                     gt_gui.utils.draw_hover_text(hover_text, '')
                     imgui.end_popup()
             imgui.end_table()

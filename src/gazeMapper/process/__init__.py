@@ -198,11 +198,11 @@ def action_update_and_invalidate(action: Action, state: State, study_config: 'co
 
     return action_state_mutations
 
-def _is_recording_action_possible(rec: str, action_states: dict[Action, State], study_config: 'config.Study', rec_type: 'session.RecordingType', action: Action):
+def _is_recording_action_possible(rec: str, action_states: dict[Action, State], study_config: 'config.Study', rec_type: 'session.RecordingType', action: Action) -> tuple[bool,list[Action]]:
     if not is_action_possible_given_config(action, study_config):
-        return False
+        return False, None
     elif not is_action_possible_for_recording(rec, rec_type, action, study_config):
-        return False
+        return False, None
 
     preconditions = {Action.IMPORT} # IMPORT is a precondition for all actions except IMPORT itself
     match action:
@@ -231,11 +231,12 @@ def _is_recording_action_possible(rec: str, action_states: dict[Action, State], 
             raise NotImplementedError(f'Logic is not implemented for {action.displayable_name} ({action}), major developer oversight! Let him know.')
 
     # check that preconditions are met
-    return all((action_states[p]==State.Completed for p in preconditions))
+    states = [action_states[p]==State.Completed for p in preconditions]
+    return all(states), [p for p,s in zip(preconditions,states) if not s]
 
-def _is_session_action_possible(session_action_states: dict[Action, State], recording_action_states: dict[str,dict[Action, State]], study_config: 'config.Study', rec_types: dict[str,'session.RecordingType'], action: Action):
+def _is_session_action_possible(session_action_states: dict[Action, State], recording_action_states: dict[str,dict[Action, State]], study_config: 'config.Study', rec_types: dict[str,'session.RecordingType'], action: Action) -> tuple[bool, list[Action]]:
     if not is_action_possible_given_config(action, study_config):
-        return False
+        return False, None
 
     preconditions = {Action.IMPORT} # IMPORT is a precondition for all actions
     match action:
@@ -262,16 +263,20 @@ def _is_session_action_possible(session_action_states: dict[Action, State], reco
         case _:
             raise NotImplementedError(f'Logic is not implemented for {action.displayable_name} ({action}), major developer oversight! Let him know.')
 
-    precond_met = []
+    precond_met: dict[Action,tuple[bool,list[str]]] = {}
     for p in preconditions:
         if is_session_level_action(p):
-            precond_met.append(session_action_states[p]==State.Completed)
+            met = session_action_states[p]==State.Completed
+            precond_met[p] = (met,None)
         else:
-            precond_met.append(all(((not is_action_possible_for_recording(r, rec_types[r], p, study_config)) or recording_action_states[r][p]==State.Completed for r in recording_action_states)))
+            met1 = [is_action_possible_for_recording(r, rec_types[r], p, study_config) for r in recording_action_states]
+            met2 = [recording_action_states[r][p]==State.Completed for r in recording_action_states]
+            met = [(not m1) or m2 for m1,m2 in zip(met1,met2)]    # not m1 because ignore if action isn't possible for that recording anyway
+            precond_met[p] = (all(met), [] if all(met) else [r for r,m1,m2 in zip(recording_action_states,met1,met2) if m1 and not m2])
 
-    return all(precond_met)
+    return all((precond_met[p][0] for p in precond_met)), {p: precond_met[p][1] for p in precond_met if not precond_met[p][0]}
 
-def get_possible_actions(session_action_states: dict[Action, State], recording_action_states: dict[str,dict[Action, State]], actions_to_check: set[Action], study_config: 'config.Study') -> dict[Action,bool|list[str]]:
+def get_possible_actions(session_action_states: dict[Action, State], recording_action_states: dict[str,dict[Action, State]], actions_to_check: set[Action], study_config: 'config.Study') -> dict[Action, tuple[bool|list[str], dict[Action,list[str]]]]:
     # determine based on actions_states which actions have all their preconditions met. Return a set containing just
     # those possible actions
     # actions_to_check can be a subset of all actions, if user e.g. knows some actions aren't possible or wanted due to settings
@@ -279,14 +284,55 @@ def get_possible_actions(session_action_states: dict[Action, State], recording_a
     merged_states = {r:session_action_states|recording_action_states[r] for r in recording_action_states}
     rec_types = {r.name:r.type for r in study_config.session_def.recordings}
 
-    possible_actions: dict[Action,bool|list[str]] = {}
+    possible_actions: dict[Action,tuple[bool|list[str],dict[Action,list[str]]]] = {}  # per action list if possible/recordings for which its possible, and also which preconditions are unmet
     for a in actions_to_check:
         if is_session_level_action(a):
-            if _is_session_action_possible(session_action_states, recording_action_states, study_config, rec_types, a):
-                possible_actions[a] = True
+            possible_actions[a] = _is_session_action_possible(session_action_states, recording_action_states, study_config, rec_types, a)
         else:
-            possible_recs = [r for r in merged_states if _is_recording_action_possible(r, merged_states[r], study_config, rec_types[r], a)]
-            if possible_recs:
-                possible_actions[a] = possible_recs
+            states = {r:_is_recording_action_possible(r, merged_states[r], study_config, rec_types[r], a) for r in merged_states}
+            possible_recs = [r for r in merged_states if states[r][0]]
+            fails = _get_precond_fails_for_rec(states)
+            if possible_recs or fails:
+                possible_actions[a] = possible_recs, fails
 
     return possible_actions
+
+def _get_precond_fails_for_rec(states: dict[str,tuple[bool,list[Action]]]) -> dict[Action,None|list[str]]:
+    out: dict[Action,None|list[str]] = {}
+    for r in states:
+        if states[r][0] or states[r][1] is None:
+            continue
+        for a in states[r][1]:
+            if is_session_level_action(a):
+                out[a] = None
+            elif a not in out:
+                out[a] = [r]
+            else:
+                out[a].append(r)
+    return out
+
+def get_impossible_reason_text(action: Action, states: dict[str, dict[Action,tuple[bool|list[str],dict[Action,list[str]]]]], for_recording=False, for_single=False) -> str:
+    reason = f'Cannot run {action.displayable_name} because required actions have not yet been run'
+    if for_single:
+        reason += f':\n{_get_impossible_reason_text_impl(states[action][1], "")}'
+    else:
+        reason += ' for the following '
+        if for_recording:
+            reason += 'recording(s):\n'
+        else:
+            reason += 'session(s):\n'
+        for s in states:
+            if action not in states[s]:
+                continue
+            ac = states[s][action][1]
+            reason += f'- {s}:\n{_get_impossible_reason_text_impl(ac, s)}'
+    return reason
+
+def _get_impossible_reason_text_impl(fails: dict[Action,list[str]], ref: str) -> str:
+    reason = ''
+    for a in fails:
+        reason += f'  - {a.displayable_name}'
+        if fails[a] is not None and (len(fails[a])>1 or fails[a][0]!=ref):
+            reason += f' ({", ".join(fails[a])})'
+        reason += '\n'
+    return reason
