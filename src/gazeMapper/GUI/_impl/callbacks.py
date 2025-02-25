@@ -264,7 +264,7 @@ def show_action_options(g, session_name: str, rec_name: str|None, action: proces
     # NB: `show_visualization` is always an option, the others below are
     # shown when `show_visualization` is true (else they don't apply)
     match action:
-        case process.Action.GAZE_OVERLAY_VIDEO:
+        case process.Action.MAKE_GAZE_OVERLAY_VIDEO:
             options = {'show_visualization': [
                     False, 'Show visualization', 'Show a viewer that allows to follow the generation of the video. Each frame is shown with gaze overlaid as it is written into the video file.'
                 ]}
@@ -282,7 +282,7 @@ def show_action_options(g, session_name: str, rec_name: str|None, action: proces
                 ], 'show_only_intervals': [
                     True, 'Show only intervals', 'Only the coded mapping episodes (if available) are shown in the viewer while the rest of the scene video is skipped past.'
                 ]}
-        case process.Action.MAKE_VIDEO:
+        case process.Action.MAKE_MAPPED_GAZE_VIDEO:
             options = {'show_visualization': [
                     False, 'Show visualization', 'The generated video(s) are shown in a viewer as they are created.'
                 ]}
@@ -342,7 +342,7 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
             to_export['validation'] = True
             rec_dirs.extend(recs)
         if 'video' not in to_export:
-            if s.state[process.Action.MAKE_VIDEO]==process.State.Completed:
+            if s.state[process.Action.MAKE_MAPPED_GAZE_VIDEO]==process.State.Completed:
                 to_export['video'] = True
 
     dq_df, dq_set = None, None

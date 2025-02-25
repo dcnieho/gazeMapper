@@ -53,4 +53,4 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     video_maker.process_video()
 
     # update state
-    session.update_action_states(working_dir, process.Action.GAZE_OVERLAY_VIDEO, process.State.Completed, study_config)
+    session.update_action_states(working_dir, process.Action.MAKE_GAZE_OVERLAY_VIDEO, process.State.Completed, study_config)
