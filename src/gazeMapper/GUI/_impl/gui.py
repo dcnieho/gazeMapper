@@ -1371,7 +1371,7 @@ class GUI:
                     if a not in actions_running:
                         actions_possible[a] = actions[a]
                     else:
-                        recs = [r for r in actions[a] if r not in actions_running[a]]
+                        recs = [r for r in actions[a][0] if r not in actions_running[a]]
                         if recs:
                             actions_possible[a] = recs
         return actions_possible, actions_running

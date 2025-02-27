@@ -289,7 +289,9 @@ def get_possible_actions(session_action_states: dict[Action, State], recording_a
     possible_actions: dict[Action,tuple[bool|list[str],dict[Action,list[str]]]] = {}  # per action list if possible/recordings for which its possible, and also which preconditions are unmet
     for a in actions_to_check:
         if is_session_level_action(a):
-            possible_actions[a] = _is_session_action_possible(session_action_states, recording_action_states, study_config, rec_types, a)
+            states = _is_session_action_possible(session_action_states, recording_action_states, study_config, rec_types, a)
+            if states[0] or states[1]:
+                possible_actions[a] = states
         else:
             states = {r:_is_recording_action_possible(r, merged_states[r], study_config, rec_types[r], a) for r in merged_states}
             possible_recs = [r for r in merged_states if states[r][0]]
