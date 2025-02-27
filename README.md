@@ -197,7 +197,7 @@ Example 1 is a minimum example, showing a short recording where a participant lo
 
     1. Next, run the `Gaze to plane` action.
     1. Next, run the `Validation` action.
-    1. Finally, run the `Make video` action, which draws the detected markers, the participant's gaze and the projection of that gaze to the plane on the scene video, along with information about the episode annotations.
+    1. Finally, run the `Make mapped gaze video` action, which draws the detected markers, the participant's gaze and the projection of that gaze to the plane on the scene video, along with information about the episode annotations.
     1. Now, you can export the gaze data projected to the plane, the created video and the glassesValidator data quality measures to a folder of your choosing using the `Export trials` action. An export for this example after following the above steps is [available here](https://lu.box.com/s/oum8tp5joh1z08f4it6sc1zkmyzaa8dz).
 
 ### Example 2: Two participants and two planes
@@ -302,7 +302,7 @@ Nonetheless, below we provide a full description of how recording preparation, d
     1. Next, run the `Sync to reference` action to synchronize the two recordings together.
     1. Next, run the `Gaze to plane` action.
     1. Next, run the `Validation` action.
-    1. Finally, run the `Make video` action, which draws the detected markers, the participant's gaze and the projection of that gaze to the plane on the scene video, along with information about the episode annotations.
+    1. Finally, run the `Make mapped gaze video` action, which draws the detected markers, the participant's gaze and the projection of that gaze to the plane on the scene video, along with information about the episode annotations.
     1. Now, you can export the gaze data projected to the plane, the created video and the glassesValidator data quality measures to a folder of your choosing using the `Export trials` action. An export for this example after following the above steps is [available here](https://lu.box.com/s/oum8tp5joh1z08f4it6sc1zkmyzaa8dz).
 
 ### Example 3: One participant, multiple planes and an overview camera
@@ -397,7 +397,7 @@ Example 3 is a more advanced example, showing a recording of a participant looki
     1. Next, run the `Sync to reference` action to synchronize the two recordings together.
     1. Next, run the `Gaze to plane` action.
     1. Next, run the `Validation` action.
-    1. Finally, run the `Make video` action, which draws the detected markers, the participant's gaze and the projection of that gaze to the plane on the scene video, along with information about the episode annotations.
+    1. Finally, run the `Make mapped gaze video` action, which draws the detected markers, the participant's gaze and the projection of that gaze to the plane on the scene video, along with information about the episode annotations.
     1. Now, you can export the gaze data projected to the plane, the created video and the glassesValidator data quality measures to a folder of your choosing using the `Export trials` action. An export for this example after following the above steps is [available here](https://lu.box.com/s/oum8tp5joh1z08f4it6sc1zkmyzaa8dz).
 
 ## gazeMapper projects
@@ -435,6 +435,8 @@ During the importing and processing of a session, or an eye tracker or camera re
 |`recording_info.json`|recording|[`Session.import_recording`](#gazemappersession)|Information about the recording.|
 |`recording.gazeMapper`|recording|[`Session.import_recording`](#gazemappersession)|JSON file encoding the state of each [recording-level gazeMapper action](#actions).|
 |`worldCamera.mp4`|recording|[`Session.import_recording`](#gazemappersession)|Copy of the (scene) camera video (optional, depends on the `import_do_copy_video` option).|
+|||||
+|`gazeOverlay.mp4`|recording|`Session.make_gaze_overlay_video`|Video of the eye tracker scene camera with overlaid gaze point.|
 |||||
 |`coding.tsv`|recording|[`process.code_episodes`](#coding-analysis-synchronization-and-validation-episodes)|File denoting the analysis, synchronization and validation episodes to be processed. This is produced with the coding interface included with gazeMapper. Can be manually created or edited to override the coded episodes.|
 |`planePose_<plane name>.tsv`|recording|[`process.detect_markers`](#gazemapper-planes)|File with information about plane pose w.r.t. the (scene) camera for each frame where the plane was detected.|
@@ -571,11 +573,12 @@ gazeMapper has built-in support for computing data quality from the gaze data of
 Besides planes, gazeMapper can also be configured to detect and report on the appearance of individual markers. This is configured in the `Individual markers editor` pane in the GUI or by means of `gazeMapper.marker.Marker` objects.
 
 ## Actions
-gazeMapper can perform the following processing actions on a wearable eye tracking data. Some, like detecting the fiducial markers and projecting gaze data to the plane(s), are always available, some other actions are only available when certain settings are enabled. Unavailable actions are not shown in the GUI. Some actions depend on the output of other actions. Such actions whose preconditions have not been met cannot be started from the GUI. Some actions are performed on a gazeMapper session (e.g., `SYNC_TO_REFERENCE` and `MAKE_VIDEO`) whereas others are run on one recording at a time (e.g., `CODE_EPISODES` and `DETECT_MARKERS`). The former will be referred to as session-level actions, the latter as recording-level actions. API use is not gated by such checks, but errors may be raised due to, for instance, missing input files. All available actions (`gazeMapper.process.Action`) are listed in the table below, more details about some of these processing actions are provided in the section below.
+gazeMapper can perform the following processing actions on a wearable eye tracking data. Some, like detecting the fiducial markers and projecting gaze data to the plane(s), are always available, some other actions are only available when certain settings are enabled. Unavailable actions are not shown in the GUI. Some actions depend on the output of other actions. Such actions whose preconditions have not been met cannot be started from the GUI. Some actions are performed on a gazeMapper session (e.g., `SYNC_TO_REFERENCE` and `MAKE_MAPPED_GAZE_VIDEO`) whereas others are run on one recording at a time (e.g., `CODE_EPISODES` and `DETECT_MARKERS`). The former will be referred to as session-level actions, the latter as recording-level actions. API use is not gated by such checks, but errors may be raised due to, for instance, missing input files. All available actions (`gazeMapper.process.Action`) are listed in the table below, more details about some of these processing actions are provided in the section below.
 
 | Action | Availability | Level | Description |
 | --- | --- | --- | --- |
 |`IMPORT`|always|recording|Import a recording from a source directory to a recording working directory, which includes casting the eye tracker-specific data format into the [glassesTools common format](https://github.com/dcnieho/glassesTools/blob/master/README.md#common-data-format) used by gazeMapper.|
+|`MAKE_GAZE_OVERLAY_VIDEO`|always|recording|Make videos of the eye tracker scene camera with overlaid gaze point on the scene video. Can be made directly after import and is not affected by any of the video settings, these are for the `MAKE_MAPPED_GAZE_VIDEO` action.|
 |`CODE_EPISODES`|always|recording|[Code analysis, synchronization and validation episodes](#coding-analysis-synchronization-and-validation-episodes) in a recording. Shows a coding GUI.|
 |`DETECT_MARKERS`|always|recording|Detect fiducial markers and determine participants pose for one or multiple [planes](#gazemapper-planes) and [individual markers](#individual-markers).|
 |`GAZE_TO_PLANE`|always|recording|Mapping head-referenced gaze to one or multiple [planes](#gazemapper-planes).|
@@ -585,7 +588,7 @@ gazeMapper can perform the following processing actions on a wearable eye tracki
 |`SYNC_TO_REFERENCE`|`sync_ref_recording` option|session|[Synchronize the gaze data and cameras of multiple recordings](#synchronizing-multiple-eye-tracker-or-external-camera-recordings). Only makes sense to perform if there are multiple recordings in a session, since otherwise there is nothing to synchronize.|
 |`RUN_VALIDATION`|[plane setup](#gazemapper-planes) and [episode coding setup](#coding-analysis-synchronization-and-validation-episodes)|recording|Run [glassesValidator](#validation-glassesvalidator-planes) to compute data quality from the gaze data of a participant looking at a validation poster.|
 |`EXPORT_TRIALS`|always|session|Create file for each recording containing the gaze position on one or multiple planes.|
-|`MAKE_VIDEO`|`video_make_which` option|session|Make videos of the eye tracker scene camera or external camera (synchronized if there are multiple) showing gaze on the scene video from the eye tracker, gaze projected to the detected planes, detected plane origins, detected individual markers, and gaze from other eye tracker recordings (if available).|
+|`MAKE_MAPPED_GAZE_VIDEO`|`video_make_which` option|session|Make videos of the eye tracker scene camera or external camera (synchronized if there are multiple) showing gaze on the scene video from the eye tracker, gaze projected to the detected planes, detected plane origins, detected individual markers, and gaze from other eye tracker recordings (if available).|
 
 In the GUI, an overview of what processing actions are enqueued or running for a session or recording are shown in the `Sessions` pane, in the detail view for a specific session, and in the `Processing queue` pane.
 
