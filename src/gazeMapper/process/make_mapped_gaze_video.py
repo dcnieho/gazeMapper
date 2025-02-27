@@ -5,6 +5,7 @@ import math
 import cv2
 import numpy as np
 import copy
+import subprocess
 
 from glassesTools import annotation, aruco, drawing, intervals, gaze_headref, gaze_worldref, naming as gt_naming, ocv, plane, propagating_thread, timestamps, transforms, utils
 from glassesTools.gui.video_player import GUI
@@ -448,6 +449,18 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
 
                 file = rec_working_dir / naming.process_video
 
+                # check if source file has audio
+                command = ['ffprobe',
+                    '-loglevel', 'error',
+                    '-select_streams', 'a',
+                    '-show_entries', 'stream=codec_type',
+                    '-of', 'csv=p=0',
+                    f'{in_videos[v]}']
+                proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                out, err = proc.communicate()
+                if err or out.decode().strip()!='audio':
+                    # file does not have audio, nothing to do, skip
+                    continue
                 # move file to temp name
                 tempName = file.parent / (file.stem + '_temp' + file.suffix)
                 shutil.move(file, tempName)
