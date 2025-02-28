@@ -9,6 +9,7 @@ from typing import Callable
 import copy
 import threading
 import time
+import datetime
 
 import imgui_bundle
 from imgui_bundle import imgui, immapp, imgui_md, hello_imgui, glfw_utils, icons_fontawesome_6 as ifa6
@@ -39,6 +40,7 @@ class GUI:
         self._sessions_lock: threading.Lock                             = threading.Lock()
         self._selected_sessions: dict[str, bool]                        = {}
         self._session_lister = session_lister.List(self.sessions, self._sessions_lock, self._selected_sessions, info_callback=self._open_session_detail, draw_action_status_callback=self._session_action_status, item_context_callback=self._session_context_menu)
+        self._et_widget_drawer = gt_gui.recording_table.EyeTrackerName()
 
         self.recording_config_overrides: dict[str, dict[str, config.StudyOverride]]   = {}
         self._recording_listers  : dict[str, gt_gui.recording_table.RecordingTable]   = {}
@@ -540,6 +542,7 @@ class GUI:
             self._selected_sessions.clear()
             self._selected_sessions |= {k:(selected[k] if k in selected else False) for k in self.sessions}
         self._update_shown_actions_for_config()
+        self._session_lister_set_extra_columns_to_show()    # only place we have to add this. Adding or deleting a session def from the study config triggers this function
 
     def _check_project_setup_state(self):
         if self.study_config is not None:
@@ -599,6 +602,52 @@ class GUI:
         self._session_lister_set_actions_to_show(self._session_lister)
         for sess in self._recording_listers:
             self._recording_lister_set_actions_to_show(self._recording_listers[sess], sess)
+
+    def _session_lister_set_extra_columns_to_show(self):
+        if len(self.study_config.session_def.recordings)>1:
+            self._session_lister.set_extra_columns(None)
+        else:
+            # only a single recording per session, show some extra info about the recording in the session view:
+            # Eye Tracker, Recording name, Participant and duration
+            def _draw_status(which: str, item: session.Session):
+                rec = next(iter(item.recordings.values())).info if item.recordings else None
+                if rec is None:
+                    imgui.text('-')
+                    return
+                # NB: guaranteed to be an eye tracking recording, as we only get here with single recordings
+                # and there must be at least one eye tracking recording
+                match which:
+                    case "Eye Tracker":
+                        self._et_widget_drawer.draw(rec, align=True)
+                    case "Recording Name":
+                        imgui.text(rec.name)
+                    case "Participant":
+                        imgui.text(rec.participant or "Unknown")
+                    case "Duration":
+                        imgui.text("Unknown" if (d:=rec.duration) is None else str(datetime.timedelta(seconds=d//1000)))
+            def _get_sort_value(which: str, iid: int):
+                rec = next(iter(self.sessions[iid].recordings.values())).info if self.sessions[iid].recordings else None
+                if rec is None:
+                    imgui.text('-')
+                    return 999 if which=="Duration" else 'zzzzz'
+                match which:
+                    case "Eye Tracker":
+                        return rec.eye_tracker.value.lower()
+                    case "Recording Name":
+                        return rec.name.lower()
+                    case "Participant":
+                        return rec.participant.lower()
+                    case "Duration":
+                        return 0 if (d:=rec.duration) is None else d
+
+            self._session_lister.set_extra_columns([
+                session_lister.ColumnSpec(lbl,
+                                          imgui.TableColumnFlags_.no_resize,
+                                          lambda rec,w=lbl[2:]: _draw_status(w,rec),
+                                          lambda iid,w=lbl[2:]: _get_sort_value(w,iid),
+                                          lbl[2:])
+                for lbl in (ifa6.ICON_FA_EYE+" Eye Tracker", ifa6.ICON_FA_SIGNATURE+" Recording Name", ifa6.ICON_FA_USER_TIE+" Participant", ifa6.ICON_FA_STOPWATCH+" Duration")
+            ])
 
     def close_project(self):
         self._project_settings_pane.is_visible = False
