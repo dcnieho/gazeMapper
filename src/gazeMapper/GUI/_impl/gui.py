@@ -1375,7 +1375,7 @@ class GUI:
                 gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='set_cam_cal', working_directory=working_directory))
             imgui.end_menu()
         changed = False
-        if imgui.selectable(ifa6.ICON_FA_FOLDER_OPEN + " Open working folder", False)[0]:
+        if imgui.selectable(ifa6.ICON_FA_FOLDER_OPEN + " Open recording folder", False)[0]:
             for r in recs:
                 callbacks.open_folder(sess.recordings[r].info.working_directory)
         if imgui.selectable(ifa6.ICON_FA_TRASH_CAN + " Delete recording", False)[0]:
