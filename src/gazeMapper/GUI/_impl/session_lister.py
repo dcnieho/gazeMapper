@@ -8,6 +8,13 @@ from . import colors
 from ... import process, session
 
 
+class ColumnSpec(typing.NamedTuple):
+    name: str
+    flags: int
+    display_func:  typing.Callable[[session.Session],None]
+    sort_key_func: typing.Callable[[int],typing.Any]
+    header_lbl: str|None=None   # if set, different string than name is used for the column header. Works only for non-angled headers
+
 class List:
     def __init__(self,
                  items: dict[int|str, session.Session],
@@ -33,6 +40,8 @@ class List:
         self._view_column_count_base = 3    # selector, name, recordings
         self._view_column_count = None
 
+        self._extra_columns: list[ColumnSpec] = None
+
         self._last_y = None
 
         self.table_flags: int = (
@@ -50,7 +59,14 @@ class List:
 
     def set_actions_to_show(self, actions: set[process.Action]):
         self.display_actions = [k for k in process.Action if k in actions] # filter out crap and fix display order
-        self._view_column_count = self._view_column_count_base + len(self.display_actions)
+        self._determine_column_count()
+
+    def set_extra_columns(self, columns: list[ColumnSpec]|None):
+        self._extra_columns = columns
+        self._determine_column_count()
+
+    def _determine_column_count(self):
+        self._view_column_count = self._view_column_count_base + len(self.display_actions) + (0 if self._extra_columns is None else len(self._extra_columns))
 
     def draw(self, limit_outer_size=False):
         with self.items_lock:
@@ -74,11 +90,14 @@ class List:
             imgui.table_setup_column("Selector", imgui.TableColumnFlags_.no_hide | imgui.TableColumnFlags_.no_sort | imgui.TableColumnFlags_.no_reorder | imgui.TableColumnFlags_.no_header_label, init_width_or_weight=checkbox_width)  # 0
             imgui.table_setup_column("Name", imgui.TableColumnFlags_.default_sort | imgui.TableColumnFlags_.no_hide)  # 1
             imgui.table_setup_column("Recordings", imgui.TableColumnFlags_.angled_header)  # 2
-            for k in process.Action:   # 3+
-                if k in self.display_actions:
-                    imgui.table_setup_column(k.displayable_name, imgui.TableColumnFlags_.angled_header)
+            # 3+
+            for k in self.display_actions:
+                imgui.table_setup_column(k.displayable_name, imgui.TableColumnFlags_.angled_header)
+            if self._extra_columns is not None:
+                for c in self._extra_columns:
+                    imgui.table_setup_column(c.name, c.flags)
 
-            # Enabled columns
+            # Sticky column headers and selector row
             if imgui.table_get_column_flags(0) & imgui.TableColumnFlags_.is_enabled:
                 imgui.table_setup_scroll_freeze(1, 2)  # Sticky column headers and selector row
             else:
@@ -93,29 +112,47 @@ class List:
 
                 # Headers
                 imgui.table_angled_headers_row()
-                imgui.table_headers_row()
-                # set up checkbox column: reflects whether all, some or none of visible items are selected, and allows selecting all or none
-                imgui.table_set_column_index(0)
-                # get state
-                num_selected = sum([self.selected_items[iid] for iid in self.sorted_ids])
-                if num_selected==0:
-                    # none selected
-                    multi_selected_state = -1
-                elif num_selected==len(self.sorted_ids):
-                    # all selected
-                    multi_selected_state = 1
-                else:
-                    # some selected
-                    multi_selected_state = 0
+                imgui.table_next_row(imgui.TableRowFlags_.headers)
+                for c_idx in range(self._view_column_count):
+                    if not imgui.table_set_column_index(c_idx):
+                        continue
+                    if c_idx==0:  # checkbox column: reflects whether all, some or none of visible sessions are selected, and allows selecting all or none
+                        # get state
+                        num_selected = sum([self.selected_items[iid] for iid in self.sorted_ids])
+                        if num_selected==0:
+                            # none selected
+                            multi_selected_state = -1
+                        elif num_selected==len(self.sorted_ids):
+                            # all selected
+                            multi_selected_state = 1
+                        else:
+                            # some selected
+                            multi_selected_state = 0
 
-                if multi_selected_state==0:
-                    imgui.push_item_flag(imgui.internal.ItemFlagsPrivate_.mixed_value, True)
-                clicked, new_state = glassesTools.gui.utils.my_checkbox(f"##header_checkbox", multi_selected_state==1, frame_size=(0,0), frame_padding_override=(imgui.get_style().frame_padding.x/2,0), do_vertical_align=False)
-                if multi_selected_state==0:
-                    imgui.pop_item_flag()
+                        if multi_selected_state==0:
+                            imgui.push_item_flag(imgui.internal.ItemFlagsPrivate_.mixed_value, True)
+                        clicked, new_state = glassesTools.gui.utils.my_checkbox(f"##header_checkbox", multi_selected_state==1, frame_size=(0,0), frame_padding_override=(imgui.get_style().frame_padding.x/2,0), do_vertical_align=False)
+                        if multi_selected_state==0:
+                            imgui.pop_item_flag()
 
-                if clicked:
-                    glassesTools.utils.set_all(self.selected_items, new_state, subset = self.sorted_ids)
+                        if clicked:
+                            glassesTools.utils.set_all(self.selected_items, new_state, subset = self.sorted_ids)
+                    else:
+                        # action status columns or extra columns
+                        if c_idx<3:
+                            column_name = ("Name","Recordings")[c_idx-1]
+                        else:
+                            idx = c_idx-self._view_column_count_base
+                            if idx<len(self.display_actions):
+                                # action columns
+                                column_name = self.display_actions[idx].displayable_name
+                            else:
+                                # extra columns
+                                idx = idx-len(self.display_actions)
+                                column_name = self._extra_columns[idx].header_lbl if self._extra_columns[idx].header_lbl is not None else self._extra_columns[idx].name
+                        if imgui.table_get_column_flags(c_idx) & imgui.TableColumnFlags_.no_header_label:
+                            column_name = '##'+column_name
+                        imgui.table_header(column_name)
 
                 # Loop rows
                 any_selectable_clicked = False
@@ -190,8 +227,15 @@ class List:
                                 if missing_recs:
                                     glassesTools.gui.utils.draw_hover_text('missing recordings:\n'+'\n'.join(missing_recs), '')
                             case _:
-                                # task status columns
-                                self.draw_action_status_callback(item, self.display_actions[ri-self._view_column_count_base])
+                                # action status columns or extra columns
+                                idx = ri-self._view_column_count_base
+                                if idx<len(self.display_actions):
+                                    # action columns
+                                    self.draw_action_status_callback(item, self.display_actions[idx])
+                                else:
+                                    # extra columns
+                                    idx = idx-len(self.display_actions)
+                                    self._extra_columns[idx].display_func(item)
                         num_columns_drawn+=1
 
                     # handle selection logic
@@ -239,11 +283,18 @@ class List:
                     case 2:     # Number of recordings
                         key = lambda iid: self.items[iid].num_present_recordings()
                     case _:     # status indicators
-                        action = self.display_actions[sort_spec.column_index-self._view_column_count_base]
-                        if process.is_session_level_action(action):
-                            key = lambda iid: 999 if not self.items[iid].has_all_recordings() else self.items[iid].state[action]
+                        idx = sort_spec.column_index-self._view_column_count_base
+                        if idx<len(self.display_actions):
+                            # action columns
+                            action = self.display_actions[sort_spec.column_index-self._view_column_count_base]
+                            if process.is_session_level_action(action):
+                                key = lambda iid: 999 if not self.items[iid].has_all_recordings() else self.items[iid].state[action]
+                            else:
+                                key = lambda iid: 999 if not self.items[iid].has_all_recordings() else self.items[iid].action_completed_num_recordings(action)
                         else:
-                            key = lambda iid: 999 if not self.items[iid].has_all_recordings() else self.items[iid].action_completed_num_recordings(action)
+                            # extra columns
+                            idx = idx-len(self.display_actions)
+                            key = self._extra_columns[idx].sort_key_func
                 ids.sort(key=key, reverse=sort_spec.get_sort_direction()==imgui.SortDirection.descending)
             self.sorted_ids = ids
             sort_specs_in.specs_dirty = False
