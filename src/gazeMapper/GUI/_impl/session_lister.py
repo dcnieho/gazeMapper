@@ -43,8 +43,9 @@ class List:
             imgui.TableFlags_.sort_multi |
             imgui.TableFlags_.reorderable |
             imgui.TableFlags_.sizing_fixed_fit |
-            imgui.TableFlags_.highlight_hovered_column #|
-            #imgui.TableFlags_.borders_inner_v
+            imgui.TableFlags_.highlight_hovered_column |
+            imgui.TableFlags_.borders_inner_v |
+            imgui.TableFlags_.no_borders_in_body_until_resize
         )
 
     def set_actions_to_show(self, actions: set[process.Action]):
