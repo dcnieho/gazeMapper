@@ -1307,6 +1307,8 @@ class GUI:
             for s in sess:
                 callbacks.remove_folder(s.working_directory)
             changed = True
+        if len(sess)==1 and sess[0].recordings:
+            changed |= self._draw_context_menu_items_for_recording_folders(sess[0], list(sess[0].recordings))
         return changed
     def _recording_context_menu(self, session_name: str, rec_name: str) -> bool:
         # ignore input recording name, get selected sessions
@@ -1359,10 +1361,6 @@ class GUI:
                 imgui.end_disabled()
             gt_gui.utils.draw_hover_text(hover_text, '')
         # draw source/working folder interactions
-        source_directories = [sd for r in recs if (sd:=sess.recordings[r].info.source_directory).is_dir()]
-        if source_directories and imgui.selectable(ifa6.ICON_FA_FOLDER_OPEN + " Open source folder", False)[0]:
-            for s in source_directories:
-                callbacks.open_folder(s)
         if len(recs)==1 and imgui.begin_menu('Camera calibration'):
             working_directory = sess.recordings[recs[0]].info.working_directory
             has_cam_cal_file = (working_directory/gt_naming.scene_camera_calibration_fname).is_file()
@@ -1374,11 +1372,19 @@ class GUI:
             if imgui.selectable(ifa6.ICON_FA_DOWNLOAD+' Set calibration XML', False)[0]:
                 gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='set_cam_cal', working_directory=working_directory))
             imgui.end_menu()
+        changed = self._draw_context_menu_items_for_recording_folders(sess, recs)
+        return changed
+    def _draw_context_menu_items_for_recording_folders(self, sess: session.Session, recs: list[str]):
+        plural = 's' if len(recs)>1 else ''
+        source_directories = [sd for r in recs if (sd:=sess.recordings[r].info.source_directory).is_dir()]
+        if source_directories and imgui.selectable(ifa6.ICON_FA_FOLDER_OPEN + " Open recording source folder"+plural, False)[0]:
+            for s in source_directories:
+                callbacks.open_folder(s)
         changed = False
-        if imgui.selectable(ifa6.ICON_FA_FOLDER_OPEN + " Open recording folder", False)[0]:
+        if imgui.selectable(ifa6.ICON_FA_FOLDER_OPEN + " Open recording working folder"+plural, False)[0]:
             for r in recs:
                 callbacks.open_folder(sess.recordings[r].info.working_directory)
-        if imgui.selectable(ifa6.ICON_FA_TRASH_CAN + " Delete recording", False)[0]:
+        if imgui.selectable(ifa6.ICON_FA_TRASH_CAN + " Delete recording"+plural, False)[0]:
             for r in recs:
                 callbacks.remove_folder(sess.recordings[r].info.working_directory)
             changed = True
