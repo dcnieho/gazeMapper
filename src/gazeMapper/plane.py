@@ -7,8 +7,8 @@ import inspect
 import typing
 
 from glassesTools import plane, utils
-from glassesValidator.config import get_validation_setup
-from glassesValidator.config.poster import Poster
+from glassesTools.validation.config import get_validation_setup
+from glassesTools.validation.config.plane import ValidationPlane
 
 from . import type_utils
 
@@ -136,7 +136,7 @@ def make(p_type: Type, name: str, path: pathlib.Path|None, **kwargs) -> Definiti
         if 'use_default' in kwargs and not kwargs['use_default']:
             validator_config_dir = path
         validation_setup = get_validation_setup(validator_config_dir)
-        kwargs['aruco_dict'] = Poster.default_aruco_dict
+        kwargs['aruco_dict'] = ValidationPlane.default_aruco_dict
         kwargs['marker_border_bits'] = validation_setup['markerBorderBits']
         kwargs['min_num_markers'] = validation_setup['minNumMarkers']
         kwargs['ref_image_size'] = validation_setup['referencePosterSize']
@@ -183,8 +183,8 @@ def get_plane_from_definition(plane_def: Definition, path: str | pathlib.Path) -
         validator_config_dir = None # use glassesValidator built-in/default
         if not plane_def.use_default:
             validator_config_dir = path
-        validation_setup = get_validation_setup(validator_config_dir)
-        return Poster(validator_config_dir, validation_setup, ref_image_store_path=path / plane.Plane.default_ref_image_name)
+        validation_config = get_validation_setup(validator_config_dir)
+        return ValidationPlane(validator_config_dir, validation_config, ref_image_store_path=path / plane.Plane.default_ref_image_name)
     else:
         pl = plane.Plane(
             markers             = path / plane_def.marker_file,

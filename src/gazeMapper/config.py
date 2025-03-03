@@ -8,7 +8,7 @@ import typing
 from typing import Any, Literal
 
 from glassesTools import annotation, gaze_worldref, utils
-from glassesValidator import process as gv_process
+from glassesTools.validation import DataQualityType, get_DataQualityType_explanation
 
 from . import marker, plane, session, typed_dict_defaults, type_utils
 
@@ -89,7 +89,7 @@ class Study:
 
                  validate_do_global_shift                       : bool                              = True,
                  validate_max_dist_fac                          : float                             = .5,
-                 validate_dq_types                              : set[gv_process.DataQualityType]|None = None,
+                 validate_dq_types                              : set[DataQualityType]|None         = None,
                  validate_allow_dq_fallback                     : bool                              = False,
                  validate_include_data_loss                     : bool                              = False,
                  validate_I2MC_settings                         : I2MCSettings|None                 = None,
@@ -549,8 +549,8 @@ class Study:
 _params = inspect.signature(Study.__init__).parameters
 study_defaults = {k:d for k in _params if (d:=_params[k].default)!=inspect._empty}
 study_parameter_types = {k:_params[k].annotation for k in _params if k not in ['self','strict_check']}
-def _get_gv_data_quality_type_doc(dq: gv_process.DataQualityType):
-    t,doc = gv_process.get_DataQualityType_explanation(dq)
+def _get_gv_data_quality_type_doc(dq: DataQualityType):
+    t,doc = get_DataQualityType_explanation(dq)
     return (dq, type_utils.GUIDocInfo(t,doc))
 def _get_annotation_event_doc(a: annotation.Event):
     t = annotation.tooltip_map[a]
@@ -619,11 +619,11 @@ study_parameter_doc = {
     'export_output3D': type_utils.GUIDocInfo('Mapped data export: include 3D fields', 'Determines whether gaze positions on the plane in the scene camera reference frame are exported when invoking the Export Trials action.'),
     'export_output2D': type_utils.GUIDocInfo('Mapped data export: include 2D fields', 'Determines whether gaze positions on the plane in the plane\'s reference frame are exported when invoking the Export Trials action.'),
     'export_only_code_marker_presence': type_utils.GUIDocInfo('Mapped data export: only include marker presence?', 'If enabled, for each marker only a single column is added to the export created by the Export Trials action, indicating whether the given marker was detected or not on a given frame. If not enabled, marker pose information is included in the export.'),
-    'validate_do_global_shift': type_utils.GUIDocInfo('glassesValidator: Apply global shift?', 'If enabled, for each validation interval the mean position will be removed from the gaze data and the targets, removing any overall shift of the data. This improves the matching of fixations to targets when there is a significant overall offset in the data. It may fail (backfire) if there are data samples far outside the range of the validation targets, or if there is no data for some targets.'),
+    'validate_do_global_shift': type_utils.GUIDocInfo('glassesValidator: Apply global shift?', 'If enabled, for each validation interval the median position will be removed from the gaze data and the mean from the targets, removing any overall shift of the data. This improves the matching of fixations to targets when there is a significant overall offset in the data. It may fail (backfire) if there are data samples far outside the range of the validation targets, or if there is no data for some targets.'),
     'validate_max_dist_fac': type_utils.GUIDocInfo('glassesValidator: Maximum distance factor', 'Factor for determining distance limit when assigning fixation points to validation targets. If for a given target the closest fixation point is further away than <factor>*[minimum intertarget distance], then no fixation point will be assigned to this target, i.e., it will not be matched to any fixation point. Set to a large value to essentially disable.'),
     'validate_dq_types': type_utils.GUIDocInfo('glassesValidator: Data quality types', 'Selects the types of data quality you would like to calculate for each of the recordings. When none are selected, a good default is used for each recording. When none of the selected types is available, depending on the `validate_allow_dq_fallback` setting, either an error is thrown or that same default is used instead. Whether a data quality type is available depends on what type of gaze information is available for a recording, as well as whether the camera is calibrated.',{
         None: # None indicates the doc specification applies to the contained values
-            dict([_get_gv_data_quality_type_doc(dq) for dq in gv_process.DataQualityType])
+            dict([_get_gv_data_quality_type_doc(dq) for dq in DataQualityType])
     }),
     'validate_allow_dq_fallback': type_utils.GUIDocInfo('glassesValidator: Allow fallback data quality type?', 'If not enabled, an error is raised when the data quality type(s) indicated in "glassesValidator: Data quality types" are not available. If enabled, a sensible default other data type will be used instead. Does not apply if the "glassesValidator: Data quality types" is not set.'),
     'validate_include_data_loss': type_utils.GUIDocInfo('glassesValidator: Include data loss?', 'If enabled, the data quality report will include data loss during the episode selected for each target on the validation poster. This is NOT the data loss of the whole recording and thus not what you want to report in your paper.'),

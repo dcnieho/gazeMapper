@@ -19,7 +19,6 @@ import OpenGL.GL as gl
 
 import glassesTools
 from glassesTools import annotation, gui as gt_gui, naming as gt_naming, plane as gt_plane, platform as gt_platform
-import glassesValidator
 
 from ... import config, marker, plane, process, project_watcher, session, type_utils, version
 from .. import async_thread
@@ -1569,7 +1568,6 @@ class GUI:
             imgui.text("Made by Diederick C. Niehorster")
             imgui.text("")
             imgui_md.render(f"[glassesTools {glassesTools.version.__version__}](https://github.com/dcnieho/glassesTools)")
-            imgui_md.render(f"[glassesValidator {glassesValidator.version.__version__}](https://github.com/dcnieho/glassesValidator)")
             imgui.text(f"Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
             imgui.text(f"OpenGL {'.'.join(str(gl.glGetInteger(num)) for num in (gl.GL_MAJOR_VERSION, gl.GL_MINOR_VERSION))}, PyOpenGL {OpenGL.__version__}")
             imgui.text(f"GLFW {'.'.join(str(num) for num in glfw.get_version())}, pyGLFW {glfw.__version__}")

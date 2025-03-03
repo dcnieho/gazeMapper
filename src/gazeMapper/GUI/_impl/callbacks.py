@@ -9,8 +9,7 @@ import threading
 from imgui_bundle import imgui, imspinner, hello_imgui, icons_fontawesome_6 as ifa6
 
 from glassesTools import annotation, aruco, async_thread, camera_recording, eyetracker, gui as gt_gui, naming as gt_naming, platform, recording, video_utils
-from glassesValidator.config import deploy_validation_config, get_validation_setup
-from glassesValidator import process as gv_process
+from glassesTools.validation import config as val_config, DataQualityType, export, get_DataQualityType_explanation
 
 from . import colors, utils
 from ... import config, marker, naming, plane, process, session
@@ -150,10 +149,10 @@ def glasses_validator_plane_check_config(study_config: config.Study, pl: plane.D
     # check if there are already are validation setup files
     working_dir = config.guess_config_dir(study_config.working_directory)/pl.name
     try:
-        get_validation_setup(working_dir)
+        val_config.get_validation_setup(working_dir)
     except:
         # no config file, deploy
-        deploy_validation_config(working_dir)
+        val_config.deploy_validation_config(working_dir)
     else:
         # already exists, nothing to do
         pass
@@ -347,7 +346,7 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
 
     dq_df, dq_set = None, None
     if rec_dirs:
-        dq_df, default_dq_type, dq_targets = gv_process.collect_data_quality(rec_dirs, {p:f'{naming.validation_prefix}{p}_data_quality.tsv' for p in g.study_config.planes_per_episode[annotation.Event.Validate]}, col_for_parent='session')
+        dq_df, default_dq_type, dq_targets = export.collect_data_quality(rec_dirs, {p:f'{naming.validation_prefix}{p}_data_quality.tsv' for p in g.study_config.planes_per_episode[annotation.Event.Validate]}, col_for_parent='session')
         if dq_df is None:
             to_export.pop('validation', None)
         else:
@@ -357,7 +356,7 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
             # data quality type
             type_idx = dq_df.index.names.index('type')
             dq_set['dq_types'] = {k:False for k in sorted(list(dq_df.index.levels[type_idx]), key=lambda dq: dq.value)}
-            for dq in gv_process.DataQualityType:
+            for dq in DataQualityType:
                 if g.study_config.validate_dq_types is not None and dq in g.study_config.validate_dq_types and dq in dq_set['dq_types']:
                     dq_set['dq_types'][dq] = True
             if not any(dq_set['dq_types'].values()):
@@ -402,7 +401,7 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
                             imgui.table_next_row()
                             imgui.table_next_column()
                             imgui.align_text_to_frame_padding()
-                            t,ht = gv_process.get_DataQualityType_explanation(dq)
+                            t,ht = get_DataQualityType_explanation(dq)
                             imgui.text(t)
                             gt_gui.utils.draw_hover_text(ht, text="")
                             imgui.table_next_column()
@@ -467,7 +466,7 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
         if 'validation' in to_export and to_export['validation']:
             dq_types = [dq for dq in dq_set['dq_types'] if dq_set['dq_types'][dq]]
             targets  = [t for t in dq_set['targets'] if dq_set['targets'][t]]
-            gv_process.summarize_and_store_data_quality(dq_df, path/'data_quality.tsv', dq_types, targets, dq_set['targets_avg'], dq_set['include_data_loss'])
+            export.summarize_and_store_data_quality(dq_df, path/'data_quality.tsv', dq_types, targets, dq_set['targets_avg'], dq_set['include_data_loss'])
 
     buttons = {
         ifa6.ICON_FA_CHECK+f" Continue": launch_export,

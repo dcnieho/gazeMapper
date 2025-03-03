@@ -1,7 +1,8 @@
 import pathlib
+import numpy as np
 
-from glassesValidator import process as gv_process, utils as gv_utils
-from glassesTools import annotation
+from glassesTools import annotation, fixation_classification
+from glassesTools.validation import config as val_config, assign_fixations, compute_offsets
 
 
 from .. import config, episode, naming, plane, process, session
@@ -37,29 +38,42 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
         if not plane_def.use_default:
             validator_config_dir = config_dir/p
 
-        # write marker intervals file as we'll need it
-        marker_interval_file_name = f'{naming.validation_prefix}{p}_analysis_intervals.tsv'
-        gv_utils.writeMarkerIntervalsFile(working_dir/marker_interval_file_name, episodes)
-        # call the glassesValidator processing steps
-        output_gaze_offset_file_name = f'{naming.validation_prefix}{p}_gaze_target_offsets.tsv'
-        gv_process.compute_offsets_to_targets(working_dir, validator_config_dir,
-                                              marker_interval_file_name=marker_interval_file_name,
-                                              pose_file_name=f'{naming.plane_pose_prefix}{p}.tsv',
-                                              world_gaze_file_name=f'{naming.world_gaze_prefix}{p}.tsv',
-                                              output_gaze_offset_file_name=output_gaze_offset_file_name)
+        validation_plane = val_config.plane.ValidationPlane(validator_config_dir)
 
-        output_analysis_interval_file_name = f'{naming.validation_prefix}{p}_fixation_intervals.tsv'
-        gv_process.determine_fixation_intervals(working_dir, validator_config_dir, study_config.validate_do_global_shift, study_config.validate_max_dist_fac,
-                                                study_config.validate_I2MC_settings,
-                                                marker_interval_file_name=marker_interval_file_name,
-                                                world_gaze_file_name=f'{naming.world_gaze_prefix}{p}.tsv',
-                                                fixation_detection_file_name_prefix=f'{naming.validation_prefix}{p}_targetSelection_I2MC_',
-                                                output_analysis_interval_file_name=output_analysis_interval_file_name)
+        plot_limits = [[validation_plane.bbox[0]-validation_plane.marker_size, validation_plane.bbox[2]+validation_plane.marker_size],
+                       [validation_plane.bbox[1]-validation_plane.marker_size, validation_plane.bbox[3]+validation_plane.marker_size]]
+        fixation_classification.from_plane_gaze(working_dir/f'{naming.world_gaze_prefix}{p}.tsv',
+                                                episodes,
+                                                working_dir,
+                                                I2MC_settings_override=study_config.validate_I2MC_settings,
+                                                filename_stem=f'{naming.validation_prefix}{p}_fixations',
+                                                plot_limits=plot_limits)
 
-        gv_process.calculate_data_quality(working_dir, study_config.validate_dq_types, study_config.validate_allow_dq_fallback, study_config.validate_include_data_loss,
-                                          analysis_interval_file_name=output_analysis_interval_file_name,
-                                          gaze_offset_file_name=output_gaze_offset_file_name,
-                                          output_data_quality_file_name=f'{naming.validation_prefix}{p}_data_quality.tsv')
+        targets = {t_id: np.append(validation_plane.targets[t_id].center, 0.) for t_id in validation_plane.targets}   # get centers of targets
+        for idx,_ in enumerate(episodes):
+            fix_file = working_dir / f'{naming.validation_prefix}{p}_fixations_interval_{idx+1:02d}.tsv'
+            assign_fixations.distance(targets,
+                                      fix_file,
+                                      working_dir,
+                                      do_global_shift=study_config.validate_do_global_shift,
+                                      max_dist_fac=study_config.validate_max_dist_fac,
+                                      filename_stem=f'{naming.validation_prefix}{p}_fixation_assignment',
+                                      iteration=idx,
+                                      background_image=(validation_plane.get_ref_image(as_RGB=True),
+                                                        np.array([validation_plane.bbox[x] for x in (0,2,3,1)])),
+                                      plot_limits=plot_limits)
+
+        compute_offsets.compute(working_dir/f'{naming.world_gaze_prefix}{p}.tsv',
+                                working_dir/f'{naming.plane_pose_prefix}{p}.tsv',
+                                working_dir/f'{naming.validation_prefix}{p}_fixation_assignment.tsv',
+                                episodes,
+                                targets,
+                                validation_plane.config['distance']*10.,
+                                working_dir,
+                                filename=f'{naming.validation_prefix}{p}_data_quality.tsv',
+                                dq_types=study_config.validate_dq_types,
+                                allow_dq_fallback=study_config.validate_allow_dq_fallback,
+                                include_data_loss=study_config.validate_include_data_loss)
 
     # update state
     session.update_action_states(working_dir, process.Action.RUN_VALIDATION, process.State.Completed, study_config)
