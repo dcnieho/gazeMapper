@@ -256,13 +256,19 @@ class Study:
             match e:
                 case annotation.Event.Sync_Camera:
                     allow_one_plane = allow_more_than_one = False
-                case annotation.Event.Validate | annotation.Event.Sync_ET_Data:
+                case annotation.Event.Sync_ET_Data:
+                    if self.get_cam_movement_for_et_sync_method=='plane':
+                        allow_one_plane = True
+                        allow_more_than_one = False
+                    else:
+                        allow_one_plane = allow_more_than_one = False
+                case annotation.Event.Validate:
                     allow_one_plane = True
                     allow_more_than_one = False
                 case annotation.Event.Trial:
                     allow_one_plane = allow_more_than_one = True
             if not allow_one_plane:
-                msg = f'No planes should be defined for a {e.value} episode'
+                msg = f'No planes should be defined for a {e.value} episode. Remove entry, even if its empty.'
                 if strict_check:
                     raise ValueError(msg)
                 else:
