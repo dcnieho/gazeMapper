@@ -428,7 +428,9 @@ class Study:
             else:
                 t = utils.unpack_none_union(study_parameter_types['get_cam_movement_for_et_sync_function'])[0]
                 keys = t.__required_keys__|t.__optional_keys__
-                problems['get_cam_movement_for_et_sync_function'] = {k:f'{k} should be set when get_cam_movement_for_et_sync_function is set to "function"' for k in keys if not self.get_cam_movement_for_et_sync_function or (k not in t._field_defaults and (k not in self.get_cam_movement_for_et_sync_function or not self.get_cam_movement_for_et_sync_function[k]))}
+                this_problems = {k:f'{k} should be set when get_cam_movement_for_et_sync_function is set to "function"' for k in keys if not self.get_cam_movement_for_et_sync_function or (k not in t._field_defaults and (k not in self.get_cam_movement_for_et_sync_function or not self.get_cam_movement_for_et_sync_function[k]))}
+                if this_problems:
+                    problems['get_cam_movement_for_et_sync_function'] = this_problems
         elif self.get_cam_movement_for_et_sync_method=='plane':
             if annotation.Event.Sync_ET_Data not in self.planes_per_episode:
                 if strict_check:
