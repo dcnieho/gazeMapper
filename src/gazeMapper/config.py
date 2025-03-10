@@ -293,6 +293,8 @@ class Study:
         problems: type_utils.ProblemDict = {}
         if not self.episodes_to_code:
             type_utils.merge_problem_dicts(problems, {'episodes_to_code': 'At minimum one episode should be selected to be coded'})
+        if annotation.Event.Sync_ET_Data in self.episodes_to_code and self.get_cam_movement_for_et_sync_method=='':
+            type_utils.merge_problem_dicts(problems, {'episodes_to_code': f'{annotation.Event.Sync_ET_Data.name} should not be listed in the episodes to be coded if there is no method for plane synchronization (get_cam_movement_for_et_sync_method) specified.'})
 
         for e in self.planes_per_episode:
             if e not in self.episodes_to_code:
