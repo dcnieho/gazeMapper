@@ -281,7 +281,7 @@ class Study:
                     type_utils.merge_problem_dicts(problems, {'planes_per_episode': {e: msg}})
 
         for e in self.episodes_to_code:
-            if e not in self.planes_per_episode and e not in [annotation.Event.Sync_Camera]:
+            if e not in self.planes_per_episode and e!=annotation.Event.Sync_Camera and (e==annotation.Event.Sync_ET_Data and self.get_cam_movement_for_et_sync_method=='plane'):
                 msg = f'{e.value} episodes are set up to be coded and require an associated plane, but no plane(s) are defined in planes_per_episode for {e.value} episodes'
                 if strict_check:
                     raise ValueError(msg)
