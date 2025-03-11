@@ -296,9 +296,14 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
                 if missing_fields:
                     obj[new_item_name] = types[new_item_name]()
                 else:
-                    t = getattr(builtins,new_item_type)
+                    if new_item_type.startswith('list'):
+                        t = getattr(builtins,'list')
+                        t2= getattr(builtins,new_item_type[5:-1])
+                        t = t[t2]
+                    else:
+                        t = getattr(builtins,new_item_type)
                     obj[new_item_name] = t()
-                draw_dict_editor.new_item = (iid,obj)
+                draw_dict_editor.new_item = (iid,obj,new_item_name,t)
             def _valid_item_name():
                 nonlocal missing_fields
                 nonlocal new_item_name
@@ -341,7 +346,7 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
                             imgui.pop_style_color()
                         imgui.table_next_column()
                         imgui.set_next_item_width(-1)
-                        types = ['bool','str','int','float']
+                        types = ['bool','str','int','float','list[str]','list[float]','list[int]']
                         t_idx = types.index(new_item_type) if new_item_type is not None else -1
                         _,t_idx = imgui.combo("##item_type_selector", t_idx, types)
                         new_item_type = None if t_idx==-1 else types[t_idx]
