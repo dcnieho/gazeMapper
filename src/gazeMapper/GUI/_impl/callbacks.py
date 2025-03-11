@@ -480,7 +480,7 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
             export.summarize_and_store_data_quality(dq_df, path/'data_quality.tsv', dq_types, targets, dq_set['targets_avg'], dq_set['include_data_loss'])
 
     buttons = {
-        ifa6.ICON_FA_CHECK+f" Continue": launch_export,
+        ifa6.ICON_FA_CHECK+f" Continue": (launch_export, lambda: not any((to_export[e] for e in to_export))),
         ifa6.ICON_FA_CIRCLE_XMARK+f" Cancel": None
     }
 
