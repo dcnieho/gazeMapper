@@ -10,6 +10,7 @@ import copy
 import threading
 import time
 import datetime
+import typing
 
 import imgui_bundle
 from imgui_bundle import imgui, immapp, imgui_md, hello_imgui, glfw_utils, icons_fontawesome_6 as ifa6
@@ -33,15 +34,18 @@ class GUI:
 
         self.project_dir: pathlib.Path = None
         self.study_config: config.Study = None
+        self._dict_type_rec: dict[str, typing.Type]|None = None
 
         self.sessions: dict[str, session.Session]                       = {}
         self.session_config_overrides: dict[str, config.StudyOverride]  = {}
+        self._session_dict_type_rec: dict[str, dict[str, typing.Type]]  = {}
         self._sessions_lock: threading.Lock                             = threading.Lock()
         self._selected_sessions: dict[str, bool]                        = {}
         self._session_lister = session_lister.List(self.sessions, self._sessions_lock, self._selected_sessions, info_callback=self._open_session_detail, draw_action_status_callback=self._session_action_status, item_context_callback=self._session_context_menu)
         self._et_widget_drawer = gt_gui.recording_table.EyeTrackerName()
 
         self.recording_config_overrides: dict[str, dict[str, config.StudyOverride]]   = {}
+        self._recording_dict_type_rec: dict[str, dict[str, dict[str, typing.Type]]]   = {}
         self._recording_listers  : dict[str, gt_gui.recording_table.RecordingTable]   = {}
         self._selected_recordings: dict[str, dict[str, bool]]                         = {}
 
@@ -225,7 +229,9 @@ class GUI:
                     sess_name = r.removesuffix('##session_view')
                     # cleanup
                     self.session_config_overrides.pop(sess_name)
+                    self._session_dict_type_rec.pop(sess_name)
                     self.recording_config_overrides.pop(sess_name)
+                    self._recording_dict_type_rec.pop(sess_name)
                     self._selected_recordings.pop(sess_name)
                     self._recording_listers.pop(sess_name)
 
@@ -780,7 +786,7 @@ class GUI:
             imgui.text_colored(colors.error,'*There are problems in the below setup that need to be resolved')
 
         fields = [k for k in config.study_parameter_types.keys() if k in config.study_defaults]
-        changed, new_config = settings_editor.draw(copy.deepcopy(self.study_config), fields, config.study_parameter_types, config.study_defaults, self._possible_value_getters, None, self._problems_cache, config.study_parameter_doc)
+        changed, new_config, self._dict_type_rec = settings_editor.draw(copy.deepcopy(self.study_config), fields, config.study_parameter_types, config.study_defaults, self._possible_value_getters, None, self._dict_type_rec, self._problems_cache, config.study_parameter_doc)
         if changed:
             try:
                 new_config.check_valid(strict_check=False)
@@ -795,7 +801,7 @@ class GUI:
                 self.process_pool.set_num_workers(self.study_config.gui_num_workers)
 
     def _action_list_pane_drawer(self):
-        changed, new_config = settings_editor.draw(copy.deepcopy(self.study_config), ['gui_num_workers'], config.study_parameter_types, config.study_defaults, self._possible_value_getters, None, self._problems_cache, config.study_parameter_doc)
+        changed, new_config, _ = settings_editor.draw(copy.deepcopy(self.study_config), ['gui_num_workers'], config.study_parameter_types, config.study_defaults, self._possible_value_getters, None, None, self._problems_cache, config.study_parameter_doc)
         if changed:
             self.study_config = new_config
             self.study_config.store_as_json()
@@ -996,7 +1002,7 @@ class GUI:
                     imgui.pop_style_color()
                 if p.type==plane.Type.Plane_2D and imgui.button(ifa6.ICON_FA_BARCODE+f' deploy ArUco markers'):
                     gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='deploy_aruco', ArUco_dict=p.aruco_dict, markerBorderBits=p.marker_border_bits))
-                changed, _, new_p, _ = settings_editor.draw_dict_editor(copy.deepcopy(p), type(p), 0, list(plane.definition_parameter_types[p.type].keys()), plane.definition_parameter_types[p.type], plane.definition_defaults[p.type], problems=problem_fields, fixed=fixed_fields, documentation=plane.definition_parameter_doc)
+                changed, _, new_p, _, _ = settings_editor.draw_dict_editor(copy.deepcopy(p), type(p), 0, {}, list(plane.definition_parameter_types[p.type].keys()), plane.definition_parameter_types[p.type], plane.definition_defaults[p.type], problems=problem_fields, fixed=fixed_fields, documentation=plane.definition_parameter_doc)
                 if changed:
                     # persist changed config
                     new_p.store_as_json(plane_dir)
@@ -1090,7 +1096,7 @@ class GUI:
             imgui.text_colored(colors.error,'*There are problems in the below setup that need to be resolved')
 
         # episodes to be coded
-        changed, new_config = settings_editor.draw(copy.deepcopy(self.study_config), ['episodes_to_code', 'planes_per_episode'], config.study_parameter_types, {}, self._possible_value_getters, None, self._problems_cache, config.study_parameter_doc)
+        changed, new_config, _ = settings_editor.draw(copy.deepcopy(self.study_config), ['episodes_to_code', 'planes_per_episode'], config.study_parameter_types, {}, self._possible_value_getters, None, None, self._problems_cache, config.study_parameter_doc)
         if changed:
             try:
                 new_config.check_valid(strict_check=False)
@@ -1446,9 +1452,12 @@ class GUI:
             self._recording_listers[sess.name] = gt_gui.recording_table.RecordingTable(sess.recordings, self._sessions_lock, self._selected_recordings[sess.name], None, lambda r: r.info, item_context_callback=lambda rec_name: self._recording_context_menu(sess.name, rec_name))
             self._recording_listers[sess.name].dont_show_empty = True
             self.session_config_overrides[sess.name] = config.load_or_create_override(config.OverrideLevel.Session, sess.working_directory)
+            self._session_dict_type_rec[sess.name] = {}
             self.recording_config_overrides[sess.name] = {}
+            self._recording_dict_type_rec[sess.name] = {}
             for r in sess.recordings:
                 self.recording_config_overrides[sess.name][r] = config.load_or_create_override(config.OverrideLevel.Recording, sess.recordings[r].info.working_directory, sess.recordings[r].definition.type)
+                self._recording_dict_type_rec[sess.name][r] = {}
             self._recording_lister_set_actions_to_show(self._recording_listers[sess.name], sess.name)
 
     def _session_detail_GUI(self, sess: session.Session):
@@ -1516,7 +1525,7 @@ class GUI:
         sess_changed = False
         if imgui.tree_node_ex('Setting overrides for this session',imgui.TreeNodeFlags_.framed):
             fields = config.StudyOverride.get_allowed_parameters(config.OverrideLevel.Session)[0]
-            sess_changed, new_config = settings_editor.draw(effective_config, fields, config.study_parameter_types, config.study_defaults, self._possible_value_getters, self.study_config, effective_config.field_problems(), config.study_parameter_doc)
+            sess_changed, new_config, self._session_dict_type_rec[sess.name] = settings_editor.draw(effective_config, fields, config.study_parameter_types, config.study_defaults, self._possible_value_getters, self.study_config, self._session_dict_type_rec[sess.name], effective_config.field_problems(), config.study_parameter_doc)
             if sess_changed:
                 try:
                     new_config.check_valid(strict_check=False)
@@ -1536,7 +1545,7 @@ class GUI:
                     fields = config.StudyOverride.get_allowed_parameters(config.OverrideLevel.Recording, sess.recordings[r].definition.type)[0]
                     effective_config_for_session = self.session_config_overrides[sess.name].apply(self.study_config, strict_check=False)
                     effective_config = self.recording_config_overrides[sess.name][r].apply(effective_config_for_session, strict_check=False)
-                    changed, new_config = settings_editor.draw(effective_config, fields, config.study_parameter_types, config.study_defaults, self._possible_value_getters, effective_config_for_session, effective_config.field_problems(), config.study_parameter_doc)
+                    changed, new_config, self._recording_dict_type_rec[sess.name][r] = settings_editor.draw(effective_config, fields, config.study_parameter_types, config.study_defaults, self._possible_value_getters, effective_config_for_session, self._recording_dict_type_rec[sess.name][r], effective_config.field_problems(), config.study_parameter_doc)
                     if changed or sess_changed: # NB: also need to update file when parent has changed
                         try:
                             new_config.check_valid(strict_check=False)

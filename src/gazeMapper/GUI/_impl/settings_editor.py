@@ -3,6 +3,7 @@ import builtins
 import inspect
 import pathlib
 import enum
+import copy
 
 import glassesTools.annotation
 from imgui_bundle import imgui, imgui_md, icons_fontawesome_6 as ifa6
@@ -29,15 +30,15 @@ def set_gui_instance(gui):
     global _gui_instance
     _gui_instance = gui
 
-def draw(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[], set[typing.Any]]], parent_obj: _C2|None=None, problems: type_utils.ProblemDict|None=None, documentation: dict[str,type_utils.GUIDocInfo]|None=None, fixed: type_utils.NestedDict|None=None) -> tuple[bool,_C]:
+def draw(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[], set[typing.Any]]], parent_obj: _C2|None=None, actual_types: dict[typing.Any, typing.Type]=None, problems: type_utils.ProblemDict|None=None, documentation: dict[str,type_utils.GUIDocInfo]|None=None, fixed: type_utils.NestedDict|None=None) -> tuple[bool,_C,dict[typing.Any, typing.Type]|None]:
     if not fields:
         return
 
-    table_is_started, changed, _, obj, _ = _draw_impl(obj, fields, types, defaults, possible_value_getters, parent_obj, problems or {}, documentation or {}, fixed or {})
+    table_is_started, changed, _, obj, _, actual_types = _draw_impl(obj, fields, types, defaults, possible_value_getters, parent_obj, problems or {}, documentation or {}, fixed or {}, actual_types or {})
     if table_is_started:
         imgui.end_table()
 
-    return changed, obj
+    return changed, obj, actual_types
 
 def _replace_type_arg(f_type: typing.Type, base_type: typing.Type, v_type, n_type, fail_is_ok=False) -> typing.Type:
     o_types = typing.get_args(f_type)
@@ -124,13 +125,16 @@ def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_get
             raise ValueError(f'type of {field} ({f_type}) not handled')
     return is_dict, base_type, f_type, nullable
 
-def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[], set[typing.Any]]], parent_obj: _C2|None, problems: type_utils.ProblemDict, documentation: dict[str,type_utils.GUIDocInfo], fixed: type_utils.NestedDict, level=0, table_is_started=False, has_remove=False) -> tuple[bool,bool,bool,_C,str|None]:
+def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[], set[typing.Any]]], parent_obj: _C2|None, problems: type_utils.ProblemDict, documentation: dict[str,type_utils.GUIDocInfo], fixed: type_utils.NestedDict, actual_types: dict[typing.Any, typing.Type]=None, level=0, table_is_started=False, has_remove=False) -> tuple[bool,bool,bool,_C,str|None,dict[typing.Any, typing.Type]]:
     changed = False
     max_fields_width = get_fields_text_width(fields, documentation)*1.08    # little bit of extra space for bold font
     ret_new_obj = False
     removed_field = None
     for f in fields:
-        tp = types[f] if f in types else list(types.values())[0]    # backup only needed when we have an invalid config (e.g. trying to show planes_per_episode entry for an episode that is no longer set to be coded)
+        if actual_types and f in actual_types and not isinstance(actual_types[f],dict):
+            tp = actual_types[f]
+        else:
+            tp = types[f] if f in types else list(types.values())[0]    # backup only needed when we have an invalid config (e.g. trying to show planes_per_episode entry for an episode that is no longer set to be coded)
         is_dict, base_type, f_type, nullable = _get_field_type(f, obj, tp, possible_value_getters.get(f,None) if possible_value_getters else None)
         doc = documentation.get(f,None) or documentation.get(None,None)
         this_lbl = doc.display_string if doc is not None and not isinstance(doc,dict) else f
@@ -158,9 +162,12 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
                     imgui.pop_style_color()
                 if this_explanation:
                     glassesTools.gui.utils.draw_hover_text(this_explanation, text='')
-                this_changed, made_obj, new_sub_obj, removed = draw_dict_editor(this_obj, f_type, level+1, defaults=defaults.get(f,None) if defaults else None, possible_value_getters=possible_value_getters.get(f,None) if possible_value_getters else None, parent_obj=this_parent, problems=problems.get(f,None) if isinstance(problems, dict) else {}, documentation=this_child_doc, fixed=fixed.get(f,None), nullable=nullable, removable=has_remove)
+                this_changed, made_obj, new_sub_obj, removed, actual_types_ = draw_dict_editor(this_obj, f_type, level+1, actual_types.get(f,{}), defaults=defaults.get(f,None) if defaults else None, possible_value_getters=possible_value_getters.get(f,None) if possible_value_getters else None, parent_obj=this_parent, problems=problems.get(f,None) if isinstance(problems, dict) else {}, documentation=this_child_doc, fixed=fixed.get(f,None), nullable=nullable, removable=has_remove)
+                if actual_types_:
+                    actual_types[f] = actual_types_
                 if removed:
                     removed_field = f
+                    actual_types.pop(f,None)
                 changed |= this_changed
                 if this_changed and made_obj:
                     if isinstance(obj,dict):
@@ -194,9 +201,9 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
         if this_changed and new_f_obj is not None:
             ret_new_obj = True
             obj = new_f_obj
-    return table_is_started, changed, ret_new_obj, obj, removed_field
+    return table_is_started, changed, ret_new_obj, obj, removed_field, actual_types
 
-def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None, types: dict[typing.Any, typing.Type]=None, defaults:dict[typing.Any, typing.Any]=None, possible_value_getters: typing.Callable[[_T], set[typing.Any]]|list[typing.Callable[[_T], set[typing.Any]]]|dict[str,typing.Callable[[_T], set[typing.Any]]]=None, parent_obj: _C2|None=None, problems: type_utils.ProblemDict=None, documentation: dict[str,type_utils.GUIDocInfo]=None, fixed: type_utils.NestedDict=None, nullable=False, removable=False) -> tuple[bool,bool,_T,bool]:
+def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, actual_types: dict[typing.Any, typing.Type], fields: list=None, types: dict[typing.Any, typing.Type]=None, defaults:dict[typing.Any, typing.Any]=None, possible_value_getters: typing.Callable[[_T], set[typing.Any]]|list[typing.Callable[[_T], set[typing.Any]]]|dict[str,typing.Callable[[_T], set[typing.Any]]]=None, parent_obj: _C2|None=None, problems: type_utils.ProblemDict=None, documentation: dict[str,type_utils.GUIDocInfo]=None, fixed: type_utils.NestedDict=None, nullable=False, removable=False) -> tuple[bool,bool,_T,bool,dict[typing.Any, typing.Type]|None]:
     made_or_replaced_obj = False
     if (made_or_replaced_obj := obj is None):
         obj = o_type()
@@ -252,6 +259,8 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
                     types = {k:all_type for k in obj}
                 else:
                     types = {k:type(obj[k]) for k in obj}
+                    if not actual_types:
+                        actual_types = copy.deepcopy(types)
     if defaults is None:
         if typed_dict_defaults.is_typeddictdefault(o_type):
             defaults = o_type._field_defaults.copy()
@@ -268,7 +277,7 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
     table_is_started = _start_table(level, first_column_width)
     if not table_is_started:
         return False, made_or_replaced_obj, obj, False
-    table_is_started, changed, ret_new_obj, obj, removed_field = _draw_impl(obj, fields, types, defaults, possible_value_getters if isinstance(possible_value_getters,dict) else None, parent_obj, problems if isinstance(problems,dict) else {}, documentation or {}, fixed or {}, level, table_is_started, has_remove=has_remove)
+    table_is_started, changed, ret_new_obj, obj, removed_field, actual_types = _draw_impl(obj, fields, types, defaults, possible_value_getters if isinstance(possible_value_getters,dict) else None, parent_obj, problems if isinstance(problems,dict) else {}, documentation or {}, fixed or {}, actual_types, level, table_is_started, has_remove=has_remove)
     if removed_field:
         obj.pop(removed_field)
         changed = True
@@ -282,6 +291,7 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
             obj = draw_dict_editor.new_item[1]
             changed = True
             made_or_replaced_obj = True
+            actual_types[draw_dict_editor.new_item[2]] = draw_dict_editor.new_item[3]
             draw_dict_editor.new_item = None
         if imgui.button('add item'):
             new_item_name = ''
@@ -379,7 +389,7 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
             made_or_replaced_obj = True
             obj = parent_obj
 
-    return changed, made_or_replaced_obj, obj, removed
+    return changed, made_or_replaced_obj, obj, removed, actual_types
 draw_dict_editor.new_item = None
 
 def get_fields_text_width(fields: list[str], documentation: dict[str, type_utils.GUIDocInfo], backup_str='xxxxx'):
@@ -564,7 +574,8 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, documenta
     # prep
     field_lbl = field_lbl.translate({ord("#"): None})   # ensure there are no # in the lbl that would confuse imgui internals
     # get possible values and their order
-    v_type = typing.get_args(f_type)[0]
+    v_types = typing.get_args(f_type)
+    v_type = v_types[0] if v_types else int # fallback to something, int
     fixed_value_set = True
     if typing.get_origin(v_type)==typing.Literal:
         all_values = typing.get_args(v_type)
@@ -714,8 +725,8 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, documenta
             if selected:
                 to_add = miss_values[p_idx]
         if not fixed_value_set:
-            if draw_list_set_editor.inputter_temp is None:
-                draw_list_set_editor.inputter_temp = v_type()
+            if field_lbl not in draw_list_set_editor.inputter_temp or not isinstance(draw_list_set_editor.inputter_temp[field_lbl],v_type):
+                draw_list_set_editor.inputter_temp[field_lbl] = v_type()
             kwargs = {}
             flags = imgui.InputTextFlags_.escape_clears_all
             match v_type:
@@ -740,10 +751,13 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, documenta
             if not same_line:   # NB: also true when no values
                 imgui.set_cursor_screen_pos(imgui.get_cursor_screen_pos()+(h_edge_spacing, 0))
             imgui.set_next_item_width(inputter_width)
-            _,draw_list_set_editor.inputter_temp = fun(f'##inputter_{field_lbl}', draw_list_set_editor.inputter_temp, flags=flags, **kwargs)
-            if imgui.is_item_deactivated_after_edit():
-                to_add = draw_list_set_editor.inputter_temp
-                draw_list_set_editor.inputter_temp = None
+            active_id = imgui.get_current_context().active_id
+            _,draw_list_set_editor.inputter_temp[field_lbl] = fun(f'##inputter_{field_lbl}', draw_list_set_editor.inputter_temp[field_lbl], flags=flags, **kwargs)
+            item_id = imgui.get_item_id()
+            validated = item_id==active_id and imgui.is_key_pressed(imgui.Key.enter) or imgui.is_key_pressed(imgui.Key.keypad_enter)
+            if validated or imgui.is_item_deactivated_after_edit():
+                to_add = draw_list_set_editor.inputter_temp[field_lbl]
+                draw_list_set_editor.inputter_temp.pop(field_lbl)
 
         # deal with drag-drop
         if has_order and len(val)>1:
@@ -788,4 +802,4 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, documenta
                 val.add(to_add)
 
     return val
-draw_list_set_editor.inputter_temp = None
+draw_list_set_editor.inputter_temp: dict[str,typing.Any] = {}
