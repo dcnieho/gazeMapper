@@ -346,9 +346,12 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
         if recs:=[s.recordings[r].info.working_directory for r in s.recordings if s.recordings[r].state[process.Action.RUN_VALIDATION]==process.State.Completed]:
             to_export['validation'] = True
             rec_dirs.extend(recs)
-        if 'video' not in to_export:
+        if 'gaze overlay video' not in to_export:
+            if any((s.recordings[r].state[process.Action.MAKE_GAZE_OVERLAY_VIDEO]==process.State.Completed for r in s.recordings)):
+                to_export['gaze overlay video'] = True
+        if 'mapped gaze video' not in to_export:
             if s.state[process.Action.MAKE_MAPPED_GAZE_VIDEO]==process.State.Completed:
-                to_export['video'] = True
+                to_export['mapped gaze video'] = True
 
     dq_df, dq_set = None, None
     if rec_dirs:
@@ -463,8 +466,10 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
         exp = []
         if 'plane gaze' in to_export and to_export['plane gaze']:
             exp.append('planeGaze')
-        if 'video' in to_export and to_export['video']:
-            exp.append('video')
+        if 'gaze overlay video' in to_export and to_export['gaze overlay video']:
+            exp.append('gaze_overlay_video')
+        if 'mapped gaze video' in to_export and to_export['mapped gaze video']:
+            exp.append('mapped_gaze_video')
         for s in sessions:
             g.launch_task(s, None, process.Action.EXPORT_TRIALS, export_path=path, to_export=exp)
 
