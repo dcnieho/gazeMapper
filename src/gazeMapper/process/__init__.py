@@ -234,7 +234,8 @@ def _is_recording_action_possible(rec: str, action_states: dict[Action, State], 
 
     # check that preconditions are met
     states = [action_states[p]==State.Completed for p in preconditions]
-    return all(states), [p for p,s in zip(preconditions,states) if not s]
+    missing = [p for p,s in zip(preconditions,states) if not s]
+    return all(states), [p for p in Action if p in missing] # NB: ensure stable order
 
 def _is_session_action_possible(session_action_states: dict[Action, State], recording_action_states: dict[str,dict[Action, State]], study_config: 'config.Study', rec_types: dict[str,'session.RecordingType'], action: Action) -> tuple[bool, list[Action]]:
     if not is_action_possible_given_config(action, study_config):
