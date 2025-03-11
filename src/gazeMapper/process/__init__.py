@@ -241,7 +241,8 @@ def _is_session_action_possible(session_action_states: dict[Action, State], reco
     if not is_action_possible_given_config(action, study_config):
         return False, None
 
-    preconditions = {Action.IMPORT} # IMPORT is a precondition for all actions
+    preconditions = set()
+    preconditions_test = 'and'
     match action:
         case Action.SYNC_TO_REFERENCE:
             preconditions.update([Action.CODE_EPISODES])
@@ -249,12 +250,8 @@ def _is_session_action_possible(session_action_states: dict[Action, State], reco
             if study_config.get_cam_movement_for_et_sync_method in ['plane', 'function']:
                 preconditions.add(Action.SYNC_ET_TO_CAM)
         case Action.EXPORT_TRIALS:
-            preconditions.update([Action.CODE_EPISODES, Action.GAZE_TO_PLANE])
-            # NB: even if study_config.auto_code_trial_episodes is defined, user may decide to code trials manually. So don't add Action.AUTO_CODE_TRIALS to preconditions
-            if study_config.sync_ref_recording:
-                preconditions.add(Action.SYNC_TO_REFERENCE)
-            elif study_config.get_cam_movement_for_et_sync_method in ['plane', 'function']:
-                preconditions.add(Action.SYNC_ET_TO_CAM)
+            preconditions.update([Action.MAKE_GAZE_OVERLAY_VIDEO, Action.GAZE_TO_PLANE, Action.RUN_VALIDATION, Action.MAKE_MAPPED_GAZE_VIDEO])
+            preconditions_test = 'or'
         case Action.MAKE_MAPPED_GAZE_VIDEO:
             preconditions.update([Action.CODE_EPISODES])
             # NB: even if study_config.auto_code_sync_points is defined, user may decide to code sync manually. So don't add Action.AUTO_CODE_SYNC to preconditions
@@ -267,7 +264,7 @@ def _is_session_action_possible(session_action_states: dict[Action, State], reco
             raise NotImplementedError(f'Logic is not implemented for {action.displayable_name} ({action}), major developer oversight! Let him know.')
 
     precond_met: dict[Action,tuple[bool,list[str]]] = {}
-    for p in preconditions:
+    for p in [p for p in Action if p in preconditions]: # NB: ensure stable order
         if is_session_level_action(p):
             met = session_action_states[p]==State.Completed
             precond_met[p] = (met,None)
@@ -277,7 +274,11 @@ def _is_session_action_possible(session_action_states: dict[Action, State], reco
             met = [(not m1) or m2 for m1,m2 in zip(met1,met2)]    # not m1 because ignore if action isn't possible for that recording anyway
             precond_met[p] = (all(met), [] if all(met) else [r for r,m1,m2 in zip(recording_action_states,met1,met2) if m1 and not m2])
 
-    return all((precond_met[p][0] for p in precond_met)), {p: precond_met[p][1] for p in precond_met if not precond_met[p][0]}
+    if preconditions_test=='and':
+        ok = all((precond_met[p][0] for p in precond_met))
+    else:
+        ok = any((precond_met[p][0] for p in precond_met))
+    return ok, {p: precond_met[p][1] for p in precond_met if not precond_met[p][0]} if not ok else {}
 
 def get_possible_actions(session_action_states: dict[Action, State], recording_action_states: dict[str,dict[Action, State]], actions_to_check: set[Action], study_config: 'config.Study') -> dict[Action, tuple[bool|list[str], dict[Action,list[str]]]]:
     # determine based on actions_states which actions have all their preconditions met. Return a set containing just
