@@ -31,6 +31,8 @@ def get_folder_picker(g, reason: str, *args, **kwargs):
                 set_cam_cal(selected[0], *args, **kwargs)
             case 'deploy_aruco':
                 aruco.deploy_marker_images(selected[0], 1000, *args, **kwargs)
+            case 'deploy_gv_poster_pdf':
+                val_config.plane.deploy_default_pdf(selected[0])
             case 'export':
                 show_export_config(g, selected[0], *args, **kwargs)
             case _:
@@ -55,6 +57,10 @@ def get_folder_picker(g, reason: str, *args, **kwargs):
             picker_type = gt_gui.file_picker.FilePicker
         case 'deploy_aruco':
             header = "Select folder to store ArUco marker images"
+            allow_multiple = False
+            picker_type = gt_gui.file_picker.DirPicker
+        case 'deploy_gv_poster_pdf':
+            header = "Select folder to store default glassesValidator poster pdf"
             allow_multiple = False
             picker_type = gt_gui.file_picker.DirPicker
         case 'export':

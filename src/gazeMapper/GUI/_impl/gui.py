@@ -1000,7 +1000,7 @@ class GUI:
                 plane_dir = config.guess_config_dir(self.study_config.working_directory)/p.name
                 if problem_fields:
                     imgui.pop_style_color()
-                if p.type==plane.Type.Plane_2D and imgui.button(ifa6.ICON_FA_BARCODE+f' deploy ArUco markers'):
+                if p.type==plane.Type.Plane_2D and imgui.button(ifa6.ICON_FA_BARCODE+f' get ArUco markers'):
                     gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='deploy_aruco', ArUco_dict=p.aruco_dict, markerBorderBits=p.marker_border_bits))
                 changed, _, new_p, _, _ = settings_editor.draw_dict_editor(copy.deepcopy(p), type(p), 0, {}, list(plane.definition_parameter_types[p.type].keys()), plane.definition_parameter_types[p.type], plane.definition_defaults[p.type], problems=problem_fields, fixed=fixed_fields, documentation=plane.definition_parameter_doc)
                 if changed:
@@ -1022,6 +1022,10 @@ class GUI:
                     imgui.begin_tooltip()
                     self._plane_preview_cache[p.name].render(largest=400*hello_imgui.dpi_window_size_factor())
                     imgui.end_tooltip()
+                if p.type==plane.Type.GlassesValidator and p.use_default:
+                    imgui.same_line()
+                    if imgui.button(ifa6.ICON_FA_TICKET+f' get glassesValidator poster pdf'):
+                        gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='deploy_gv_poster_pdf'))
                 imgui.same_line()
                 if imgui.button(ifa6.ICON_FA_TRASH_CAN+' delete plane'):
                     callbacks.delete_plane(self.study_config, p)
