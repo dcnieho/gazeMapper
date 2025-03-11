@@ -660,7 +660,7 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, documenta
 
             imgui.internal.item_size(w_sizes[i])
             # if visible
-            iid = imgui.get_id(f'{val_txt[i]}##{field_lbl}')
+            iid = imgui.get_id(f'{val_txt[i]}##{field_lbl}_{i}')
             if imgui.internal.item_add(t_bb, iid):
                 # enable interaction
                 if (has_order and len(val)>1) or val_tooltips[i]:
@@ -690,7 +690,7 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, documenta
                         imgui.end_drag_drop_source()
 
                 imgui.set_cursor_screen_pos((t_bb.min.x+2*x_padding+t_sizes[i].x,t_pos.y))
-                if imgui.small_button(f'x##{field_lbl}_{val_txt[i]}'):
+                if imgui.small_button(f'x##{field_lbl}_{i}'):
                     to_remove = v
 
             imgui.end_group()
@@ -751,7 +751,7 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, documenta
             drag_drop_result = None
             for i,t_bb in enumerate(bbs):
                 imgui.set_cursor_screen_pos(t_bb.min-(imgui.get_style().item_spacing.x, 0))
-                imgui.invisible_button(f"##{field_lbl}_before_{val_txt[i]}",(imgui.get_style().item_spacing.x, t_bb.get_height()))
+                imgui.invisible_button(f"##{field_lbl}_before_{i}",(imgui.get_style().item_spacing.x, t_bb.get_height()))
                 if imgui.begin_drag_drop_target():
                     payload = imgui.accept_drag_drop_payload_py_id(field_lbl)
                     if payload is not None:
@@ -759,7 +759,7 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, documenta
                     imgui.end_drag_drop_target()
                 if i==len(bbs)-1 or i+1 in line_break_idxs:
                     imgui.set_cursor_screen_pos((t_bb.max.x, t_bb.min.y))
-                    imgui.invisible_button(f"##{field_lbl}_after_{val_txt[i]}",(imgui.get_style().item_spacing.x, t_bb.get_height()))
+                    imgui.invisible_button(f"##{field_lbl}_after_{i}",(imgui.get_style().item_spacing.x, t_bb.get_height()))
                     if imgui.begin_drag_drop_target():
                         payload = imgui.accept_drag_drop_payload_py_id(field_lbl)
                         if payload is not None:
