@@ -151,7 +151,7 @@ def _determine_to_invalidate(action: Action, study_config: 'config.Study') -> se
         case Action.IMPORT:
             return action.next_values()
         case Action.MAKE_GAZE_OVERLAY_VIDEO:
-            return set()
+            return {Action.EXPORT_TRIALS}
         case Action.CODE_EPISODES:
             actions = {a for a in action.next_values() if a not in [Action.AUTO_CODE_SYNC, Action.AUTO_CODE_TRIALS]}
             if study_config.auto_code_sync_points or study_config.auto_code_trial_episodes:
@@ -180,7 +180,7 @@ def _determine_to_invalidate(action: Action, study_config: 'config.Study') -> se
         case Action.SYNC_TO_REFERENCE:
             return {a for a in Action.GAZE_TO_PLANE.next_values(inclusive=True) if a not in [Action.AUTO_CODE_TRIALS, Action.AUTO_CODE_SYNC, Action.SYNC_ET_TO_CAM, Action.SYNC_TO_REFERENCE]}
         case Action.RUN_VALIDATION:
-            return set()
+            return {Action.EXPORT_TRIALS}
         case Action.EXPORT_TRIALS:
             return set()
         case Action.MAKE_MAPPED_GAZE_VIDEO:
