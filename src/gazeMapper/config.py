@@ -845,7 +845,7 @@ class StudyOverride:
 
 def _apply_impl(obj, overrides: dict[str,Any], annotations: dict[str,typing.Type]|None):
     for p in overrides:
-        ori_val = obj[p] if isinstance(obj,dict) else getattr(obj,p)
+        ori_val = obj.get(p,None) if isinstance(obj,dict) else getattr(obj,p)
         val = overrides[p]
         just_set = ori_val is None
         if not just_set and (isinstance(val,dict) or type_utils.is_NamedTuple_type(type(val))):
