@@ -209,7 +209,7 @@ def _is_recording_action_possible(rec: str, action_states: dict[Action, State], 
     preconditions = {Action.IMPORT} # IMPORT is a precondition for all actions except IMPORT itself
     match action:
         case Action.IMPORT:
-            return action_states[Action.IMPORT]==State.Not_Run  # possible if not already imported
+            return action_states[Action.IMPORT]==State.Not_Run, []  # possible if not already imported
         case Action.MAKE_GAZE_OVERLAY_VIDEO:
             pass    # nothing besides import
         case Action.CODE_EPISODES:
