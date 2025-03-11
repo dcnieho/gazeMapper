@@ -28,7 +28,7 @@ def run(working_dir: str|pathlib.Path, export_path: str|pathlib.Path, to_export:
         export_plane_gaze(export_path, working_dir, study_config, recs)
 
     if 'video' in to_export:
-        export_detectOutput_video(export_path, working_dir, recs)
+        export_mappedGaze_video(export_path, working_dir, recs)
 
     # update state
     session.update_action_states(working_dir, process.Action.EXPORT_TRIALS, process.State.Completed, study_config)
@@ -125,11 +125,11 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
         # store
         # write into df (use polars as that library saves to file waaay faster)
         plane_gazes = pl.from_pandas(plane_gazes)
-        plane_gazes.write_csv(export_path / f'{working_dir.name}_{r}_{naming.gaze_export_name}.tsv', separator='\t', null_value='nan', float_precision=8)
+        plane_gazes.write_csv(export_path / f'{naming.gaze_export_name}_{working_dir.name}_{r}.tsv', separator='\t', null_value='nan', float_precision=8)
 
-def export_detectOutput_video(export_path: pathlib.Path, working_dir: pathlib.Path, recs: list[str]):
+def export_mappedGaze_video(export_path: pathlib.Path, working_dir: pathlib.Path, recs: list[str]):
     for r in recs:
-        inFile = working_dir/r/naming.process_video
+        inFile = working_dir/r/naming.mapped_gaze_video
         if not inFile.is_file():
             continue
-        shutil.copy2(inFile, export_path / f'{working_dir.name}_{r}.mp4')
+        shutil.copy2(inFile, export_path / f'mappedGaze_{working_dir.name}_{r}.mp4')

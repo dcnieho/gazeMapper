@@ -280,12 +280,12 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
         # open output video files
         for v in write_vids:
             # get which pixel format
-            codec    = ffpyplayer.tools.get_format_codec(fmt=pathlib.Path(naming.process_video).suffix[1:])
+            codec    = ffpyplayer.tools.get_format_codec(fmt=pathlib.Path(naming.mapped_gaze_video).suffix[1:])
             pix_fmt  = ffpyplayer.tools.get_best_pix_fmt('bgr24',ffpyplayer.tools.get_supported_pixfmts(codec))
             fpsFrac  = Fraction(vid_info[lead_vid][2]).limit_denominator(10000).as_integer_ratio()
             # scene video
             out_opts = {'pix_fmt_in':'bgr24', 'pix_fmt_out':pix_fmt, 'width_in':vid_info[v][0], 'height_in':vid_info[v][1], 'frame_rate':fpsFrac}
-            vid_writer[v] = MediaWriter(str(working_dir / v / naming.process_video), [out_opts], overwrite=True)
+            vid_writer[v] = MediaWriter(str(working_dir / v / naming.mapped_gaze_video), [out_opts], overwrite=True)
 
         # update state: set to not run so that if we crash or cancel below the task is correctly marked as not run (video files are corrupt)
         session.update_action_states(working_dir, process.Action.MAKE_MAPPED_GAZE_VIDEO, process.State.Not_Run, study_config)
@@ -446,8 +446,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
         if shutil.which('ffmpeg') is not None:
             for v in write_vids:
                 rec_working_dir = working_dir / v
-
-                file = rec_working_dir / naming.process_video
+                file = rec_working_dir / naming.mapped_gaze_video
 
                 # check if source file has audio
                 command = ['ffprobe',
