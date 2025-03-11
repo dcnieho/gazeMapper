@@ -22,13 +22,14 @@ def run(working_dir: str|pathlib.Path, export_path: str|pathlib.Path, to_export:
     study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir}, **study_settings)
     # get session info
     session_info = session.Session.from_definition(study_config.session_def, working_dir)
-    recs    = [r for r in session_info.recordings if session_info.recordings[r].definition.type==session.RecordingType.Eye_Tracker]
+    all_recs    = [r for r in session_info.recordings]
+    et_recs     = [r for r in session_info.recordings if session_info.recordings[r].definition.type==session.RecordingType.Eye_Tracker]
 
     if 'planeGaze' in to_export:
-        export_plane_gaze(export_path, working_dir, study_config, recs)
+        export_plane_gaze(export_path, working_dir, study_config, et_recs)
 
     if 'video' in to_export:
-        export_mappedGaze_video(export_path, working_dir, recs)
+        export_mappedGaze_video(export_path, working_dir, all_recs)
 
     # update state
     session.update_action_states(working_dir, process.Action.EXPORT_TRIALS, process.State.Completed, study_config)
