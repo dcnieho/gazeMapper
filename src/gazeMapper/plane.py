@@ -72,7 +72,7 @@ class Definition_GlassesValidator(Definition):
                  use_default        : bool = True,
                  ):
         super().__init__(Type.GlassesValidator, name)
-        self.use_default= use_default   # If True, denotes this is the default/built-in glassesValidator plane, if False, denotes custom settings are expected
+        self.use_default        = use_default           # If True, denotes this is the default/built-in glassesValidator plane, if False, denotes custom settings are expected
         # custom settings
         self.aruco_dict         = aruco_dict
         self.marker_border_bits = marker_border_bits
