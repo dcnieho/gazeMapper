@@ -232,7 +232,7 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, fields: list=None
                     all_fields = set((e for e in kv_type[0]))
         if kv_type and len(kv_type)==2:
             # get value type, if meaningful
-            if typing.get_origin(kv_type[1]) not in [typing.Any, typing.Union]:
+            if kv_type[1]!=typing.Any and typing.get_origin(kv_type[1]) not in [typing.Union]:
                 if all_fields:
                     types = {k:kv_type[1] for k in all_fields}
                 else:
