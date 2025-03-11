@@ -847,7 +847,8 @@ def _apply_impl(obj, overrides: dict[str,Any], annotations: dict[str,typing.Type
     for p in overrides:
         ori_val = obj.get(p,None) if isinstance(obj,dict) else getattr(obj,p)
         val = overrides[p]
-        just_set = ori_val is None
+        not_found= isinstance(obj,dict) and p not in obj
+        just_set = ori_val is None and not not_found
         if not just_set and (isinstance(val,dict) or type_utils.is_NamedTuple_type(type(val))):
             # dict-like object: recurse
             val = _apply_impl(ori_val, {p2: val[p2] if isinstance(val,dict) else getattr(val,p2) for p2 in type_utils.get_fields(val) if (isinstance(val,dict) and p2 in val) or hasattr(val,p2)}, type_utils.get_annotations(ori_val))
@@ -855,7 +856,8 @@ def _apply_impl(obj, overrides: dict[str,Any], annotations: dict[str,typing.Type
         # special case: for dict-like object we can unset specific fields, so allow those by skipping check for them
         if not just_set and val is None and (annotations is None or p not in annotations or not utils.unpack_none_union(annotations[p])[1]):
             if isinstance(obj,dict):
-                del obj[p]
+                if p in obj:
+                    del obj[p]
             else:
                 delattr(obj,p)
         else:
