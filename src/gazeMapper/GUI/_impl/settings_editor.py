@@ -305,6 +305,7 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, actual_types: dic
                 nonlocal new_item_type
                 if missing_fields:
                     obj[new_item_name] = types[new_item_name]()
+                    t = types[new_item_name]
                 else:
                     if new_item_type.startswith('list'):
                         t = getattr(builtins,'list')
