@@ -1258,7 +1258,6 @@ class GUI:
                 else:
                     running = [(s,r) for s in actions_running if a in actions_running[s] for r in actions_running[s][a]]
                     hover_text = f'Cancel running {a.displayable_name} for session(s):\n- '+'\n- '.join([f'{s}, recording(s):\n  - '+'\n  - '.join(actions_running[s][a]) for s in actions_running if a in actions_running[s]])
-                hover_text = hover_text.replace('running Run','Run')    # deal with task called "Run Validation"
                 icon = ifa6.ICON_FA_HAND
             else:
                 if process.is_session_level_action(a):
@@ -1278,8 +1277,6 @@ class GUI:
                         hover_text = process.get_impossible_reason_text(a, actions)
                     status = [self.sessions[s].recordings[r].state[a] for s in actions if a in actions[s] for r in actions[s][a][0]]
                     status = max(status) if status else process.State.Not_Run
-                hover_text = hover_text.replace('Run Run','Run')    # deal with task called "Run Validation"
-                hover_text = hover_text.replace('run Run','run')    # deal with task called "Run Validation"
                 if a.has_options and possible:
                     hover_text += '\nShift-click to bring up a popup with configuration options for this run.'
                 icon = ifa6.ICON_FA_PLAY if status<process.State.Completed else ifa6.ICON_FA_ARROW_ROTATE_RIGHT
@@ -1338,17 +1335,14 @@ class GUI:
             if running:
                 possible = True
                 hover_text = f'Cancel running {a.displayable_name} for recordings:\n- '+'\n- '.join(running)
-                hover_text = hover_text.replace('running Run','Run')    # deal with task called "Run Validation"
                 icon = ifa6.ICON_FA_HAND
             else:
                 to_run = [r for r in actions if a in actions[r] and actions[r][a][0]]
                 possible = not not to_run
                 if possible:
                     hover_text = f'Run {a.displayable_name} for recordings:\n- '+'\n- '.join(to_run)
-                    hover_text = hover_text.replace('Run Run','Run')        # deal with task called "Run Validation"
                 else:
                     hover_text = process.get_impossible_reason_text(a, actions, for_recording=True)
-                    hover_text = hover_text.replace('run Run','run')    # deal with task called "Run Validation"
                 status = [sess.recordings[r].state[a] for r in to_run]
                 status = max(status) if status else process.State.Not_Run
                 if a.has_options and possible:

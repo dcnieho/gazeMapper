@@ -26,7 +26,7 @@ class Action(enum.IntEnum):
     AUTO_CODE_TRIALS = enum.auto()
     SYNC_ET_TO_CAM = enum.auto()
     SYNC_TO_REFERENCE = enum.auto()
-    RUN_VALIDATION = enum.auto()
+    VALIDATE = enum.auto()
     EXPORT_TRIALS = enum.auto()
     MAKE_MAPPED_GAZE_VIDEO = enum.auto()
     @property
@@ -61,7 +61,7 @@ class Action(enum.IntEnum):
             pass    # we're done
         return vals
 def action_str_to_enum_val(x: str) -> Action:
-    return utils.enum_str_2_val(x, Action, {'MAKE_VIDEO':'MAKE_MAPPED_GAZE_VIDEO'})
+    return utils.enum_str_2_val(x, Action, {'MAKE_VIDEO':'MAKE_MAPPED_GAZE_VIDEO', 'RUN_VALIDATION':'VALIDATE'})
 utils.register_type(utils.CustomTypeEntry(Action, '__enum.process.Action__', utils.enum_val_2_str, action_str_to_enum_val))
 
 def action_to_func(action: Action) -> typing.Callable[..., None]:
@@ -98,7 +98,7 @@ def action_to_func(action: Action) -> typing.Callable[..., None]:
             return sync_et_to_cam
         case Action.SYNC_TO_REFERENCE:
             return sync_to_ref
-        case Action.RUN_VALIDATION:
+        case Action.VALIDATE:
             return run_validation
         case Action.EXPORT_TRIALS:
             return export_trials
@@ -120,7 +120,7 @@ def is_action_possible_given_config(action: Action, study_config: 'config.Study'
             return study_config.get_cam_movement_for_et_sync_method in ['plane', 'function']
         case Action.SYNC_TO_REFERENCE:
             return not not study_config.sync_ref_recording
-        case Action.RUN_VALIDATION:
+        case Action.VALIDATE:
             return annotation.Event.Validate in study_config.planes_per_episode
         case Action.EXPORT_TRIALS:
             return True     # always possible (in terms of config), since gaze overlay videos are always possible
@@ -133,7 +133,7 @@ def is_action_possible_given_config(action: Action, study_config: 'config.Study'
 
 def is_action_possible_for_recording(rec: str, rec_type: 'session.RecordingType', action: Action, study_config: 'config.Study') -> bool:
     from .. import session
-    if rec_type==session.RecordingType.Camera and action in [Action.MAKE_GAZE_OVERLAY_VIDEO, Action.GAZE_TO_PLANE, Action.SYNC_ET_TO_CAM, Action.RUN_VALIDATION]:
+    if rec_type==session.RecordingType.Camera and action in [Action.MAKE_GAZE_OVERLAY_VIDEO, Action.GAZE_TO_PLANE, Action.SYNC_ET_TO_CAM, Action.VALIDATE]:
         return False
     elif action==Action.AUTO_CODE_TRIALS and study_config.sync_ref_recording and rec!=study_config.sync_ref_recording:
         # if we have a sync_ref_recording, automatic coding of trials is only possible for the sync_ref_recording, not the other recordings
@@ -170,7 +170,7 @@ def _determine_to_invalidate(action: Action, study_config: 'config.Study') -> se
         case Action.AUTO_CODE_SYNC:
             return {Action.CODE_EPISODES, Action.GAZE_TO_PLANE, Action.SYNC_TO_REFERENCE, Action.EXPORT_TRIALS, Action.MAKE_MAPPED_GAZE_VIDEO}
         case Action.AUTO_CODE_TRIALS:
-            actions = {a for a in Action.CODE_EPISODES.next_values(inclusive=True) if a not in [Action.AUTO_CODE_TRIALS, Action.AUTO_CODE_SYNC, Action.SYNC_ET_TO_CAM, Action.SYNC_TO_REFERENCE, Action.RUN_VALIDATION]}
+            actions = {a for a in Action.CODE_EPISODES.next_values(inclusive=True) if a not in [Action.AUTO_CODE_TRIALS, Action.AUTO_CODE_SYNC, Action.SYNC_ET_TO_CAM, Action.SYNC_TO_REFERENCE, Action.VALIDATE]}
             if study_config.auto_code_sync_points or study_config.auto_code_trial_episodes:
                 # if there is some form of automatic coding configured, then the whole video will be processed for each recording in a session, and thus coding doesn't invalidate the processed video
                 actions.discard(Action.DETECT_MARKERS)
@@ -179,7 +179,7 @@ def _determine_to_invalidate(action: Action, study_config: 'config.Study') -> se
             return {a for a in Action.GAZE_TO_PLANE.next_values(inclusive=True) if a not in [Action.AUTO_CODE_TRIALS, Action.AUTO_CODE_SYNC, Action.SYNC_ET_TO_CAM]}
         case Action.SYNC_TO_REFERENCE:
             return {a for a in Action.GAZE_TO_PLANE.next_values(inclusive=True) if a not in [Action.AUTO_CODE_TRIALS, Action.AUTO_CODE_SYNC, Action.SYNC_ET_TO_CAM, Action.SYNC_TO_REFERENCE]}
-        case Action.RUN_VALIDATION:
+        case Action.VALIDATE:
             return {Action.EXPORT_TRIALS}
         case Action.EXPORT_TRIALS:
             return set()
@@ -227,7 +227,7 @@ def _is_recording_action_possible(rec: str, action_states: dict[Action, State], 
             preconditions.update([Action.DETECT_MARKERS])
         case Action.SYNC_ET_TO_CAM:
             preconditions.update([Action.CODE_EPISODES, Action.DETECT_MARKERS])
-        case Action.RUN_VALIDATION:
+        case Action.VALIDATE:
             preconditions.update([Action.CODE_EPISODES, Action.GAZE_TO_PLANE])
         case _:
             raise NotImplementedError(f'Logic is not implemented for {action.displayable_name} ({action}), major developer oversight! Let him know.')
@@ -250,7 +250,7 @@ def _is_session_action_possible(session_action_states: dict[Action, State], reco
             if study_config.get_cam_movement_for_et_sync_method in ['plane', 'function']:
                 preconditions.add(Action.SYNC_ET_TO_CAM)
         case Action.EXPORT_TRIALS:
-            preconditions.update([Action.MAKE_GAZE_OVERLAY_VIDEO, Action.GAZE_TO_PLANE, Action.RUN_VALIDATION, Action.MAKE_MAPPED_GAZE_VIDEO])
+            preconditions.update([Action.MAKE_GAZE_OVERLAY_VIDEO, Action.GAZE_TO_PLANE, Action.VALIDATE, Action.MAKE_MAPPED_GAZE_VIDEO])
             preconditions_test = 'or'
         case Action.MAKE_MAPPED_GAZE_VIDEO:
             preconditions.update([Action.CODE_EPISODES])

@@ -196,7 +196,7 @@ Example 1 is a minimum example, showing a short recording where a participant lo
         To align the two signals in time with each other, drag the green dot in the middle of either plot. The horizontal offset is the applied time shift (indicated by the value in the lower-right corner of the upper plot). Any vertical shift is not stored, but can be useful when aligning the two signals. When done aligning the two signals, press done atop the window.
 
     1. Next, run the `Gaze to plane` action.
-    1. Next, run the `Validation` action.
+    1. Next, run the `Validate` action.
     1. Finally, run the `Make mapped gaze video` action, which draws the detected markers, the participant's gaze and the projection of that gaze to the plane on the scene video, along with information about the episode annotations.
     1. Now, you can export the gaze data projected to the plane, the created video and the glassesValidator data quality measures to a folder of your choosing using the `Export trials` action. An export for this example after following the above steps is [available here](https://lu.box.com/s/oum8tp5joh1z08f4it6sc1zkmyzaa8dz).
 
@@ -301,7 +301,7 @@ Nonetheless, below we provide a full description of how recording preparation, d
 
     1. Next, run the `Sync to reference` action to synchronize the two recordings together.
     1. Next, run the `Gaze to plane` action.
-    1. Next, run the `Validation` action.
+    1. Next, run the `Validate` action.
     1. Finally, run the `Make mapped gaze video` action, which draws the detected markers, the participant's gaze and the projection of that gaze to the plane on the scene video, along with information about the episode annotations.
     1. Now, you can export the gaze data projected to the plane, the created video and the glassesValidator data quality measures to a folder of your choosing using the `Export trials` action. An export for this example after following the above steps is [available here](https://lu.box.com/s/oum8tp5joh1z08f4it6sc1zkmyzaa8dz).
 
@@ -396,7 +396,7 @@ Example 3 is a more advanced example, showing a recording of a participant looki
 
     1. Next, run the `Sync to reference` action to synchronize the two recordings together.
     1. Next, run the `Gaze to plane` action.
-    1. Next, run the `Validation` action.
+    1. Next, run the `Validate` action.
     1. Finally, run the `Make mapped gaze video` action, which draws the detected markers, the participant's gaze and the projection of that gaze to the plane on the scene video, along with information about the episode annotations.
     1. Now, you can export the gaze data projected to the plane, the created video and the glassesValidator data quality measures to a folder of your choosing using the `Export trials` action. An export for this example after following the above steps is [available here](https://lu.box.com/s/oum8tp5joh1z08f4it6sc1zkmyzaa8dz).
 
@@ -586,7 +586,7 @@ gazeMapper can perform the following processing actions on a wearable eye tracki
 |`AUTO_CODE_TRIALS`|`auto_code_trial_episodes` option|recording|[Automatically find trial start and ends](#automatic-coding-of-analysis-and-synchronization-episodes) using fiducial markers in the scene camera.|
 |`SYNC_ET_TO_CAM`|`get_cam_movement_for_et_sync_method` option|recording|[Synchronize gaze data to the scene camera](#synchronizing-eye-tracker-data-and-scene-camera). Shows a GUI for manually performing this synchronization.|
 |`SYNC_TO_REFERENCE`|`sync_ref_recording` option|session|[Synchronize the gaze data and cameras of multiple recordings](#synchronizing-multiple-eye-tracker-or-external-camera-recordings). Only makes sense to perform if there are multiple recordings in a session, since otherwise there is nothing to synchronize.|
-|`RUN_VALIDATION`|[plane setup](#gazemapper-planes) and [episode coding setup](#coding-analysis-synchronization-and-validation-episodes)|recording|Run [glassesValidator](#validation-glassesvalidator-planes) to compute data quality from the gaze data of a participant looking at a validation poster.|
+|`VALIDATE`|[plane setup](#gazemapper-planes) and [episode coding setup](#coding-analysis-synchronization-and-validation-episodes)|recording|Run [glassesValidator](#validation-glassesvalidator-planes) to compute data quality from the gaze data of a participant looking at a validation poster.|
 |`EXPORT_TRIALS`|always|session|Create file for each recording containing the gaze position on one or multiple planes.|
 |`MAKE_MAPPED_GAZE_VIDEO`|`video_make_which` option|session|Make videos of the eye tracker scene camera or external camera (synchronized if there are multiple) showing gaze on the scene video from the eye tracker, gaze projected to the detected planes, detected plane origins, detected individual markers, and gaze from other eye tracker recordings (if available).|
 
@@ -722,7 +722,7 @@ These settings are used for when the `get_cam_movement_for_et_sync_method` setti
 |Parameters|`parameters`||`dict` of `kwargs` to pass to the function. The frame to process (`np.ndarray`) is the first (positional) input passed to the function, and should not be specified in this dict.|
 
 ## `gazeMapper.config.I2MCSettings`
-Settings used when running [I2MC](https://link.springer.com/article/10.3758/s13428-016-0822-1) fixation classifier used as part of determining the fixation that are assigned to validation targets. Used for the [`gazeMapper.process.Action.RUN_VALIDATION`](#actions), see [here](#validation-glassesvalidator-planes).
+Settings used when running [I2MC](https://link.springer.com/article/10.3758/s13428-016-0822-1) fixation classifier used as part of determining the fixation that are assigned to validation targets. Used for the [`gazeMapper.process.Action.VALIDATE`](#actions), see [here](#validation-glassesvalidator-planes).
 N.B.: The below fields with `None` as the default value are set by glassesValidator based on the input gaze data. When a value is set for one of these settings, it overrides glassesValidator's dynamic parameter setting.
 |Setting<br>name in GUI|Setting name<br>in settings file|Default<br>value|Description|
 | --- | --- | --- | --- |

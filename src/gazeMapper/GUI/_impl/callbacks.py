@@ -343,7 +343,7 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
         if 'plane gaze' not in to_export:
             if annotation.Event.Trial in g.study_config.planes_per_episode and any((s.recordings[r].state[process.Action.GAZE_TO_PLANE]==process.State.Completed for r in s.recordings)):
                 to_export['plane gaze'] = True
-        if recs:=[s.recordings[r].info.working_directory for r in s.recordings if s.recordings[r].state[process.Action.RUN_VALIDATION]==process.State.Completed]:
+        if recs:=[s.recordings[r].info.working_directory for r in s.recordings if s.recordings[r].state[process.Action.VALIDATE]==process.State.Completed]:
             to_export['validation'] = True
             rec_dirs.extend(recs)
         if 'gaze overlay video' not in to_export:

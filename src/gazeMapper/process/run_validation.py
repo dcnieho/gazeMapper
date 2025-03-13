@@ -76,4 +76,4 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
                                 include_data_loss=study_config.validate_include_data_loss)
 
     # update state
-    session.update_action_states(working_dir, process.Action.RUN_VALIDATION, process.State.Completed, study_config)
+    session.update_action_states(working_dir, process.Action.VALIDATE, process.State.Completed, study_config)
