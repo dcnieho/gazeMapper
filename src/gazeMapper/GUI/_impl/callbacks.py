@@ -528,14 +528,14 @@ async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[record
     recs = rec_getter()
     all_recs: list[recording.Recording] = []
     dup_recs: list[recording.Recording] = []
-    known_rec_dirs = [g.sessions[s].recordings[r].info.source_directory for s in g.sessions for r in g.sessions[s].recordings if g.sessions[s].recordings[r].definition.type==dev_type]
+    known_rec_dirs = [g.sessions[s].recordings[r].info.get_source_directory() for s in g.sessions for r in g.sessions[s].recordings if g.sessions[s].recordings[r].definition.type==dev_type]
     known_rec_names= [g.sessions[s].recordings[r].info.name for s in g.sessions for r in g.sessions[s].recordings if g.sessions[s].recordings[r].definition.type==dev_type]
     for rec in recs:
         # skip duplicates. For eye tracker recordings, this checks for the source folder. For camera recordings, its checks for the full file path
         if dev_type==session.RecordingType.Camera:
-            dup = rec.source_directory/rec.video_file in (g.sessions[s].recordings[r].info.source_directory/g.sessions[s].recordings[r].info.video_file for s in g.sessions for r in g.sessions[s].recordings if g.sessions[s].recordings[r].definition.type==dev_type)
+            dup = rec.get_source_directory()/rec.video_file in (g.sessions[s].recordings[r].info.get_source_directory()/g.sessions[s].recordings[r].info.video_file for s in g.sessions for r in g.sessions[s].recordings if g.sessions[s].recordings[r].definition.type==dev_type)
         elif dev_type==session.RecordingType.Eye_Tracker:
-            dup = any([a and b for a,b in zip([rec.source_directory==d for d in known_rec_dirs],[rec.name==n for n in known_rec_names])])
+            dup = any([a and b for a,b in zip([rec.get_source_directory()==d for d in known_rec_dirs],[rec.name==n for n in known_rec_names])])
         if dup:
             dup_recs.append(rec)
         else:
@@ -549,7 +549,7 @@ async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[record
     if not all_recs:
         if dup_recs:
             msg = f"{dev_rec_lbl} were found in the specified import paths, but could not be imported as they are already part of sessions in this gazeMapper project."
-            more= "Duplicates that were not imported:\n"+('\n'.join([str(r.source_directory) for r in dup_recs]))
+            more= "Duplicates that were not imported:\n"+('\n'.join([str(r.get_source_directory()) for r in dup_recs]))
         else:
             msg = f"No {dev_rec_lbl} were found among the specified import paths."
             more = None
@@ -566,7 +566,7 @@ async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[record
     def _recording_context_menu(iid: int) -> bool:
         nonlocal selected_slot
         if imgui.selectable(ifa6.ICON_FA_FOLDER_OPEN + f" Open folder##{iid}", False)[0]:
-            open_folder(recordings_to_add[iid].source_directory)
+            open_folder(recordings_to_add[iid].get_source_directory())
         if selected_slot is not None and imgui.selectable(ifa6.ICON_FA_ARROW_LEFT + f" Assign to selected recording", False)[0]:
             recording_assignment[selected_slot[0]][selected_slot[1]] = iid
             selected_slot = None

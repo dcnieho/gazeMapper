@@ -1386,7 +1386,7 @@ class GUI:
         if not recs:
             return False
         plural = 's' if len(recs)>1 else ''
-        source_directories = [sd for s,r in recs if (sd:=sess[s].recordings[r].info.source_directory).is_dir()]
+        source_directories = [sd for s,r in recs if (sd:=sess[s].recordings[r].info.get_source_directory()) is not None and sd.is_dir()]
         if source_directories and imgui.selectable(ifa6.ICON_FA_FOLDER_OPEN + " Open recording source folder"+plural, False)[0]:
             for s in source_directories:
                 callbacks.open_folder(s)
