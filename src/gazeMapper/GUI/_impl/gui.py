@@ -1313,8 +1313,7 @@ class GUI:
             for s in sess:
                 callbacks.remove_folder(s.working_directory)
             changed = True
-        if len(sess)==1 and sess[0].recordings:
-            changed |= self._draw_context_menu_items_for_recording_folders(sess[0], list(sess[0].recordings))
+        changed |= self._draw_context_menu_items_for_recording_folders(sess, None)
         return changed
     def _recording_context_menu(self, session_name: str, rec_name: str) -> bool:
         # ignore input recording name, get selected sessions
@@ -1375,21 +1374,30 @@ class GUI:
             if imgui.selectable(ifa6.ICON_FA_DOWNLOAD+' Set calibration XML', False)[0]:
                 gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='set_cam_cal', working_directory=working_directory))
             imgui.end_menu()
-        changed = self._draw_context_menu_items_for_recording_folders(sess, recs)
+        changed = self._draw_context_menu_items_for_recording_folders([sess], recs)
         return changed
-    def _draw_context_menu_items_for_recording_folders(self, sess: session.Session, recs: list[str]):
+    def _draw_context_menu_items_for_recording_folders(self, sess: list[session.Session], recs: list[str]|None):
+        if recs is None:
+            recs = [(i,r) for i,s in enumerate(sess) for r in s.recordings]
+        else:
+            if not len(sess)==1:
+                raise RuntimeError('Programmer error. If recs argument is provided, there should only be a single session provided')
+            recs = [(0,r) for r in recs]
+        if not recs:
+            return False
         plural = 's' if len(recs)>1 else ''
-        source_directories = [sd for r in recs if (sd:=sess.recordings[r].info.source_directory).is_dir()]
+        source_directories = [sd for s,r in recs if (sd:=sess[s].recordings[r].info.source_directory).is_dir()]
         if source_directories and imgui.selectable(ifa6.ICON_FA_FOLDER_OPEN + " Open recording source folder"+plural, False)[0]:
             for s in source_directories:
                 callbacks.open_folder(s)
         changed = False
-        if imgui.selectable(ifa6.ICON_FA_FOLDER_OPEN + " Open recording working folder"+plural, False)[0]:
-            for r in recs:
-                callbacks.open_folder(sess.recordings[r].info.working_directory)
-        if imgui.selectable(ifa6.ICON_FA_TRASH_CAN + " Delete recording"+plural, False)[0]:
-            for r in recs:
-                callbacks.remove_folder(sess.recordings[r].info.working_directory)
+        working_directories = [wd for s,r in recs if (wd:=sess[s].recordings[r].info.working_directory) and wd.is_dir()]
+        if working_directories and imgui.selectable(ifa6.ICON_FA_FOLDER_OPEN + " Open recording working folder"+plural, False)[0]:
+            for s,r in recs:
+                callbacks.open_folder(sess[s].recordings[r].info.working_directory)
+        if working_directories and imgui.selectable(ifa6.ICON_FA_TRASH_CAN + " Delete recording"+plural, False)[0]:
+            for s,r in recs:
+                callbacks.remove_folder(sess[s].recordings[r].info.working_directory)
             changed = True
         return changed
     def _filter_session_context_menu_actions(self, session_name: str, rec_name: str|None, actions: dict[process.Action,bool|list[str]]) -> tuple[dict[process.Action,bool|list[str]], dict[process.Action,int|dict[str,int]]]:
