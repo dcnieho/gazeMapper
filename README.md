@@ -169,7 +169,7 @@ Example 1 is a minimum example, showing a short recording where a participant lo
 
         ![Project config](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/project_config_1.png?raw=true)
 4. Now that the project is set up, we are ready to import and process recordings.
-    1. On the `Session` pane, click `import eye tracker recordings`. There, select the [folder containing the example data](https://github.com/dcnieho/gazeMapper/tree/master/example_data/1_simple/data) and indicate its an `SMI ETG` recording. Note that you could also trigger import by drag-dropping a data folder onto gazeMapper. Note also that an SMI ETG recording has to be [prepared](#required-preprocessing-outside-gazemapper) before it can be imported by gazeMapper. This preparation has already been performed for the included example data.
+    1. On the `Session` pane, click `import eye tracker recordings`. There, select the [folder containing the example data](https://github.com/dcnieho/gazeMapper/tree/master/example_data/1_simple/data) (`1_simple/data`) and indicate its an `SMI ETG` recording. Note that you could also trigger import by drag-dropping a data folder onto gazeMapper. Note also that an SMI ETG recording has to be [prepared](#required-preprocessing-outside-gazemapper) before it can be imported by gazeMapper. This preparation has already been performed for the included example data.
     1. On the window that pops up, click `+ new session`, and name the session `1` (or any name you like). Expand session `1`. You should now see the following:
 
         ![Add recording 1](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/add_recording_1_1.png?raw=true)
@@ -264,12 +264,12 @@ Nonetheless, below we provide a full description of how recording preparation, d
 
         ![Project config](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/project_config_2.png?raw=true)
 4. Now that the project is set up, we are ready to import and process recordings.
-    1. On the `Session` pane, click `import eye tracker recordings`. There, select the [folder containing the example data](https://github.com/dcnieho/gazeMapper/tree/master/example_data/2_two_participants_two_planes/data) and indicate you're looking for `Tobii Glasses 2` recordings. Note that you could also trigger import by drag-dropping a data folder onto gazeMapper.
+    1. On the `Session` pane, click `import eye tracker recordings`. There, select the [folder containing the example data](https://github.com/dcnieho/gazeMapper/tree/master/example_data/2_two_participants_two_planes/data) (`2_two_participants_two_planes/data`) and indicate you're looking for `Tobii Glasses 2` recordings. Note that you could also trigger import by drag-dropping a data folder onto gazeMapper.
     1. On the window that pops up, click `+ new session`, and name the session `1` (or any name you like). Expand session `1`. You should now see the following:
 
         ![Add recording 1](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/add_recording_2_1.png?raw=true)
     1. Assign the recording to the session by dragging it from the right, and dropping it on the left for the `lead` recording where it says `drop recording here`. Click `Continue`. The recording will now be imported.
-    1. Again click `import eye tracker recordings`, select the [folder containing the example data](https://github.com/dcnieho/gazeMapper/tree/master/example_data/2_two_participants_two_planes/data) and this time indicate you're looking for `Pupil Invisible` recordings. Assign the found Pupil Invisible recording to the `follow` recording.
+    1. Again click `import eye tracker recordings`, select the [folder containing the example data](https://github.com/dcnieho/gazeMapper/tree/master/example_data/2_two_participants_two_planes/data) (`2_two_participants_two_planes/data`) and this time indicate you're looking for `Pupil Invisible` recordings. Assign the found Pupil Invisible recording to the `follow` recording.
 
         ![Add recording 2](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/add_recording_2_2.png?raw=true)
 
@@ -363,12 +363,12 @@ Example 3 is a more advanced example, showing a recording of a participant looki
 
         ![Project config](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/project_config_3.png?raw=true)
 4. Now that the project is set up, we are ready to import and process recordings.
-    1. On the `Session` pane, click `import eye tracker recordings`. There, select the [folder containing the example data](https://github.com/dcnieho/gazeMapper/tree/master/example_data/3_external_camera_moving_plane/data) and indicate you're looking for `Pupil Invisible` recordings. Note that you could also trigger import by drag-dropping a data folder onto gazeMapper.
+    1. On the `Session` pane, click `import eye tracker recordings`. There, select the [folder containing the example data](https://github.com/dcnieho/gazeMapper/tree/master/example_data/3_external_camera_moving_plane/data) (`3_external_camera_moving_plane/data`) and indicate you're looking for `Pupil Invisible` recordings. Note that you could also trigger import by drag-dropping a data folder onto gazeMapper.
     1. On the window that pops up, click `+ new session`, and name the session `1` (or any name you like). Expand session `1`. You should now see the following:
 
         ![Add recording 1](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/add_recording_3_1.png?raw=true)
     1. Assign the recording to the session by dragging it from the right, and dropping it on the left for the `eye tracker` recording where it says `drop recording here`. Click `Continue`. The recording will now be imported.
-    1. Click `import camera recordings`, select the [folder containing the example data](https://github.com/dcnieho/gazeMapper/tree/master/example_data/3_external_camera_moving_plane/data) and click continue. Assign the found camera recording (`cam1_R003_reencode.mp4`) to the `overview` recording.
+    1. Click `import camera recordings`, select the [folder containing the example data](https://github.com/dcnieho/gazeMapper/tree/master/example_data/3_external_camera_moving_plane/data) (`3_external_camera_moving_plane/data`) and click continue. Assign the found camera recording (`cam1_R003_reencode.mp4`) to the `overview` recording.
 
         ![Add recording 2](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/add_recording_3_2.png?raw=true)
 
@@ -550,7 +550,7 @@ A generic 2D fiducial marker plane is defined by a file with four columns that d
 | `y` |The vertical location of the marker's center on the plane (mm).|
 | `rotation_angle` |The rotation of the marker, if any (degree).|
 
-A file with this information should be stored under any name (e.g., `markerPositions.csv`) in the plane's configuration folder inside the project's configuration folder. See the example data for an example of such a file (TODO).
+A file with this information should be stored under any name (e.g., `markerPositions.csv`) in the plane's configuration folder inside the project's configuration folder. See the [example data](https://github.com/dcnieho/gazeMapper/blob/master/example_data/1_simple/configuration/screen/markerPositions_screen.csv) for an example of such a file.
 
 To be able turn the information of the above file into a plane, further settings are needed:
 | Setting | Description |
