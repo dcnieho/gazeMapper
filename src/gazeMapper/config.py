@@ -268,19 +268,19 @@ class Study:
                 case annotation.Event.Trial:
                     allow_one_plane = allow_more_than_one = True
             if not allow_one_plane:
-                msg = f'No planes should be defined for a {e.value} episode. Remove entry, even if its empty.'
+                msg = f'No planes should be defined for a {annotation.tooltip_map[e]}. Remove entry, even if its empty.'
                 if strict_check:
                     raise ValueError(msg)
                 else:
                     type_utils.merge_problem_dicts(problems, {'planes_per_episode': {e: msg}})
             elif not self.planes_per_episode[e]:
-                msg = ('At least one' if allow_more_than_one else 'One')+f' plane should be defined for a {e.value} episode'
+                msg = ('At least one' if allow_more_than_one else 'One')+f' plane should be defined for a {annotation.tooltip_map[e]}'
                 if strict_check:
                     raise ValueError(msg)
                 else:
                     type_utils.merge_problem_dicts(problems, {'planes_per_episode': {e: msg}})
             if not allow_more_than_one and len(self.planes_per_episode[e])>1:
-                msg = f'Only one plane should be defined for a {e.value} episode'
+                msg = f'Only one plane should be defined for a {annotation.tooltip_map[e]}'
                 if strict_check:
                     raise ValueError(msg)
                 else:
@@ -288,7 +288,7 @@ class Study:
 
         for e in self.episodes_to_code:
             if e not in self.planes_per_episode and e!=annotation.Event.Sync_Camera and (e==annotation.Event.Sync_ET_Data and self.get_cam_movement_for_et_sync_method=='plane'):
-                msg = f'{e.value} episodes are set up to be coded and require an associated plane, but no plane(s) are defined in planes_per_episode for {e.value} episodes'
+                msg = f'{annotation.tooltip_map[e]}s are set up to be coded and require an associated plane, but no plane(s) are defined in planes_per_episode for {annotation.tooltip_map[e]}s'
                 if strict_check:
                     raise ValueError(msg)
                 else:
@@ -300,15 +300,15 @@ class Study:
         if not self.episodes_to_code:
             type_utils.merge_problem_dicts(problems, {'episodes_to_code': 'At minimum one episode should be selected to be coded'})
         if annotation.Event.Sync_ET_Data in self.episodes_to_code and self.get_cam_movement_for_et_sync_method=='':
-            type_utils.merge_problem_dicts(problems, {'episodes_to_code': f'{annotation.Event.Sync_ET_Data.name} should not be listed in the episodes to be coded if there is no method for plane synchronization (get_cam_movement_for_et_sync_method) specified.'})
+            type_utils.merge_problem_dicts(problems, {'episodes_to_code': f'{annotation.tooltip_map[annotation.Event.Sync_ET_Data]} should not be listed in the episodes to be coded if there is no method for plane synchronization (get_cam_movement_for_et_sync_method) specified.'})
 
         for e in self.planes_per_episode:
             if e not in self.episodes_to_code:
                 if strict_check:
-                    raise ValueError(f'Plane(s) are defined in planes_per_episode for {e.name} episodes, but {e.name} episodes are not set up to be coded in episodes_to_code. Fix episodes_to_code.')
+                    raise ValueError(f'Plane(s) are defined in planes_per_episode for {annotation.tooltip_map[e]}s, but {annotation.tooltip_map[e]}s are not set up to be coded in episodes_to_code. Fix episodes_to_code.')
                 else:
-                    type_utils.merge_problem_dicts(problems, {'episodes_to_code': f'Plane(s) are defined in planes_per_episode for {e.value} episodes, but {e.value} episodes are not set up to be coded'})
-                    type_utils.merge_problem_dicts(problems, {'planes_per_episode': {e: f'{e.value} episodes are not set up to be coded in episodes_to_code, so no plane(s) should be set up for {e.value} episodes.'}})
+                    type_utils.merge_problem_dicts(problems, {'episodes_to_code': f'Plane(s) are defined in planes_per_episode for {annotation.tooltip_map[e]}s, but {annotation.tooltip_map[e]}s are not set up to be coded'})
+                    type_utils.merge_problem_dicts(problems, {'planes_per_episode': {e: f'{annotation.tooltip_map[e]}s are not set up to be coded in episodes_to_code, so no plane(s) should be set up for {annotation.tooltip_map[e]}s.'}})
         return problems
 
     def _check_auto_coding_setup(self, strict_check) -> type_utils.ProblemDict:
