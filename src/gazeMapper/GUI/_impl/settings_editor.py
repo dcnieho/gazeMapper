@@ -131,7 +131,7 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
     ret_new_obj = False
     removed_field = None
     for f in fields:
-        if actual_types and f in actual_types and not isinstance(actual_types[f],dict):
+        if isinstance(actual_types,dict) and f in actual_types and not isinstance(actual_types[f],dict):
             tp = actual_types[f]
         else:
             tp = types[f] if f in types else list(types.values())[0]    # backup only needed when we have an invalid config (e.g. trying to show planes_per_episode entry for an episode that is no longer set to be coded)
