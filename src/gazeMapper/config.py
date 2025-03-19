@@ -269,6 +269,8 @@ class Study:
                     allow_one_plane = allow_more_than_one = True
             if not allow_one_plane:
                 msg = f'No planes should be defined for a {annotation.tooltip_map[e]}. Remove entry, even if its empty.'
+                if e==annotation.Event.Sync_ET_Data:
+                    msg += ' Alternatively, you may want to set the get_cam_movement_for_et_sync_method on the main options panel to "Plane".'
                 if strict_check:
                     raise ValueError(msg)
                 else:
@@ -402,8 +404,8 @@ class Study:
             if strict_check:
                 raise ValueError('when sync_ref_recording is set, coding of camera sync points should be set up in episodes_to_code')
             else:
-                problems['episodes_to_code'] = f'if sync_ref_recording is set, {annotation.Event.Sync_Camera.value} events should be set up to be coded'
-                type_utils.merge_problem_dicts(problems, {'sync_ref_recording': f'sync_ref_recording is set, but {annotation.Event.Sync_Camera.value} events are not set up to be coded in episodes_to_code'})
+                problems['episodes_to_code'] = f'if sync_ref_recording is set, {annotation.tooltip_map[annotation.Event.Sync_Camera]}s should be set up to be coded'
+                type_utils.merge_problem_dicts(problems, {'sync_ref_recording': f'sync_ref_recording is set, but {annotation.tooltip_map[annotation.Event.Sync_Camera]}s are not set up to be coded in episodes_to_code'})
         return problems
 
     def _check_et_sync_method(self, strict_check) -> type_utils.ProblemDict:
