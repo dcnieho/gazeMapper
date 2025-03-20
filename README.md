@@ -18,8 +18,7 @@ A data quality tool for eye tracking glasses. Behavior Research Methods. doi: 10
 
 ## Example
 ![application example](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/world_data.png?raw=true)
-Example where gazeMapper has been used to map head-centered gaze from two head-worn eye tracker recordings to synchronized world-centered
-gaze data of the pair, drawn on an overview video recording with an additional external camera. From Hessels, R.S., Iwabuchi, T., Niehorster, D.C., Funawatari, R., Benjamins, J.S., Kawakami, S.; Nyström, M., Suda, M., Hooge, I.T.C., Sumiya, M., Heijnen, J., Teunisse, M. & Senju, A. (submitted). Gaze behavior in face-to-face interaction: A cross-cultural investigation between Japan and the Netherlands. Manuscript submitted for publication, 2024
+Example where gazeMapper has been used to map head-centered gaze from two head-worn eye tracker recordings (top panels, camera positions are indicated using stars, and gaze positions using colored circles. Blue indicated eye tracker 1 [ET1] and orange eye tracker 2). to synchronized world-centered gaze data of the pair, drawn on an overview video frame (bottom panel) recorded with an additional external camera. From [Hessels, R.S.,Teunisse, M., Niehorster, D.C., Nyström, M., Benjamins, J.S., Senju, A. & Hooge, I.T.S. (2023). Task related gaze behaviour in face to face dyadic collaboration: Toward an interactive theory. _Visual Cognition 31_(4), pp. 291-313. doi: 10.1080/13506285.2023.2250507](https://doi.org/10.1080/13506285.2023.2250507).
 
 # How to acquire
 GazeMapper is available from `https://github.com/dcnieho/gazeMapper`, and supports Python 3.11 on Windows, MacOS and Linux (newer versions of Python should work fine but are not tested).
