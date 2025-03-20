@@ -11,14 +11,14 @@ gazeMapper can:
 3) Determine data quality measures, e.g., accuracy and precision using [glassesValidator](https://github.com/dcnieho/glassesValidator) ([Niehorster et al., 2023](https://doi.org/10.3758/s13428-023-02105-5)).
 
 If you use this tool or any of the code in this repository, please cite:<br>
-Niehorster, D.C., Hessels, R.S., Nyström, M., Benjamins, J.S. and Hooge, I.T.C. (submitted). gazeMapper: A tool for automated world-based analysis of gaze data from one or multiple wearable eye trackers. Manuscript submitted for publication, 2024 ([BibTeX](#bibtex))<br>
+Niehorster, D.C., Hessels, R.S., Nyström, M., Benjamins, J.S. and Hooge, I.T.C. (submitted). gazeMapper: A tool for automated world-based analysis of gaze data from one or multiple wearable eye trackers. Manuscript submitted for publication, 2025 ([BibTeX](#bibtex))<br>
 If you use the functionality for automatic determining the data quality (accuracy and precision) of wearable eye tracker recordings, please additionally cite:<br>
 [Niehorster, D.C., Hessels, R.S., Benjamins, J.S., Nyström, M. and Hooge, I.T.C. (2023). GlassesValidator:
 A data quality tool for eye tracking glasses. Behavior Research Methods. doi: 10.3758/s13428-023-02105-5](https://doi.org/10.3758/s13428-023-02105-5) ([BibTeX](#bibtex))
 
 ## Example
 ![application example](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/world_data.png?raw=true)
-Example where gazeMapper has been used to map head-centered gaze from two head-worn eye tracker recordings (top panels, camera positions are indicated using stars, and gaze positions using colored circles. Blue indicated eye tracker 1 [ET1] and orange eye tracker 2). to synchronized world-centered gaze data of the pair, drawn on an overview video frame (bottom panel) recorded with an additional external camera. From [Hessels, R.S.,Teunisse, M., Niehorster, D.C., Nyström, M., Benjamins, J.S., Senju, A. & Hooge, I.T.S. (2023). Task related gaze behaviour in face to face dyadic collaboration: Toward an interactive theory. _Visual Cognition 31_(4), pp. 291-313. doi: 10.1080/13506285.2023.2250507](https://doi.org/10.1080/13506285.2023.2250507).
+Example where gazeMapper has been used to map head-centered eye tracking data from two head-worn eye tracker recordings (top panels, camera positions are indicated using stars, and gaze positions using colored circles. Blue indicates eye tracker 1 [ET1] and orange eye tracker 2) to synchronized world-centered gaze data of the pair, drawn on an overview video frame (bottom panel) recorded with an additional external camera. The shown frames are produced by gazeMapper's advanced gaze video functionality (though larger stars and circles to indicate the camera and gaze points were manually overlaid for clarity). From [Hessels, R.S.,Teunisse, M., Niehorster, D.C., Nyström, M., Benjamins, J.S., Senju, A. & Hooge, I.T.S. (2023). Task related gaze behaviour in face to face dyadic collaboration: Toward an interactive theory. _Visual Cognition 31_(4), pp. 291-313. doi: 10.1080/13506285.2023.2250507](https://doi.org/10.1080/13506285.2023.2250507).
 
 # How to acquire
 GazeMapper is available from `https://github.com/dcnieho/gazeMapper`, and supports Python 3.11 on Windows, MacOS and Linux (newer versions of Python should work fine but are not tested).
