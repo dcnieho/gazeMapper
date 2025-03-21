@@ -221,6 +221,8 @@ def _is_recording_action_possible(rec: str, action_states: dict[Action, State], 
             preconditions.update([Action.CODE_EPISODES, Action.DETECT_MARKERS])
             if study_config.sync_ref_recording:
                 preconditions.add(Action.SYNC_TO_REFERENCE)
+            if study_config.get_cam_movement_for_et_sync_method!='':
+                preconditions.add(Action.SYNC_ET_TO_CAM)
         case Action.AUTO_CODE_SYNC:
             preconditions.update([Action.DETECT_MARKERS])
         case Action.AUTO_CODE_TRIALS:
@@ -247,7 +249,7 @@ def _is_session_action_possible(session_action_states: dict[Action, State], reco
         case Action.SYNC_TO_REFERENCE:
             preconditions.update([Action.CODE_EPISODES])
             # NB: even if study_config.auto_code_sync_points is defined, user may decide to code sync manually. So don't add Action.AUTO_CODE_SYNC to preconditions
-            if study_config.get_cam_movement_for_et_sync_method in ['plane', 'function']:
+            if study_config.get_cam_movement_for_et_sync_method!='':
                 preconditions.add(Action.SYNC_ET_TO_CAM)
         case Action.EXPORT_TRIALS:
             preconditions.update([Action.MAKE_GAZE_OVERLAY_VIDEO, Action.GAZE_TO_PLANE, Action.VALIDATE, Action.MAKE_MAPPED_GAZE_VIDEO])
@@ -258,7 +260,7 @@ def _is_session_action_possible(session_action_states: dict[Action, State], reco
             # NB: even if study_config.auto_code_trial_episodes is defined, user may decide to code trials manually. So don't add Action.AUTO_CODE_TRIALS to preconditions
             if study_config.sync_ref_recording:
                 preconditions.add(Action.SYNC_TO_REFERENCE)
-            elif study_config.get_cam_movement_for_et_sync_method in ['plane', 'function']:
+            elif study_config.get_cam_movement_for_et_sync_method!='':
                 preconditions.add(Action.SYNC_ET_TO_CAM)
         case _:
             raise NotImplementedError(f'Logic is not implemented for {action.displayable_name} ({action}), major developer oversight! Let him know.')
