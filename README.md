@@ -20,6 +20,59 @@ A data quality tool for eye tracking glasses. Behavior Research Methods. doi: 10
 ![application example](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/world_data.png?raw=true)
 Example where gazeMapper has been used to map head-centered eye tracking data from two head-worn eye tracker recordings (top panels, camera positions are indicated using stars, and gaze positions using colored circles. Blue indicates eye tracker 1 [ET1] and orange eye tracker 2) to synchronized world-centered gaze data of the pair, drawn on an overview video frame (bottom panel) recorded with an additional external camera. The shown frames are produced by gazeMapper's advanced gaze video functionality (though larger stars and circles to indicate the camera and gaze points were manually overlaid for clarity). From [Hessels, R.S.,Teunisse, M., Niehorster, D.C., Nyström, M., Benjamins, J.S., Senju, A. & Hooge, I.T.S. (2023). Task related gaze behaviour in face to face dyadic collaboration: Toward an interactive theory. _Visual Cognition 31_(4), pp. 291-313. doi: 10.1080/13506285.2023.2250507](https://doi.org/10.1080/13506285.2023.2250507).
 
+# Table of contents
+- [How to acquire](#how-to-acquire)
+  - [Complete instructions for MacOS](#complete-instructions-for-macos)
+  - [Complete instructions for Linux](#complete-instructions-for-linux)
+- [Usage](#usage)
+  - [Workflow and example data](#workflow-and-example-data)
+    - [Example 1: Single participant and single plane](#example-1-single-participant-and-single-plane)
+    - [Example 2: Two participants and two planes](#example-2-two-participants-and-two-planes)
+    - [Example 3: One participant, multiple planes and an overview camera](#example-3-one-participant-multiple-planes-and-an-overview-camera)
+  - [gazeMapper projects](#gazemapper-projects)
+  - [Output](#output)
+    - [Coordinate system of data](#coordinate-system-of-data)
+  - [Eye trackers](#eye-trackers)
+    - [Required preprocessing outside gazeMapper](#required-preprocessing-outside-gazemapper)
+  - [gazeMapper sessions](#gazemapper-sessions)
+  - [gazeMapper planes](#gazemapper-planes)
+    - [Validation (glassesValidator planes)](#validation-glassesvalidator-planes)
+  - [Individual Markers](#individual-markers)
+  - [Actions](#actions)
+  - [Coding analysis, synchronization and validation episodes](#coding-analysis-synchronization-and-validation-episodes)
+    - [Automatic coding of analysis and synchronization episodes](#automatic-coding-of-analysis-and-synchronization-episodes)
+      - [Automatic coding of synchronization timepoints](#automatic-coding-of-synchronization-timepoints)
+      - [Automatic coding of analysis episodes](#automatic-coding-of-analysis-episodes)
+  - [Synchronization](#synchronization)
+    - [Synchronizing eye tracker data and scene camera](#synchronizing-eye-tracker-data-and-scene-camera)
+    - [Synchronizing multiple eye tracker or external camera recordings](#synchronizing-multiple-eye-tracker-or-external-camera-recordings)
+- [Configuration](#configuration)
+  - [`gazeMapper.config.AutoCodeSyncPoints`](#gazemapperconfigautocodesyncpoints)
+  - [`gazeMapper.config.AutoCodeTrialEpisodes`](#gazemapperconfigautocodetrialepisodes)
+  - [`gazeMapper.config.CamMovementForEtSyncFunction`](#gazemapperconfigcammovementforetsyncfunction)
+  - [`gazeMapper.config.I2MCSettings`](#gazemapperconfigi2mcsettings)
+  - [`gazeMapper.config.RgbColor`](#gazemapperconfigrgbcolor)
+  - [Overriding a project's settings for a specific session or recording](#overriding-a-projects-settings-for-a-specific-session-or-recording)
+- [API](#api)
+  - [`gazeMapper.config`](#gazemapperconfig)
+    - [`gazeMapper.config.Study`](#gazemapperconfigstudy)
+    - [`gazeMapper.config.OverrideLevel`](#gazemapperconfigoverridelevel)
+    - [`gazeMapper.config.StudyOverride`](#gazemapperconfigstudyoverride)
+  - [`gazeMapper.episode`](#gazemapperepisode)
+  - [`gazeMapper.marker`](#gazemappermarker)
+  - [`gazeMapper.plane`](#gazemapperplane)
+    - [`gazeMapper.plane.Type`](#gazemapperplanetype)
+    - [`gazeMapper.plane.Definition` and subclasses](#gazemapperplanedefinition-and-subclasses)
+  - [`gazeMapper.process`](#gazemapperprocess)
+  - [`gazeMapper.session`](#gazemappersession)
+    - [`gazeMapper.session.RecordingType`](#gazemappersessionrecordingtype)
+    - [`gazeMapper.session.RecordingDefinition`](#gazemappersessionrecordingdefinition)
+    - [`gazeMapper.session.Recording`](#gazemappersessionrecording)
+    - [`gazeMapper.session.SessionDefinition`](#gazemappersessionsessiondefinition)
+    - [`gazeMapper.session.Session`](#gazemappersessionsession)
+    - [Free functions](#free-functions)
+- [Citation](#citation)
+
 # How to acquire
 GazeMapper is available from `https://github.com/dcnieho/gazeMapper`, and supports Python 3.11 on Windows, MacOS and Linux (newer versions of Python should work fine but are not tested).
 
@@ -568,7 +621,7 @@ These settings are typically stored in a file `plane_def.json` in the plane's co
 ### Validation (glassesValidator planes)
 gazeMapper has built-in support for computing data quality from the gaze data of a participant looking at a validation poster using glassesValidator. To use this functionality, a plane of type GlassesValidator (`gazeMapper.plane.Type.GlassesValidator`) needs to be defined in the project's setup. By default, the default glassesValidator plane is used for a GlassesValidator plane. When the default checkbox is unchecked in the GUI (the `is_default` setting in `plane_def.json` is False), a custom configuration can be used. When unchecking this checkbox in the GUI, files containing the plane setup are deployed to the plane configuration folder, so that the user can edit or replace them. API users are requested to call `glassesValidator.config.deploy_validation_config()` to deploy the glassesValidator configuration files to the plane's configuration folder. The customization options for a glassesValidator plane are [documented here](https://github.com/dcnieho/glassesValidator/blob/master/README.md#customizing-the-poster).
 
-### Individual Markers
+## Individual Markers
 Besides planes, gazeMapper can also be configured to detect and report on the appearance of individual markers. This is configured in the `Individual markers editor` pane in the GUI or by means of `gazeMapper.marker.Marker` objects.
 
 ## Actions
