@@ -335,7 +335,8 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
 
     # for the sessions, see what we have to export
     to_export: dict[str,bool] = {}
-    rec_dirs: list[pathlib.Path] = []
+    rec_dirs_val: list[pathlib.Path] = []
+    rec_dirs_et_sync: list[pathlib.Path] = []
     for s_name in sessions:
         s = g.sessions.get(s_name,None)
         if s is None:
@@ -345,7 +346,10 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
                 to_export['plane gaze'] = True
         if recs:=[s.recordings[r].info.working_directory for r in s.recordings if s.recordings[r].state[process.Action.VALIDATE]==process.State.Completed]:
             to_export['validation'] = True
-            rec_dirs.extend(recs)
+            rec_dirs_val.extend(recs)
+        if recs:=[s.recordings[r].info.working_directory for r in s.recordings if s.recordings[r].state[process.Action.SYNC_ET_TO_CAM]==process.State.Completed]:
+            to_export['eye tracker synchronization'] = True
+            rec_dirs_et_sync.extend(recs)
         if 'gaze overlay video' not in to_export:
             if any((s.recordings[r].state[process.Action.MAKE_GAZE_OVERLAY_VIDEO]==process.State.Completed for r in s.recordings)):
                 to_export['gaze overlay video'] = True
@@ -354,8 +358,8 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
                 to_export['mapped gaze video'] = True
 
     dq_df, dq_set = None, None
-    if rec_dirs:
-        dq_df, default_dq_type, dq_targets = export.collect_data_quality(rec_dirs, {p:f'{naming.validation_prefix}{p}_data_quality.tsv' for p in g.study_config.planes_per_episode[annotation.Event.Validate]}, col_for_parent='session')
+    if rec_dirs_val:
+        dq_df, default_dq_type, dq_targets = export.collect_data_quality(rec_dirs_val, {p:f'{naming.validation_prefix}{p}_data_quality.tsv' for p in g.study_config.planes_per_episode[annotation.Event.Validate]}, col_for_parent='session')
         if dq_df is None:
             to_export.pop('validation', None)
         else:
@@ -478,6 +482,10 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
             dq_types = [dq for dq in dq_set['dq_types'] if dq_set['dq_types'][dq]]
             targets  = [t for t in dq_set['targets'] if dq_set['targets'][t]]
             export.summarize_and_store_data_quality(dq_df, path/'data_quality.tsv', dq_types, targets, dq_set['targets_avg'], dq_set['include_data_loss'])
+
+        # export et sync for all recordings in all sessions
+        if 'eye tracker synchronization' in to_export and to_export['eye tracker synchronization']:
+            export.export_et_sync(rec_dirs_et_sync, naming.VOR_sync_file, path/'et_sync.tsv')
 
     buttons = {
         ifa6.ICON_FA_CHECK+f" Continue": (launch_export, lambda: not any((to_export[e] for e in to_export))),
