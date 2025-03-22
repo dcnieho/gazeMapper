@@ -319,17 +319,17 @@ class Study:
         if self.auto_code_sync_points:
             if annotation.Event.Sync_Camera not in self.episodes_to_code:
                 if strict_check:
-                    raise ValueError(f'The auto_code_sync_points option is configured, but {annotation.Event.Sync_Camera} points are not set to be coded in episodes_to_code. Fix episodes_to_code.')
+                    raise ValueError(f'The auto_code_sync_points option is configured, but {annotation.tooltip_map[annotation.Event.Sync_Camera]}s are not set to be coded in episodes_to_code. Fix episodes_to_code.')
                 else:
-                    this_problems['episodes_to_code'] = f'The auto_code_sync_points option is configured, but {annotation.Event.Sync_Camera.value} points are not set to be coded in episodes_to_code.'
-                    this_problems['auto_code_sync_points'] = f'The auto_code_sync_points option is configured, but {annotation.Event.Sync_Camera.value} points are not set to be coded in episodes_to_code. Fix episodes_to_code or remove auto_code_sync_points setup.'
+                    this_problems['episodes_to_code'] = f'The auto_code_sync_points option is configured, but {annotation.tooltip_map[annotation.Event.Sync_Camera]}s are not set to be coded in episodes_to_code.'
+                    this_problems['auto_code_sync_points'] = f'The auto_code_sync_points option is configured, but {annotation.tooltip_map[annotation.Event.Sync_Camera]}s are not set to be coded in episodes_to_code. Fix episodes_to_code or remove auto_code_sync_points setup.'
         if self.auto_code_trial_episodes:
             if annotation.Event.Trial not in self.episodes_to_code:
                 if strict_check:
-                    raise ValueError(f'The auto_code_trial_episodes option is configured, but {annotation.Event.Trial} episodes are not set to be coded in episodes_to_code. Fix episodes_to_code.')
+                    raise ValueError(f'The auto_code_trial_episodes option is configured, but {annotation.tooltip_map[annotation.Event.Trial]}s are not set to be coded in episodes_to_code. Fix episodes_to_code.')
                 else:
-                    this_problems['episodes_to_code'] = f'The auto_code_trial_episodes option is configured, but {annotation.Event.Trial.value} episodes are not set to be coded in episodes_to_code.'
-                    this_problems['auto_code_trial_episodes'] = f'The auto_code_trial_episodes option is configured, but {annotation.Event.Trial.value} episodes are not set to be coded in episodes_to_code. Fix episodes_to_code or remove auto_code_sync_points setup.'
+                    this_problems['episodes_to_code'] = f'The auto_code_trial_episodes option is configured, but {annotation.tooltip_map[annotation.Event.Trial]}s are not set to be coded in episodes_to_code.'
+                    this_problems['auto_code_trial_episodes'] = f'The auto_code_trial_episodes option is configured, but {annotation.tooltip_map[annotation.Event.Trial]}s are not set to be coded in episodes_to_code. Fix episodes_to_code or remove auto_code_sync_points setup.'
         return type_utils.merge_problem_dicts(problems,this_problems)
 
     def _check_auto_markers(self, strict_check) -> type_utils.ProblemDict:
@@ -427,10 +427,10 @@ class Study:
             return problems
         if annotation.Event.Sync_ET_Data not in self.episodes_to_code:
             if strict_check:
-                raise ValueError(f'if get_cam_movement_for_et_sync_method is set to "plane" or "function", {annotation.Event.Sync_ET_Data.value} events should be set up to be coded in episodes_to_code')
+                raise ValueError(f'if get_cam_movement_for_et_sync_method is set to "plane" or "function", {annotation.tooltip_map[annotation.Event.Sync_ET_Data]}s should be set up to be coded in episodes_to_code')
             else:
-                problems['episodes_to_code'] = f'if get_cam_movement_for_et_sync_method is set to "plane" or "function", {annotation.Event.Sync_ET_Data.value} events should be set up to be coded'
-                problems['get_cam_movement_for_et_sync_method'] = f'get_cam_movement_for_et_sync_method is set to "{self.get_cam_movement_for_et_sync_method}", but {annotation.Event.Sync_ET_Data.value} events are not set up to be coded in episodes_to_code'
+                problems['episodes_to_code'] = f'if get_cam_movement_for_et_sync_method is set to "plane" or "function", {annotation.tooltip_map[annotation.Event.Sync_ET_Data]}s should be set up to be coded'
+                problems['get_cam_movement_for_et_sync_method'] = f'get_cam_movement_for_et_sync_method is set to "{self.get_cam_movement_for_et_sync_method}", but {annotation.tooltip_map[annotation.Event.Sync_ET_Data]}s are not set up to be coded in episodes_to_code'
         if self.get_cam_movement_for_et_sync_method=='function':
             if strict_check:
                 if not self.get_cam_movement_for_et_sync_function or not all([x in self.get_cam_movement_for_et_sync_function for x in ["module_or_file","function","parameters"]]):
@@ -444,10 +444,10 @@ class Study:
         elif self.get_cam_movement_for_et_sync_method=='plane':
             if annotation.Event.Sync_ET_Data not in self.planes_per_episode:
                 if strict_check:
-                    raise ValueError(f'if get_cam_movement_for_et_sync_method is set to "plane", a plane should be set up to be used for processing {annotation.Event.Sync_ET_Data.value} events in planes_per_episode')
+                    raise ValueError(f'if get_cam_movement_for_et_sync_method is set to "plane", a plane should be set up to be used for processing {annotation.tooltip_map[annotation.Event.Sync_ET_Data]}s in planes_per_episode')
                 else:
-                    problems['planes_per_episode'] = f'if get_cam_movement_for_et_sync_method is set to "plane", a plane should be set up to be used for processing {annotation.Event.Sync_ET_Data.value} events'
-                    type_utils.merge_problem_dicts(problems, {'get_cam_movement_for_et_sync_method': f'get_cam_movement_for_et_sync_method is set to "plane", but no plane specified for syncing eye tracker data to the scene cam (i.e., for {annotation.Event.Sync_ET_Data.value} events) in planes_per_episode'})
+                    problems['planes_per_episode'] = f'if get_cam_movement_for_et_sync_method is set to "plane", a plane should be set up to be used for processing {annotation.tooltip_map[annotation.Event.Sync_ET_Data]}s'
+                    type_utils.merge_problem_dicts(problems, {'get_cam_movement_for_et_sync_method': f'get_cam_movement_for_et_sync_method is set to "plane", but no plane specified for syncing eye tracker data to the scene cam (i.e., for {annotation.tooltip_map[annotation.Event.Sync_ET_Data]}s) in planes_per_episode'})
         return problems
 
     def _check_make_video(self, strict_check) -> type_utils.ProblemDict:

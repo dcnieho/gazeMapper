@@ -146,13 +146,13 @@ def get_coding_file(working_dir: str|pathlib.Path, missing_ref_coding_ok=False):
     if not coding_file.is_file():
         if missing_ref_coding_ok:
             return None
-        raise FileNotFoundError(f'A coding file must be available for the recording ({working_dir.name}) to run sync_to_ref, but it is not. Run code_episodes and code at least one {annotation.Event.Sync_Camera.value} episode. Not found: {coding_file}')
+        raise FileNotFoundError(f'A coding file must be available for the recording ({working_dir.name}) to run sync_to_ref, but it is not. Run code_episodes and code at least one {annotation.tooltip_map[annotation.Event.Sync_Camera]}. Not found: {coding_file}')
     episodes = episode.list_to_marker_dict(episode.read_list_from_file(coding_file))[annotation.Event.Sync_Camera]
     episodes = [x[0] for x in episodes] # remove inner wrapping list, there are only single values in it anyway
     if not episodes:
         if missing_ref_coding_ok:
             return None
-        raise ValueError(f'No {annotation.Event.Sync_Camera.value} points found for this recording ({working_dir.name}). Run code_episodes and code at least one {annotation.Event.Sync_Camera.value} point.')
+        raise ValueError(f'No {annotation.tooltip_map[annotation.Event.Sync_Camera]}s found for this recording ({working_dir.name}). Run code_episodes and code at least one {annotation.tooltip_map[annotation.Event.Sync_Camera]}.')
     return episodes
 
 def get_episode_frame_indices_from_ref(working_dir: str|pathlib.Path, event: annotation.Event, rec: str, ref_rec:str, all_recs: list[str], do_time_stretch: bool, average_recordings: list[str], stretch_which: str, extra_fr=0, missing_ref_coding_ok=False) -> list[list[int]]:
@@ -166,7 +166,7 @@ def get_episode_frame_indices_from_ref(working_dir: str|pathlib.Path, event: ann
     if event not in ref_episodes:
         if missing_ref_coding_ok:
             return [[]]
-        raise KeyError(f'Trying to get {event.value} episodes from the reference recording ({ref_rec}), but the coding file for this reference recording doesn\'t contain any ({event.value}) episodes')
+        raise KeyError(f'Trying to get {annotation.tooltip_map[event]}s from the reference recording ({ref_rec}), but the coding file for this reference recording doesn\'t contain any {annotation.tooltip_map[event]}s')
     # get sync and timestamp info we need to transform reference frames indices to frame indices of this recording
     sync = get_sync_for_recs(working_dir.parent, all_recs, ref_rec, do_time_stretch, average_recordings, missing_ref_coding_ok)
     if sync is None:

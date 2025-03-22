@@ -57,10 +57,10 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     # get interval coding
     coding_file = working_dir / naming.coding_file
     if not coding_file.is_file():
-        raise FileNotFoundError(f'A coding file must be available to run sync_et_to_cam, but it is not. Run code_episodes and code at least one {annotation.Event.Sync_ET_Data.value} episode. Not found: {coding_file}')
+        raise FileNotFoundError(f'A coding file must be available to run sync_et_to_cam, but it is not. Run code_episodes and code at least one {annotation.tooltip_map[annotation.Event.Sync_ET_Data]}. Not found: {coding_file}')
     episodes = episode.list_to_marker_dict(episode.read_list_from_file(coding_file))[annotation.Event.Sync_ET_Data]
     if not episodes:
-        raise RuntimeError(f'No {annotation.Event.Sync_ET_Data.value} episodes found for this recording. Run code_episodes and code at least one {annotation.Event.Sync_ET_Data.value} episode.')
+        raise RuntimeError(f'No {annotation.tooltip_map[annotation.Event.Sync_ET_Data]}s found for this recording. Run code_episodes and code at least one {annotation.tooltip_map[annotation.Event.Sync_ET_Data]}.')
 
     # Read gaze data
     gazes = gaze_headref.read_dict_from_file(working_dir / gt_naming.gaze_data_fname, episodes)[0]
