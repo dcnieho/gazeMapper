@@ -46,6 +46,13 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
 
     # per recording, read the relevant files and put them all together
     for r in recs:
+        # check if files needed for export are present, else skip
+        if not all(((working_dir / r / f'{naming.world_gaze_prefix}{p}.tsv').is_file() for p in planes)):
+            print(f'Warning: not all plane gaze files found for recording {r} in session {working_dir.name}. Skipping...')
+            continue
+        if not all((marker.get_file_name(m.id, working_dir / r).is_file() for m in study_config.individual_markers)):
+            print(f'Warning: not all individual marker detection files found for recording {r} in session {working_dir.name}. Skipping...')
+            continue
         # get trial coding
         # trial episodes are gotten from the reference recording if there is one and this is not the reference recording
         if study_config.sync_ref_recording and r!=study_config.sync_ref_recording:
