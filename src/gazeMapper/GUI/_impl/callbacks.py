@@ -14,10 +14,16 @@ from glassesTools.validation import config as val_config, DataQualityType, expor
 from . import colors, utils
 from ... import config, marker, naming, plane, process, session
 
+_picker_last_folder = None
 def get_folder_picker(g, reason: str, *args, **kwargs):
     from . import gui
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
     def select_callback(selected: list[pathlib.Path]):
+        global _picker_last_folder
+        if len(selected)==1 and selected[0].is_dir():
+            _picker_last_folder = selected[0]
+        else:
+            _picker_last_folder = selected[0].parent
         match reason:
             case 'loading' | 'creating':
                 try_load_project(g, selected, action=reason)
@@ -69,7 +75,7 @@ def get_folder_picker(g, reason: str, *args, **kwargs):
             picker_type = gt_gui.file_picker.DirPicker
         case _:
             raise ValueError(f'reason "{reason}" not understood')
-    picker = picker_type(title=header, allow_multiple=allow_multiple, callback=select_callback)
+    picker = picker_type(title=header, allow_multiple=allow_multiple, callback=select_callback, start_dir=_picker_last_folder)
     picker.set_show_only_dirs(False)
     return picker
 
