@@ -44,9 +44,12 @@ def get_marker_dict_from_list(markers: list[Marker]) -> dict[int,dict[str]]:
         out[m.id] = {'marker_size': m.size}
     return out
 
-def load_file(marker_id: int, folder: str|pathlib.Path) -> pd.DataFrame:
+def get_file_name(marker_id: int, folder: str|pathlib.Path) -> pathlib.Path:
     folder = pathlib.Path(folder)
-    file = folder / f'{naming.marker_pose_prefix}{marker_id}.tsv'
+    return folder / f'{naming.marker_pose_prefix}{marker_id}.tsv'
+
+def load_file(marker_id: int, folder: str|pathlib.Path) -> pd.DataFrame:
+    file = get_file_name(marker_id, folder)
     return pd.read_csv(file,sep='\t', dtype=defaultdict(lambda: float, **gt_marker.Pose._non_float))
 
 @overload
