@@ -62,7 +62,8 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
             episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / r / naming.coding_file), study_config.episodes_to_code)
             subset_var = 'frame_idx'
         if annotation.Event.Trial not in episodes or not episodes[annotation.Event.Trial]:
-            raise RuntimeError(f'No {annotation.Event.Trial.value} episodes found in the coding file, nothing to export')
+            print(f'Warning: no {annotation.tooltip_map[annotation.Event.Trial]}s found in the coding file for recording {r} in session {working_dir.name}. Skipping...')
+            continue
         episodes = episodes[annotation.Event.Trial]
 
         # get all gaze data
