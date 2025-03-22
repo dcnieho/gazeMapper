@@ -465,7 +465,7 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
     def launch_export():
         exp = []
         if 'plane gaze' in to_export and to_export['plane gaze']:
-            exp.append('planeGaze')
+            exp.append('plane_gaze')
         if 'gaze overlay video' in to_export and to_export['gaze overlay video']:
             exp.append('gaze_overlay_video')
         if 'mapped gaze video' in to_export and to_export['mapped gaze video']:

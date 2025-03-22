@@ -25,7 +25,7 @@ def run(working_dir: str|pathlib.Path, export_path: str|pathlib.Path, to_export:
     all_recs    = [r for r in session_info.recordings]
     et_recs     = [r for r in session_info.recordings if session_info.recordings[r].definition.type==session.RecordingType.Eye_Tracker]
 
-    if 'planeGaze' in to_export:
+    if 'plane_gaze' in to_export:
         export_plane_gaze(export_path, working_dir, study_config, et_recs)
 
     if 'gaze_overlay_video' in to_export:
