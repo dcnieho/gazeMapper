@@ -1,5 +1,5 @@
 [tool.bumpversion]
-current_version = "1.4.3"
+current_version = "1.4.4"
 
 [[tool.bumpversion.files]]
 filename = "src/gazeMapper/version.py"
