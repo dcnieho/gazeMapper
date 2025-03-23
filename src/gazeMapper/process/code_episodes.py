@@ -6,11 +6,12 @@ from imgui_bundle import imgui
 from ffpyplayer.player import MediaPlayer
 
 import sys
+
 isMacOS = sys.platform.startswith("darwin")
 if isMacOS:
     import AppKit
 
-from glassesTools import annotation, drawing, gaze_headref, gaze_worldref, naming as gt_naming, ocv, plane as gt_plane, propagating_thread, timestamps, transforms
+from glassesTools import annotation, drawing, gaze_headref, gaze_worldref, naming as gt_naming, ocv, plane as gt_plane, process_pool, propagating_thread, timestamps, transforms
 from glassesTools.gui.video_player import GUI
 
 
@@ -238,4 +239,4 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     episode.write_list_to_file(episode.marker_dict_to_list(episodes), coding_file)
 
     # update state
-    session.update_action_states(working_dir, process.Action.CODE_EPISODES, process.State.Completed, study_config)
+    session.update_action_states(working_dir, process.Action.CODE_EPISODES, process_pool.State.Completed, study_config)

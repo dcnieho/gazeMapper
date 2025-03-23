@@ -2,7 +2,7 @@ import pathlib
 import pandas as pd
 import polars as pl
 
-from glassesTools import annotation, gaze_headref, naming, timestamps
+from glassesTools import annotation, gaze_headref, naming, process_pool, timestamps
 
 
 from . import _utils
@@ -103,4 +103,4 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
             df.to_csv(ts_file, sep='\t', float_format="%.8f")
 
     # update state
-    session.update_action_states(working_dir, process.Action.SYNC_TO_REFERENCE, process.State.Completed, study_config)
+    session.update_action_states(working_dir, process.Action.SYNC_TO_REFERENCE, process_pool.State.Completed, study_config)

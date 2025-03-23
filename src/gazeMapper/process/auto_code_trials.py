@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import shutil
 
-from glassesTools import annotation
+from glassesTools import annotation, process_pool
 
 from .. import config, episode, marker, naming, process, session
 from . import _utils
@@ -91,4 +91,4 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
     episode.write_list_to_file(episode.marker_dict_to_list(episodes), coding_file)
 
     # update state
-    session.update_action_states(working_dir, process.Action.AUTO_CODE_TRIALS, process.State.Completed, study_config)
+    session.update_action_states(working_dir, process.Action.AUTO_CODE_TRIALS, process_pool.State.Completed, study_config)

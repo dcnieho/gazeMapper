@@ -3,9 +3,8 @@ import pandas as pd
 import numpy as np
 from typing import Any, Callable
 
-from glassesTools import annotation, aruco, drawing, marker as gt_marker, naming as gt_naming, plane as gt_plane, propagating_thread, timestamps
+from glassesTools import annotation, aruco, drawing, marker as gt_marker, naming as gt_naming, plane as gt_plane, process_pool, propagating_thread, timestamps
 from glassesTools.gui.video_player import GUI
-
 
 from .. import config, episode, marker, naming, plane, process, session, synchronization
 
@@ -94,7 +93,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
         df.to_csv(working_dir/naming.target_sync_file, sep='\t', index=False, na_rep='nan', float_format="%.8f")
 
     # update state
-    session.update_action_states(working_dir, process.Action.DETECT_MARKERS, process.State.Completed, study_config)
+    session.update_action_states(working_dir, process.Action.DETECT_MARKERS, process_pool.State.Completed, study_config)
 
 
 def _get_sync_function(study_config: config.Study,

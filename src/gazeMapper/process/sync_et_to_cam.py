@@ -3,19 +3,17 @@ import numpy as np
 import pandas as pd
 import polars as pl
 from collections import defaultdict
-
 import sys
+
 isMacOS = sys.platform.startswith("darwin")
 if isMacOS:
     import AppKit
 
-from glassesTools import annotation, gaze_headref, naming as gt_naming, ocv, plane, propagating_thread, timestamps, video_utils
+from glassesTools import annotation, gaze_headref, naming as gt_naming, ocv, plane, process_pool, propagating_thread, timestamps, video_utils
 from glassesTools.gui.signal_sync import GUI, TargetPos
-
 
 from . import _utils
 from .. import config, episode, naming, process, session
-
 
 
 def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **study_settings):
@@ -168,4 +166,4 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     df.write_csv(working_dir / gt_naming.gaze_data_fname, separator='\t', null_value='nan', float_precision=8)
 
     # update state
-    session.update_action_states(working_dir, process.Action.SYNC_ET_TO_CAM, process.State.Completed, study_config)
+    session.update_action_states(working_dir, process.Action.SYNC_ET_TO_CAM, process_pool.State.Completed, study_config)

@@ -19,11 +19,12 @@ import OpenGL
 import OpenGL.GL as gl
 
 import glassesTools
-from glassesTools import annotation, gui as gt_gui, naming as gt_naming, plane as gt_plane, platform as gt_platform
+from glassesTools import annotation, gui as gt_gui, naming as gt_naming, plane as gt_plane, platform as gt_platform, process_pool
+from glassesTools.gui import colors
 
 from ... import config, marker, plane, process, project_watcher, session, type_utils, version
 from .. import async_thread
-from . import callbacks, colors, image_helper, process_pool, session_lister, settings_editor, utils
+from . import callbacks, image_helper, session_lister, settings_editor, utils
 
 
 class GUI:
@@ -418,7 +419,7 @@ class GUI:
             # set pending and running states since these are not stored in the states file
             for job_id in self.job_scheduler.jobs:
                 job_state = self.job_scheduler.jobs[job_id].get_state()
-                if job_state in [process.State.Pending, process.State.Running]:
+                if job_state in [process_pool.State.Pending, process_pool.State.Running]:
                     self._update_job_states_impl(self.job_scheduler.jobs[job_id].user_data, job_state)
 
         # if there are no jobs left, clean up process pool
@@ -432,7 +433,7 @@ class GUI:
             return False
         return True
 
-    def _update_job_states_impl(self, job: utils.JobInfo, job_state: process.State):
+    def _update_job_states_impl(self, job: utils.JobInfo, job_state: process_pool.State):
         sess = self.sessions.get(job.session,None)
         if sess is None:
             return
@@ -446,10 +447,10 @@ class GUI:
         else:
             sess.state[job.action] = job_state
 
-    def _action_done_callback(self, future: process_pool.ProcessFuture, job_id: int, job: utils.JobInfo, state: process.State):
+    def _action_done_callback(self, future: process_pool.ProcessFuture, job_id: int, job: utils.JobInfo, state: process_pool.State):
         # if process failed, notify error
         session_level = job.recording is None
-        if state==process.State.Failed:
+        if state==process_pool.State.Failed:
             exc = future.exception()    # should not throw exception since CancelledError is already encoded in state and future is done
             tb = gt_gui.utils.get_traceback(type(exc), exc, exc.__traceback__)
             lbl = f'session "{job.session}"'
@@ -460,7 +461,7 @@ class GUI:
             self.job_scheduler.jobs[job_id].error = tb
 
         # clean up, if needed, when a task failed or was canceled
-        if job.action==process.Action.IMPORT and state in [process.State.Canceled, process.State.Failed]:
+        if job.action==process.Action.IMPORT and state in [process_pool.State.Canceled, process_pool.State.Failed]:
             # remove working directory if this was an import task
             async_thread.run(callbacks.remove_recording_working_dir(self.project_dir, job.session, job.recording))
             # also update GUI state, might be needed if there was no working directory yet for instance
@@ -580,7 +581,7 @@ class GUI:
         actions = process.get_actions_for_config(cfg, exclude_session_level=True)
         def _draw_status(action: process.Action, item: session.Recording):
             if process.is_action_possible_for_recording(item.definition.name, item.definition.type, action, cfg):
-                session_lister.draw_process_state(item.state[action])
+                gt_gui.utils.draw_process_state(item.state[action])
             else:
                 imgui.text('-')
                 if action==process.Action.AUTO_CODE_TRIALS and cfg.sync_ref_recording and item.definition.name!=cfg.sync_ref_recording:
@@ -815,7 +816,7 @@ class GUI:
         jobs = self.job_scheduler.jobs.copy()
         job_ids = sorted(jobs.keys())
         job_states = {job_id:jobs[job_id].get_state() for job_id in job_ids}
-        if any((job_states[i] in [process.State.Pending, process.State.Running] for i in job_states)):
+        if any((job_states[i] in [process_pool.State.Pending, process_pool.State.Running] for i in job_states)):
             if imgui.button(ifa6.ICON_FA_HAND+' Cancel all'):
                 self.job_scheduler.cancel_all_jobs()
 
@@ -873,14 +874,14 @@ class GUI:
                             imgui.text(f'{job_id}')
                         case 1:
                             # Status
-                            session_lister.draw_process_state((job_state:=jobs[job_id].get_state()))
+                            gt_gui.utils.draw_process_state((job_state:=jobs[job_id].get_state()))
                             if jobs[job_id].error:
                                 gt_gui.utils.draw_hover_text(jobs[job_id].error, text='')
                                 imgui.same_line()
                                 if imgui.small_button(ifa6.ICON_FA_COPY+f'##{job_id}_copy_error'):
                                     imgui.set_clipboard_text(jobs[job_id].error)
                                 gt_gui.utils.draw_hover_text('Copy error to clipboard', text='')
-                            if job_state in [process.State.Pending, process.State.Running]:
+                            if job_state in [process_pool.State.Pending, process_pool.State.Running]:
                                 imgui.same_line()
                                 if imgui.small_button(ifa6.ICON_FA_HAND+f' Cancel##{job_id}'):
                                     self.job_scheduler.cancel_job(job_id)
@@ -1207,7 +1208,7 @@ class GUI:
     def _get_pending_running_job_list(self) -> dict[utils.JobInfo, int]:
         active_jobs: dict[utils.JobInfo, int] = {}
         for job_id in self.job_scheduler.jobs:
-            if self.job_scheduler.jobs[job_id].get_state() in [process.State.Pending, process.State.Running]:
+            if self.job_scheduler.jobs[job_id].get_state() in [process_pool.State.Pending, process_pool.State.Running]:
                 active_jobs[self.job_scheduler.jobs[job_id].user_data] = job_id
         return active_jobs
 
@@ -1216,14 +1217,14 @@ class GUI:
             imgui.text_colored(colors.error, '-')
         else:
             if process.is_session_level_action(action):
-                session_lister.draw_process_state(item.state[action])
+                gt_gui.utils.draw_process_state(item.state[action])
             else:
                 cfg = self.session_config_overrides[item.name].apply(self.study_config, strict_check=False) if item.name in self.session_config_overrides else self.study_config
                 states = {r:item.recordings[r].state[action] for r in item.recordings if process.is_action_possible_for_recording(r, item.definition.get_recording_def(r).type, action, cfg)}
-                not_completed = [r for r in states if states[r]!=process.State.Completed]
-                if any(st:=[s for r in states if (s:=states[r]) in [process.State.Pending, process.State.Running]]):
+                not_completed = [r for r in states if states[r]!=process_pool.State.Completed]
+                if any(st:=[s for r in states if (s:=states[r]) in [process_pool.State.Pending, process_pool.State.Running]]):
                     # progress marker
-                    session_lister.draw_process_state(process.State.Running if process.State.Running in st else process.State.Pending, have_hover_popup=False)
+                    gt_gui.utils.draw_process_state(process_pool.State.Running if process_pool.State.Running in st else process_pool.State.Pending, have_hover_popup=False)
                 else:
                     n_rec = len(states)
                     clr = colors.error if not_completed else colors.ok
@@ -1276,10 +1277,10 @@ class GUI:
                     else:
                         hover_text = process.get_impossible_reason_text(a, actions)
                     status = [self.sessions[s].recordings[r].state[a] for s in actions if a in actions[s] for r in actions[s][a][0]]
-                    status = max(status) if status else process.State.Not_Run
+                    status = max(status) if status else process_pool.State.Not_Run
                 if a.has_options and possible:
                     hover_text += '\nShift-click to bring up a popup with configuration options for this run.'
-                icon = ifa6.ICON_FA_PLAY if status<process.State.Completed else ifa6.ICON_FA_ARROW_ROTATE_RIGHT
+                icon = ifa6.ICON_FA_PLAY if status<process_pool.State.Completed else ifa6.ICON_FA_ARROW_ROTATE_RIGHT
             if not possible:
                 imgui.begin_disabled()
             if imgui.selectable(icon+f" {a.displayable_name}", False)[0]:
@@ -1343,10 +1344,10 @@ class GUI:
                 else:
                     hover_text = process.get_impossible_reason_text(a, actions, for_recording=True)
                 status = [sess.recordings[r].state[a] for r in to_run]
-                status = max(status) if status else process.State.Not_Run
+                status = max(status) if status else process_pool.State.Not_Run
                 if a.has_options and possible:
                     hover_text += '\nShift-click to bring up a popup with configuration options for this run.'
-                icon = ifa6.ICON_FA_PLAY if status<process.State.Completed else ifa6.ICON_FA_ARROW_ROTATE_RIGHT
+                icon = ifa6.ICON_FA_PLAY if status<process_pool.State.Completed else ifa6.ICON_FA_ARROW_ROTATE_RIGHT
             if not possible:
                 imgui.begin_disabled()
             if imgui.selectable(icon+f" {a.displayable_name}##{session_name}", False)[0]:
@@ -1490,7 +1491,7 @@ class GUI:
         if session_level_actions and imgui.begin_table(f'##{sess.name}_session_level', 2, imgui.TableFlags_.sizing_fixed_fit):
             for a in session_level_actions:
                 imgui.table_next_column()
-                session_lister.draw_process_state(sess.state[a])
+                gt_gui.utils.draw_process_state(sess.state[a])
                 imgui.table_next_column()
                 imgui.selectable(a.displayable_name, False, imgui.SelectableFlags_.span_all_columns|imgui.SelectableFlags_.allow_overlap)
                 if (a in menu_actions or a in menu_actions_running) and imgui.begin_popup_context_item(f"##{sess.name}_{a}_context"):
@@ -1506,7 +1507,7 @@ class GUI:
                         if a.has_options and possible:
                             hover_text += '\nShift-click to bring up a popup with configuration options for this run.'
                         status = self.sessions[sess.name].state[a]
-                        icon = ifa6.ICON_FA_PLAY if status<process.State.Completed else ifa6.ICON_FA_ARROW_ROTATE_RIGHT
+                        icon = ifa6.ICON_FA_PLAY if status<process_pool.State.Completed else ifa6.ICON_FA_ARROW_ROTATE_RIGHT
                     if not possible:
                         imgui.begin_disabled()
                     if imgui.selectable(icon+f" {a.displayable_name}##{sess.name}", False)[0]:

@@ -5,7 +5,7 @@ import pandas as pd
 import polars as pl
 from collections import defaultdict
 
-from glassesTools import annotation, gaze_worldref, naming as gt_naming
+from glassesTools import annotation, gaze_worldref, naming as gt_naming, process_pool
 
 from .. import config, episode, marker, naming, process, session
 
@@ -35,7 +35,7 @@ def run(working_dir: str|pathlib.Path, export_path: str|pathlib.Path, to_export:
         export_mappedGaze_video(export_path, working_dir, all_recs)
 
     # update state
-    session.update_action_states(working_dir, process.Action.EXPORT_TRIALS, process.State.Completed, study_config)
+    session.update_action_states(working_dir, process.Action.EXPORT_TRIALS, process_pool.State.Completed, study_config)
 
 
 def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, study_config: config.Study, recs: list[str]):

@@ -1,10 +1,9 @@
 import threading
-from imgui_bundle import imgui, icons_fontawesome_6 as ifa6, imspinner
+from imgui_bundle import imgui, icons_fontawesome_6 as ifa6
 import typing
 
 import glassesTools
 
-from . import colors
 from ... import process, session
 
 
@@ -222,7 +221,7 @@ class List:
                                 # Number of recordings
                                 n_rec = len(item.definition.recordings)
                                 missing_recs = item.missing_recordings()
-                                clr = colors.error if missing_recs else colors.ok
+                                clr = glassesTools.gui.colors.error if missing_recs else glassesTools.gui.colors.ok
                                 imgui.text_colored(clr, f'{n_rec-len(missing_recs)}/{n_rec}{" "+ifa6.ICON_FA_TRIANGLE_EXCLAMATION if missing_recs else ""}')
                                 if missing_recs:
                                     glassesTools.gui.utils.draw_hover_text('missing recordings:\n'+'\n'.join(missing_recs), '')
@@ -299,31 +298,3 @@ class List:
             self.sorted_ids = ids
             sort_specs_in.specs_dirty = False
             self._require_sort = False
-
-def draw_process_state(state: process.State, have_hover_popup=True):
-    symbol_size = imgui.calc_text_size(ifa6.ICON_FA_CIRCLE)
-    match state:
-        case process.State.Not_Run:
-            imgui.text_colored(colors.gray, ifa6.ICON_FA_CIRCLE)
-            hover_text = 'Not run'
-        case process.State.Pending:
-            radius    = symbol_size.x / 2
-            thickness = symbol_size.x / 3 / 2.5 # 3 is number of dots, 2.5 is nextItemKoeff in imspinner.spinner_bounce_dots()
-            imspinner.spinner_bounce_dots(f'waitBounceDots', radius, thickness, color=imgui.get_style_color_vec4(imgui.Col_.text))
-            hover_text = 'Pending'
-        case process.State.Running:
-            spinner_radii = [x/22/2*symbol_size.x for x in [22, 16, 10]]
-            lw = 3.5/22/2*symbol_size.x
-            imspinner.spinner_ang_triple(f'runSpinner', *spinner_radii, lw, c1=imgui.get_style_color_vec4(imgui.Col_.text), c2=colors.warning, c3=imgui.get_style_color_vec4(imgui.Col_.text))
-            hover_text = 'Running'
-        case process.State.Completed:
-            imgui.text_colored(colors.ok, ifa6.ICON_FA_CIRCLE_CHECK)
-            hover_text = 'Completed'
-        case process.State.Canceled:
-            imgui.text_colored(colors.warning, ifa6.ICON_FA_HAND)
-            hover_text = 'Canceled'
-        case process.State.Failed:
-            imgui.text_colored(colors.error_bright, ifa6.ICON_FA_TRIANGLE_EXCLAMATION)
-            hover_text = 'Failed'
-    if have_hover_popup:
-        glassesTools.gui.utils.draw_hover_text(hover_text, text='')

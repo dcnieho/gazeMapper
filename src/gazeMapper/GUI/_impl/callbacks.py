@@ -8,10 +8,11 @@ import pathvalidate
 import threading
 from imgui_bundle import imgui, imspinner, hello_imgui, icons_fontawesome_6 as ifa6
 
-from glassesTools import annotation, aruco, async_thread, camera_recording, eyetracker, gui as gt_gui, naming as gt_naming, platform, recording, video_utils
+from glassesTools import annotation, aruco, async_thread, camera_recording, eyetracker, gui as gt_gui, naming as gt_naming, platform, process_pool, recording, video_utils
 from glassesTools.validation import config as val_config, DataQualityType, export, get_DataQualityType_explanation
+from glassesTools.gui import colors
 
-from . import colors, utils
+from . import utils
 from ... import config, marker, naming, plane, process, session
 
 _picker_last_folder = None
@@ -348,19 +349,19 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
         if s is None:
             continue
         if 'plane gaze' not in to_export:
-            if annotation.Event.Trial in g.study_config.planes_per_episode and any((s.recordings[r].state[process.Action.GAZE_TO_PLANE]==process.State.Completed for r in s.recordings)):
+            if annotation.Event.Trial in g.study_config.planes_per_episode and any((s.recordings[r].state[process.Action.GAZE_TO_PLANE]==process_pool.State.Completed for r in s.recordings)):
                 to_export['plane gaze'] = True
-        if recs:=[s.recordings[r].info.working_directory for r in s.recordings if s.recordings[r].state[process.Action.VALIDATE]==process.State.Completed]:
+        if recs:=[s.recordings[r].info.working_directory for r in s.recordings if s.recordings[r].state[process.Action.VALIDATE]==process_pool.State.Completed]:
             to_export['validation'] = True
             rec_dirs_val.extend(recs)
-        if recs:=[s.recordings[r].info.working_directory for r in s.recordings if s.recordings[r].state[process.Action.SYNC_ET_TO_CAM]==process.State.Completed]:
+        if recs:=[s.recordings[r].info.working_directory for r in s.recordings if s.recordings[r].state[process.Action.SYNC_ET_TO_CAM]==process_pool.State.Completed]:
             to_export['eye tracker synchronization'] = True
             rec_dirs_et_sync.extend(recs)
         if 'gaze overlay video' not in to_export:
-            if any((s.recordings[r].state[process.Action.MAKE_GAZE_OVERLAY_VIDEO]==process.State.Completed for r in s.recordings)):
+            if any((s.recordings[r].state[process.Action.MAKE_GAZE_OVERLAY_VIDEO]==process_pool.State.Completed for r in s.recordings)):
                 to_export['gaze overlay video'] = True
         if 'mapped gaze video' not in to_export:
-            if s.state[process.Action.MAKE_MAPPED_GAZE_VIDEO]==process.State.Completed:
+            if s.state[process.Action.MAKE_MAPPED_GAZE_VIDEO]==process_pool.State.Completed:
                 to_export['mapped gaze video'] = True
 
     dq_df, dq_set = None, None

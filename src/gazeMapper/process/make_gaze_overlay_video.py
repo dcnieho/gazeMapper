@@ -1,8 +1,7 @@
 import pathlib
 
-from glassesTools import gaze_overlay_video, naming as gt_naming, propagating_thread, timestamps
+from glassesTools import gaze_overlay_video, naming as gt_naming, process_pool, propagating_thread, timestamps
 from glassesTools.gui.video_player import GUI
-
 
 from .. import config, process, session
 
@@ -50,10 +49,10 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
         gui.set_show_timeline(True, video_ts, window_id=gui.main_window_id)
 
     # update state: set to not run so that if we crash or cancel below the task is correctly marked as not run (video files are corrupt)
-    session.update_action_states(working_dir, process.Action.MAKE_GAZE_OVERLAY_VIDEO, process.State.Not_Run, study_config)
+    session.update_action_states(working_dir, process.Action.MAKE_GAZE_OVERLAY_VIDEO, process_pool.State.Not_Run, study_config)
 
     # now run
     video_maker.process_video()
 
     # update state
-    session.update_action_states(working_dir, process.Action.MAKE_GAZE_OVERLAY_VIDEO, process.State.Completed, study_config)
+    session.update_action_states(working_dir, process.Action.MAKE_GAZE_OVERLAY_VIDEO, process_pool.State.Completed, study_config)

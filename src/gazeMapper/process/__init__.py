@@ -1,20 +1,7 @@
 import enum
 import typing
 
-from glassesTools import annotation, utils
-
-class State(enum.IntEnum):
-    Not_Run     = enum.auto()
-    Pending     = enum.auto()
-    Running     = enum.auto()
-    Completed   = enum.auto()
-    # two more states needed by process_pool
-    Canceled    = enum.auto()
-    Failed      = enum.auto()
-    @property
-    def displayable_name(self):
-        return self.name.replace("_", " ")
-utils.register_type(utils.CustomTypeEntry(State,'__enum.process.State__', utils.enum_val_2_str, lambda x: getattr(State, x.split('.')[1])))
+from glassesTools import annotation, process_pool, utils
 
 class Action(enum.IntEnum):
     IMPORT = enum.auto()
@@ -188,7 +175,7 @@ def _determine_to_invalidate(action: Action, study_config: 'config.Study') -> se
         case _:
             raise NotImplementedError(f'Logic is not implemented for {action.displayable_name} ({action}), major developer oversight! Let him know.')
 
-def action_update_and_invalidate(action: Action, state: State, study_config: 'config.Study') -> dict[Action, State]:
+def action_update_and_invalidate(action: Action, state: process_pool.State, study_config: 'config.Study') -> dict[Action, process_pool.State]:
     # set status of indicated task
     action_state_mutations = {action: state}
 
@@ -196,11 +183,11 @@ def action_update_and_invalidate(action: Action, state: State, study_config: 'co
     # being performed. There may be a better way of doing this, but i prefer to actively, per case, think this through
     # and explicitly write it out
     for a in _determine_to_invalidate(action, study_config):
-        action_state_mutations[a] = State.Not_Run
+        action_state_mutations[a] = process_pool.State.Not_Run
 
     return action_state_mutations
 
-def _is_recording_action_possible(rec: str, action_states: dict[Action, State], study_config: 'config.Study', rec_type: 'session.RecordingType', action: Action) -> tuple[bool,list[Action]]:
+def _is_recording_action_possible(rec: str, action_states: dict[Action, process_pool.State], study_config: 'config.Study', rec_type: 'session.RecordingType', action: Action) -> tuple[bool,list[Action]]:
     if not is_action_possible_given_config(action, study_config):
         return False, None
     elif not is_action_possible_for_recording(rec, rec_type, action, study_config):
@@ -209,7 +196,7 @@ def _is_recording_action_possible(rec: str, action_states: dict[Action, State], 
     preconditions = {Action.IMPORT} # IMPORT is a precondition for all actions except IMPORT itself
     match action:
         case Action.IMPORT:
-            return action_states[Action.IMPORT]==State.Not_Run, []  # possible if not already imported
+            return action_states[Action.IMPORT]==process_pool.State.Not_Run, []  # possible if not already imported
         case Action.MAKE_GAZE_OVERLAY_VIDEO:
             pass    # nothing besides import
         case Action.CODE_EPISODES:
@@ -235,11 +222,11 @@ def _is_recording_action_possible(rec: str, action_states: dict[Action, State], 
             raise NotImplementedError(f'Logic is not implemented for {action.displayable_name} ({action}), major developer oversight! Let him know.')
 
     # check that preconditions are met
-    states = [action_states[p]==State.Completed for p in preconditions]
+    states = [action_states[p]==process_pool.State.Completed for p in preconditions]
     missing = [p for p,s in zip(preconditions,states) if not s]
     return all(states), [p for p in Action if p in missing] # NB: ensure stable order
 
-def _is_session_action_possible(session_action_states: dict[Action, State], recording_action_states: dict[str,dict[Action, State]], study_config: 'config.Study', rec_types: dict[str,'session.RecordingType'], action: Action) -> tuple[bool, list[Action]]:
+def _is_session_action_possible(session_action_states: dict[Action, process_pool.State], recording_action_states: dict[str,dict[Action, process_pool.State]], study_config: 'config.Study', rec_types: dict[str,'session.RecordingType'], action: Action) -> tuple[bool, list[Action]]:
     if not is_action_possible_given_config(action, study_config):
         return False, None
 
@@ -268,11 +255,11 @@ def _is_session_action_possible(session_action_states: dict[Action, State], reco
     precond_met: dict[Action,tuple[bool,list[str]]] = {}
     for p in [p for p in Action if p in preconditions]: # NB: ensure stable order
         if is_session_level_action(p):
-            met = session_action_states[p]==State.Completed
+            met = session_action_states[p]==process_pool.State.Completed
             precond_met[p] = (met,None)
         else:
             met1 = [is_action_possible_for_recording(r, rec_types[r], p, study_config) for r in recording_action_states]
-            met2 = [recording_action_states[r][p]==State.Completed for r in recording_action_states]
+            met2 = [recording_action_states[r][p]==process_pool.State.Completed for r in recording_action_states]
             met = [(not m1) or m2 for m1,m2 in zip(met1,met2)]    # not m1 because ignore if action isn't possible for that recording anyway
             precond_met[p] = (all(met), [] if all(met) else [r for r,m1,m2 in zip(recording_action_states,met1,met2) if m1 and not m2])
 
@@ -282,7 +269,7 @@ def _is_session_action_possible(session_action_states: dict[Action, State], reco
         ok = any((precond_met[p][0] for p in precond_met))
     return ok, {p: precond_met[p][1] for p in precond_met if not precond_met[p][0]} if not ok else {}
 
-def get_possible_actions(session_action_states: dict[Action, State], recording_action_states: dict[str,dict[Action, State]], actions_to_check: set[Action], study_config: 'config.Study') -> dict[Action, tuple[bool|list[str], dict[Action,list[str]]]]:
+def get_possible_actions(session_action_states: dict[Action, process_pool.State], recording_action_states: dict[str,dict[Action, process_pool.State]], actions_to_check: set[Action], study_config: 'config.Study') -> dict[Action, tuple[bool|list[str], dict[Action,list[str]]]]:
     # determine based on actions_states which actions have all their preconditions met. Return a set containing just
     # those possible actions
     # actions_to_check can be a subset of all actions, if user e.g. knows some actions aren't possible or wanted due to settings

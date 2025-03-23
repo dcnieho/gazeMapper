@@ -1,9 +1,8 @@
 import pathlib
 import numpy as np
 
-from glassesTools import annotation, fixation_classification
+from glassesTools import annotation, fixation_classification, process_pool
 from glassesTools.validation import config as val_config, assign_fixations, compute_offsets
-
 
 from .. import config, episode, naming, plane, process, session
 
@@ -76,4 +75,4 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
                                 include_data_loss=study_config.validate_include_data_loss)
 
     # update state
-    session.update_action_states(working_dir, process.Action.VALIDATE, process.State.Completed, study_config)
+    session.update_action_states(working_dir, process.Action.VALIDATE, process_pool.State.Completed, study_config)

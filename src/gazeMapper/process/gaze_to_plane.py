@@ -1,9 +1,8 @@
 import pathlib
 
-from glassesTools import annotation, gaze_headref, gaze_worldref, naming as gt_naming, ocv, plane as gt_plane, propagating_thread
+from glassesTools import annotation, gaze_headref, gaze_worldref, naming as gt_naming, ocv, plane as gt_plane, process_pool, propagating_thread
 from glassesTools.gui import worldgaze as worldgaze_gui
 from glassesTools.gui.video_player import GUI
-
 
 from .. import config, episode, naming, plane, process, session, synchronization
 
@@ -88,7 +87,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, s
         gaze_worldref.write_dict_to_file(plane_gazes[p], working_dir/f'{naming.world_gaze_prefix}{p}.tsv', skip_missing=True)
 
     # update state
-    session.update_action_states(working_dir, process.Action.GAZE_TO_PLANE, process.State.Completed, study_config)
+    session.update_action_states(working_dir, process.Action.GAZE_TO_PLANE, process_pool.State.Completed, study_config)
 
     # done if no visualization wanted
     if gui is None:

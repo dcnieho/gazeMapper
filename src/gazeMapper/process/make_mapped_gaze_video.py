@@ -7,16 +7,16 @@ import numpy as np
 import copy
 import subprocess
 
-from glassesTools import annotation, aruco, drawing, intervals, gaze_headref, gaze_worldref, naming as gt_naming, ocv, plane, propagating_thread, timestamps, transforms, utils
-from glassesTools.gui.video_player import GUI
-
-from .. import config, episode, marker, naming, process, session, synchronization
-from .detect_markers import _get_plane_setup, _get_sync_function
-
 from ffpyplayer.writer import MediaWriter
 from ffpyplayer.pic import Image
 import ffpyplayer.tools
 from fractions import Fraction
+
+from glassesTools import annotation, aruco, drawing, intervals, gaze_headref, gaze_worldref, naming as gt_naming, ocv, plane, process_pool, propagating_thread, timestamps, transforms, utils
+from glassesTools.gui.video_player import GUI
+
+from .. import config, episode, marker, naming, process, session, synchronization
+from .detect_markers import _get_plane_setup, _get_sync_function
 
 
 def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show_visualization=False, **study_settings):
@@ -288,7 +288,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
             vid_writer[v] = MediaWriter(str(working_dir / v / naming.mapped_gaze_video), [out_opts], overwrite=True)
 
         # update state: set to not run so that if we crash or cancel below the task is correctly marked as not run (video files are corrupt)
-        session.update_action_states(working_dir, process.Action.MAKE_MAPPED_GAZE_VIDEO, process.State.Not_Run, study_config)
+        session.update_action_states(working_dir, process.Action.MAKE_MAPPED_GAZE_VIDEO, process_pool.State.Not_Run, study_config)
 
         # now make the video
         def n_digit(value):
@@ -494,7 +494,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
         gui.stop()
 
     # update state
-    session.update_action_states(working_dir, process.Action.MAKE_MAPPED_GAZE_VIDEO, process.State.Completed, study_config)
+    session.update_action_states(working_dir, process.Action.MAKE_MAPPED_GAZE_VIDEO, process_pool.State.Completed, study_config)
 
 def draw_gaze_on_other_video(frame_other, pose_this: plane.Pose, pose_other: plane.Pose, plane_gaze: gaze_worldref.Gaze, camera_params_other, clr, which_gaze_on_plane, which_gaze_on_plane_allow_fallback, do_draw_gaze, do_draw_gaze_vec, do_draw_camera, sub_pixel_fac):
     if not do_draw_gaze and not do_draw_gaze_vec and not do_draw_camera:

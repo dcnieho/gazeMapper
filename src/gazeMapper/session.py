@@ -4,7 +4,7 @@ import json
 import typeguard
 import shutil
 
-from glassesTools import camera_recording, importing, naming, utils
+from glassesTools import camera_recording, importing, naming, process_pool, utils
 from glassesTools.recording import Recording as EyeTrackerRecording
 from glassesTools.camera_recording import Recording as CameraRecording
 
@@ -51,7 +51,7 @@ class Recording:
         self.definition = definition
         self.info       = info
 
-        self.state: dict[process.Action, process.State] = {}
+        self.state: dict[process.Action, process_pool.State] = {}
         if not self.info.working_directory:
             # don't create action states file if this recording only exists in memory (still needs to be imported)
             self.state = _get_not_run_action_states(True)
@@ -130,7 +130,7 @@ class Session:
             recordings = {}
         self.recordings = recordings
 
-        self.state: dict[process.Action, process.State] = {}
+        self.state: dict[process.Action, process_pool.State] = {}
         self.load_action_states(True, True)
 
     def create_working_directory(self, parent_directory: str|pathlib.Path):
@@ -159,7 +159,7 @@ class Session:
         self.update_recording_info(which, rec_info)    # the import call may have updated the info (e.g. filled in recording length that wasn't known from metadata). Update what we hold in memory
         # denote import finished
         _create_action_states_file(rec_info.working_directory, True)
-        update_action_states(rec_info.working_directory, process.Action.IMPORT, process.State.Completed, study_config)
+        update_action_states(rec_info.working_directory, process.Action.IMPORT, process_pool.State.Completed, study_config)
         self.recordings[which].load_action_states(False, False)
 
     def add_recording_and_import(self, which: str, rec_info: EyeTrackerRecording|CameraRecording, cam_cal_file: str|pathlib.Path=None, **kwargs) -> Recording:
@@ -235,15 +235,15 @@ class Session:
 
     def is_action_completed(self, action: process.Action) -> bool:
         if process.is_session_level_action(action):
-            return self.state[action]==process.State.Completed
+            return self.state[action]==process_pool.State.Completed
         else:
-            return all((self.recordings[r].state[action]==process.State.Completed for r in self.recordings))
+            return all((self.recordings[r].state[action]==process_pool.State.Completed for r in self.recordings))
 
     def action_completed_num_recordings(self, action: process.Action) -> int:
         if process.is_session_level_action(action):
             raise ValueError('The status of session-level actions cannot be listed per recording')
 
-        return sum([self.recordings[r].state[action]==process.State.Completed for r in self.recordings])
+        return sum([self.recordings[r].state[action]==process_pool.State.Completed for r in self.recordings])
 
     @staticmethod
     def from_definition(definition: SessionDefinition|None, path: str | pathlib.Path) -> 'Session':
@@ -303,12 +303,12 @@ def _get_action_status_fname(for_recording: bool) -> str:
     else:
         return Session.status_file_name
 
-def _get_not_run_action_states(for_recording: bool) -> dict[process.Action, process.State]:
+def _get_not_run_action_states(for_recording: bool) -> dict[process.Action, process_pool.State]:
     if for_recording:
         filt = lambda x: not process.is_session_level_action(x)
     else:
         filt = lambda x:     process.is_session_level_action(x)
-    return {k:process.State.Not_Run for k in process.Action if filt(k)}
+    return {k:process_pool.State.Not_Run for k in process.Action if filt(k)}
 
 def _create_action_states_file(file: pathlib.Path, for_recording: bool):
     if file.is_dir():
@@ -316,20 +316,20 @@ def _create_action_states_file(file: pathlib.Path, for_recording: bool):
     action_states = _get_not_run_action_states(for_recording)
     _write_action_states_to_file(file, action_states)
 
-def _write_action_states_to_file(file: pathlib.Path, action_states: dict[process.Action, process.State]):
+def _write_action_states_to_file(file: pathlib.Path, action_states: dict[process.Action, process_pool.State]):
     action_states = {utils.enum_val_2_str(k):action_states[k] for k in action_states}    # turn key into string so it can be stored in a json file
     with open(file, 'w') as f:
         json.dump(action_states, f, cls=utils.CustomTypeEncoder, indent=2)
 
-def _read_action_states(file: pathlib.Path) -> dict[process.Action, process.State]:
+def _read_action_states(file: pathlib.Path) -> dict[process.Action, process_pool.State]:
     if not file.is_file():
         return None
 
     with open(file, 'r') as f:
         action_states = json.load(f, object_hook=utils.json_reconstitute)
-        return {process.action_str_to_enum_val(k): process.State(action_states[k]) for k in action_states}  # turn key from string back into enum instance, and same for state value
+        return {process.action_str_to_enum_val(k): process_pool.State(action_states[k]) for k in action_states}  # turn key from string back into enum instance, and same for state value
 
-def _upgrade_action_states(file: pathlib.Path, action_states: dict[process.Action, process.State], for_recording: bool) -> dict[process.Action, process.State]:
+def _upgrade_action_states(file: pathlib.Path, action_states: dict[process.Action, process_pool.State], for_recording: bool) -> dict[process.Action, process_pool.State]:
     if file.is_dir():
         file /= _get_action_status_fname(for_recording)
     expected_action_states = _get_not_run_action_states(for_recording)
@@ -342,7 +342,7 @@ def _upgrade_action_states(file: pathlib.Path, action_states: dict[process.Actio
         _write_action_states_to_file(file, upgraded_action_states)
     return upgraded_action_states
 
-def get_action_states(working_dir: str|pathlib.Path, for_recording: bool, create_if_missing = False, skip_if_missing=False, upgrade_if_needed=False) -> dict[process.Action, process.State]:
+def get_action_states(working_dir: str|pathlib.Path, for_recording: bool, create_if_missing = False, skip_if_missing=False, upgrade_if_needed=False) -> dict[process.Action, process_pool.State]:
     working_dir = pathlib.Path(working_dir)
     file = working_dir / _get_action_status_fname(for_recording)
     action_states = _read_action_states(file)
@@ -369,7 +369,7 @@ def _apply_mutations_and_store(file, action_state_mutations, skip_if_missing=Fal
 
     _write_action_states_to_file(file, action_states)
 
-def update_action_states(working_dir: str|pathlib.Path, action: process.Action, state: process.State, study_config: 'config.Study', skip_if_missing=False) -> dict[process.Action, process.State]:
+def update_action_states(working_dir: str|pathlib.Path, action: process.Action, state: process_pool.State, study_config: 'config.Study', skip_if_missing=False) -> dict[process.Action, process_pool.State]:
     for_recording = not process.is_session_level_action(action)
 
     action_state_mutations  = process.action_update_and_invalidate(action, state, study_config)

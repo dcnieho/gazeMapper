@@ -13,7 +13,6 @@ import glassesTools.gui
 from glassesTools.gui.timeline import color_darken
 
 from ... import type_utils, typed_dict_defaults
-from . import colors
 
 
 val_to_str_registry: dict[typing.Type, dict[typing.Any, str]] = {
@@ -153,7 +152,7 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
                 imgui.end_table()
                 table_is_started = False
             if problems and f in problems:
-                imgui.push_style_color(imgui.Col_.text, colors.error)
+                imgui.push_style_color(imgui.Col_.text, glassesTools.gui.colors.error)
             if imgui.tree_node_ex(this_lbl,imgui.TreeNodeFlags_.framed):
                 if problems and f in problems:
                     if isinstance(problems[f],str) or (isinstance(problems[f],dict) and 'problem_with_this_key' in problems[f]):
@@ -332,7 +331,7 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, actual_types: dic
                     imgui.align_text_to_frame_padding()
                     invalid = not _valid_item_name()
                     if invalid:
-                        imgui.push_style_color(imgui.Col_.text, colors.error)
+                        imgui.push_style_color(imgui.Col_.text, glassesTools.gui.colors.error)
                     imgui.text("Item name")
                     if invalid:
                         imgui.pop_style_color()
@@ -351,7 +350,7 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, actual_types: dic
                         imgui.align_text_to_frame_padding()
                         invalid = new_item_type is None
                         if invalid:
-                            imgui.push_style_color(imgui.Col_.text, colors.error)
+                            imgui.push_style_color(imgui.Col_.text, glassesTools.gui.colors.error)
                         imgui.text("Item type")
                         if invalid:
                             imgui.pop_style_color()
@@ -439,9 +438,9 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
         imgui.begin_disabled()
     if problem:
         imgui.align_text_to_frame_padding()
-        imgui.text_colored(colors.error, field_lbl)
+        imgui.text_colored(glassesTools.gui.colors.error, field_lbl)
         if isinstance(problem,str):
-            imgui.push_style_color(imgui.Col_.text, colors.error)
+            imgui.push_style_color(imgui.Col_.text, glassesTools.gui.colors.error)
             glassesTools.gui.utils.draw_hover_text(problem,text='')
             imgui.pop_style_color()
     elif is_default or is_parent or is_none or fixed:
