@@ -8,7 +8,7 @@ import typing
 
 from glassesTools import plane, utils
 from glassesTools.validation.config import get_validation_setup
-from glassesTools.validation.config.plane import ValidationPlane
+from glassesTools.validation import Plane as ValidationPlane
 
 from . import type_utils
 

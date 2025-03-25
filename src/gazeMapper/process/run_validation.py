@@ -2,7 +2,7 @@ import pathlib
 import numpy as np
 
 from glassesTools import annotation, fixation_classification, process_pool
-from glassesTools.validation import config as val_config, assign_fixations, compute_offsets
+from glassesTools.validation import assign_fixations, compute_offsets, Plane as ValidationPlane
 
 from .. import config, episode, naming, plane, process, session
 
@@ -37,7 +37,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
         if not plane_def.use_default:
             validator_config_dir = config_dir/p
 
-        validation_plane = val_config.plane.ValidationPlane(validator_config_dir)
+        validation_plane = ValidationPlane(validator_config_dir)
 
         plot_limits = [[validation_plane.bbox[0]-validation_plane.marker_size, validation_plane.bbox[2]+validation_plane.marker_size],
                        [validation_plane.bbox[1]-validation_plane.marker_size, validation_plane.bbox[3]+validation_plane.marker_size]]

@@ -9,7 +9,7 @@ import threading
 from imgui_bundle import imgui, imspinner, hello_imgui, icons_fontawesome_6 as ifa6
 
 from glassesTools import annotation, aruco, async_thread, camera_recording, eyetracker, gui as gt_gui, naming as gt_naming, platform, process_pool, recording, video_utils
-from glassesTools.validation import config as val_config, DataQualityType, export, get_DataQualityType_explanation
+from glassesTools.validation import config as val_config, default_poster, DataQualityType, export, get_DataQualityType_explanation
 from glassesTools.gui import colors
 
 from . import utils
@@ -39,7 +39,7 @@ def get_folder_picker(g, reason: str, *args, **kwargs):
             case 'deploy_aruco':
                 aruco.deploy_marker_images(selected[0], 1000, *args, **kwargs)
             case 'deploy_gv_poster_pdf':
-                val_config.plane.deploy_default_pdf(selected[0])
+                default_poster.deploy_default_pdf(selected[0])
             case 'export':
                 show_export_config(g, selected[0], *args, **kwargs)
             case _:
@@ -165,7 +165,7 @@ def glasses_validator_plane_check_config(study_config: config.Study, pl: plane.D
         val_config.get_validation_setup(working_dir)
     except:
         # no config file, deploy
-        val_config.deploy_validation_config(working_dir)
+        default_poster.deploy_config(working_dir)
     else:
         # already exists, nothing to do
         pass
