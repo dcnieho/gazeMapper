@@ -1232,9 +1232,6 @@ class GUI:
                 if not_completed:
                     rec_strs = [f'{r} ({states[r].displayable_name})' for r in not_completed]
                     glassesTools.gui.utils.draw_hover_text('not completed for recordings:\n'+'\n'.join(rec_strs),'')
-        if imgui.begin_popup_context_item(f"##{item.name}_{action}_context"):
-            self._session_context_menu(item.name)
-            imgui.end_popup()
 
     def _session_context_menu(self, session_name: str) -> bool:
         # ignore input session name, get selected sessions
