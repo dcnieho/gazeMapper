@@ -437,8 +437,6 @@ class GUI:
         sess = self.sessions.get(job.session,None)
         if sess is None:
             return
-        if job.recording and job.recording not in sess.recordings:
-            return
         if job.recording:
             rec = sess.recordings.get(job.recording,None)
             if rec is None:
