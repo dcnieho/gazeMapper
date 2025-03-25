@@ -328,7 +328,7 @@ def _get_impossible_reason_text_impl(fails: dict[Action,list[str]], ref: str) ->
     reason = ''
     for a in fails:
         reason += f'  - {a.displayable_name}'
-        if fails[a] is not None and (len(fails[a])>1 or fails[a][0]!=ref):
+        if not not fails[a] and (len(fails[a])>1 or fails[a][0]!=ref):
             reason += f' ({", ".join(fails[a])})'
         reason += '\n'
     return reason
