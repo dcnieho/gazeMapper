@@ -261,7 +261,8 @@ def _is_session_action_possible(session_action_states: dict[Action, process_pool
             met1 = [is_action_possible_for_recording(r, rec_types[r], p, study_config) for r in recording_action_states]
             met2 = [recording_action_states[r][p]==process_pool.State.Completed for r in recording_action_states]
             met = [(not m1) or m2 for m1,m2 in zip(met1,met2)]    # not m1 because ignore if action isn't possible for that recording anyway
-            precond_met[p] = (all(met), [] if all(met) else [r for r,m1,m2 in zip(recording_action_states,met1,met2) if m1 and not m2])
+            all_met = all(met) if met else False
+            precond_met[p] = (all_met, [] if all_met else [r for r,m1,m2 in zip(recording_action_states,met1,met2) if m1 and not m2])
 
     if preconditions_test=='and':
         ok = all((precond_met[p][0] for p in precond_met))
