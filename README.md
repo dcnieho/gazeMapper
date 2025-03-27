@@ -80,7 +80,7 @@ For Windows users who wish to use the gazeMapper GUI, the easiest way to acquire
 a standalone executable](https://github.com/dcnieho/gazeMapper/releases/latest). The standalone executable is not
 available for MacOS or Linux. Complete installation instruction for [MacOS](#complete-instructions-for-macos) and [Linux](#complete-instructions-for-linux) users are available below.
 
-For users on Windows, Mac or Linux who wish to use gazeMapper *in their Python code*, the easiest way to acquire
+For users on Windows, Mac (14 Sonoma or later) or Linux who wish to use gazeMapper *in their Python code*, the easiest way to acquire
 gazeMapper is to install it directly into your Python distribution using the command
 `python -m pip install gazeMapper`.
 If you run into problems on MacOS to install the `imgui_bundle` package, you can
@@ -103,7 +103,7 @@ Once pip-installed in your Python distribution, there are three ways to run the 
     ```
 
 ## Complete instructions for MacOS
-Installing and running gazeMapper on a Mac will involve some use of the terminal. In this section we will show you step by step how to install, and then what to do every time you want to run gazeMapper.
+Installing and running gazeMapper on a Mac will involve some use of the terminal. In this section we will show you step by step how to install, and then what to do every time you want to run gazeMapper. MacOS 14 (Sonoma) or later are supported.
 Note that it is critical on MacOS that gazeMapper is installed natively, and not under Rosetta or Parallels. That will lead to an error when importing the `polars` package, and other unfixable errors. If you are not sure what kind of system you have, consult [this page](https://support.apple.com/en-us/116943) to learn how to find out.
 ### Installing gazeMapper
 1. To acquire and manage Python, install Anaconda by following [these instructions](https://docs.anaconda.com/anaconda/install/mac-os/). Additional notes:
