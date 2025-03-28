@@ -522,7 +522,7 @@ gazeMapper supports the following eye trackers:
 - Tobii Pro Glasses 3
 - Viewpointsystem VPS 19
 
-* The generic eye tracker allows users to import recordings made with unsupported eye trackers into tools built upon glassesTools, if the user has already converted the recording to the [glassesTools format](https://github.com/dcnieho/glassesTools/blob/master/README.md#common-data-format) themselves. The name of the eye tracker can be set in the [recording info](https://github.com/dcnieho/glassesTools/blob/master/README.md#recording-info) file through the `eye_tracker_name` property, so that recordings from different devices imported as generic eye tracker recordings can be distinguished.
+\* The generic eye tracker allows users to import recordings made with unsupported eye trackers into tools built upon glassesTools, if the user has already converted the recording to the [glassesTools format](https://github.com/dcnieho/glassesTools/blob/master/README.md#common-data-format) themselves. The name of the eye tracker can be set in the [recording info](https://github.com/dcnieho/glassesTools/blob/master/README.md#recording-info) file through the `eye_tracker_name` property, so that recordings from different devices imported as generic eye tracker recordings can be distinguished.
 
 Pull requests or partial help implementing support for further wearable eye trackers are gladly received. To support a new eye tracker,
 implement it in [glassesTools](https://github.com/dcnieho/glassesTools/blob/master/README.md#eye-tracker-support).
