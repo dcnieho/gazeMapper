@@ -530,7 +530,7 @@ def draw_gaze_on_other_video(frame_other, pose_this: plane.Pose, pose_other: pla
     # also draw position of this camera on the other video, and possibly gaze vector
     if do_draw_camera or do_draw_gaze_vec:
         # take point 0,0,0 in this camera's space (i.e. camera position) and transform to the plane's world space
-        cam_pos_world_this = pose_this.cam_frame_to_world((0.,0.,0.))
+        cam_pos_world_this = pose_this.cam_frame_to_world(np.zeros((1,3)))
         if pose_other.world_frame_to_cam(cam_pos_world_this)[2]<=0:
             # other video's camera is behind this camera, won't be visible
             # and projecting it anyway yields a nonsensical result
