@@ -689,8 +689,11 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, documenta
                     clr = imgui.get_color_u32(imgui.Col_.button)
                 # draw frame
                 imgui.internal.render_frame(t_bb.min, t_bb.max, clr, True, imgui.get_style().frame_rounding)
-                # draw text on top
-                imgui.internal.render_text_clipped((t_bb.min.x+x_padding, t_bb.min.y), (t_bb.max.x-x_padding, t_bb.max.y), val_txt[i], '', w_sizes[i], imgui.get_style().button_text_align, t_bb)
+                # draw text on top (need to go super low-level, as it seems that imgui.internal.render_text_clipped() has some issue on the mac, can't figure it out)
+                align = imgui.get_style().button_text_align
+                pos = imgui.ImVec2(tuple((x-y)*a for x,y,a in zip((t_bb.get_width()-2*x_padding,t_bb.get_height()),w_sizes[i],align))) + (t_bb.min.x+x_padding, t_bb.min.y)
+                imgui.get_current_context().current_window.draw_list.add_text(
+                    imgui.get_current_context().font, 0., pos, imgui.get_color_u32(imgui.Col_.text), val_txt[i], None, 0., t_bb.to_vec4())
                 if has_order and len(val)>1:
                     glassesTools.gui.utils.draw_hover_text("Drag to reorder",'')
                     if imgui.begin_drag_drop_source(imgui.DragDropFlags_.payload_auto_expire):
