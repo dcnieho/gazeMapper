@@ -512,6 +512,7 @@ downward, which means that (-,-) coordinates are to the left and above of the pl
 gazeMapper supports the following eye trackers:
 - AdHawk MindLink
 - Generic*
+- Meta Project Aria Generation 1
 - Pupil Core
 - Pupil Invisible
 - Pupil Neon
@@ -540,6 +541,17 @@ software before they can be imported into gazeMapper. These are:
   - For the *Pupil Core*, for best results you may wish to do a scene camera calibration yourself, see https://docs.pupil-labs.com/core/software/pupil-capture/#camera-intrinsics-estimation.
     If you do not do so, a generic calibration will be used by Pupil Capture during data recording, by Pupil Player during data
     analysis and by the glassesTools processing functions, which may result in incorrect accuracy values.
+- *Meta Project Aria Generation 1*:
+  - First, open a recording in Aria Studio on the computer.
+  - In Aria Studio, request a MPS run for eye gaze (if you haven't already done so), and wait for it to complete successfully.
+  - Open the [`meta_aria_gen1_exporter.py`](https://github.com/dcnieho/glassesTools/tree/master/tools/meta_aria_gen1_exporter.py) script
+    provided in glassesTools and set the variable `vrs_file` to the full path to the recording's `.vrs` file. By default, it is assumed
+    that the recording's `.vrs` file and the MPS results are in the same folder and have the default names used by Aria Studio, e.g.
+    `some_folder/recording.vrs` and `somefolder/mps_recording_vrs`. If the MPS results are located elsewhere, you can provide the
+    path to them using the `mps_folder` variable (optional).
+  - Run the script (ensure you have the right packages installed, see the comment atop the script). An export of the recording will
+    be made in a format that can be imported by gazeMapper and by default stored in the folder `somefolder/export_recording`. If you
+    wish to use another export folder, set the variable `output_folder` (optional).
 - *SMI ETG*: For SMI ETG recordings, access to BeGaze is required and the following steps should be performed:
   - **NB**: Note that it is critical that a [`SYNC_ET_TO_CAM` action](#actions) is performed for SMI ETG recordings. This is required because the gaze timestamps in the export file created below have an unknown zero that is not related to the scene video clock, and no info about offset between these clocks is available. The gaze signal and video feed have to be manually aligned (synchronized).
   - Export gaze data: `Export` -> `Legacy: Export Raw Data to File`.
