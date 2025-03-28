@@ -11,7 +11,7 @@ isMacOS = sys.platform.startswith("darwin")
 if isMacOS:
     import AppKit
 
-from glassesTools import annotation, drawing, gaze_headref, gaze_worldref, naming as gt_naming, ocv, plane as gt_plane, process_pool, propagating_thread, timestamps, transforms
+from glassesTools import annotation, drawing, gaze_headref, gaze_worldref, naming as gt_naming, ocv, plane as gt_plane, process_pool, propagating_thread, timestamps
 from glassesTools.gui.video_player import GUI
 
 
