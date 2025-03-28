@@ -80,7 +80,6 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
 
             # get camera calibration info
             camera_params= ocv.CameraParams.read_from_file(working_dir / gt_naming.scene_camera_calibration_fname)
-            camera_params.has_intrinsics()
 
             # compute target positions
             target_positions: dict[int, TargetPos] = {}
