@@ -109,11 +109,11 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     ival = 0
     need_to_load = True
     while True:
-        if not has_requested_focus:
+        if gui.is_running() and not has_requested_focus:
             AppKit.NSApplication.sharedApplication().activateIgnoringOtherApps_(1)
             has_requested_focus = True
 
-        if need_to_load:
+        if gui.is_running() and need_to_load:
             # select data
             start, end = episodes[ival]
             plot_gaze  = {fr:gazes           [fr] for fr in      gazes       if fr>=start and fr<=end}

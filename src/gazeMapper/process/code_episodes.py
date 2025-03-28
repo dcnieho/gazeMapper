@@ -192,7 +192,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
             if frame is not None:
                 gui.update_image(frame, pts, frame_idx, window_id=gui.main_window_id)
 
-        if not has_requested_focus:
+        if gui.is_running() and not has_requested_focus:
             AppKit.NSApplication.sharedApplication().activateIgnoringOtherApps_(1)
             has_requested_focus = True
 
