@@ -93,9 +93,9 @@ class GUI:
                 return
             tb = gt_gui.utils.get_traceback(type(exc), exc, exc.__traceback__)
             if isinstance(exc, asyncio.TimeoutError):
-                gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Processing error", f"A background process has failed:\n{type(exc).__name__}: {str(exc) or 'No further details'}", gt_gui.msg_box.MsgBox.warn, more=tb)
+                gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Processing error", f"A background process has failed:\n{exc}: {str(exc) or 'No further details'}", gt_gui.msg_box.MsgBox.warn, more=tb)
                 return
-            gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Processing error", f"Something went wrong in an asynchronous task of a separate thread:\n\n{tb}", gt_gui.msg_box.MsgBox.error)
+            gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Processing error", f"Something went wrong in an asynchronous task of a separate thread", gt_gui.msg_box.MsgBox.error, more=tb)
         async_thread.done_callback = asyncexcepthook
 
     def _load_fonts(self):
@@ -492,8 +492,8 @@ class GUI:
             self.study_config = config.Study.load_from_json(config_dir, strict_check=False)
             self._reload_sessions()
             self.process_pool.set_num_workers(self.study_config.gui_num_workers)
-        except Exception as e:
-            gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Project loading error", f"Failed to load the project at {self.project_dir}:\n{e}\n\n{gt_gui.utils.get_traceback(e)}", gt_gui.msg_box.MsgBox.error)
+        except Exception as exc:
+            gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Project loading error", f"Failed to load the project at {self.project_dir}:\n{exc}", gt_gui.msg_box.MsgBox.error, more=gt_gui.utils.get_traceback(type(exc), exc, exc.__traceback__))
             self.close_project()
             return
 
@@ -1015,8 +1015,11 @@ class GUI:
                 imgui.same_line()
                 if imgui.button(ifa6.ICON_FA_IMAGE+' generate reference image'):
                     p_dir = config.guess_config_dir(self.study_config.working_directory) / p.name
-                    plane.get_plane_from_definition(p, p_dir)   # constructing the plane triggers generation of the reference image
-                    self._plane_preview_cache[p.name] = utils.load_image_with_helper(p_dir/gt_plane.Plane.default_ref_image_name)
+                    try:
+                        plane.get_plane_from_definition(p, p_dir)   # constructing the plane triggers generation of the reference image
+                        self._plane_preview_cache[p.name] = utils.load_image_with_helper(p_dir/gt_plane.Plane.default_ref_image_name)
+                    except Exception as exc:
+                        gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Plane processing error", f"Failed to load and render the {p.name} plane:\n{exc}", gt_gui.msg_box.MsgBox.error, more=gt_gui.utils.get_traceback(type(exc), exc, exc.__traceback__))
                 if p.name in self._plane_preview_cache and imgui.is_item_hovered(imgui.HoveredFlags_.for_tooltip|imgui.HoveredFlags_.delay_normal):
                     imgui.begin_tooltip()
                     self._plane_preview_cache[p.name].render(largest=400*hello_imgui.dpi_window_size_factor())
