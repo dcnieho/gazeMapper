@@ -1006,7 +1006,7 @@ class GUI:
                     # persist changed config
                     new_p.store_as_json(plane_dir)
                     if new_p.type==plane.Type.GlassesValidator and not new_p.use_default:
-                        callbacks.glasses_validator_plane_check_config(self.study_config, new_p)
+                        callbacks.glasses_validator_plane_check_or_deploy_config(self.study_config, new_p)
                     # recreate plane so any settings changes (e.g. applied defaults) are reflected in the gui
                     self.study_config.planes[i] = plane.Definition.load_from_json(plane_dir)
                     self._plane_preview_cache.pop(p.name, None)

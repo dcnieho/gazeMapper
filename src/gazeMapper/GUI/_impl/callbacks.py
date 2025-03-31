@@ -156,7 +156,7 @@ def delete_plane(study_config: config.Study, plane: plane.Definition):
     # remove from known planes
     study_config.planes = [p for p in study_config.planes if p.name!=plane.name]
 
-def glasses_validator_plane_check_config(study_config: config.Study, pl: plane.Definition_GlassesValidator):
+def glasses_validator_plane_check_or_deploy_config(study_config: config.Study, pl: plane.Definition_GlassesValidator):
     if not isinstance(pl, plane.Definition_GlassesValidator) or pl.use_default:
         return
     # check if there are already are validation setup files
