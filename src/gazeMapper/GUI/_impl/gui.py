@@ -1024,10 +1024,12 @@ class GUI:
                     imgui.begin_tooltip()
                     self._plane_preview_cache[p.name].render(largest=400*hello_imgui.dpi_window_size_factor())
                     imgui.end_tooltip()
-                if p.type==plane.Type.GlassesValidator and p.use_default:
+                if p.type==plane.Type.GlassesValidator:
                     imgui.same_line()
-                    if imgui.button(ifa6.ICON_FA_TICKET+f' get glassesValidator poster pdf'):
+                    if p.use_default and imgui.button(ifa6.ICON_FA_TICKET+f' get glassesValidator poster pdf'):
                         gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='deploy_gv_poster_pdf'))
+                    elif not p.use_default and imgui.button(ifa6.ICON_FA_CLIPBOARD_LIST+f' deploy default config'):
+                        callbacks.glasses_validator_deploy_config(self, p)
                 imgui.same_line()
                 if imgui.button(ifa6.ICON_FA_TRASH_CAN+' delete plane'):
                     callbacks.delete_plane(self.study_config, p)

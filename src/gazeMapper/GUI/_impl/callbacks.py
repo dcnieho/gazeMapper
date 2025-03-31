@@ -170,6 +170,20 @@ def glasses_validator_plane_check_or_deploy_config(study_config: config.Study, p
         # already exists, nothing to do
         pass
 
+def glasses_validator_deploy_config(g, pl: plane.Definition_GlassesValidator):
+    from . import gui
+    g = typing.cast(gui.GUI,g)  # indicate type to typechecker
+    if not isinstance(pl, plane.Definition_GlassesValidator):
+        return
+    working_dir = config.guess_config_dir(g.study_config.working_directory)/pl.name
+    not_deployed = default_poster.deploy_config(working_dir)
+    if not_deployed:
+        buttons = {
+            ifa6.ICON_FA_CHECK+" Yes": lambda: default_poster.deploy_config(working_dir,overwrite=True),
+            ifa6.ICON_FA_CIRCLE_XMARK+" No": None
+        }
+        gt_gui.utils.push_popup(g, gt_gui.msg_box.msgbox, "Overwrite config?", "The following files already existed and were not deployed:\n- "+('\n- '.join(not_deployed))+"\nDo you want to overwrite these files?", gt_gui.msg_box.MsgBox.warn, buttons)
+
 def make_recording_definition(study_config: config.Study, r_type: session.RecordingType, name: str):
     # append to defined recordings
     study_config.session_def.recordings.append(session.RecordingDefinition(name,r_type))
