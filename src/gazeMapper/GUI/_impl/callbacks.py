@@ -240,7 +240,6 @@ def new_session_button(g, notify_func: typing.Callable[[str], None]|None = None)
             imgui.set_next_item_width(-1)
             _,new_sess_name = imgui.input_text("##new_sess_name",new_sess_name)
             imgui.end_table()
-        return 0 if imgui.is_key_released(imgui.Key.enter) else None
 
     def _make_session():
         make_session(g.project_dir, new_sess_name)
@@ -251,7 +250,7 @@ def new_session_button(g, notify_func: typing.Callable[[str], None]|None = None)
         ifa6.ICON_FA_CHECK+" Create session": (_make_session, lambda: not _valid_sess_name()),
         ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
     }
-    gt_gui.utils.push_popup(g, lambda: gt_gui.utils.popup("Add session", _add_sess_popup, buttons = buttons, outside=False))
+    gt_gui.utils.push_popup(g, lambda: gt_gui.utils.popup("Add session", _add_sess_popup, buttons = buttons, button_keymap={0:imgui.Key.enter}, outside=False))
 
 def make_session(project_dir: pathlib.Path, session_name: str):
     sess_dir = project_dir/session_name
@@ -349,7 +348,7 @@ def show_action_options(g, session_name: str, rec_name: str|None, action: proces
     }
 
     # show configurable options for action
-    gt_gui.utils.push_popup(g, lambda: gt_gui.utils.popup(f"Set options##{session_name}_{rec_name}", set_action_options_popup, buttons = buttons, closable=True, outside=False))
+    gt_gui.utils.push_popup(g, lambda: gt_gui.utils.popup(f"Set options##{session_name}_{rec_name}", set_action_options_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, closable=True, outside=False))
 
 
 def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
@@ -516,7 +515,7 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
     }
 
     # ask what to export
-    gt_gui.utils.push_popup(g, lambda: gt_gui.utils.popup(f"Set what to export", set_export_config_popup, buttons = buttons, closable=True, outside=False))
+    gt_gui.utils.push_popup(g, lambda: gt_gui.utils.popup(f"Set what to export", set_export_config_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, closable=True, outside=False))
 
 
 async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[recording.Recording|camera_recording.Recording]], dev_type: session.RecordingType, dev: eyetracker.EyeTracker|None, sessions: list[str], generic_device_name: str=None):
@@ -553,7 +552,7 @@ async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[record
         imgui.dummy((0,2*imgui.get_style().item_spacing.y))
         imgui.end_group()
 
-    gt_gui.utils.push_popup(g, lambda: gt_gui.utils.popup("Preparing import", prepping_recs_popup, buttons = None, closable=False, outside=False))
+    gt_gui.utils.push_popup(g, lambda: gt_gui.utils.popup("Preparing import", prepping_recs_popup, buttons=None, button_keymap={0:imgui.Key.enter}, closable=False, outside=False))
 
     # step 1, find what recordings of this type of eye tracker are in the path
     recs = rec_getter()
@@ -718,7 +717,7 @@ async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[record
         ifa6.ICON_FA_CHECK+" Continue": lambda: async_thread.run(_import_recordings(g, recordings_to_add, recording_assignment, generic_device_name)),
         ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
     }
-    gt_gui.utils.push_popup(g, lambda: gt_gui.utils.popup("Assign and import recordings", list_recs_popup, buttons = buttons, closable=True, outside=False))
+    gt_gui.utils.push_popup(g, lambda: gt_gui.utils.popup("Assign and import recordings", list_recs_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, closable=True, outside=False))
 
 async def _import_recordings(g, recordings: list[recording.Recording|camera_recording.Recording], recording_assignment: dict[str, dict[str, int]], generic_device_name: str|None):
     from . import gui
@@ -821,7 +820,7 @@ def add_eyetracking_recordings(g, paths: list[pathlib.Path], sessions: list[str]
     }
 
     # ask what type of eye tracker we should be looking for
-    gt_gui.utils.push_popup(g, lambda: gt_gui.utils.popup("Select eye tracker", add_recs_popup, buttons = buttons, closable=True, outside=False))
+    gt_gui.utils.push_popup(g, lambda: gt_gui.utils.popup("Select eye tracker", add_recs_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, closable=True, outside=False))
 
 def camera_show_glob_filter_config(g, paths, sessions):
     from . import gui
@@ -846,7 +845,7 @@ def camera_show_glob_filter_config(g, paths, sessions):
         ifa6.ICON_FA_CHECK+" Continue": lambda: add_camera_recordings(g, paths, glob_filter, sessions),
         ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
     }
-    gt_gui.utils.push_popup(g, lambda: gt_gui.utils.popup("Select device", setting_popup, buttons = buttons, closable=True, outside=False))
+    gt_gui.utils.push_popup(g, lambda: gt_gui.utils.popup("Select device", setting_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, closable=True, outside=False))
 
 def add_camera_recordings(g, paths: list[pathlib.Path], glob_filter: str, sessions: list[str]):
     from . import gui
@@ -950,4 +949,4 @@ def add_recordings(g, paths: list[pathlib.Path], sessions: list[str]):
     }
 
     # ask what type of device recordings we want to import
-    gt_gui.utils.push_popup(g, lambda: gt_gui.utils.popup("Select device", choose_dev_popup, buttons = buttons, closable=True, outside=False))
+    gt_gui.utils.push_popup(g, lambda: gt_gui.utils.popup("Select device", choose_dev_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, closable=True, outside=False))

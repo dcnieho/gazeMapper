@@ -361,13 +361,12 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, actual_types: dic
                         _,t_idx = imgui.combo("##item_type_selector", t_idx, types)
                         new_item_type = None if t_idx==-1 else types[t_idx]
                     imgui.end_table()
-                return 0 if imgui.is_key_released(imgui.Key.enter) else None
 
             buttons = {
                 ifa6.ICON_FA_CHECK+f" {'Add' if missing_fields else 'Create'} item": (_do_add_item, lambda: not _valid_item_name() or (not missing_fields and new_item_type is None)),
                 ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
             }
-            glassesTools.gui.utils.push_popup(_gui_instance, lambda: glassesTools.gui.utils.popup("Add item", _add_item_popup, buttons = buttons, outside=False))
+            glassesTools.gui.utils.push_popup(_gui_instance, lambda: glassesTools.gui.utils.popup("Add item", _add_item_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, outside=False))
     if nullable and not made_or_replaced_obj:
         if has_add:
             imgui.same_line()

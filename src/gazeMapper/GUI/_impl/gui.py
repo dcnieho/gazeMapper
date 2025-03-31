@@ -976,13 +976,12 @@ class GUI:
                     _,r_idx = imgui.combo("##rec_type_selector", r_idx, [r.value for r in session.RecordingType])
                     new_rec_type = None if r_idx==-1 else session.recording_types[r_idx]
                     imgui.end_table()
-                return 0 if imgui.is_key_released(imgui.Key.enter) else None
 
             buttons = {
                 ifa6.ICON_FA_CHECK+" Create recording": (lambda: (callbacks.make_recording_definition(self.study_config, new_rec_type, new_rec_name), self._reload_sessions()), lambda: not _valid_rec_name() or new_rec_type is None),
                 ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
             }
-            gt_gui.utils.push_popup(self, lambda: gt_gui.utils.popup("Add recording", _add_rec_popup, buttons = buttons, outside=False))
+            gt_gui.utils.push_popup(self, lambda: gt_gui.utils.popup("Add recording", _add_rec_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, outside=False))
 
     def _plane_editor_pane_drawer(self):
         if not self.study_config.planes:
@@ -1076,13 +1075,12 @@ class GUI:
                     _,p_idx = imgui.combo("##plane_type_selector", p_idx, [p.value for p in plane.types])
                     new_plane_type = None if p_idx==-1 else plane.types[p_idx]
                     imgui.end_table()
-                return 0 if imgui.is_key_released(imgui.Key.enter) else None
 
             buttons = {
                 ifa6.ICON_FA_CHECK+" Create plane": (lambda: callbacks.make_plane(self.study_config, new_plane_type, new_plane_name), lambda: not _valid_plane_name() or new_plane_type is None),
                 ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
             }
-            gt_gui.utils.push_popup(self, lambda: gt_gui.utils.popup("Add plane", _add_plane_popup, buttons = buttons, outside=False))
+            gt_gui.utils.push_popup(self, lambda: gt_gui.utils.popup("Add plane", _add_plane_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, outside=False))
 
     def _episode_setup_pane_drawer(self):
         if not self.study_config.planes:
@@ -1200,13 +1198,12 @@ class GUI:
                     imgui.table_next_column()
                     _,new_mark_size = imgui.input_float("##new_mark_size",new_mark_size)
                     imgui.end_table()
-                return 0 if imgui.is_key_released(imgui.Key.enter) else None
 
             buttons = {
                 ifa6.ICON_FA_CHECK+" Create marker": (lambda: callbacks.make_individual_marker(self.study_config, new_mark_id, new_mark_size), lambda: not _valid_mark_id() or new_mark_size<=0.),
                 ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
             }
-            gt_gui.utils.push_popup(self, lambda: gt_gui.utils.popup("Add marker", _add_rec_popup, buttons = buttons, outside=False))
+            gt_gui.utils.push_popup(self, lambda: gt_gui.utils.popup("Add marker", _add_rec_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, outside=False))
 
     def _get_pending_running_job_list(self) -> dict[utils.JobInfo, int]:
         active_jobs: dict[utils.JobInfo, int] = {}
