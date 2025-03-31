@@ -269,7 +269,7 @@ class GUI:
         if disabled:
             imgui.end_disabled()
         if imgui.menu_item(ifa6.ICON_FA_FOLDER_OPEN+" Open project folder", "", False)[0]:
-            callbacks.open_folder(self.project_dir)
+            callbacks.open_folder(self, self.project_dir)
 
     def _show_menu_gui(self):
         # this is always called, so we handle popups and other state here
@@ -1011,7 +1011,7 @@ class GUI:
                     self.study_config.planes[i] = plane.Definition.load_from_json(plane_dir)
                     self._plane_preview_cache.pop(p.name, None)
                 if imgui.button(ifa6.ICON_FA_FOLDER_OPEN+' open plane configuration folder'):
-                    callbacks.open_folder(plane_dir)
+                    callbacks.open_folder(self, plane_dir)
                 imgui.same_line()
                 if imgui.button(ifa6.ICON_FA_IMAGE+' generate reference image'):
                     p_dir = config.guess_config_dir(self.study_config.working_directory) / p.name
@@ -1309,7 +1309,7 @@ class GUI:
         changed = False
         if imgui.selectable(ifa6.ICON_FA_FOLDER_OPEN + " Open session folder", False)[0]:
             for s in sess:
-                callbacks.open_folder(s.working_directory)
+                callbacks.open_folder(self, s.working_directory)
         if imgui.selectable(ifa6.ICON_FA_TRASH_CAN + " Delete session", False)[0]:
             for s in sess:
                 callbacks.remove_folder(s.working_directory)
@@ -1390,12 +1390,12 @@ class GUI:
         source_directories = [sd for s,r in recs if (sd:=sess[s].recordings[r].info.get_source_directory()) is not None and sd.is_dir()]
         if source_directories and imgui.selectable(ifa6.ICON_FA_FOLDER_OPEN + " Open recording source folder"+plural, False)[0]:
             for s in source_directories:
-                callbacks.open_folder(s)
+                callbacks.open_folder(self, s)
         changed = False
         working_directories = [wd for s,r in recs if (wd:=sess[s].recordings[r].info.working_directory) and wd.is_dir()]
         if working_directories and imgui.selectable(ifa6.ICON_FA_FOLDER_OPEN + " Open recording working folder"+plural, False)[0]:
             for s,r in recs:
-                callbacks.open_folder(sess[s].recordings[r].info.working_directory)
+                callbacks.open_folder(self, sess[s].recordings[r].info.working_directory)
         if working_directories and imgui.selectable(ifa6.ICON_FA_TRASH_CAN + " Delete recording"+plural, False)[0]:
             for s,r in recs:
                 callbacks.remove_folder(sess[s].recordings[r].info.working_directory)
@@ -1474,7 +1474,7 @@ class GUI:
         show_import_et = any((sess.definition.get_recording_def(r).type==session.RecordingType.Eye_Tracker for r in missing_recs))
         show_import_cam = any((sess.definition.get_recording_def(r).type==session.RecordingType.Camera for r in missing_recs))
         if imgui.button(ifa6.ICON_FA_FOLDER_OPEN + " Open working folder"):
-            callbacks.open_folder(sess.working_directory)
+            callbacks.open_folder(self, sess.working_directory)
         if show_import_et:
             imgui.same_line()
             if imgui.button(ifa6.ICON_FA_FILE_IMPORT+' import eye tracker recordings'):

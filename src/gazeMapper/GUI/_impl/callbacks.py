@@ -274,9 +274,11 @@ def open_url(path: str):
             stderr=subprocess.DEVNULL
         ))
 
-def open_folder(path: pathlib.Path):
+def open_folder(g, path: pathlib.Path):
+    from . import gui
+    g = typing.cast(gui.GUI,g)  # indicate type to typechecker
     if not path.is_dir():
-        gt_gui.utils.push_popup(globals, gt_gui.msg_box.msgbox, "Folder not found", f"The folder you're trying to open\n{path}\ncould not be found.", gt_gui.msg_box.MsgBox.warn)
+        gt_gui.utils.push_popup(g, gt_gui.msg_box.msgbox, "Folder not found", f"The folder you're trying to open\n{path}\ncould not be found.", gt_gui.msg_box.MsgBox.warn)
         return
     open_url(str(path))
 
@@ -595,7 +597,7 @@ async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[record
     def _recording_context_menu(iid: int) -> bool:
         nonlocal selected_slot
         if imgui.selectable(ifa6.ICON_FA_FOLDER_OPEN + f" Open folder##{iid}", False)[0]:
-            open_folder(recordings_to_add[iid].get_source_directory())
+            open_folder(g, recordings_to_add[iid].get_source_directory())
         if selected_slot is not None and imgui.selectable(ifa6.ICON_FA_ARROW_LEFT + f" Assign to selected recording", False)[0]:
             recording_assignment[selected_slot[0]][selected_slot[1]] = iid
             selected_slot = None
