@@ -1,7 +1,7 @@
 import pathlib
 
 from glassesTools import gaze_overlay_video, naming as gt_naming, process_pool, propagating_thread, timestamps
-from glassesTools.gui.video_player import GUI
+from glassesTools.gui import video_player
 
 from .. import config, process, session
 
@@ -17,11 +17,12 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show
 
     # if we need gui, we run processing in a separate thread (GUI needs to be on the main thread for OSX, see https://github.com/pthom/hello_imgui/issues/33)
     if show_visualization:
-        gui = GUI(use_thread = False)
+        gui = video_player.GUI(use_thread = False)
         gui.add_window(working_dir.name)
         gui.set_show_controls(True)
         gui.set_show_play_percentage(True)
         gui.set_show_action_tooltip(True)
+        gui.set_button_props_for_action(video_player.Action.Quit, 'Stop', tooltip='Interrupt (cut short) the video generation')
 
         proc_thread = propagating_thread.PropagatingThread(target=do_the_work, args=(working_dir, config_dir, gui), kwargs=study_settings, cleanup_fun=gui.stop)
         proc_thread.start()
@@ -31,7 +32,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show
         do_the_work(working_dir, config_dir, None, **study_settings)
 
 
-def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, **study_settings):
+def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_player.GUI, **study_settings):
     # get settings for the study
     study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent, config.OverrideLevel.Recording: working_dir}, **study_settings)
 

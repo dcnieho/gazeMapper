@@ -13,7 +13,7 @@ import ffpyplayer.tools
 from fractions import Fraction
 
 from glassesTools import annotation, aruco, drawing, intervals, gaze_headref, gaze_worldref, naming as gt_naming, ocv, plane, process_pool, propagating_thread, timestamps, transforms, utils
-from glassesTools.gui.video_player import GUI
+from glassesTools.gui import video_player
 
 from .. import config, episode, marker, naming, process, session, synchronization
 from .detect_markers import _get_plane_setup, _get_sync_function
@@ -29,7 +29,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show
 
     if show_visualization:
         # We run processing in a separate thread (GUI needs to be on the main thread for OSX, see https://github.com/pthom/hello_imgui/issues/33)
-        gui = GUI(use_thread = False)
+        gui = video_player.GUI(use_thread = False)
         gui.add_window(working_dir.name)
 
         proc_thread = propagating_thread.PropagatingThread(target=do_the_work, args=(working_dir, config_dir, gui), kwargs=study_settings, cleanup_fun=gui.stop)
@@ -39,7 +39,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show
     else:
         do_the_work(working_dir, config_dir, None, **study_settings)
 
-def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, **study_settings):
+def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_player.GUI, **study_settings):
     has_gui = gui is not None
     sub_pixel_fac = 8   # for anti-aliased drawing
 
@@ -272,6 +272,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
                 gui.set_timecode_position('r', gui_window_ids[v])
                 gui.set_show_play_percentage(True, gui_window_ids[v])
                 gui.set_show_action_tooltip(True, gui_window_ids[v])
+                gui.set_button_props_for_action(video_player.Action.Quit, 'Stop', tooltip='Interrupt (cut short) the video generation')
 
         # open output video files
         for v in write_vids:
