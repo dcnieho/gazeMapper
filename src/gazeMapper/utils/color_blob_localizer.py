@@ -23,8 +23,10 @@ def detect_blob_HSV(frame: np.ndarray, low: tuple[int], high: tuple[int], edge_c
     else:
         border_mask = border_mask_cache[(n_cols, n_rows)]
 
-
-    mask = cv2.inRange(frame, (*low,), (*high,))
+    if low[0]>high[0]:
+        mask = cv2.inRange(frame, (*low,), (180, *high[1:])) + cv2.inRange(frame, (0,*low[1:]), (*high,))
+    else:
+        mask = cv2.inRange(frame, (*low,), (*high,))
 
     # Consider targets only in center
     mask = mask * border_mask
