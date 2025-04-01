@@ -4,6 +4,7 @@ import pandas as pd
 import polars as pl
 from collections import defaultdict
 import sys
+import time
 
 isMacOS = sys.platform.startswith("darwin")
 if isMacOS:
@@ -128,6 +129,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
             # submit to GUI
             gui.set_data(f'{working_dir.parent.name}, {working_dir.name}', ival, plot_gaze, plot_t_pos, offset_t=toff)
             need_to_load = False
+        if not gui.is_running():
+            # suspend thread so GUI can start running
+            time.sleep(0.001)
 
 
         closed,is_done = gui.get_state()
