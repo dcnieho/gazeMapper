@@ -44,7 +44,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
     video_ts = timestamps.VideoTimestamps(working_dir / gt_naming.frame_timestamps_fname)
 
     # set up gaze overlay video maker and run it
-    video_maker = gaze_overlay_video.VideoMaker(working_dir, in_video, video_ts, working_dir / gt_naming.gaze_data_fname)
+    video_maker = gaze_overlay_video.VideoMaker(working_dir, in_video, video_ts, working_dir / gt_naming.scene_camera_calibration_fname, working_dir / gt_naming.gaze_data_fname)
+    video_maker.set_vid_pos_look(study_config.overlay_video_gaze_vid_pos_color, study_config.overlay_video_gaze_vid_pos_radius, study_config.overlay_video_gaze_vid_pos_thickness)
+    video_maker.set_world_pos_look(study_config.overlay_video_gaze_world_pos_color, study_config.overlay_video_gaze_world_pos_radius, study_config.overlay_video_gaze_world_pos_thickness)
     video_maker.attach_gui(gui)
     if gui is not None:
         gui.set_show_timeline(True, video_ts, window_id=gui.main_window_id)

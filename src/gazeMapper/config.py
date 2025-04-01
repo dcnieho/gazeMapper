@@ -71,6 +71,13 @@ class Study:
                  import_source_dir_as_relative_path             : bool                              = False,
                  import_known_custom_eye_trackers               : list[str]|None                    = None,
 
+                 overlay_video_gaze_vid_pos_color               : RgbColor                          = RgbColor(  0,255,  0),
+                 overlay_video_gaze_world_pos_color             : RgbColor|None                     = RgbColor(255,  0,255),
+                 overlay_video_gaze_vid_pos_radius              : int                               = 8,
+                 overlay_video_gaze_world_pos_radius            : int                               = 5,
+                 overlay_video_gaze_vid_pos_thickness           : int                               = 2,
+                 overlay_video_gaze_world_pos_thickness         : int                               = -1,
+
                  sync_ref_recording                             : str|None                          = None,
                  sync_ref_do_time_stretch                       : bool|None                         = None,
                  sync_ref_stretch_which                         : Literal['ref','other']|None       = None,
@@ -136,6 +143,13 @@ class Study:
         self.import_do_copy_video                           = import_do_copy_video
         self.import_source_dir_as_relative_path             = import_source_dir_as_relative_path
         self.import_known_custom_eye_trackers               = import_known_custom_eye_trackers
+
+        self.overlay_video_gaze_vid_pos_color               = overlay_video_gaze_vid_pos_color
+        self.overlay_video_gaze_world_pos_color             = overlay_video_gaze_world_pos_color
+        self.overlay_video_gaze_vid_pos_radius              = overlay_video_gaze_vid_pos_radius
+        self.overlay_video_gaze_world_pos_radius            = overlay_video_gaze_world_pos_radius
+        self.overlay_video_gaze_vid_pos_thickness           = overlay_video_gaze_vid_pos_thickness
+        self.overlay_video_gaze_world_pos_thickness         = overlay_video_gaze_world_pos_thickness
 
         self.get_cam_movement_for_et_sync_method            = get_cam_movement_for_et_sync_method
         self.get_cam_movement_for_et_sync_function          = get_cam_movement_for_et_sync_function
@@ -637,6 +651,12 @@ study_parameter_doc = {
     'import_do_copy_video': type_utils.GUIDocInfo('Copy video during import?', 'If not enabled, the scene video of an eye tracker recording, or the video of an external camera is not copied to the gazeMapper recording directory during import. Instead, the video will be loaded from the recording\'s source directory (so do not move it). Ignored when the video must be transcoded to be processed with gazeMapper.'),
     'import_source_dir_as_relative_path': type_utils.GUIDocInfo('Store source directory as relative path?', 'Specifies whether the path to the source directory stored in the recording info file is an absolute path (this option is not enabled) or a relative path (enabled). If a relative path is used, the imported recording and the source directory can be moved to another location, and the source directory can still be found as long as the relative path (e.g., one folder up and in the directory "original recordings": "../original recordings") doesn\'t change.'),
     'import_known_custom_eye_trackers': type_utils.GUIDocInfo('Registered custom eye trackers', 'gazeMapper allows importing generic eye trackers for which no specific support is implemented, if their recording data is preprocessed to conform to glassesTools\' generic data format. Here you can define specific known generic eye tracker names that you may import.'),
+    'overlay_video_gaze_vid_pos_color': type_utils.GUIDocInfo('Gaze overlay video: Color for gaze position on video', 'Color used for drawing the recorded gaze position on the scene video.', _rgb_doc),
+    'overlay_video_gaze_world_pos_color': type_utils.GUIDocInfo('Gaze overlay video: Color for 3D gaze position', 'Color used for drawing the recorded 3D gaze position in the world. Not drawn if value is not set.', _rgb_doc),
+    'overlay_video_gaze_vid_pos_radius': type_utils.GUIDocInfo('Gaze overlay video: Radius for gaze position on video', 'Radius of circle used for drawing the recorded gaze position on the scene video.'),
+    'overlay_video_gaze_world_pos_radius': type_utils.GUIDocInfo('Gaze overlay video: Radius for 3D gaze position', 'Radius of circle used for drawing the recorded 3D gaze position in the world.'),
+    'overlay_video_gaze_vid_pos_thickness': type_utils.GUIDocInfo('Gaze overlay video: Thickness for gaze position on video', 'Line thickness of circle used for drawing the recorded gaze position on the scene video.'),
+    'overlay_video_gaze_world_pos_thickness': type_utils.GUIDocInfo('Gaze overlay video: Thickness for 3D gaze position', 'Line thickness of circle used for drawing the recorded 3D gaze position in the world.'),
     'sync_ref_recording': type_utils.GUIDocInfo('Synchronization: Reference recording', 'If there are multiple recordings, sets to which recording all other recordings will be synchronized.'),
     'sync_ref_do_time_stretch': type_utils.GUIDocInfo('Synchronization: Do time stretch?', 'If enabled, multiple sync points are used to calculate a time stretch factor to compensate for clock drift when synchronizing multiple recordings.'),
     'sync_ref_stretch_which': type_utils.GUIDocInfo('Synchronization: Stretch which recording', 'Which recording(s) should be corrected for clock drift if "Synchronization: Do time stretch?" is enabled.',{
