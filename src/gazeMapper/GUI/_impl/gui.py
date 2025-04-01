@@ -512,7 +512,7 @@ class GUI:
             return _get_known_recordings(filter_ref=True)
         def _get_known_recordings_only_eye_tracker() -> set[str]:
             return _get_known_recordings(dev_types=[session.RecordingType.Eye_Tracker])
-        def _get_known_individual_markers() -> set[str]:
+        def _get_known_individual_markers() -> set[int]:
             return {m.id for m in self.study_config.individual_markers}
         def _get_known_planes() -> set[str]:
             return {p.name for p in self.study_config.planes}
@@ -528,7 +528,7 @@ class GUI:
             'sync_ref_average_recordings': _get_known_recordings_no_ref,
             'planes_per_episode': [_get_episodes_to_code_for_planes, _get_known_planes],
             'auto_code_sync_points': {'markers': _get_known_individual_markers},
-            'auto_code_trial_episodes': {'start_markers': _get_known_individual_markers, 'end_markers': _get_known_individual_markers}
+            'auto_code_episodes': [_get_episodes_to_code_for_planes, {None: {'start_markers': _get_known_individual_markers, 'end_markers': _get_known_individual_markers}}]
         }
 
         self._need_set_window_title = True
@@ -586,7 +586,7 @@ class GUI:
                 gt_gui.utils.draw_process_state(item.state[action])
             else:
                 imgui.text('-')
-                if action==process.Action.AUTO_CODE_TRIALS and cfg.sync_ref_recording and item.definition.name!=cfg.sync_ref_recording:
+                if action==process.Action.AUTO_CODE_EPISODES and cfg.sync_ref_recording and item.definition.name!=cfg.sync_ref_recording:
                     msg = f'Not applicable to a recording that is not the sync_ref_recording'
                 else:
                     msg = f'Not applicable to a {item.definition.type.value} recording'

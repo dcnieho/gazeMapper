@@ -19,7 +19,7 @@ class AutoCodeSyncPoints(typed_dict_defaults.TypedDictDefault, total=False):
     max_gap_duration: int       = 4
     min_duration    : int       = 6
 
-class AutoCodeTrialEpisodes(typed_dict_defaults.TypedDictDefault, total=False):
+class AutoCodeEpisodes(typed_dict_defaults.TypedDictDefault, total=False):
     start_markers               : list[int]
     end_markers                 : list[int]
     max_gap_duration            : int       = 4
@@ -81,7 +81,11 @@ class Study:
                  sync_et_to_cam_use_average                     : bool                              = True,
 
                  auto_code_sync_points                          : AutoCodeSyncPoints|None           = None,
-                 auto_code_trial_episodes                       : AutoCodeTrialEpisodes|None        = None,
+                 auto_code_episodes                             : dict[Literal[
+                                                                    annotation.Event.Sync_ET_Data,
+                                                                    annotation.Event.Trial,
+                                                                    annotation.Event.Validate],
+                                                                  AutoCodeEpisodes]|None            = None,
 
                  export_output3D                                : bool                              = False,
                  export_output2D                                : bool                              = True,
@@ -143,7 +147,7 @@ class Study:
         self.sync_ref_average_recordings                    = sync_ref_average_recordings
 
         self.auto_code_sync_points                          = auto_code_sync_points
-        self.auto_code_trial_episodes                       = auto_code_trial_episodes
+        self.auto_code_episodes                             = auto_code_episodes
 
         self.export_output3D                                = export_output3D
         self.export_output2D                                = export_output2D
@@ -201,9 +205,10 @@ class Study:
         if self.auto_code_sync_points is not None:
             self.auto_code_sync_points = AutoCodeSyncPoints(self.auto_code_sync_points)
             self.auto_code_sync_points.apply_defaults()
-        if self.auto_code_trial_episodes is not None:
-            self.auto_code_trial_episodes = AutoCodeTrialEpisodes(self.auto_code_trial_episodes)
-            self.auto_code_trial_episodes.apply_defaults()
+        if self.auto_code_episodes is not None:
+            self.auto_code_episodes = {e: AutoCodeEpisodes(self.auto_code_episodes[e]) for e in self.auto_code_episodes}
+            for e in self.auto_code_episodes:
+                self.auto_code_episodes[e].apply_defaults()
         if self.validate_I2MC_settings is not None:
             self.validate_I2MC_settings = I2MCSettings(self.validate_I2MC_settings)
             self.validate_I2MC_settings.apply_defaults()
@@ -324,13 +329,14 @@ class Study:
                 else:
                     this_problems['episodes_to_code'] = f'The auto_code_sync_points option is configured, but {annotation.tooltip_map[annotation.Event.Sync_Camera]}s are not set to be coded in episodes_to_code.'
                     this_problems['auto_code_sync_points'] = f'The auto_code_sync_points option is configured, but {annotation.tooltip_map[annotation.Event.Sync_Camera]}s are not set to be coded in episodes_to_code. Fix episodes_to_code or remove auto_code_sync_points setup.'
-        if self.auto_code_trial_episodes:
-            if annotation.Event.Trial not in self.episodes_to_code:
-                if strict_check:
-                    raise ValueError(f'The auto_code_trial_episodes option is configured, but {annotation.tooltip_map[annotation.Event.Trial]}s are not set to be coded in episodes_to_code. Fix episodes_to_code.')
-                else:
-                    this_problems['episodes_to_code'] = f'The auto_code_trial_episodes option is configured, but {annotation.tooltip_map[annotation.Event.Trial]}s are not set to be coded in episodes_to_code.'
-                    this_problems['auto_code_trial_episodes'] = f'The auto_code_trial_episodes option is configured, but {annotation.tooltip_map[annotation.Event.Trial]}s are not set to be coded in episodes_to_code. Fix episodes_to_code or remove auto_code_sync_points setup.'
+        if self.auto_code_episodes:
+            for e in self.auto_code_episodes:
+                if e not in self.episodes_to_code:
+                    if strict_check:
+                        raise ValueError(f'Coding of {annotation.tooltip_map[e]}s is configured in the auto_code_episodes option, but {annotation.tooltip_map[e]}s are not set to be coded in episodes_to_code. Fix episodes_to_code.')
+                    else:
+                        this_problems['episodes_to_code'] = f'Coding of {annotation.tooltip_map[e]}s is configured in the auto_code_episodes option, but {annotation.tooltip_map[e]}s are not set to be coded in episodes_to_code.'
+                        this_problems['auto_code_episodes'] = f'Coding of {annotation.tooltip_map[e]}s is configured in the auto_code_episodes option, but {annotation.tooltip_map[e]}s are not set to be coded in episodes_to_code. Fix episodes_to_code or remove {annotation.tooltip_map[e]}s from the auto_code_episodes setup.'
         return type_utils.merge_problem_dicts(problems,this_problems)
 
     def _check_auto_markers(self, strict_check) -> type_utils.ProblemDict:
@@ -353,23 +359,24 @@ class Study:
                 if missing_markers:
                     problems['auto_code_sync_points'] = {}
                     problems['auto_code_sync_points']['markers'] = f'The marker(s) {missing_markers[0] if len(missing_markers)==1 else missing_markers} are not defined in individual_markers'
-        if self.auto_code_trial_episodes:
-            for f in ['start_markers','end_markers']:
-                if f not in self.auto_code_trial_episodes:
-                    if strict_check:
-                        raise ValueError(f'auto_code_trial_episodes.{f} cannot be empty or unspecified')
+        if self.auto_code_episodes:
+            for e in self.auto_code_episodes:
+                for f in ['start_markers','end_markers']:
+                    if f not in self.auto_code_episodes[e] or not self.auto_code_episodes[e][f]:
+                        if strict_check:
+                            raise ValueError(f'auto_code_episodes[{e}].{f} cannot be empty or unspecified')
+                        else:
+                            type_utils.merge_problem_dicts(problems, {'auto_code_episodes': {e: {f: f'auto_code_episodes[{e}].{f} cannot be empty or unspecified'}}})
                     else:
-                        type_utils.merge_problem_dicts(problems, {'auto_code_trial_episodes': {f: f'auto_code_trial_episodes.{f} cannot be empty or unspecified'}})
-                else:
-                    missing_markers: list[int] = []
-                    for i in self.auto_code_trial_episodes[f]:
-                        if not any([m.id==i for m in self.individual_markers]):
-                            if strict_check:
-                                raise ValueError(f'Marker "{i}" specified in auto_code_trial_episodes.{f}, but unknown because not present in individual_markers')
-                            else:
-                                missing_markers.append(i)
-                    if missing_markers:
-                        type_utils.merge_problem_dicts(problems, {'auto_code_trial_episodes': {f: f'The marker(s) {missing_markers[0] if len(missing_markers)==1 else missing_markers} are not defined in individual_markers'}})
+                        missing_markers: list[int] = []
+                        for i in self.auto_code_episodes[e][f]:
+                            if not any([m.id==i for m in self.individual_markers]):
+                                if strict_check:
+                                    raise ValueError(f'Marker "{i}" specified in auto_code_episodes.[{e}].{f}, but unknown because not present in individual_markers')
+                                else:
+                                    missing_markers.append(i)
+                        if missing_markers:
+                            type_utils.merge_problem_dicts(problems, {'auto_code_episodes': {e: {f: f'The marker(s) {missing_markers[0] if len(missing_markers)==1 else missing_markers} are not defined in individual_markers'}}})
         return problems
 
     def _check_individual_markers(self, strict_check):
@@ -513,16 +520,21 @@ class Study:
         else:
             path = f_path.parent
         with open(f_path, 'w') as f:
-            to_dump = {k:getattr(self,k) for k in vars(self) if not k.startswith('_') and k not in ['session_def','planes','working_directory']}    # session_def and planes will be populated from contents in the provided folder, and working_directory as the provided path
+            to_dump = {k:copy.deepcopy(getattr(self,k)) for k in vars(self) if not k.startswith('_') and k not in ['session_def','planes','working_directory']}    # session_def and planes will be populated from contents in the provided folder, and working_directory as the provided path
             to_dump['planes_per_episode'] = [(k, to_dump['planes_per_episode'][k]) for k in to_dump['planes_per_episode']]   # pack as list of tuples for storage
             # filter out defaulted
             to_dump = {k:to_dump[k] for k in to_dump if k not in study_defaults or study_defaults[k]!=to_dump[k]}
             # also filter out defaults in some subfields
-            for k in ['auto_code_sync_points','auto_code_trial_episodes','validate_I2MC_settings']:
+            for k in ['auto_code_sync_points','validate_I2MC_settings']:
                 if k in to_dump:
                     to_dump[k] = {kk:to_dump[k][kk] for kk in to_dump[k] if kk not in to_dump[k]._field_defaults or to_dump[k]._field_defaults[kk]!=to_dump[k][kk]}
                     if not to_dump[k] and k in study_defaults and study_defaults[k] is not None:
                         to_dump.pop(k)
+            if 'auto_code_episodes' in to_dump:
+                for e in to_dump['auto_code_episodes']:
+                    to_dump['auto_code_episodes'][e] = {kk:to_dump['auto_code_episodes'][e][kk] for kk in to_dump['auto_code_episodes'][e] if kk not in to_dump['auto_code_episodes'][e]._field_defaults or to_dump['auto_code_episodes'][e]._field_defaults[kk]!=to_dump['auto_code_episodes'][e][kk]}
+                # pack as list of tuples for storage
+                to_dump['auto_code_episodes'] = [(e, to_dump['auto_code_episodes'][e]) for e in to_dump['auto_code_episodes']]   # pack as list of tuples for storage
             # dump to file
             json.dump(to_dump, f, cls=utils.CustomTypeEncoder, indent=2)
         # this doesn't store any files itself, but triggers the contained info to be stored
@@ -553,6 +565,12 @@ class Study:
         with open(d_path, 'r') as f:
             kwds = json.load(f, object_hook=utils.json_reconstitute)
         kwds['planes_per_episode'] = {k:v for k,v in kwds['planes_per_episode']}  # stored as list of tuples, unpack
+        if 'auto_code_episodes' in kwds:
+            kwds['auto_code_episodes'] = {k:v for k,v in kwds['auto_code_episodes']}  # stored as list of tuples, unpack
+        # backwards compatibility
+        if 'auto_code_trial_episodes' in kwds:
+            setup = kwds.pop('auto_code_trial_episodes')
+            kwds['auto_code_episodes'] = {annotation.Event.Trial: setup}
         # help with named tuple roundtrip
         if 'video_recording_colors' in kwds:
             kwds['video_recording_colors'] = {k: RgbColor(*kwds['video_recording_colors'][k]) for k in kwds['video_recording_colors']}
@@ -581,7 +599,7 @@ study_parameter_types = {k:_params[k].annotation for k in _params if k not in ['
 def _get_gv_data_quality_type_doc(dq: DataQualityType):
     t,doc = get_DataQualityType_explanation(dq)
     return (dq, type_utils.GUIDocInfo(t,doc))
-def _get_annotation_event_doc(a: annotation.Event):
+def _get_annotation_event_doc(a: annotation.Event, children: dict = None):
     t = annotation.tooltip_map[a]
     doc = {
         annotation.Event.Trial: 'Denotes an episode for which to map gaze to plane(s). This determines for which segments there will be gaze data when running the Export Trials.',
@@ -589,7 +607,9 @@ def _get_annotation_event_doc(a: annotation.Event):
         annotation.Event.Sync_Camera: 'Time point (frame from video) when a synchronization event happened, used for synchronizing different recordings.',
         annotation.Event.Sync_ET_Data: 'Episode to be used for synchronization of eye tracker data to scene camera (e.g. using VOR).'
     }.get(a)
-    return (a, type_utils.GUIDocInfo(t,doc))
+    if children is None:
+        children = {}
+    return (a, type_utils.GUIDocInfo(t,doc, children))
 _rgb_doc = {
     'r': type_utils.GUIDocInfo('Red', 'Intensity of the red channel (0-255).'),
     'g': type_utils.GUIDocInfo('Green', 'Intensity of the green channel (0-255).'),
@@ -638,12 +658,16 @@ study_parameter_doc = {
         'max_gap_duration': type_utils.GUIDocInfo('Maximum gap duration', 'Maximum gap (number of frames) to be filled in sequences of marker detections.'),
         'min_duration': type_utils.GUIDocInfo('Minimum duration', 'Minimum length (number of frames) of a sequence of marker detections. Shorter runs are removed.')
     }),
-    'auto_code_trial_episodes': type_utils.GUIDocInfo('Automated coding of trial episodes','Setup for automatic coding of trial (analysis) episodes.',{
-        'start_markers': type_utils.GUIDocInfo('Start marker(s)', 'A single marker ID or a sequence of marker IDs that indicate the start of a trial.'),
-        'end_markers': type_utils.GUIDocInfo('End marker(s)', 'A single marker ID or a sequence of marker IDs that indicate the end of a trial.'),
-        'max_gap_duration': type_utils.GUIDocInfo('Maximum gap duration', 'Maximum gap (number of frames) to be filled in sequences of marker detections.'),
-        'max_intermarker_gap_duration': type_utils.GUIDocInfo('Maximum intermarker gap duration', 'Maximum gap (number of frames) between the detection of two markers in a sequence.'),
-        'min_duration': type_utils.GUIDocInfo('Minimum duration', 'Minimum length (number of frames) of a sequence of marker detections. Shorter runs are removed.')
+    'auto_code_episodes': type_utils.GUIDocInfo('Automated coding of episodes','Setup for automatic coding of episodes.',{
+        None: # None indicates the doc specification applies to the contained values
+            dict([_get_annotation_event_doc(a,{
+                'start_markers': type_utils.GUIDocInfo('Start marker(s)', 'A single marker ID or a sequence of marker IDs that indicate the start of an episode.'),
+                'end_markers': type_utils.GUIDocInfo('End marker(s)', 'A single marker ID or a sequence of marker IDs that indicate the end of an episode.'),
+                'max_gap_duration': type_utils.GUIDocInfo('Maximum gap duration', 'Maximum gap (number of frames) to be filled in sequences of marker detections.'),
+                'max_intermarker_gap_duration': type_utils.GUIDocInfo('Maximum intermarker gap duration', 'Maximum gap (number of frames) between the detection of two markers in a sequence.'),
+                'min_duration': type_utils.GUIDocInfo('Minimum duration', 'Minimum length (number of frames) of a sequence of marker detections. Shorter runs are removed.')
+                }
+            ) for a in annotation.Event if a!=annotation.Event.Sync_Camera])
     }),
     'export_output3D': type_utils.GUIDocInfo('Mapped data export: include 3D fields', 'Determines whether gaze positions on the plane in the scene camera reference frame are exported when invoking the Export Trials action.'),
     'export_output2D': type_utils.GUIDocInfo('Mapped data export: include 2D fields', 'Determines whether gaze positions on the plane in the plane\'s reference frame are exported when invoking the Export Trials action.'),
@@ -746,10 +770,10 @@ class StudyOverride:
             # use whitelist
             if recording_type==session.RecordingType.Camera:
                 # if for a camera recording, almost no parameters make sense to set
-                include = {'auto_code_sync_points', 'auto_code_trial_episodes'}
+                include = {'auto_code_sync_points', 'auto_code_episodes'}
             else:
                 include = {'get_cam_movement_for_et_sync_method','get_cam_movement_for_et_sync_function',
-                           'auto_code_sync_points', 'auto_code_trial_episodes',
+                           'auto_code_sync_points', 'auto_code_episodes',
                            'validate_do_global_shift', 'validate_max_dist_fac', 'validate_dq_types', 'validate_allow_dq_fallback', 'validate_include_data_loss', 'validate_I2MC_settings'}
             exclude = set(all_params)-include
         allowed_params = [a for a in all_params if a not in exclude]
@@ -851,8 +875,8 @@ class StudyOverride:
             kwds['get_cam_movement_for_et_sync_function'] = CamMovementForEtSyncFunction(**kwds['get_cam_movement_for_et_sync_function'])
         if 'auto_code_sync_points' in kwds and kwds['auto_code_sync_points'] is not None:
             kwds['auto_code_sync_points'] = AutoCodeSyncPoints(**kwds['auto_code_sync_points'])
-        if 'auto_code_trial_episodes' in kwds and kwds['auto_code_trial_episodes'] is not None:
-            kwds['auto_code_trial_episodes'] = AutoCodeTrialEpisodes(**kwds['auto_code_trial_episodes'])
+        if 'auto_code_episodes' in kwds and kwds['auto_code_episodes'] is not None:
+            kwds['auto_code_episodes'] = {e: AutoCodeEpisodes(**kwds['auto_code_episodes'][e]) for e in kwds['auto_code_episodes']}
         if 'validate_I2MC_settings' in kwds and kwds['validate_I2MC_settings'] is not None:
             kwds['validate_I2MC_settings'] = I2MCSettings(**kwds['validate_I2MC_settings'])
         if 'video_recording_colors' in kwds and kwds['video_recording_colors'] is not None:

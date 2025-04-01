@@ -134,11 +134,17 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
             tp = actual_types[f]
         else:
             tp = types[f] if f in types else list(types.values())[0]    # backup only needed when we have an invalid config (e.g. trying to show planes_per_episode entry for an episode that is no longer set to be coded)
-        is_dict, base_type, f_type, nullable = _get_field_type(f, obj, tp, possible_value_getters.get(f,None) if possible_value_getters else None)
+        possible_value_getter = (possible_value_getters.get(f,None) or possible_value_getters.get(None,None)) if possible_value_getters else None
+        is_dict, base_type, f_type, nullable = _get_field_type(f, obj, tp, possible_value_getter)
         doc = documentation.get(f,None) or documentation.get(None,None)
-        this_lbl = doc.display_string if doc is not None and not isinstance(doc,dict) else f
-        this_explanation = doc.doc_str if doc is not None and not isinstance(doc,dict) else None
-        this_child_doc = doc.children if isinstance(doc,type_utils.GUIDocInfo) else doc if doc is not None else {}
+        if isinstance(doc,dict):
+            this_lbl = doc[f].display_string if f in doc else f
+            this_explanation = doc[f].doc_str if f in doc else None
+            this_child_doc = doc[f].children if f in doc and isinstance(doc[f],type_utils.GUIDocInfo) else doc if doc is not None else {}
+        else:
+            this_lbl = doc.display_string if doc is not None else f
+            this_explanation = doc.doc_str if doc is not None else None
+            this_child_doc = doc.children if isinstance(doc,type_utils.GUIDocInfo) else doc if doc is not None else {}
 
         this_obj = obj.get(f,None) if isinstance(obj,dict) else getattr(obj,f)
         if is_dict and this_obj is not None:
@@ -161,7 +167,7 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
                     imgui.pop_style_color()
                 if this_explanation:
                     glassesTools.gui.utils.draw_hover_text(this_explanation, text='')
-                this_changed, made_obj, new_sub_obj, removed, actual_types_ = draw_dict_editor(this_obj, f_type, level+1, actual_types.get(f,{}), defaults=defaults.get(f,None) if defaults else None, possible_value_getters=possible_value_getters.get(f,None) if possible_value_getters else None, parent_obj=this_parent, problems=problems.get(f,None) if isinstance(problems, dict) else {}, documentation=this_child_doc, fixed=fixed.get(f,None), nullable=nullable, removable=has_remove)
+                this_changed, made_obj, new_sub_obj, removed, actual_types_ = draw_dict_editor(this_obj, f_type, level+1, actual_types.get(f,{}), defaults=defaults.get(f,None) if defaults else None, possible_value_getters=possible_value_getter, parent_obj=this_parent, problems=problems.get(f,None) if isinstance(problems, dict) else {}, documentation=this_child_doc, fixed=fixed.get(f,None), nullable=nullable, removable=has_remove)
                 if actual_types_:
                     actual_types[f] = actual_types_
                 if removed:
@@ -228,8 +234,10 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, actual_types: dic
         kv_type = typing.get_args(o_type)
         if possible_value_getters and not isinstance(possible_value_getters, dict):
             if isinstance(possible_value_getters,list):
-                possible_value_getters = possible_value_getters[0] # first one should be for keys
-            all_fields = set(possible_value_getters())
+                all_fields = possible_value_getters[0]() # first one should be for keys
+                possible_value_getters = possible_value_getters[1]  # second one for values, and thus the one to be passed on
+            else:
+                all_fields = set(possible_value_getters())
         else:
             if kv_type:
                 if typing.get_origin(kv_type[0])==typing.Literal:
