@@ -240,11 +240,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
         video_sets.extend([(r,set(),recs) for r in study_config.video_make_which])
 
     # per set of videos
-    should_exit = False
     for lead_vid, other_vids, proc_vids in video_sets:
-        if should_exit:
-            break
-
         vid_writer          : dict[str, MediaWriter]                = {}
         frame               : dict[str, np.ndarray]                 = {}
         frame_idx           : dict[str, int]                        = {}
@@ -299,7 +295,10 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
         timestamp_width |= {v: n_digit_timestamp(videos_ts[v].get_timestamp(max(ref_frame_idxs[v]))) for v in other_vids}
         frame_idx_width = {lead_vid: n_digit(videos_ts[lead_vid].get_last()[0])}
         frame_idx_width |= {v: n_digit(max(ref_frame_idxs[v])) for v in other_vids}
+        should_exit = False
         while True:
+            if should_exit:
+                break
             status, pose[lead_vid], _, _, (frame[lead_vid], frame_idx[lead_vid], frame_ts[lead_vid]) = \
                 pose_estimators[lead_vid].process_one_frame()
             # TODO: if there is a discontinuity, fill in the missing frames so audio stays in sync
