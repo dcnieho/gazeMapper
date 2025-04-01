@@ -50,7 +50,7 @@ del _params
 def get_marker_dict_from_list(markers: list[Marker]) -> dict[int,dict[str]]:
     out = {}
     for m in markers:
-        out[m.id] = {'marker_size': m.size}
+        out[m.id] = {'detect_only': m.detect_only, 'size': m.size}
     return out
 
 def get_file_name(marker_id: int, folder: str|pathlib.Path) -> pathlib.Path:
