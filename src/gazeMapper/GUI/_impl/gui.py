@@ -519,11 +519,11 @@ class GUI:
         def _get_episodes_to_code_for_planes() -> set[annotation.Event]:
             return {e for e in self.study_config.episodes_to_code if e!=annotation.Event.Sync_Camera}
         self._possible_value_getters = {
-            'video_make_which': _get_known_recordings,
-            'video_recording_colors': _get_known_recordings_only_eye_tracker,
-            'video_show_gaze_on_plane_in_which': _get_known_recordings,
-            'video_show_camera_in_which': _get_known_recordings,
-            'video_show_gaze_vec_in_which': _get_known_recordings,
+            'mapped_video_make_which': _get_known_recordings,
+            'mapped_video_recording_colors': _get_known_recordings_only_eye_tracker,
+            'mapped_video_show_gaze_on_plane_in_which': _get_known_recordings,
+            'mapped_video_show_camera_in_which': _get_known_recordings,
+            'mapped_video_show_gaze_vec_in_which': _get_known_recordings,
             'sync_ref_recording': _get_known_recordings,
             'sync_ref_average_recordings': _get_known_recordings_no_ref,
             'planes_per_episode': [_get_episodes_to_code_for_planes, _get_known_planes],

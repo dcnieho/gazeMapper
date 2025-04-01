@@ -45,8 +45,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
 
     # get settings for the study
     study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir}, **study_settings)
-    if not study_config.video_make_which:
-        raise ValueError(f'There are no videos to be made (make_video_which is not defined or null in the study setup)')
+    if not study_config.mapped_video_make_which:
+        raise ValueError(f'There are no videos to be made (mapped_video_make_which is not defined or null in the study setup)')
 
     # get session info
     session_info = session.Session.from_definition(study_config.session_def, working_dir)
@@ -114,7 +114,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
                                                                         study_config.sync_ref_do_time_stretch, study_config.sync_ref_stretch_which)
                            for e in episodes[r]}
 
-        if study_config.video_process_annotations_for_all_recordings:
+        if study_config.mapped_video_process_annotations_for_all_recordings:
             # go through all planes for all episodes and apply them to all recordings
             # not annotation.Event.Trial as that already comes from only the reference recording
             inserted = False
@@ -187,8 +187,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
             if not all([abs(i_ref-i_rec)<=1 for i_ref,i_rec in zip(ref_sync_points,rec_sync_points)]):
                 raise RuntimeError(f'Camera sync points found for recording {r} ({episodes_as_ref_flat[r][annotation.Event.Sync_Camera]}) that do not occur among the reference recordings sync points ({study_config.sync_ref_recording}, {episodes_as_ref_flat[study_config.sync_ref_recording][annotation.Event.Sync_Camera]}). That means the sync logic must have failed')
         # load plane poses
-        if not (study_config.video_process_planes_for_all_frames or study_config.video_process_individual_markers_for_all_frames or study_config.video_show_detected_markers or study_config.video_show_rejected_markers):
-            to_load = [r for r in recs if r not in study_config.video_make_which]
+        if not (study_config.video_process_planes_for_all_frames or study_config.mapped_video_process_individual_markers_for_all_frames or study_config.mapped_video_show_detected_markers or study_config.mapped_video_show_rejected_markers):
+            to_load = [r for r in recs if r not in study_config.mapped_video_make_which]
             for r in to_load:
                 all_poses[r] = {}
                 for p in plane_names:
@@ -196,7 +196,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
 
     # build pose estimator
     for rec in recs:
-        if rec not in study_config.video_make_which and not (study_config.video_process_planes_for_all_frames or study_config.video_process_individual_markers_for_all_frames):
+        if rec not in study_config.mapped_video_make_which and not (study_config.video_process_planes_for_all_frames or study_config.mapped_video_process_individual_markers_for_all_frames):
             continue
         in_videos[rec] = session.get_video_path(session_info.recordings[rec].info)     # get video file to process
         pose_estimators[rec] = aruco.PoseEstimator(in_videos[rec], videos_ts[rec], camera_params[rec])
@@ -213,18 +213,18 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
         if study_config.sync_ref_recording and rec!=study_config.sync_ref_recording:
             pose_estimators[rec].set_do_report_frames(False)
 
-        if rec in study_config.video_make_which:
+        if rec in study_config.mapped_video_make_which:
             pose_estimators[rec].set_visualize_on_frame(True)
             pose_estimators[rec].sub_pixel_fac                      = sub_pixel_fac
-            pose_estimators[rec].show_detected_markers              = study_config.video_show_detected_markers
-            pose_estimators[rec].show_plane_axes                    = study_config.video_show_plane_axes
-            pose_estimators[rec].proc_individual_markers_all_frames = study_config.video_process_individual_markers_for_all_frames
-            pose_estimators[rec].show_individual_marker_axes        = study_config.video_show_individual_marker_axes
-            pose_estimators[rec].show_sync_func_output              = study_config.video_show_sync_func_output
-            pose_estimators[rec].show_unexpected_markers            = study_config.video_show_unexpected_markers
-            pose_estimators[rec].show_rejected_markers              = study_config.video_show_rejected_markers
+            pose_estimators[rec].show_detected_markers              = study_config.mapped_video_show_detected_markers
+            pose_estimators[rec].show_plane_axes                    = study_config.mapped_video_show_plane_axes
+            pose_estimators[rec].proc_individual_markers_all_frames = study_config.mapped_video_process_individual_markers_for_all_frames
+            pose_estimators[rec].show_individual_marker_axes        = study_config.mapped_video_show_individual_marker_axes
+            pose_estimators[rec].show_sync_func_output              = study_config.mapped_video_show_sync_func_output
+            pose_estimators[rec].show_unexpected_markers            = study_config.mapped_video_show_unexpected_markers
+            pose_estimators[rec].show_rejected_markers              = study_config.mapped_video_show_rejected_markers
 
-        if rec in study_config.video_make_which or rec==study_config.sync_ref_recording:
+        if rec in study_config.mapped_video_make_which or rec==study_config.sync_ref_recording:
             # get video file info
             vid_info[rec] = pose_estimators[rec].get_video_info()
             # override fps with frame timestamp info
@@ -235,9 +235,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
 
     video_sets: list[tuple[str, set[str], set[str]]] = []
     if study_config.sync_ref_recording:
-        video_sets.append((study_config.sync_ref_recording,{r for r in study_config.video_make_which if r!=study_config.sync_ref_recording}, recs))
+        video_sets.append((study_config.sync_ref_recording,{r for r in study_config.mapped_video_make_which if r!=study_config.sync_ref_recording}, recs))
     else:
-        video_sets.extend([(r,set(),recs) for r in study_config.video_make_which])
+        video_sets.extend([(r,set(),recs) for r in study_config.mapped_video_make_which])
 
     # per set of videos
     for lead_vid, other_vids, proc_vids in video_sets:
@@ -251,7 +251,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
         all_vids    = set([lead_vid]) | other_vids
         # videos to be written out may not be equal to all_vids. This can occur if we
         # have a study_config.sync_ref_recording, but config is not to make a video for it
-        write_vids  = {v for v in all_vids if v in study_config.video_make_which}
+        write_vids  = {v for v in all_vids if v in study_config.mapped_video_make_which}
 
         if has_gui:
             # clean up any previous windows (except main window, this will have to be renamed only)
@@ -331,14 +331,14 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
             # draw gaze on the video
             for v in proc_vids:
                 if v in gazes_head and frame_idx[lead_vid] in gazes_head[v]:
-                    clr = study_config.video_recording_colors[v][::-1]  # RGB -> BGR
+                    clr = study_config.mapped_video_recording_colors[v][::-1]  # RGB -> BGR
                     for g in gazes_head[v][frame_idx[lead_vid]]:
                         if v in all_vids:
                             g.draw(frame[v], sub_pixel_fac=sub_pixel_fac, clr=clr, draw_3d_gaze_point=False)
 
                         # check if we need gaze on plane for drawing on any of the videos
-                        plane_gaze_on_this_video = not not study_config.video_show_gaze_on_plane_in_which and v in study_config.video_show_gaze_on_plane_in_which
-                        plane_gaze_or_pose_on_other_video = (not not study_config.video_show_gaze_on_plane_in_which and any((vo!=v for vo in study_config.video_show_gaze_on_plane_in_which))) or (not not study_config.video_show_gaze_vec_in_which and any((vo!=v for vo in study_config.video_show_gaze_vec_in_which))) or (not not study_config.video_show_camera_in_which and any((vo!=v for vo in study_config.video_show_camera_in_which)))
+                        plane_gaze_on_this_video = not not study_config.mapped_video_show_gaze_on_plane_in_which and v in study_config.mapped_video_show_gaze_on_plane_in_which
+                        plane_gaze_or_pose_on_other_video = (not not study_config.mapped_video_show_gaze_on_plane_in_which and any((vo!=v for vo in study_config.mapped_video_show_gaze_on_plane_in_which))) or (not not study_config.mapped_video_show_gaze_vec_in_which and any((vo!=v for vo in study_config.mapped_video_show_gaze_vec_in_which))) or (not not study_config.mapped_video_show_camera_in_which and any((vo!=v for vo in study_config.mapped_video_show_camera_in_which)))
                         if not pose[v] or not (plane_gaze_on_this_video or plane_gaze_or_pose_on_other_video):
                             continue
 
@@ -351,14 +351,14 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
                                 plane_gazes[pl] = (gaze_worldref.distance_from_plane(plane_gaze, planes[pl]), pose[v][pl].pose_reprojection_error if pose[v][pl].pose_successful() else np.nan, plane_gaze)
 
                         # find the plane to which gaze is closest
-                        best = None if not plane_gazes else sorted(plane_gazes.keys(), key=lambda d: (sum(plane_gazes[d][0:2])/2 if not np.isnan(plane_gazes[d][1]) else plane_gazes[d][0]) if plane_gazes[d][0]<=study_config.video_gaze_to_plane_margin else math.inf)
+                        best = None if not plane_gazes else sorted(plane_gazes.keys(), key=lambda d: (sum(plane_gazes[d][0:2])/2 if not np.isnan(plane_gazes[d][1]) else plane_gazes[d][0]) if plane_gazes[d][0]<=study_config.mapped_video_gaze_to_plane_margin else math.inf)
                         # check if gaze is not too far outside all planes
                         if best is None:
                             continue
 
                         # draw on current video
-                        if v in study_config.video_show_gaze_on_plane_in_which:
-                            plane_gazes[best[0]][2].draw_on_world_video(frame[v], camera_params[v], sub_pixel_fac, pose[v][best[0]], study_config.video_projected_vidPos_color, study_config.video_projected_world_pos_color, study_config.video_projected_left_ray_color, study_config.video_projected_right_ray_color, study_config.video_projected_average_ray_color)
+                        if v in study_config.mapped_video_show_gaze_on_plane_in_which:
+                            plane_gazes[best[0]][2].draw_on_world_video(frame[v], camera_params[v], sub_pixel_fac, pose[v][best[0]], study_config.mapped_video_projected_vidPos_color, study_config.mapped_video_projected_world_pos_color, study_config.mapped_video_projected_left_ray_color, study_config.mapped_video_projected_right_ray_color, study_config.mapped_video_projected_average_ray_color)
 
                         # also draw on other recordings, if so configured
                         # depending on configuration also includes camera and gaze vector between the two
@@ -376,11 +376,11 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
                                                      pose[v][pl], pose[vo][pl],
                                                      plane_gazes[pl][2],
                                                      camera_params[vo], clr,
-                                                     study_config.video_which_gaze_type_on_plane,
-                                                     study_config.video_which_gaze_type_on_plane_allow_fallback,
-                                                     vo in study_config.video_show_gaze_on_plane_in_which,
-                                                     vo in study_config.video_show_gaze_vec_in_which,
-                                                     vo in study_config.video_show_camera_in_which,
+                                                     study_config.mapped_video_which_gaze_type_on_plane,
+                                                     study_config.mapped_video_which_gaze_type_on_plane_allow_fallback,
+                                                     vo in study_config.mapped_video_show_gaze_on_plane_in_which,
+                                                     vo in study_config.mapped_video_show_gaze_vec_in_which,
+                                                     vo in study_config.mapped_video_show_camera_in_which,
                                                      sub_pixel_fac)
 
 

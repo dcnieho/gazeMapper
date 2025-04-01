@@ -183,7 +183,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
                     if p in plane_gazes and frame_idx in plane_gazes[p]:
                         this_plane_gazes[p] = gaze_worldref.distance_from_plane(plane_gazes[p][frame_idx][0], planes_setup[p])
                 # get best gaze (closest to a plane)
-                best = None if not this_plane_gazes else sorted(this_plane_gazes.keys(), key=lambda d: this_plane_gazes[d] if this_plane_gazes[d]<=study_config.video_gaze_to_plane_margin else np.inf)
+                best = None if not this_plane_gazes else sorted(this_plane_gazes.keys(), key=lambda d: this_plane_gazes[d] if this_plane_gazes[d]<=study_config.mapped_video_gaze_to_plane_margin else np.inf)
                 # check if gaze is not too far outside all planes, draw
                 if best is not None:
                     p = best[0]

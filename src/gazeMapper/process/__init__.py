@@ -112,7 +112,7 @@ def is_action_possible_given_config(action: Action, study_config: 'config.Study'
         case Action.EXPORT_TRIALS:
             return True     # always possible (in terms of config), since gaze overlay videos are always possible
         case Action.MAKE_MAPPED_GAZE_VIDEO:
-            return not not study_config.video_make_which
+            return not not study_config.mapped_video_make_which
 
         case _:
             # no config preconditions for the other actions
@@ -147,7 +147,7 @@ def _determine_to_invalidate(action: Action, study_config: 'config.Study') -> se
             return actions
         case Action.DETECT_MARKERS:
             actions = {a for a in action.next_values() if a not in [Action.SYNC_TO_REFERENCE]}
-            if study_config.video_process_planes_for_all_frames or study_config.video_process_individual_markers_for_all_frames or study_config.video_show_detected_markers or study_config.video_show_rejected_markers:
+            if study_config.mapped_video_process_planes_for_all_frames or study_config.mapped_video_process_individual_markers_for_all_frames or study_config.mapped_video_show_detected_markers or study_config.mapped_video_show_rejected_markers:
                 # in this case MAKE_VIDEO processes each frame itself, so output of DETECT_MARKERS is not used
                 actions.discard(Action.MAKE_MAPPED_GAZE_VIDEO)
             return actions

@@ -98,28 +98,28 @@ class Study:
                  validate_include_data_loss                     : bool                              = False,
                  validate_I2MC_settings                         : I2MCSettings|None                 = None,
 
-                 video_make_which                               : set[str]|None                     = None,
-                 video_recording_colors                         : dict[str,RgbColor]|None           = None,
-                 video_projected_vidPos_color                   : RgbColor|None                     = RgbColor(255,255,  0),
-                 video_projected_world_pos_color                : RgbColor|None                     = RgbColor(255,  0,255),
-                 video_projected_left_ray_color                 : RgbColor|None                     = RgbColor(  0,  0,255),
-                 video_projected_right_ray_color                : RgbColor|None                     = RgbColor(255,  0,  0),
-                 video_projected_average_ray_color              : RgbColor|None                     = RgbColor(255,  0,255),
-                 video_process_planes_for_all_frames            : bool                              = False,
-                 video_process_annotations_for_all_recordings   : bool                              = True,
-                 video_show_detected_markers                    : bool                              = True,
-                 video_show_plane_axes                          : bool                              = True,
-                 video_process_individual_markers_for_all_frames: bool                              = True,
-                 video_show_individual_marker_axes              : bool                              = True,
-                 video_show_sync_func_output                    : bool                              = True,
-                 video_show_unexpected_markers                  : bool                              = False,
-                 video_show_rejected_markers                    : bool                              = False,
-                 video_show_gaze_on_plane_in_which              : set[str]|None                     = None,
-                 video_show_gaze_vec_in_which                   : set[str]|None                     = None,
-                 video_show_camera_in_which                     : set[str]|None                     = None,
-                 video_which_gaze_type_on_plane                 : gaze_worldref.Type                = gaze_worldref.Type.Scene_Video_Position,
-                 video_which_gaze_type_on_plane_allow_fallback  : bool                              = True,
-                 video_gaze_to_plane_margin                     : float                             = 0.25,
+                 mapped_video_make_which                               : set[str]|None                     = None,
+                 mapped_video_recording_colors                         : dict[str,RgbColor]|None           = None,
+                 mapped_video_projected_vidPos_color                   : RgbColor|None                     = RgbColor(255,255,  0),
+                 mapped_video_projected_world_pos_color                : RgbColor|None                     = RgbColor(255,  0,255),
+                 mapped_video_projected_left_ray_color                 : RgbColor|None                     = RgbColor(  0,  0,255),
+                 mapped_video_projected_right_ray_color                : RgbColor|None                     = RgbColor(255,  0,  0),
+                 mapped_video_projected_average_ray_color              : RgbColor|None                     = RgbColor(255,  0,255),
+                 mapped_video_process_planes_for_all_frames            : bool                              = False,
+                 mapped_video_process_annotations_for_all_recordings   : bool                              = True,
+                 mapped_video_show_detected_markers                    : bool                              = True,
+                 mapped_video_show_plane_axes                          : bool                              = True,
+                 mapped_video_process_individual_markers_for_all_frames: bool                              = True,
+                 mapped_video_show_individual_marker_axes              : bool                              = True,
+                 mapped_video_show_sync_func_output                    : bool                              = True,
+                 mapped_video_show_unexpected_markers                  : bool                              = False,
+                 mapped_video_show_rejected_markers                    : bool                              = False,
+                 mapped_video_show_gaze_on_plane_in_which              : set[str]|None                     = None,
+                 mapped_video_show_gaze_vec_in_which                   : set[str]|None                     = None,
+                 mapped_video_show_camera_in_which                     : set[str]|None                     = None,
+                 mapped_video_which_gaze_type_on_plane                 : gaze_worldref.Type                = gaze_worldref.Type.Scene_Video_Position,
+                 mapped_video_which_gaze_type_on_plane_allow_fallback  : bool                              = True,
+                 mapped_video_gaze_to_plane_margin                     : float                             = 0.25,
 
                  gui_num_workers                                : int                               = 2,
 
@@ -160,28 +160,28 @@ class Study:
         self.validate_include_data_loss                     = validate_include_data_loss
         self.validate_I2MC_settings                         = validate_I2MC_settings
 
-        self.video_make_which                               = video_make_which
-        self.video_recording_colors                         = video_recording_colors
-        self.video_projected_vidPos_color                   = video_projected_vidPos_color
-        self.video_projected_world_pos_color                = video_projected_world_pos_color
-        self.video_projected_left_ray_color                 = video_projected_left_ray_color
-        self.video_projected_right_ray_color                = video_projected_right_ray_color
-        self.video_projected_average_ray_color              = video_projected_average_ray_color
-        self.video_process_planes_for_all_frames            = video_process_planes_for_all_frames   # if True, all planes are processed for all frames, if False, only according to the planes_per_episode setup and the coding
-        self.video_process_annotations_for_all_recordings   = video_process_annotations_for_all_recordings   # if True, all coded episodes for all planes of all recordings are processed (so e.g. if validation coded for one recording in the session, that plane is processed for all)
-        self.video_show_detected_markers                    = video_show_detected_markers
-        self.video_show_plane_axes                          = video_show_plane_axes
-        self.video_process_individual_markers_for_all_frames= video_process_individual_markers_for_all_frames   # if True, all frames are processed in search of individual markers, if False, individual markers are only searched for when in a coded episode of any of the planes specified in planes_per_episode setup
-        self.video_show_individual_marker_axes              = video_show_individual_marker_axes
-        self.video_show_sync_func_output                    = video_show_sync_func_output
-        self.video_show_unexpected_markers                  = video_show_unexpected_markers
-        self.video_show_rejected_markers                    = video_show_rejected_markers
-        self.video_show_gaze_on_plane_in_which              = video_show_gaze_on_plane_in_which
-        self.video_show_gaze_vec_in_which                   = video_show_gaze_vec_in_which
-        self.video_show_camera_in_which                     = video_show_camera_in_which
-        self.video_which_gaze_type_on_plane                 = video_which_gaze_type_on_plane
-        self.video_which_gaze_type_on_plane_allow_fallback  = video_which_gaze_type_on_plane_allow_fallback
-        self.video_gaze_to_plane_margin                     = video_gaze_to_plane_margin    # fraction of plane size, added to each side of the plane
+        self.mapped_video_make_which                               = mapped_video_make_which
+        self.mapped_video_recording_colors                         = mapped_video_recording_colors
+        self.mapped_video_projected_vidPos_color                   = mapped_video_projected_vidPos_color
+        self.mapped_video_projected_world_pos_color                = mapped_video_projected_world_pos_color
+        self.mapped_video_projected_left_ray_color                 = mapped_video_projected_left_ray_color
+        self.mapped_video_projected_right_ray_color                = mapped_video_projected_right_ray_color
+        self.mapped_video_projected_average_ray_color              = mapped_video_projected_average_ray_color
+        self.mapped_video_process_planes_for_all_frames            = mapped_video_process_planes_for_all_frames             # if True, all planes are processed for all frames, if False, only according to the planes_per_episode setup and the coding
+        self.mapped_video_process_annotations_for_all_recordings   = mapped_video_process_annotations_for_all_recordings    # if True, all coded episodes for all planes of all recordings are processed (so e.g. if validation coded for one recording in the session, that plane is processed for all)
+        self.mapped_video_show_detected_markers                    = mapped_video_show_detected_markers
+        self.mapped_video_show_plane_axes                          = mapped_video_show_plane_axes
+        self.mapped_video_process_individual_markers_for_all_frames= mapped_video_process_individual_markers_for_all_frames # if True, all frames are processed in search of individual markers, if False, individual markers are only searched for when in a coded episode of any of the planes specified in planes_per_episode setup
+        self.mapped_video_show_individual_marker_axes              = mapped_video_show_individual_marker_axes
+        self.mapped_video_show_sync_func_output                    = mapped_video_show_sync_func_output
+        self.mapped_video_show_unexpected_markers                  = mapped_video_show_unexpected_markers
+        self.mapped_video_show_rejected_markers                    = mapped_video_show_rejected_markers
+        self.mapped_video_show_gaze_on_plane_in_which              = mapped_video_show_gaze_on_plane_in_which
+        self.mapped_video_show_gaze_vec_in_which                   = mapped_video_show_gaze_vec_in_which
+        self.mapped_video_show_camera_in_which                     = mapped_video_show_camera_in_which
+        self.mapped_video_which_gaze_type_on_plane                 = mapped_video_which_gaze_type_on_plane
+        self.mapped_video_which_gaze_type_on_plane_allow_fallback  = mapped_video_which_gaze_type_on_plane_allow_fallback
+        self.mapped_video_gaze_to_plane_margin                     = mapped_video_gaze_to_plane_margin    # fraction of plane size, added to each side of the plane
 
         self.gui_num_workers                                = gui_num_workers
 
@@ -474,18 +474,20 @@ class Study:
         return problems
 
     def _check_make_video(self, strict_check) -> type_utils.ProblemDict:
-        problems = self._check_recordings(self.video_make_which, 'video_make_which', strict_check)
+        problems = self._check_recordings(self.mapped_video_make_which, 'mapped_video_make_which', strict_check)
         type_utils.merge_problem_dicts(problems,
-                   self._check_recordings(self.video_recording_colors, 'video_recording_colors', strict_check))
+                   self._check_recordings(self.mapped_video_recording_colors, 'mapped_video_recording_colors', strict_check))
         type_utils.merge_problem_dicts(problems,
-                   self._check_recordings(self.video_show_camera_in_which, 'video_show_camera_in_which', strict_check))
+                   self._check_recordings(self.mapped_video_show_gaze_on_plane_in_which, 'mapped_video_show_gaze_on_plane_in_which', strict_check))
         type_utils.merge_problem_dicts(problems,
-                   self._check_recordings(self.video_show_gaze_vec_in_which, 'video_show_gaze_vec_in_which', strict_check))
-        if self.video_make_which:
+                   self._check_recordings(self.mapped_video_show_camera_in_which, 'mapped_video_show_camera_in_which', strict_check))
+        type_utils.merge_problem_dicts(problems,
+                   self._check_recordings(self.mapped_video_show_gaze_vec_in_which, 'mapped_video_show_gaze_vec_in_which', strict_check))
+        if self.mapped_video_make_which:
             # check have colors for all eye tracker recordings
             all_recs = {r.name for r in self.session_def.recordings if r.type==session.RecordingType.Eye_Tracker}
-            if self.video_recording_colors:
-                missing = list(all_recs-set(self.video_recording_colors.keys()))
+            if self.mapped_video_recording_colors:
+                missing = list(all_recs-set(self.mapped_video_recording_colors.keys()))
             else:
                 missing = list(all_recs)
             if missing:
@@ -493,7 +495,7 @@ class Study:
                 if strict_check:
                     raise ValueError(msg)
                 else:
-                    type_utils.merge_problem_dicts(problems,{'video_recording_colors': msg})
+                    type_utils.merge_problem_dicts(problems,{'mapped_video_recording_colors': msg})
         return problems
 
     def field_problems(self) -> type_utils.ProblemDict:
@@ -564,16 +566,20 @@ class Study:
         # get kwds
         with open(d_path, 'r') as f:
             kwds = json.load(f, object_hook=utils.json_reconstitute)
-        kwds['planes_per_episode'] = {k:v for k,v in kwds['planes_per_episode']}  # stored as list of tuples, unpack
+        # fix up 'video_' parameters for backwards compatibility
+        for k in list(kwds.keys()):
+            if k.startswith('video_'):
+                kwds[f'mapped_{k}'] = kwds.pop(k)
+        # stored as list of tuples, unpack
+        kwds['planes_per_episode'] = {k:v for k,v in kwds['planes_per_episode']}
         if 'auto_code_episodes' in kwds:
-            kwds['auto_code_episodes'] = {k:v for k,v in kwds['auto_code_episodes']}  # stored as list of tuples, unpack
-        # backwards compatibility
+            kwds['auto_code_episodes'] = {k:v for k,v in kwds['auto_code_episodes']}
+        # backwards compatibility, rename 'auto_code_trial_episodes'
         if 'auto_code_trial_episodes' in kwds:
-            setup = kwds.pop('auto_code_trial_episodes')
-            kwds['auto_code_episodes'] = {annotation.Event.Trial: setup}
+            kwds['auto_code_episodes'] = {annotation.Event.Trial: kwds.pop('auto_code_trial_episodes')}
         # help with named tuple roundtrip
-        if 'video_recording_colors' in kwds:
-            kwds['video_recording_colors'] = {k: RgbColor(*kwds['video_recording_colors'][k]) for k in kwds['video_recording_colors']}
+        if 'mapped_video_recording_colors' in kwds:
+            kwds['mapped_video_recording_colors'] = {k: RgbColor(*kwds['mapped_video_recording_colors'][k]) for k in kwds['mapped_video_recording_colors']}
         # get session def
         s_path = path / 'session_def.json'
         if not s_path.is_file():
@@ -697,30 +703,30 @@ study_parameter_doc = {
         'maxMergeTime': type_utils.GUIDocInfo('Maximum gap duration for merging', 'Maximum time (ms) between fixations for merging to be possible.'),
         'minFixDur': type_utils.GUIDocInfo('Minimum fixation duration', 'Minimum fixation duration (ms) after merging, fixations with shorter duration are removed from output.'),
     }),
-    'video_make_which': type_utils.GUIDocInfo('Video export: Which recordings', 'Indicates one or multiple recordings for which to make videos of the eye tracker scene camera or external camera (synchronized to one of the recordings if there are multiple) showing detected plane origins, detected individual markers and gaze from any other recordings eye tracker recordings. Also shown for eye tracker recordings are gaze on the scene video from the eye tracker, gaze projected to the detected planes. Each only if available, and enabled in the below video generation settings.'),
-    'video_recording_colors': type_utils.GUIDocInfo('Video export: Recording colors', 'Colors used for drawing each recording\'s gaze point, scene camera and gaze vector (depending on settings).',{
+    'mapped_video_make_which': type_utils.GUIDocInfo('Mapped video: Which recordings', 'Indicates one or multiple recordings for which to make videos of the eye tracker scene camera or external camera (synchronized to one of the recordings if there are multiple) showing detected plane origins, detected individual markers and gaze from any other recordings eye tracker recordings. Also shown for eye tracker recordings are gaze on the scene video from the eye tracker, gaze projected to the detected planes. Each only if available, and enabled in the below video generation settings.'),
+    'mapped_video_recording_colors': type_utils.GUIDocInfo('Mapped video: Recording colors', 'Colors used for drawing each recording\'s gaze point, scene camera and gaze vector (depending on settings).',{
         None: _rgb_doc      # None indicates the doc specification applies to the contained values
     }),
-    'video_projected_vidPos_color': type_utils.GUIDocInfo('Video export: Color for gaze position on plane', 'Color used for drawing the recorded gaze position on the scene video transformed to the plane. Not drawn if value is not set.', _rgb_doc),
-    'video_projected_world_pos_color': type_utils.GUIDocInfo('Video export: Color for 3D gaze position on plane', 'Color used for drawing the projection on a plane of the recorded 3D gaze position in the world. Not drawn if value is not set.', _rgb_doc),
-    'video_projected_left_ray_color': type_utils.GUIDocInfo('Video export: Color for left eye gaze vector projected to plane', 'Color used for drawing the projection to a plane of the recorded left eye\'s gaze vector. Not drawn if value is not set.', _rgb_doc),
-    'video_projected_right_ray_color': type_utils.GUIDocInfo('Video export: Color for right eye gaze vector projected to plane', 'Color used for drawing the projection to a plane of the recorded right eye\'s gaze vector. Not drawn if value is not set.', _rgb_doc),
-    'video_projected_average_ray_color': type_utils.GUIDocInfo('Video export: Color for average of gaze vectors projected to plane', 'Color used for drawing the average projection to a plane of the recorded left and right eyes\' gaze vectors. Not drawn if value is not set.', _rgb_doc),
-    'video_process_planes_for_all_frames': type_utils.GUIDocInfo('Video export: Process all planes for all frames?', 'If enabled, shows detection results for all planes for all frames. If not enabled, detection of each plane is only shown during the episode(s) to which it is assigned.'),
-    'video_process_annotations_for_all_recordings': type_utils.GUIDocInfo('Video export: Process all annotations for all recordings?', 'Episode annotations are shown in a bar on the bottom of the screen. If enabled, annotations for not only the recording for which the video is made, but also for the other recordings are shown in this bar.'),
-    'video_show_detected_markers': type_utils.GUIDocInfo('Video export: Show detected markers?', 'If enabled, known detected markers are indicated in the output video.'),
-    'video_show_plane_axes': type_utils.GUIDocInfo('Video export: Show planes axes?', 'If enabled, axes indicating the orientation of the detected plane are drawn at the plane\'s origin.'),
-    'video_process_individual_markers_for_all_frames': type_utils.GUIDocInfo('Video export: Process individual markers for all frames?', 'If enabled, detection results are shown for all frames in the video. If not enabled, detection results are only shown during coded episodes of the video.'),
-    'video_show_individual_marker_axes': type_utils.GUIDocInfo('Video export: Show individual markers?', 'If enabled, the pose axis and not only an outline of detected individual markers is shown.'),
-    'video_show_sync_func_output': type_utils.GUIDocInfo('Video export: Show sync function output?', 'If enabled, draw the output of the function on the output video. Applies if the "Gaze data synchronization: Function for camera movement" setting is set to "function".'),
-    'video_show_unexpected_markers': type_utils.GUIDocInfo('Video export: Show unexpected markers?', 'If not enabled, only markers that are part of defined planes or configured individual markers will be drawn on the video. If enabled, also other, unexpected markers will be drawn.'),
-    'video_show_rejected_markers': type_utils.GUIDocInfo('Video export: Show rejected markers?', 'If enabled, all shapes that potentially are markers but were rejected by OpenCV\'s ArUco detector are shown. For debug purposes.'),
-    'video_show_gaze_on_plane_in_which': type_utils.GUIDocInfo('Video export: Videos on which to draw gaze projected to plane', 'For the listed recordings, gaze projected to the plane (both the gaze point on the scene video, and the left and right eyes\' gaze vectors if available) is drawn on the video for eye tracker recordings. If there are multiple recordings in a session, gaze positions for the other recordings (if available) will also be drawn on the indicated video(s).'),
-    'video_show_gaze_vec_in_which': type_utils.GUIDocInfo('Video export: Videos on which to draw gaze vectors(s)', 'For the listed recordings, a line is drawn between the positions of the cameras of other recordings and the gaze position of these recordings projected to the plane in the generated video. Only for eye tracker recordings.'),
-    'video_show_camera_in_which': type_utils.GUIDocInfo('Video export: Videos on which to draw camera position(s)', 'For the listed recordings, the position of the cameras of other recordings is marked in the generated video.'),
-    'video_which_gaze_type_on_plane': type_utils.GUIDocInfo('Video export: Which gaze on plane to show?', 'Sets which gaze-on-plane (e.g. from gaze position on the scene video or from gaze vectors projected to the plane) is used for the gaze positions shown in the generated videos.', _gaze_type_doc),
-    'video_which_gaze_type_on_plane_allow_fallback': type_utils.GUIDocInfo('Video export: Allow fallback to showing gaze on plane based on scene video gaze?', 'Sets if it is allowed to fall back to using the projection of the gaze position on the plane derived from the gaze position on the video if the gaze-on-plane type specified in the "Video export: Which gaze on plane to show?" setting is not available.'),
-    'video_gaze_to_plane_margin': type_utils.GUIDocInfo('Video export: Gaze position margin','Gaze position more than this factor outside a defined plane will not be drawn.'),
+    'mapped_video_projected_vidPos_color': type_utils.GUIDocInfo('Mapped video: Color for gaze position on plane', 'Color used for drawing the recorded gaze position on the scene video transformed to the plane. Not drawn if value is not set.', _rgb_doc),
+    'mapped_video_projected_world_pos_color': type_utils.GUIDocInfo('Mapped video: Color for 3D gaze position on plane', 'Color used for drawing the projection on a plane of the recorded 3D gaze position in the world. Not drawn if value is not set.', _rgb_doc),
+    'mapped_video_projected_left_ray_color': type_utils.GUIDocInfo('Mapped video: Color for left eye gaze vector projected to plane', 'Color used for drawing the projection to a plane of the recorded left eye\'s gaze vector. Not drawn if value is not set.', _rgb_doc),
+    'mapped_video_projected_right_ray_color': type_utils.GUIDocInfo('Mapped video: Color for right eye gaze vector projected to plane', 'Color used for drawing the projection to a plane of the recorded right eye\'s gaze vector. Not drawn if value is not set.', _rgb_doc),
+    'mapped_video_projected_average_ray_color': type_utils.GUIDocInfo('Mapped video: Color for average of gaze vectors projected to plane', 'Color used for drawing the average projection to a plane of the recorded left and right eyes\' gaze vectors. Not drawn if value is not set.', _rgb_doc),
+    'mapped_video_process_planes_for_all_frames': type_utils.GUIDocInfo('Mapped video: Process all planes for all frames?', 'If enabled, shows detection results for all planes for all frames. If not enabled, detection of each plane is only shown during the episode(s) to which it is assigned.'),
+    'mapped_video_process_annotations_for_all_recordings': type_utils.GUIDocInfo('Mapped video: Process all annotations for all recordings?', 'Episode annotations are shown in a bar on the bottom of the screen. If enabled, annotations for not only the recording for which the video is made, but also for the other recordings are shown in this bar.'),
+    'mapped_video_show_detected_markers': type_utils.GUIDocInfo('Mapped video: Show detected markers?', 'If enabled, known detected markers are indicated in the output video.'),
+    'mapped_video_show_plane_axes': type_utils.GUIDocInfo('Mapped video: Show planes axes?', 'If enabled, axes indicating the orientation of the detected plane are drawn at the plane\'s origin.'),
+    'mapped_video_process_individual_markers_for_all_frames': type_utils.GUIDocInfo('Mapped video: Process individual markers for all frames?', 'If enabled, detection results are shown for all frames in the video. If not enabled, detection results are only shown during coded episodes of the video.'),
+    'mapped_video_show_individual_marker_axes': type_utils.GUIDocInfo('Mapped video: Show individual markers?', 'If enabled, the pose axis and not only an outline of detected individual markers is shown.'),
+    'mapped_video_show_sync_func_output': type_utils.GUIDocInfo('Mapped video: Show sync function output?', 'If enabled, draw the output of the function on the output video. Applies if the "Gaze data synchronization: Function for camera movement" setting is set to "function".'),
+    'mapped_video_show_unexpected_markers': type_utils.GUIDocInfo('Mapped video: Show unexpected markers?', 'If not enabled, only markers that are part of defined planes or configured individual markers will be drawn on the video. If enabled, also other, unexpected markers will be drawn.'),
+    'mapped_video_show_rejected_markers': type_utils.GUIDocInfo('Mapped video: Show rejected markers?', 'If enabled, all shapes that potentially are markers but were rejected by OpenCV\'s ArUco detector are shown. For debug purposes.'),
+    'mapped_video_show_gaze_on_plane_in_which': type_utils.GUIDocInfo('Mapped video: Videos on which to draw gaze projected to plane', 'For the listed recordings, gaze projected to the plane (both the gaze point on the scene video, and the left and right eyes\' gaze vectors if available) is drawn on the video for eye tracker recordings. If there are multiple recordings in a session, gaze positions for the other recordings (if available) will also be drawn on the indicated video(s).'),
+    'mapped_video_show_gaze_vec_in_which': type_utils.GUIDocInfo('Mapped video: Videos on which to draw gaze vectors(s)', 'For the listed recordings, a line is drawn between the positions of the cameras of other recordings and the gaze position of these recordings projected to the plane in the generated video. Only for eye tracker recordings.'),
+    'mapped_video_show_camera_in_which': type_utils.GUIDocInfo('Mapped video: Videos on which to draw camera position(s)', 'For the listed recordings, the position of the cameras of other recordings is marked in the generated video.'),
+    'mapped_video_which_gaze_type_on_plane': type_utils.GUIDocInfo('Mapped video: Which gaze on plane to show?', 'Sets which gaze-on-plane (e.g. from gaze position on the scene video or from gaze vectors projected to the plane) is used for the gaze positions shown in the generated videos.', _gaze_type_doc),
+    'mapped_video_which_gaze_type_on_plane_allow_fallback': type_utils.GUIDocInfo('Mapped video: Allow fallback to showing gaze on plane based on scene video gaze?', 'Sets if it is allowed to fall back to using the projection of the gaze position on the plane derived from the gaze position on the video if the gaze-on-plane type specified in the "Mapped video: Which gaze on plane to show?" setting is not available.'),
+    'mapped_video_gaze_to_plane_margin': type_utils.GUIDocInfo('Mapped video: Gaze position margin','Gaze position more than this factor outside a defined plane will not be drawn.'),
     'gui_num_workers': type_utils.GUIDocInfo('Number of workers','Each action is processed by a worker and each worker can handle one action at a time. Having more workers means more actions are processed simultaneously, but having too many will not provide any gain and might freeze the program and your whole computer. Since much of the processing utilizes more than one processor thread, set this value to significantly less than the number of threads available in your system. NB: If you currently have running or enqueued jobs, the number of workers will only be changed once all have completed or are cancelled.'),
 }
 if _missing_params:=[k for k in _params if k not in study_parameter_doc and k not in ['self','session_def','planes','individual_markers','working_directory','strict_check']]:
@@ -879,9 +885,9 @@ class StudyOverride:
             kwds['auto_code_episodes'] = {e: AutoCodeEpisodes(**kwds['auto_code_episodes'][e]) for e in kwds['auto_code_episodes']}
         if 'validate_I2MC_settings' in kwds and kwds['validate_I2MC_settings'] is not None:
             kwds['validate_I2MC_settings'] = I2MCSettings(**kwds['validate_I2MC_settings'])
-        if 'video_recording_colors' in kwds and kwds['video_recording_colors'] is not None:
-            kwds['video_recording_colors'] = {k: None if kwds['video_recording_colors'][k] is None else RgbColor(*kwds['video_recording_colors'][k]) for k in kwds['video_recording_colors']}
-        for k in ['video_projected_vidPos_ray_color','video_projected_world_pos_color','video_projected_left_ray_color','video_projected_right_ray_color','video_projected_average_ray_color']:
+        if 'mapped_video_recording_colors' in kwds and kwds['mapped_video_recording_colors'] is not None:
+            kwds['mapped_video_recording_colors'] = {k: None if kwds['mapped_video_recording_colors'][k] is None else RgbColor(*kwds['mapped_video_recording_colors'][k]) for k in kwds['mapped_video_recording_colors']}
+        for k in ['mapped_video_projected_vidPos_ray_color','mapped_video_projected_world_pos_color','mapped_video_projected_left_ray_color','mapped_video_projected_right_ray_color','mapped_video_projected_average_ray_color']:
             if k in kwds and kwds[k] is not None:
                 kwds[k] = RgbColor(**kwds[k])
         return kwds
