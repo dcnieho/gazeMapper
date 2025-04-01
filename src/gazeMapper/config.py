@@ -188,6 +188,7 @@ class Study:
             self._check_session_def(strict_check)
             self._check_planes_per_episode(strict_check)
             self._check_episodes_to_code(strict_check)
+            self._check_individual_markers(strict_check)
             self._check_sync_ref(strict_check)
             self._check_et_sync_method(strict_check)
             self._check_auto_coding_setup(strict_check)
@@ -371,6 +372,21 @@ class Study:
                         type_utils.merge_problem_dicts(problems, {'auto_code_trial_episodes': {f: f'The marker(s) {missing_markers[0] if len(missing_markers)==1 else missing_markers} are not defined in individual_markers'}})
         return problems
 
+    def _check_individual_markers(self, strict_check):
+        problems: type_utils.ProblemDict = {}
+        for m in self.individual_markers:
+            problem = ''
+            if m.detect_only and m.size is not None:
+                problem = f'size should not be set for detect only markers'
+            elif not m.detect_only and (m.size is None or m.size<=0):
+                problem = f'size should be set to a value larger than 0'
+            if problem:
+                if strict_check:
+                    raise ValueError(f'individual_markers marker {m.id}: {problem}')
+                else:
+                    problems = type_utils.merge_problem_dicts(problems, {'individual_markers': {m.id: problem}})
+        return problems
+
     def _check_sync_ref(self, strict_check):
         problems: type_utils.ProblemDict = {}
         if self.sync_ref_recording is None:
@@ -479,6 +495,7 @@ class Study:
         type_utils.merge_problem_dicts(problems, self._check_planes_per_episode(False))
         type_utils.merge_problem_dicts(problems, self._check_episodes_to_code(False))
         type_utils.merge_problem_dicts(problems, self._check_auto_coding_setup(False))
+        type_utils.merge_problem_dicts(problems, self._check_individual_markers(False))
         type_utils.merge_problem_dicts(problems, self._check_sync_ref(False))
         type_utils.merge_problem_dicts(problems, self._check_et_sync_method(False))
         type_utils.merge_problem_dicts(problems, self._check_make_video(False))

@@ -15,23 +15,32 @@ class Marker:
     @typeguard.typechecked
     def __init__(self,
                  id                 : int,
-                 size               : float,
+                 detect_only        : bool,         # if true, pose will not be determined and only marker presence is detected. That means marker size is not needed
+                 size               : float|None                = None,
                  aruco_dict         : type_utils.ArucoDictType  = cv2.aruco.DICT_4X4_250,
                  marker_border_bits : int                       = 1
                  ):
         self.id                 = id
+        self.detect_only        = detect_only
         self.size               = size
         self.aruco_dict         = aruco_dict
         self.marker_border_bits = marker_border_bits
 
     def _to_dict(self) -> dict[str,Any]:
-        out = {'id': self.id, 'size': self.size}
-        for f in ['aruco_dict', 'marker_border_bits']:
+        out = {'id': self.id, 'detect_only': self.detect_only}
+        for f in ['size', 'aruco_dict', 'marker_border_bits']:
             if (val:=getattr(self,f))!=marker_defaults[f]:
                 out[f] = val
         return out
 
-utils.register_type(utils.CustomTypeEntry(Marker,'__marker.Marker__', Marker._to_dict, lambda x: Marker(**x)))
+    @staticmethod
+    def _from_dict(kwargs: dict[str,Any]):
+        # backwards compatibility
+        if 'detect_only' not in kwargs:
+            kwargs['detect_only'] = False
+        return Marker(**kwargs)
+
+utils.register_type(utils.CustomTypeEntry(Marker,'__marker.Marker__', Marker._to_dict, Marker._from_dict))
 # get defaults for default argument of Marker constructor
 _params = inspect.signature(Marker.__init__).parameters
 marker_defaults = {k:d for k in _params if (d:=_params[k].default)!=inspect._empty}

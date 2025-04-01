@@ -19,7 +19,7 @@ import OpenGL
 import OpenGL.GL as gl
 
 import glassesTools
-from glassesTools import annotation, gui as gt_gui, naming as gt_naming, plane as gt_plane, platform as gt_platform, process_pool
+from glassesTools import annotation, gui as gt_gui, naming as gt_naming, plane as gt_plane, platform as gt_platform, process_pool, utils as gt_utils
 from glassesTools.gui import colors
 
 from ... import config, marker, plane, process, project_watcher, session, type_utils, version
@@ -52,10 +52,11 @@ class GUI:
 
         self._possible_value_getters: dict[str] = {}
 
-        self.need_setup_recordings  = True
-        self.need_setup_plane       = True
-        self.need_setup_episode     = True
-        self.can_accept_sessions    = False
+        self.need_setup_recordings          = True
+        self.need_setup_plane               = True
+        self.need_setup_episode             = True
+        self.need_setup_individual_markers  = True
+        self.can_accept_sessions            = False
         self._session_actions: set[process.Action] = set()
 
         self.config_watcher             : concurrent.futures.Future = None
@@ -552,19 +553,22 @@ class GUI:
         if self.study_config is not None:
             self._problems_cache = self.study_config.field_problems()
         # need to have:
-        # 1. at least one recording defined in the session;
+        # 1. at least one recording defined in the session
         # 2. one plane set up
         # 3. one episode to code
         # 4. one plane linked to one episode
+        # 5. no individual marker problems
         self.need_setup_recordings = not self.study_config or not self.study_config.session_def.recordings or 'session_def' in self._problems_cache
         self.need_setup_plane = not self.study_config or not self.study_config.planes or any((not p.has_complete_setup() for p in self.study_config.planes))
         self.need_setup_episode = not self.study_config or not self.study_config.episodes_to_code or not self.study_config.planes_per_episode or any((x in self._problems_cache for x in ['episodes_to_code', 'planes_per_episode']))
+        self.need_setup_individual_markers = not self.study_config or 'individual_markers' in self._problems_cache
 
         self.can_accept_sessions = \
             not self._problems_cache and \
             not self.need_setup_recordings and \
             not self.need_setup_plane and \
-            not self.need_setup_episode
+            not self.need_setup_episode and \
+            not self.need_setup_individual_markers
 
     def _session_lister_set_actions_to_show(self, lister: session_lister.List):
         if self.study_config is None:
@@ -769,8 +773,13 @@ class GUI:
             imgui.pop_style_color(3)
         imgui.same_line()
 
+        if self.need_setup_individual_markers:
+            _indicate_needs_attention()
         if imgui.button("Edit individual markers"):
             new_win_params = ('Individual marker editor', self._individual_marker_setup_pane_drawer)
+        if self.need_setup_individual_markers:
+            imgui.pop_style_color(3)
+
         if new_win_params is not None:
             if not any((w.label==new_win_params[0] for w in hello_imgui.get_runner_params().docking_params.dockable_windows)):
                 new_win = self._make_main_space_window(*new_win_params, can_be_closed=True)
@@ -781,7 +790,7 @@ class GUI:
             self._to_focus = new_win_params[0]
 
         # rest of settings handled here in a settings tree
-        if any((k not in ['session_def', 'episodes_to_code', 'planes_per_episode'] for k in self._problems_cache)):
+        if any((k not in ['session_def', 'episodes_to_code', 'planes_per_episode', 'individual_markers'] for k in self._problems_cache)):
             imgui.text_colored(colors.error,'*There are problems in the below setup that need to be resolved')
 
         fields = [k for k in config.study_parameter_types.keys() if k in config.study_defaults]
@@ -1116,22 +1125,30 @@ class GUI:
                 self._update_shown_actions_for_config()
 
     def _individual_marker_setup_pane_drawer(self):
-        table_is_started = imgui.begin_table(f"##markers_def_list", 4)
+        table_is_started = imgui.begin_table(f"##markers_def_list", 5)
         if not table_is_started:
             return
         imgui.table_setup_column("Marker ID", imgui.TableColumnFlags_.width_fixed)
+        imgui.table_setup_column("Detect only", imgui.TableColumnFlags_.width_fixed)
         imgui.table_setup_column("Size", imgui.TableColumnFlags_.width_fixed)
         imgui.table_setup_column("ArUco dictionary", imgui.TableColumnFlags_.width_fixed)
         imgui.table_setup_column("Marker border bits", imgui.TableColumnFlags_.width_stretch)
         imgui.table_headers_row()
         changed = False
         for m in self.study_config.individual_markers:
+            problem = self._problems_cache['individual_markers'][m.id] if 'individual_markers' in self._problems_cache and m.id in self._problems_cache['individual_markers'] else None
             imgui.table_next_row()
             imgui.table_next_column()
             imgui.align_text_to_frame_padding()
+            if problem:
+                imgui.push_style_color(imgui.Col_.text, gt_gui.colors.error)
             imgui.selectable(str(m.id), False)
+            if problem:
+                imgui.pop_style_color()
             if imgui.is_item_hovered(imgui.HoveredFlags_.for_tooltip|imgui.HoveredFlags_.delay_normal):
                 imgui.begin_tooltip()
+                if problem:
+                    imgui.text_colored(gt_gui.colors.error, problem)
                 key = m.id,m.aruco_dict,m.marker_border_bits
                 sz = int(200*hello_imgui.dpi_window_size_factor())
                 if key not in self._marker_preview_cache:
@@ -1139,8 +1156,14 @@ class GUI:
                 self._marker_preview_cache[key].render(width=sz, height=sz)
                 imgui.end_tooltip()
             imgui.table_next_column()
+            new_val = settings_editor.draw_value(f'detect_only_{m.id}', m.detect_only, marker.marker_parameter_types['detect_only'], False, marker.marker_defaults.get('detect_only',None), None, False, {}, False)[0]
+            if (this_changed:=m.detect_only!=new_val):
+                m.detect_only = new_val
+                changed |= this_changed
+            imgui.table_next_column()
             imgui.set_next_item_width(imgui.calc_text_size('xxxxx.xxxxxx').x+2*imgui.get_style().frame_padding.x)
-            new_val = settings_editor.draw_value(f'size_{m.id}', m.size, marker.marker_parameter_types['size'], False, marker.marker_defaults.get('size',None), None, False, {}, False)[0]
+            f_type = gt_utils.unpack_none_union(marker.marker_parameter_types['size'])[0]
+            new_val = settings_editor.draw_value(f'size_{m.id}', m.size, f_type, True, marker.marker_defaults.get('size',None), None, False, {}, False, m.size is None, f_type)[0]
             if (this_changed:=m.size!=new_val):
                 m.size = new_val
                 changed |= this_changed
@@ -1163,12 +1186,15 @@ class GUI:
         imgui.end_table()
         if imgui.button('+ new individual marker'):
             new_mark_id = -1
+            new_mark_det_only = False
             new_mark_size = -1.
             def _valid_mark_id():
-                nonlocal new_mark_id
                 return new_mark_id>=0 and not any((m.id==new_mark_id for m in self.study_config.individual_markers))
-            def _add_rec_popup():
+            def _valid_mark_size():
+                return new_mark_det_only or new_mark_size>0.
+            def _add_marker_popup():
                 nonlocal new_mark_id
+                nonlocal new_mark_det_only
                 nonlocal new_mark_size
                 imgui.dummy((30*imgui.calc_text_size('x').x,0))
                 if imgui.begin_table("##new_mark_info",2):
@@ -1186,24 +1212,33 @@ class GUI:
                     imgui.table_next_column()
                     imgui.set_next_item_width(-1)
                     _,new_mark_id = imgui.input_int("##new_mark_id",new_mark_id)
+
                     imgui.table_next_row()
                     imgui.table_next_column()
                     imgui.align_text_to_frame_padding()
-                    invalid = new_mark_size<=0.
-                    if invalid:
-                        imgui.push_style_color(imgui.Col_.text, colors.error)
-                    imgui.text("Marker size")
-                    if invalid:
-                        imgui.pop_style_color()
+                    imgui.text("Detect only?")
                     imgui.table_next_column()
-                    _,new_mark_size = imgui.input_float("##new_mark_size",new_mark_size)
+                    imgui.set_next_item_width(-1)
+                    _,new_mark_det_only = imgui.checkbox("##new_mark_det_only",new_mark_det_only)
+                    if not new_mark_det_only:
+                        imgui.table_next_row()
+                        imgui.table_next_column()
+                        imgui.align_text_to_frame_padding()
+                        invalid = not _valid_mark_size()
+                        if invalid:
+                            imgui.push_style_color(imgui.Col_.text, colors.error)
+                        imgui.text("Marker size")
+                        if invalid:
+                            imgui.pop_style_color()
+                        imgui.table_next_column()
+                        _,new_mark_size = imgui.input_float("##new_mark_size",new_mark_size)
                     imgui.end_table()
 
             buttons = {
-                ifa6.ICON_FA_CHECK+" Create marker": (lambda: callbacks.make_individual_marker(self.study_config, new_mark_id, new_mark_size), lambda: not _valid_mark_id() or new_mark_size<=0.),
+                ifa6.ICON_FA_CHECK+" Create marker": (lambda: callbacks.make_individual_marker(self.study_config, new_mark_id, new_mark_det_only, new_mark_size), lambda: not _valid_mark_id() or not _valid_mark_size()),
                 ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
             }
-            gt_gui.utils.push_popup(self, lambda: gt_gui.utils.popup("Add marker", _add_rec_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, outside=False))
+            gt_gui.utils.push_popup(self, lambda: gt_gui.utils.popup("Add marker", _add_marker_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, outside=False))
 
     def _get_pending_running_job_list(self) -> dict[utils.JobInfo, int]:
         active_jobs: dict[utils.JobInfo, int] = {}
