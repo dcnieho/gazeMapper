@@ -187,7 +187,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
             if not all([abs(i_ref-i_rec)<=1 for i_ref,i_rec in zip(ref_sync_points,rec_sync_points)]):
                 raise RuntimeError(f'Camera sync points found for recording {r} ({episodes_as_ref_flat[r][annotation.Event.Sync_Camera]}) that do not occur among the reference recordings sync points ({study_config.sync_ref_recording}, {episodes_as_ref_flat[study_config.sync_ref_recording][annotation.Event.Sync_Camera]}). That means the sync logic must have failed')
         # load plane poses
-        if not (study_config.video_process_planes_for_all_frames or study_config.mapped_video_process_individual_markers_for_all_frames or study_config.mapped_video_show_detected_markers or study_config.mapped_video_show_rejected_markers):
+        if not (study_config.mapped_video_process_planes_for_all_frames or study_config.mapped_video_process_individual_markers_for_all_frames or study_config.mapped_video_show_detected_markers or study_config.mapped_video_show_rejected_markers):
             to_load = [r for r in recs if r not in study_config.mapped_video_make_which]
             for r in to_load:
                 all_poses[r] = {}
@@ -196,7 +196,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
 
     # build pose estimator
     for rec in recs:
-        if rec not in study_config.mapped_video_make_which and not (study_config.video_process_planes_for_all_frames or study_config.mapped_video_process_individual_markers_for_all_frames):
+        if rec not in study_config.mapped_video_make_which and not (study_config.mapped_video_process_planes_for_all_frames or study_config.mapped_video_process_individual_markers_for_all_frames):
             continue
         in_videos[rec] = session.get_video_path(session_info.recordings[rec].info)     # get video file to process
         pose_estimators[rec] = aruco.PoseEstimator(in_videos[rec], videos_ts[rec], camera_params[rec])
@@ -204,7 +204,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
         planes_setup, analyze_frames = _get_plane_setup(study_config, config_dir, episodes[rec], want_analyze_frames=True)
         for p in planes_setup:
             planes[p] = planes_setup[p]['plane']
-            pose_estimators[rec].add_plane(p, planes_setup[p], None if study_config.video_process_planes_for_all_frames else analyze_frames[p])
+            pose_estimators[rec].add_plane(p, planes_setup[p], None if study_config.mapped_video_process_planes_for_all_frames else analyze_frames[p])
         for i in (markers:=marker.get_marker_dict_from_list(study_config.individual_markers)):
             pose_estimators[rec].add_individual_marker(i, markers[i])
         sync_target_function = _get_sync_function(study_config, session_info.recordings[rec].definition, None if annotation.Event.Sync_ET_Data not in episodes[rec] else episodes[rec][annotation.Event.Sync_ET_Data])
