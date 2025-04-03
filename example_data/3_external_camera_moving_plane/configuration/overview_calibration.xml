@@ -14,4 +14,10 @@
   <data>
     -0.0087910317397699791 4.0490325074794757 -0.021505729811669358
     0.018059998244863051 -39.841396653322441</data></distCoeff>
+<resolution type_id="opencv-matrix">
+  <rows>2</rows>
+  <cols>1</cols>
+  <dt>i</dt>
+  <data>
+    2592 2048</data></resolution>
 </opencv_storage>
