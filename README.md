@@ -135,8 +135,8 @@ If you have followed the above instructions to install gazeMapper, do the follow
 ## Complete instructions for Linux
 Installing and running gazeMapper on Linux will involve some use of the terminal. In this section we will show you step by step how to install, and then what to do every time you want to run gazeMapper.
 ### Installing gazeMapper
-1. You may well already have Python installed on your machine. To check, type and run `python3 --version` in a terminal. If this command completes successfully and shows you have Python 3.10 or later, you can skip to step 3.
-2. To install Python, check what is the appropriate command for your Linux distribution. Examples would be `sudo apt-get update && sudo apt-get install python3.11` for Ubuntu and its derivatives, and `sudo dnf install python3.11` for Fedora. You can replace `python3.11` in this command with a different version (minimum 3.10).
+1. You may well already have Python installed on your machine. To check, type and run `python3 --version` in a terminal. If this command completes successfully and shows you have Python 3.11 or later, you can skip to step 3.
+2. To install Python, check what is the appropriate command for your Linux distribution. Examples would be `sudo apt-get update && sudo apt-get install python3.11` for Ubuntu and its derivatives, and `sudo dnf install python3.11` for Fedora. You can replace `python3.11` in this command with a different version (minimum 3.11).
 3. Make a new folder from where you want to run gazeMapper, e.g. `mkdir gazeMapper`. Enter this folder: `cd gazeMapper`.
 4. You now first need to make an environment in which you can then install gazeMapper. To do so, type `python3 -m venv .venv` and run the command.
 4. Activate the environment you have just created: `source .venv/bin/activate`.
