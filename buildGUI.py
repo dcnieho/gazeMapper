@@ -29,13 +29,14 @@ def get_include_files():
 
 def get_zip_include_files():
     files = []
-    for d in site.getsitepackages():
-        base = pathlib.Path(d)
-        p = base / 'glassesTools' / 'validation' / 'config'
+    for v in ['default_poster', 'dynamic']:
+        for d in site.getsitepackages():
+            base = pathlib.Path(d)
+            p = base / 'glassesTools' / 'validation' / v
 
-        for f in p.rglob('*'):
-            if f.is_file() and f.suffix not in ['.py','.pyc']:
-                files.append((f, pathlib.Path(os.path.relpath(f,base))))
+            for f in p.rglob('*'):
+                if f.is_file() and f.suffix not in ['.py','.pyc']:
+                    files.append((f, pathlib.Path(os.path.relpath(f,base))))
     return files
 
 main_ns = {}
@@ -57,7 +58,7 @@ build_options = {
             "ffmpeg",
             "OpenGL_accelerate",
             "glfw",
-            "imgui_bundle",
+            "imgui_bundle"
         ],
         "silent_level": 1,
         "include_msvcr": True
