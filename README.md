@@ -103,23 +103,21 @@ Once pip-installed in your Python distribution, there are three ways to run the 
 ## Complete instructions for Windows
 Installing and running gazeMapper on Windows will involve some use of the terminal. In this section we will show you step by step how to install, and then what to do every time you want to run gazeMapper.
 ### Installing gazeMapper
-1. To acquire and manage Python, install Anaconda by following [these instructions](https://www.anaconda.com/docs/getting-started/anaconda/install#windows-installation). Additional notes:
-   1. Choose the graphical installer.
-   1. When clicking the installer link provided in these instructions, you may first be shown a user registration page. You can click "skip registration" there to directly go to the download files.
-1. Once anaconda is installed, open the Anaconda Powershell Prompt.
+1. If you do not yet have Python on your machine, you need to first install it. In these instructions we use the Miniforge clone of conda, but Anaconda or a bare Python installation (3.11 or later) would also work. To acquire and manage Python, install Miniforge by following [these instructions](https://github.com/conda-forge/miniforge?tab=readme-ov-file#windows).
+1. Once Miniforge is installed, open the Miniforge Prompt from the Start menu.
 1. You now first need to make an environment with the correct Python version in which you can then install gazeMapper. To do so, type `conda create -n gazeMapper-env python=3.11 pip` and run the command. `gazeMapper-env` is the name of the environment you create with this comment.
 1. Activate the environment you have just created: `conda activate gazeMapper-env`.
-1. Now you need to install gazeMapper. To do so, type and run `pip install gazeMapper`.
+1. Now you need to install gazeMapper into this environment. To do so, type and run `pip install gazeMapper`.
 
 ### Running gazeMapper
 If you have followed the above instructions to install gazeMapper, do the following each time you want to run gazeMapper:
-1. Open the Anaconda Powershell Prompt application.
+1. Open the Miniforge Prompt application.
 1. Activate the environment in which you have gazeMapper installed: type and run `conda activate gazeMapper-env`, where `gazeMapper-env` is the name of the environment you created using the above instructions. If you use an environment with a different name, replace the name in the command.
 1. Type and run `gazeMapper` in the Powershell prompt.
 
 ### Updating gazeMapper
 If you already have gazeMapper installed but want to update it to the latest version, do the following:
-1. Open the Anaconda Powershell Prompt application.
+1. Open the Miniforge Prompt application.
 1. Activate the environment in which you have gazeMapper installed: type and run `conda activate gazeMapper-env`, where `gazeMapper-env` is the name of the environment you created using the above instructions. If you use an environment with a different name, replace the name in the command.
 1. Type and run `pip install gazeMapper --upgrade`.
 
@@ -127,11 +125,10 @@ If you already have gazeMapper installed but want to update it to the latest ver
 Installing and running gazeMapper on a Mac will involve some use of the terminal. In this section we will show you step by step how to install, and then what to do every time you want to run gazeMapper. MacOS 14 (Sonoma) or later are supported.
 Note that it is critical on MacOS that gazeMapper is installed natively, and not under Rosetta or Parallels. That will lead to an error when importing the `polars` package, and other unfixable errors. If you are not sure what kind of system you have, consult [this page](https://support.apple.com/en-us/116943) to learn how to find out.
 ### Installing gazeMapper
-1. To acquire and manage Python, install Anaconda by following [these instructions](https://www.anaconda.com/docs/getting-started/anaconda/install#macos-linux-installation). Additional notes:
-   1. Choose the graphical installer.
-   1. When clicking the installer link provided in these instructions, you may first be shown a user registration page. You can click "skip registration" there to directly go to the download files.
+1. To acquire and manage Python, install Miniforge either by following [these instructions](https://github.com/conda-forge/miniforge?tab=readme-ov-file#unix-like-platforms-macos-linux--wsl), or by issuing `brew install miniforge` if you have homebrew installed.
+Additional notes:
    1. Ensure that you choose the correct installer for your system (Intel or Apple Silicon). If you are not sure what kind of system you have, consult [this page](https://support.apple.com/en-us/116943) to learn how to find out.
-1. Once anaconda is installed, open the Terminal application.
+1. Once Miniforge is installed, open the Terminal application.
 1. You now first need to make an environment with the correct Python version in which you can then install gazeMapper. To do so, type `conda create -n gazeMapper-env python=3.11 pip` and run the command. `gazeMapper-env` is the name of the environment you create with this comment.
 1. Activate the environment you have just created: `conda activate gazeMapper-env`.
 1. Now you need to install gazeMapper. Do the following in the below order:
@@ -157,7 +154,7 @@ If you already have gazeMapper installed but want to update it to the latest ver
 Installing and running gazeMapper on Linux will involve some use of the terminal. In this section we will show you step by step how to install, and then what to do every time you want to run gazeMapper.
 ### Installing gazeMapper
 1. You may well already have Python installed on your machine. To check, type and run `python3 --version` in a terminal. If this command completes successfully and shows you have Python 3.11 or later, you can skip to step 3.
-1. To install Python, check what is the appropriate command for your Linux distribution. Examples would be `sudo apt-get update && sudo apt-get install python3.11` for Ubuntu and its derivatives, and `sudo dnf install python3.11` for Fedora. You can replace `python3.11` in this command with a different version (minimum 3.11).
+1. To install Python, check what is the appropriate command for your Linux distribution. Examples would be `sudo apt-get update && sudo apt-get install python3.11` for Ubuntu and its derivatives, and `sudo dnf install python3.11` for Fedora. You can replace `python3.11` in this command with a different version (minimum 3.11). You may also opt to install Miniforge by following [these instructions](https://github.com/conda-forge/miniforge?tab=readme-ov-file#unix-like-platforms-macos-linux--wsl).
 1. Make a new folder from where you want to run gazeMapper, e.g. `mkdir gazeMapper`. Enter this folder: `cd gazeMapper`.
 1. You now first need to make an environment in which you can then install gazeMapper. To do so, type `python3 -m venv .venv` and run the command.
 1. Activate the environment you have just created: `source .venv/bin/activate`.
