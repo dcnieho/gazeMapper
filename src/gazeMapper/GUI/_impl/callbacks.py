@@ -140,7 +140,7 @@ def make_plane(study_config: config.Study, p_type: plane.Type, name: str):
     path = config.guess_config_dir(study_config.working_directory)
     p_dir = path / name
     # make plane
-    p_def = plane.make(p_type, name, p_dir)
+    p_def = plane.make_definition(p_type, name, p_dir)
     # store to file
     if not p_dir.is_dir():
         p_dir.mkdir()

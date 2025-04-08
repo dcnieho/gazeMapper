@@ -6,9 +6,7 @@ import typeguard
 import inspect
 import typing
 
-from glassesTools import plane, utils
-from glassesTools.validation.config import get_validation_setup
-from glassesTools.validation import Plane as ValidationPlane
+from glassesTools import plane, utils, validation
 
 from . import type_utils
 
@@ -59,7 +57,7 @@ class Definition:
             if k in kwds:
                 kwds[k] = plane.Coordinate(*kwds[k])
         kwds['p_type'] = kwds.pop('type')
-        return make(path=path.parent, name=path.parent.name, **kwds)
+        return make_definition(path=path.parent, name=path.parent.name, **kwds)
 
 class Definition_GlassesValidator(Definition):
     @typeguard.typechecked(collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
@@ -129,14 +127,14 @@ class Definition_Plane_2D(Definition):
     def has_complete_setup(self) -> bool:
         return not self.field_problems()
 
-def make(p_type: Type, name: str, path: pathlib.Path|None, **kwargs) -> Definition_GlassesValidator|Definition_Plane_2D:
+def make_definition(p_type: Type, name: str, path: pathlib.Path|None, **kwargs) -> Definition_GlassesValidator|Definition_Plane_2D:
     cls = Definition_GlassesValidator if p_type==Type.GlassesValidator else Definition_Plane_2D
     if p_type==Type.GlassesValidator:
         validator_config_dir = None # use glassesValidator built-in/default
         if 'use_default' in kwargs and not kwargs['use_default']:
             validator_config_dir = path
-        validation_setup = get_validation_setup(validator_config_dir)
-        kwargs['aruco_dict'] = ValidationPlane.default_aruco_dict
+        validation_setup = validation.config.get_validation_setup(validator_config_dir)
+        kwargs['aruco_dict'] = validation.Plane.default_aruco_dict
         kwargs['marker_border_bits'] = validation_setup['markerBorderBits']
         kwargs['min_num_markers'] = validation_setup['minNumMarkers']
         kwargs['ref_image_size'] = validation_setup['referencePosterSize']
@@ -176,24 +174,24 @@ def get_plane_from_path(path: str|pathlib.Path) -> plane.Plane:
     plane_def = Definition.load_from_json(path)
     return get_plane_from_definition(plane_def, path)
 
-def get_plane_from_definition(plane_def: Definition, path: str | pathlib.Path) -> plane.Plane:
+def get_plane_from_definition(plane_def: Definition, path: str|pathlib.Path) -> plane.Plane:
     # for loading a plane from a directory that doesn't contain a plane definition json file
     # use the provided definition instead
     if plane_def.type==Type.GlassesValidator:
         validator_config_dir = None # use glassesValidator built-in/default
         if not plane_def.use_default:
             validator_config_dir = path
-        validation_config = get_validation_setup(validator_config_dir)
-        return ValidationPlane(validator_config_dir, validation_config, ref_image_store_path=path / plane.Plane.default_ref_image_name)
+        validation_config = validation.config.get_validation_setup(validator_config_dir)
+        return validation.Plane(validator_config_dir, validation_config, ref_image_store_path=path/plane.Plane.default_ref_image_name)
     else:
         pl = plane.Plane(
-            markers             = path / plane_def.marker_file,
+            markers             = path/plane_def.marker_file,
             marker_size         = plane_def.marker_size,
             plane_size          = plane_def.plane_size,
             aruco_dict          = plane_def.aruco_dict,
             marker_border_bits  = plane_def.marker_border_bits,
             unit                = plane_def.unit,
-            ref_image_store_path= path / plane.Plane.default_ref_image_name,
+            ref_image_store_path= path/plane.Plane.default_ref_image_name,
             ref_image_size      = plane_def.ref_image_size
         )
         if plane_def.origin is not None:
