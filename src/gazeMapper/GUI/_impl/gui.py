@@ -59,8 +59,8 @@ class GUI:
         self.can_accept_sessions            = False
         self._session_actions: set[process.Action] = set()
 
-        self._config_watcher            : concurrent.futures.Future = None
-        self._config_watcher_stop_event : asyncio.Event             = None
+        self._session_watcher           : concurrent.futures.Future = None
+        self._session_watcher_stop_event: asyncio.Event             = None
 
         self.process_pool   = process_pool.ProcessPool()
         self.job_scheduler  = process_pool.JobScheduler[utils.JobInfo](self.process_pool, self._check_job_valid)
@@ -303,8 +303,7 @@ class GUI:
         glfw.set_window_title(win, new_title)
         self._need_set_window_title = False
 
-    def _config_change_callback(self, change_path: str, change_type: str):
-        change_path = pathlib.Path(change_path)
+    def _session_change_callback(self, change_path: pathlib.Path, change_type: str):
         # NB watcher filter is configured such that all adds and deletes are folder and all modifies are files of interest
         if change_type=='modified':
             # file: deal with status changes
@@ -498,8 +497,8 @@ class GUI:
             self.close_project()
             return
 
-        self._config_watcher_stop_event = asyncio.Event()
-        self._config_watcher = async_thread.run(project_watcher.watch_and_report_changes(self.project_dir, self._config_change_callback, self._config_watcher_stop_event, watch_filter=project_watcher.ChangeFilter(('.gazeMapper',), True, {config_dir}, True)))
+        self._session_watcher_stop_event = asyncio.Event()
+        self._session_watcher = async_thread.run(project_watcher.watch_and_report_changes(self.project_dir, self._session_change_callback, self._session_watcher_stop_event, watch_filter=project_watcher.ChangeFilter(('.gazeMapper',), True, {config_dir}, True)))
 
         def _get_known_recordings(filter_ref=False, dev_types:list[session.RecordingType]|None=None) -> set[str]:
             recs = {r.name for r in self.study_config.session_def.recordings}
@@ -663,16 +662,16 @@ class GUI:
         # trigger update so visibility change is honored, also delete other windows in the process
         self._window_list = [self._sessions_pane, self._project_settings_pane, self._action_list_pane]
 
-        # stop listening for config changes
-        if self._config_watcher_stop_event is not None:
-            self._config_watcher_stop_event.set()
-        if self._config_watcher is not None:
+        # stop listening for session changes
+        if self._session_watcher_stop_event is not None:
+            self._session_watcher_stop_event.set()
+        if self._session_watcher is not None:
             try:
-                self._config_watcher.result()
+                self._session_watcher.result()
             except:
                 pass
-        self._config_watcher = None
-        self._config_watcher_stop_event = None
+        self._session_watcher = None
+        self._session_watcher_stop_event = None
 
         # defer rest of unloading until windows deleted, as some of these variables will be accessed during this draw loop
         self._after_window_update_callback = self._finish_unload_project
