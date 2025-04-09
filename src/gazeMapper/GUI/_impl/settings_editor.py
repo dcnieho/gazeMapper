@@ -157,13 +157,15 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
             if table_is_started:
                 imgui.end_table()
                 table_is_started = False
-            if problems and f in problems:
+            if (has_problem:=problems and f in problems):
                 imgui.push_style_color(imgui.Col_.text, glassesTools.gui.colors.error)
-            if imgui.tree_node_ex(this_lbl,imgui.TreeNodeFlags_.framed):
-                if problems and f in problems:
+                def _hover_draw_fun():
                     if isinstance(problems[f],str) or (isinstance(problems[f],dict) and 'problem_with_this_key' in problems[f]):
                         msg = problems[f] if isinstance(problems[f],str) else problems[f]['problem_with_this_key']
                         glassesTools.gui.utils.draw_hover_text(msg, text='')
+            if imgui.tree_node_ex(this_lbl,imgui.TreeNodeFlags_.framed):
+                if has_problem:
+                    _hover_draw_fun()
                     imgui.pop_style_color()
                 if this_explanation:
                     glassesTools.gui.utils.draw_hover_text(this_explanation, text='')
@@ -181,10 +183,8 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
                         setattr(obj,f,new_sub_obj)
                 imgui.tree_pop()
             else:
-                if problems and f in problems:
-                    if isinstance(problems[f],str) or (isinstance(problems[f],dict) and 'problem_with_this_key' in problems[f]):
-                        msg = problems[f] if isinstance(problems[f],str) else problems[f]['problem_with_this_key']
-                        glassesTools.gui.utils.draw_hover_text(msg, text='')
+                if has_problem:
+                    _hover_draw_fun()
                     imgui.pop_style_color()
                 if this_explanation:
                     glassesTools.gui.utils.draw_hover_text(this_explanation, text='')
