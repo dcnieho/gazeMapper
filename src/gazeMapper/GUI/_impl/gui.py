@@ -35,6 +35,7 @@ class GUI:
 
         self.project_dir: pathlib.Path = None
         self.study_config: config.Study = None
+        self.plane_configs: dict[str,gt_plane.Plane|None] = {}  # None is plane config has errors
         self._dict_type_rec: dict[str, typing.Type]|None = None
 
         self.sessions: dict[str, session.Session]                       = {}
@@ -61,6 +62,8 @@ class GUI:
 
         self._session_watcher           : concurrent.futures.Future = None
         self._session_watcher_stop_event: asyncio.Event             = None
+        self._config_watcher            : concurrent.futures.Future = None
+        self._config_watcher_stop_event : asyncio.Event             = None
 
         self.process_pool   = process_pool.ProcessPool()
         self.job_scheduler  = process_pool.JobScheduler[utils.JobInfo](self.process_pool, self._check_job_valid)
@@ -303,6 +306,50 @@ class GUI:
         glfw.set_window_title(win, new_title)
         self._need_set_window_title = False
 
+    def _config_change_callback(self, change_path: pathlib.Path, change_type: str):
+        # NB: for planes, this callback could filter out some changes, like irrelevant txt files
+        # (maybe user added some notes or so), or csv/txt files for defaulted validation planes
+        # (get ignored) but this is pretty quick, so not worth the additional complexity
+        config_dir = config.guess_config_dir(change_path.parent)
+        if change_path.parent==config_dir:
+            # we're dealing with a change in the main config json files
+            if change_path.suffix != '.json':
+                # irrelevant
+                return
+            # TODO
+        elif change_path.parent.parent!=config_dir:
+            # we're also not dealing with a plane directory, skip
+            return
+
+        # we're dealing with a plane directory
+        plane_name = change_path.parent.name
+        if change_type=='deleted':
+            if change_path.name==plane.Definition.default_json_file_name:
+                # plane removed
+                self.study_config.planes = [p for p in self.study_config.planes if p.name!=plane_name]
+            return
+
+        # for all addition or change events, reload the concerned plane
+        i = [i for i in range(len(self.study_config.planes)) if self.study_config.planes[i].name==plane_name]
+        try:
+            p_def = plane.Definition.load_from_json(change_path.parent)
+        except:
+            # failed, just abort
+            return
+        if not i:
+            if change_type=='added' and change_path.name==plane.Definition.default_json_file_name:
+                # new plane
+                self.study_config.planes.append(p_def)
+                i = len(self.study_config.planes)-1
+            else:
+                # unknown plane, ignore
+                return
+        else:
+            i = i[0]
+            self.study_config.planes[i] = p_def
+        # try to load plane
+        self._load_plane(self.study_config.planes[i], defer_image_upload=True)
+
     def _session_change_callback(self, change_path: pathlib.Path, change_type: str):
         # NB watcher filter is configured such that all adds and deletes are folder and all modifies are files of interest
         if change_type=='modified':
@@ -491,6 +538,7 @@ class GUI:
             config_dir = config.guess_config_dir(self.project_dir)
             self.study_config = config.Study.load_from_json(config_dir, strict_check=False)
             self._reload_sessions()
+            self._reload_planes()
             self.process_pool.set_num_workers(self.study_config.gui_num_workers)
         except Exception as exc:
             gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Project loading error", f"Failed to load the project at {self.project_dir}:\n{exc}", gt_gui.msg_box.MsgBox.error, more=gt_gui.utils.get_traceback(type(exc), exc, exc.__traceback__))
@@ -499,6 +547,8 @@ class GUI:
 
         self._session_watcher_stop_event = asyncio.Event()
         self._session_watcher = async_thread.run(project_watcher.watch_and_report_changes(self.project_dir, self._session_change_callback, self._session_watcher_stop_event, watch_filter=project_watcher.ChangeFilter(('.gazeMapper',), True, {config_dir}, True)))
+        self._config_watcher_stop_event = asyncio.Event()
+        self._config_watcher = async_thread.run(project_watcher.watch_and_report_changes(config_dir, self._config_change_callback, self._config_watcher_stop_event, watch_filter=project_watcher.ChangeFilter(('.json','.csv','.txt'), do_report_directories=True, do_report_files=True)))
 
         def _get_known_recordings(filter_ref=False, dev_types:list[session.RecordingType]|None=None) -> set[str]:
             recs = {r.name for r in self.study_config.session_def.recordings}
@@ -548,6 +598,30 @@ class GUI:
         self._update_shown_actions_for_config()
         self._session_lister_set_extra_columns_to_show()    # only place we have to add this. Adding or deleting a session def from the study config triggers this function
 
+    def _reload_planes(self):
+        self.plane_configs.clear()
+        self._plane_preview_cache.clear()
+        for p_def in self.study_config.planes:
+            self._load_plane(p_def)
+
+    def _load_plane(self, p_def: plane.Definition, defer_image_upload=False):
+        config_dir = config.guess_config_dir(self.study_config.working_directory)
+        if not p_def.has_complete_setup():
+            self.plane_configs[p_def.name] = None
+            return
+
+        try:
+            self.plane_configs[p_def.name] = plane.get_plane_from_definition(p_def, config_dir/p_def.name)
+        except Exception as exc:
+            self.plane_configs[p_def.name] = exc
+        else:
+            if defer_image_upload:
+                self._plane_preview_cache[p_def.name] = 'needs_upload'
+            else:
+                self._plane_preview_cache[p_def.name] = utils.load_image_with_helper(self.plane_configs[p_def.name].get_ref_image(as_RGB=True))
+    def _upload_plane_image(self, p_def: plane.Definition):
+        self._plane_preview_cache[p_def.name] = utils.load_image_with_helper(self.plane_configs[p_def.name].get_ref_image(as_RGB=True))
+
     def _check_project_setup_state(self):
         if self.study_config is not None:
             self._problems_cache = self.study_config.field_problems()
@@ -558,7 +632,7 @@ class GUI:
         # 4. one plane linked to one episode
         # 5. no individual marker problems
         self.need_setup_recordings = not self.study_config or not self.study_config.session_def.recordings or 'session_def' in self._problems_cache
-        self.need_setup_plane = not self.study_config or not self.study_config.planes or any((not p.has_complete_setup() for p in self.study_config.planes))
+        self.need_setup_plane = not self.study_config or not self.study_config.planes or any((not p.has_complete_setup() for p in self.study_config.planes)) or any((p.name not in self.plane_configs or isinstance(self.plane_configs[p.name],Exception) for p in self.study_config.planes))
         self.need_setup_episode = not self.study_config or not self.study_config.episodes_to_code or not self.study_config.planes_per_episode or any((x in self._problems_cache for x in ['episodes_to_code', 'planes_per_episode']))
         self.need_setup_individual_markers = not self.study_config or 'individual_markers' in self._problems_cache
 
@@ -672,6 +746,16 @@ class GUI:
                 pass
         self._session_watcher = None
         self._session_watcher_stop_event = None
+        # stop listening for setup changes
+        if self._config_watcher_stop_event is not None:
+            self._config_watcher_stop_event.set()
+        if self._config_watcher is not None:
+            try:
+                self._config_watcher.result()
+            except:
+                pass
+        self._config_watcher = None
+        self._config_watcher_stop_event = None
 
         # defer rest of unloading until windows deleted, as some of these variables will be accessed during this draw loop
         self._after_window_update_callback = self._finish_unload_project
@@ -681,6 +765,7 @@ class GUI:
         self.project_dir = None
         self._possible_value_getters = {}
         self.study_config = None
+        self.plane_configs.clear()
         self.sessions.clear()
         self._selected_sessions.clear()
         self._need_set_window_title = True
@@ -997,18 +1082,30 @@ class GUI:
     def _plane_editor_pane_drawer(self):
         if not self.study_config.planes:
             imgui.text_colored(colors.error,'*At minimum one plane should be defined')
-        for i,p in enumerate(self.study_config.planes):
+        def _hover_img_error_popup(p_def: plane.Definition, load_error: Exception):
+            if imgui.is_item_hovered(imgui.HoveredFlags_.for_tooltip|imgui.HoveredFlags_.delay_normal):
+                imgui.begin_tooltip()
+                if load_error:
+                    imgui.text(str(load_error))
+                elif p.name in self._plane_preview_cache:
+                    if isinstance(self._plane_preview_cache[p_def.name],str) and self._plane_preview_cache[p_def.name]=='needs_upload':
+                        self._upload_plane_image(p_def)
+                    self._plane_preview_cache[p_def.name].render(largest=400*hello_imgui.dpi_window_size_factor())
+                imgui.end_tooltip()
+        for p in self.study_config.planes:
             problem_fields = p.field_problems()
             fixed_fields   = p.fixed_fields()
+            load_error     = self.plane_configs[p.name] if p.name in self.plane_configs and isinstance(self.plane_configs[p.name], Exception) else None
             extra = ''
             lbl = f'{p.name} ({p.type.value})'
-            if problem_fields:
+            if (has_error:=problem_fields or load_error):
                 extra = '*'
                 imgui.push_style_color(imgui.Col_.text, colors.error)
             if imgui.tree_node_ex(f'{extra}{lbl}###{lbl}', imgui.TreeNodeFlags_.framed):
-                plane_dir = config.guess_config_dir(self.study_config.working_directory)/p.name
-                if problem_fields:
+                if has_error:
                     imgui.pop_style_color()
+                _hover_img_error_popup(p, load_error)
+                plane_dir = config.guess_config_dir(self.study_config.working_directory)/p.name
                 if p.type==plane.Type.Plane_2D and imgui.button(ifa6.ICON_FA_BARCODE+f' get ArUco markers'):
                     gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='deploy_aruco', ArUco_dict=p.aruco_dict, markerBorderBits=p.marker_border_bits))
                 changed, _, new_p, _, _ = settings_editor.draw_dict_editor(copy.deepcopy(p), type(p), 0, {}, list(plane.definition_parameter_types[p.type].keys()), plane.definition_parameter_types[p.type], plane.definition_defaults[p.type], problems=problem_fields, fixed=fixed_fields, documentation=plane.definition_parameter_doc)
@@ -1017,23 +1114,10 @@ class GUI:
                     new_p.store_as_json(plane_dir)
                     if new_p.type==plane.Type.GlassesValidator and not new_p.use_default:
                         callbacks.glasses_validator_plane_check_or_deploy_config(self.study_config, new_p)
-                    # recreate plane so any settings changes (e.g. applied defaults) are reflected in the gui
-                    self.study_config.planes[i] = plane.Definition.load_from_json(plane_dir)
-                    self._plane_preview_cache.pop(p.name, None)
+                    # NB: reloading of plane happens in change watcher
                 if imgui.button(ifa6.ICON_FA_FOLDER_OPEN+' open plane configuration folder'):
                     callbacks.open_folder(self, plane_dir)
                 imgui.same_line()
-                if imgui.button(ifa6.ICON_FA_IMAGE+' generate reference image'):
-                    p_dir = config.guess_config_dir(self.study_config.working_directory) / p.name
-                    try:
-                        plane.get_plane_from_definition(p, p_dir)   # constructing the plane triggers generation of the reference image
-                        self._plane_preview_cache[p.name] = utils.load_image_with_helper(p_dir/gt_plane.Plane.default_ref_image_name)
-                    except Exception as exc:
-                        gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Plane processing error", f"Failed to load and render the {p.name} plane:\n{exc}", gt_gui.msg_box.MsgBox.error, more=gt_gui.utils.get_traceback(type(exc), exc, exc.__traceback__))
-                if p.name in self._plane_preview_cache and imgui.is_item_hovered(imgui.HoveredFlags_.for_tooltip|imgui.HoveredFlags_.delay_normal):
-                    imgui.begin_tooltip()
-                    self._plane_preview_cache[p.name].render(largest=400*hello_imgui.dpi_window_size_factor())
-                    imgui.end_tooltip()
                 if p.type==plane.Type.GlassesValidator:
                     imgui.same_line()
                     if p.use_default and imgui.button(ifa6.ICON_FA_TICKET+f' get glassesValidator poster pdf'):
@@ -1044,8 +1128,9 @@ class GUI:
                 if imgui.button(ifa6.ICON_FA_TRASH_CAN+' delete plane'):
                     callbacks.delete_plane(self.study_config, p)
                 imgui.tree_pop()
-            elif problem_fields:
+            elif has_error:
                 imgui.pop_style_color()
+            _hover_img_error_popup(p, load_error)
         if imgui.button('+ new plane'):
             new_plane_name = ''
             new_plane_type: plane.Type = None
