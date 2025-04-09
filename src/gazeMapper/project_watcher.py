@@ -54,4 +54,4 @@ async def watch_and_report_changes(path: pathlib.Path, callback: Callable, stop_
 
     async for changes in awatch(path, debounce=500, watch_filter=watch_filter, stop_event=stop_event):
         for change_type,change_path in changes:
-            callback(change_path, change_type.raw_str())
+            callback(pathlib.Path(change_path), change_type.raw_str())
