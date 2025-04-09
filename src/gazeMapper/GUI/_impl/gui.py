@@ -59,8 +59,8 @@ class GUI:
         self.can_accept_sessions            = False
         self._session_actions: set[process.Action] = set()
 
-        self.config_watcher             : concurrent.futures.Future = None
-        self.config_watcher_stop_event  : asyncio.Event             = None
+        self._config_watcher            : concurrent.futures.Future = None
+        self._config_watcher_stop_event : asyncio.Event             = None
 
         self.process_pool   = process_pool.ProcessPool()
         self.job_scheduler  = process_pool.JobScheduler[utils.JobInfo](self.process_pool, self._check_job_valid)
@@ -498,8 +498,8 @@ class GUI:
             self.close_project()
             return
 
-        self.config_watcher_stop_event = asyncio.Event()
-        self.config_watcher = async_thread.run(project_watcher.watch_and_report_changes(self.project_dir, self._config_change_callback, self.config_watcher_stop_event, watch_filter=project_watcher.ProjectFilter(('.gazeMapper',), True, {config_dir}, True, True)))
+        self._config_watcher_stop_event = asyncio.Event()
+        self._config_watcher = async_thread.run(project_watcher.watch_and_report_changes(self.project_dir, self._config_change_callback, self._config_watcher_stop_event, watch_filter=project_watcher.ChangeFilter(('.gazeMapper',), True, {config_dir}, True)))
 
         def _get_known_recordings(filter_ref=False, dev_types:list[session.RecordingType]|None=None) -> set[str]:
             recs = {r.name for r in self.study_config.session_def.recordings}
@@ -663,13 +663,16 @@ class GUI:
         # trigger update so visibility change is honored, also delete other windows in the process
         self._window_list = [self._sessions_pane, self._project_settings_pane, self._action_list_pane]
 
-        # stop watching for config changes
-        if self.config_watcher_stop_event is not None:
-            self.config_watcher_stop_event.set()
-        if self.config_watcher is not None:
-            self.config_watcher.result()
-        self.config_watcher = None
-        self.config_watcher_stop_event = None
+        # stop listening for config changes
+        if self._config_watcher_stop_event is not None:
+            self._config_watcher_stop_event.set()
+        if self._config_watcher is not None:
+            try:
+                self._config_watcher.result()
+            except:
+                pass
+        self._config_watcher = None
+        self._config_watcher_stop_event = None
 
         # defer rest of unloading until windows deleted, as some of these variables will be accessed during this draw loop
         self._after_window_update_callback = self._finish_unload_project
