@@ -34,8 +34,11 @@ def get_aruco_marker_image(sz: int, m_id: int, dictionary_id: int, marker_border
     marker_image = cv2.aruco.generateImageMarker(cv2.aruco.getPredefinedDictionary(dictionary_id), m_id, sz, marker_image, marker_border_bits)
     return image_helper.ImageHelper(marker_image)
 
-def load_image_with_helper(path: pathlib.Path):
-    return image_helper.ImageHelper(cv2.cvtColor(cv2.imread(path, cv2.IMREAD_COLOR),cv2.COLOR_BGR2RGB))
+def load_image_with_helper(path_or_image: pathlib.Path|np.ndarray):
+    if isinstance(path_or_image, pathlib.Path):
+        return image_helper.ImageHelper(cv2.cvtColor(cv2.imread(path_or_image, cv2.IMREAD_COLOR),cv2.COLOR_BGR2RGB))
+    else:
+        return image_helper.ImageHelper(path_or_image)
 
 
 class JobInfo(typing.NamedTuple):
