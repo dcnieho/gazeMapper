@@ -59,6 +59,7 @@ class RgbColor(typing.NamedTuple):
     r: int = 0
     g: int = 0
     b: int = 0
+json.register_type(json.TypeEntry(RgbColor, '__config.RgbColor__', lambda x: x._asdict(), lambda x: RgbColor(**x)))
 
 class Study:
     default_json_file_name = 'study_def.json'
@@ -595,6 +596,12 @@ class Study:
             kwds['auto_code_episodes'] = {annotation.Event(k):v for k,v in kwds['auto_code_episodes']}
         # help with enum roundtrip
         kwds['episodes_to_code'] = {annotation.Event(e) for e in kwds['episodes_to_code']}
+        # backwards compatibility, help with named tuple roundtrip
+        for k in ('overlay_video_gaze_vid_pos_color','overlay_video_gaze_world_pos_color','mapped_video_projected_vidPos_color','mapped_video_projected_world_pos_color','mapped_video_projected_left_ray_color','mapped_video_projected_right_ray_color','mapped_video_projected_average_ray_color'):
+            if k in kwds and kwds[k] is not None and not isinstance(kwds[k],RgbColor):
+                kwds[k] = RgbColor(*kwds[k])
+        if 'mapped_video_recording_colors' in kwds and any((not isinstance(kwds['mapped_video_recording_colors'][k],RgbColor) for k in kwds['mapped_video_recording_colors'])):
+            kwds['mapped_video_recording_colors'] = {k: RgbColor(*kwds['mapped_video_recording_colors'][k]) for k in kwds['mapped_video_recording_colors']}
         # backwards compatibility, rename 'auto_code_trial_episodes'
         if 'auto_code_trial_episodes' in kwds:
             kwds['auto_code_episodes'] = {annotation.Event.Trial: kwds.pop('auto_code_trial_episodes')}
