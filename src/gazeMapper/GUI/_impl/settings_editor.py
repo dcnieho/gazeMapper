@@ -5,7 +5,6 @@ import pathlib
 import enum
 import copy
 
-import glassesTools.annotation
 from imgui_bundle import imgui, imgui_md, icons_fontawesome_6 as ifa6
 
 import glassesTools
@@ -16,7 +15,7 @@ from ... import type_utils, typed_dict_defaults
 
 
 val_to_str_registry: dict[typing.Type, dict[typing.Any, str]] = {
-    type_utils.ArucoDictType: type_utils.aruco_dicts_to_str
+    type_utils.ArucoDictType: glassesTools.aruco.dicts_to_str
 }
 
 _C  = typing.TypeVar("_C")

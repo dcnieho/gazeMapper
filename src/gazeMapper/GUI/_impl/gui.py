@@ -1294,7 +1294,8 @@ class GUI:
                 sz = int(200*hello_imgui.dpi_window_size_factor())
                 if key not in self._marker_preview_cache:
                     self._marker_preview_cache[key] = utils.get_aruco_marker_image(sz, *key)
-                self._marker_preview_cache[key].render(width=sz, height=sz)
+                if self._marker_preview_cache[key] is not None:
+                    self._marker_preview_cache[key].render(width=sz, height=sz)
                 imgui.end_tooltip()
             imgui.table_next_column()
             new_val = settings_editor.draw_value(f'detect_only_{m.id}##{i}', m.detect_only, marker.marker_parameter_types['detect_only'], False, marker.marker_defaults.get('detect_only',None), None, False, {}, False)[0]

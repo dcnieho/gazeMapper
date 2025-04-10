@@ -3,6 +3,8 @@ import typing
 import numpy as np
 import cv2
 
+from glassesTools import aruco
+
 from . import image_helper
 from ... import config, process, session
 
@@ -30,8 +32,9 @@ def init_project_folder(path: str | pathlib.Path):
 
 
 def get_aruco_marker_image(sz: int, m_id: int, dictionary_id: int, marker_border_bits: int):
-    marker_image = np.zeros((sz, sz), dtype=np.uint8)
-    marker_image = cv2.aruco.generateImageMarker(cv2.aruco.getPredefinedDictionary(dictionary_id), m_id, sz, marker_image, marker_border_bits)
+    marker_image = aruco.get_marker_image(sz, m_id, dictionary_id, marker_border_bits)
+    if marker_image is None:
+        return None
     return image_helper.ImageHelper(marker_image)
 
 def load_image_with_helper(path_or_image: pathlib.Path|np.ndarray):
