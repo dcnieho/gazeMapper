@@ -644,12 +644,15 @@ class GUI:
             not self.need_setup_episode and \
             not self.need_setup_individual_markers
 
-    def _get_markers(self):
+    def _get_markers(self, use_family=False):
         markers: dict[str,dict[str,list[tuple[int,int]]]] = {}
         for p in self.plane_configs:
             if isinstance(self.plane_configs[p], gt_plane.Plane):
                 markers[p] = self.plane_configs[p].get_marker_IDs()
         markers['xx_individual_markers_xx'] = {'markers': [(m.aruco_dict_id, m.id) for m in self.study_config.individual_markers]}
+        if use_family:
+            for s in markers:
+                markers[s] = {m: [(aruco.dict_to_family[d],i) for d,i in markers[s][m]] for m in markers[s]}
         return markers
 
     def _format_duplicate_markers_msg(self, markers: set[tuple[int,int]]):
@@ -664,7 +667,9 @@ class GUI:
         for i,d in enumerate(dict_markers):
             s = 's' if len(dict_markers[d])>1 else ''
             ids = ', '.join((str(x) for x in dict_markers[d]))
-            msg = f'marker{s} {ids} for dictionary {aruco.dicts_to_str[d]}'
+            d_str,is_family = aruco.family_to_str[d]
+            f_str = ' family' if is_family else ''
+            msg = f'marker{s} {ids} for the {d_str} dictionary{f_str}'
             if i==0:
                 out = msg
             elif i==len(dict_markers)-1:
@@ -675,7 +680,7 @@ class GUI:
 
     def _check_markers(self):
         seen_markers: set[tuple[int,int]] = set()
-        used_markers = self._get_markers()
+        used_markers = self._get_markers(True)
         for s in used_markers:
             for m in used_markers[s]:
                 # check unique
@@ -1297,7 +1302,8 @@ class GUI:
         imgui.table_headers_row()
         changed = False
         for i,m in enumerate(self.study_config.individual_markers):
-            problem = self._problems_cache['individual_markers'][(m.aruco_dict_id,m.id)] if 'individual_markers' in self._problems_cache and (m.aruco_dict_id,m.id) in self._problems_cache['individual_markers'] else None
+            p_key = (aruco.dict_to_family[m.aruco_dict_id],m.id)
+            problem = self._problems_cache['individual_markers'][p_key] if 'individual_markers' in self._problems_cache and p_key in self._problems_cache['individual_markers'] else None
             imgui.table_next_row()
             imgui.table_next_column()
             imgui.align_text_to_frame_padding()
