@@ -14,9 +14,11 @@ from glassesTools.gui.timeline import color_darken
 from ... import type_utils, typed_dict_defaults
 
 
-val_to_str_registry: dict[typing.Type, dict[typing.Any, str]] = {
+TYPE_TO_STR_REGISTRY: dict[typing.Type, dict[typing.Any, str]|typing.Callable[[typing.Any], str]] = {
     type_utils.ArucoDictType: glassesTools.aruco.dicts_to_str
 }
+def register_formatter(ttype: typing.Type, formatter: dict[typing.Any, str]|typing.Callable[[typing.Any], str]):
+    TYPE_TO_STR_REGISTRY[ttype] = formatter
 
 _C  = typing.TypeVar("_C")
 _C2 = typing.TypeVar("_C2")
@@ -66,12 +68,13 @@ def _replace_type_arg(f_type: typing.Type, base_type: typing.Type, v_type, n_typ
     return f_type   # failed, but its ok, return unchanged
 
 def _get_base_type(f_type: typing.Type) -> typing.Type:
-    return typing.get_origin(f_type) or f_type  # for instance str[int]->str, and or for str->str
+    return typing.get_origin(f_type) or f_type  # for instance str[int]->str, and str->str
 
 def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_getter: typing.Callable[[],set[_T]]|None) -> tuple[bool, typing.Type, typing.Type, bool]:
     # peel off union with None, if any
     f_type, nullable = glassesTools.utils.unpack_none_union(f_type)
     base_type = _get_base_type(f_type)
+    o_types = typing.get_args(f_type)
     if callable(possible_value_getter) or (isinstance(possible_value_getter, list) and all([callable(c) for c in possible_value_getter])):
         if not isinstance(possible_value_getter,list):
             possible_value_getter = [possible_value_getter]
@@ -121,7 +124,7 @@ def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_get
             is_dict = False
         case _:
             raise ValueError(f'type of {field} ({f_type}) not handled')
-    return is_dict, base_type, f_type, nullable
+    return is_dict, base_type, o_types, f_type, nullable
 
 def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[], set[typing.Any]]], parent_obj: _C2|None, problems: type_utils.ProblemDict, documentation: dict[str,type_utils.GUIDocInfo], fixed: type_utils.NestedDict, actual_types: dict[typing.Any, typing.Type]=None, level=0, table_is_started=False, has_remove=False) -> tuple[bool,bool,bool,_C,str|None,dict[typing.Any, typing.Type]]:
     changed = False
@@ -134,7 +137,7 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
         else:
             tp = types[f] if f in types else list(types.values())[0]    # backup only needed when we have an invalid config (e.g. trying to show planes_per_episode entry for an episode that is no longer set to be coded)
         possible_value_getter = (possible_value_getters.get(f,None) or possible_value_getters.get(None,None)) if possible_value_getters else None
-        is_dict, base_type, f_type, nullable = _get_field_type(f, obj, tp, possible_value_getter)
+        is_dict, base_type, o_type_args, f_type, nullable = _get_field_type(f, obj, tp, possible_value_getter)
         doc = documentation.get(f,None) or documentation.get(None,None)
         if isinstance(doc,dict):
             this_lbl = doc[f].display_string if f in doc else f
@@ -198,7 +201,7 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
         this_problem = False
         if f in problems:
             this_problem = problems[f] if problems[f] is not None else True
-        this_changed, new_f_obj, removed = _draw_field(f, obj, base_type, f_type, nullable, defaults.get(f,None), parent_obj, problem=this_problem, documentation=doc, fixed=f in fixed, has_remove=has_remove)
+        this_changed, new_f_obj, removed = _draw_field(f, obj, base_type, f_type, o_type_args, nullable, defaults.get(f,None), parent_obj, problem=this_problem, documentation=doc, fixed=f in fixed, has_remove=has_remove)
         if removed:
             removed_field = f
         changed |= this_changed
@@ -346,7 +349,7 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, actual_types: dic
                     imgui.set_next_item_width(-1)
                     if missing_fields:
                         items = sorted(list(missing_fields), key=lambda x: x.value if isinstance(x, enum.Enum) else x)
-                        items_str, tooltips = _get_str_values(items, type(items[0]), documentation)
+                        items_str, tooltips = _get_str_values(items, type(items[0]), tuple(), documentation)
                         idx = items.index(new_item_name) if new_item_name else -1
                         _,idx = glassesTools.gui.utils.tooltip_combo("##item_selector", idx, items_str, tooltips)
                         new_item_name = None if idx==-1 else items[idx]
@@ -412,7 +415,7 @@ def _start_table(level, first_column_width):
     imgui.table_setup_column("value", imgui.TableColumnFlags_.width_stretch)
     return table_is_started
 
-def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type, nullable: bool, default: typing.Any|None, parent_obj: _T2|None, problem: bool|str, documentation: type_utils.GUIDocInfo|None, fixed: bool, has_remove: bool) -> bool:
+def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type, o_type_args: tuple[typing.Type], nullable: bool, default: typing.Any|None, parent_obj: _T2|None, problem: bool|str, documentation: type_utils.GUIDocInfo|None, fixed: bool, has_remove: bool) -> bool:
     imgui.table_next_row()
     imgui.table_next_column()
     special_val = '**special_val_when_not_found'
@@ -458,7 +461,7 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
         glassesTools.gui.utils.draw_hover_text(documentation.doc_str, text='')
     imgui.table_next_column()
     value_documentation = documentation.children.get(None,{}) or documentation.children if documentation is not None else {}
-    new_val, new_edit, removed = draw_value(field_lbl, val, f_type, nullable, default, parent_val, fixed, value_documentation, has_remove, is_none, base_type)
+    new_val, new_edit, removed = draw_value(field_lbl, val, f_type, o_type_args, nullable, default, parent_val, fixed, value_documentation, has_remove, is_none, base_type)
 
     new_obj = None
     if (changed := new_val!=val or new_edit):
@@ -472,7 +475,7 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
 
     return changed, new_obj, removed
 
-def draw_value(field_lbl: str, val: _T, f_type: typing.Type, nullable: bool, default: _T|None, parent_val: _T|None, fixed: bool, documentation: dict[typing.Any,type_utils.GUIDocInfo], has_remove: bool, is_none=False, base_type: typing.Type=None) -> tuple[_T|None, bool, bool]:
+def draw_value(field_lbl: str, val: _T, f_type: typing.Type, o_type_args: tuple[typing.Type], nullable: bool, default: _T|None, parent_val: _T|None, fixed: bool, documentation: dict[typing.Any,type_utils.GUIDocInfo], has_remove: bool, is_none=False, base_type: typing.Type=None) -> tuple[_T|None, bool, bool]:
     if base_type is None:
         base_type = _get_base_type(f_type)
     is_default = val==default
@@ -511,7 +514,7 @@ def draw_value(field_lbl: str, val: _T, f_type: typing.Type, nullable: bool, def
         case builtins.float:
             new_val = imgui.input_double(f'##{field_lbl}', val)[1]
         case builtins.list | builtins.set:
-            new_val = draw_list_set_editor(field_lbl, val, f_type, documentation)
+            new_val = draw_list_set_editor(field_lbl, val, f_type, o_type_args, documentation)
         case _ if base_type==typing.Literal or (inspect.isclass(base_type) and issubclass(base_type, enum.Enum)):
             if base_type == typing.Literal:
                 values = list(typing.get_args(f_type))
@@ -525,7 +528,7 @@ def draw_value(field_lbl: str, val: _T, f_type: typing.Type, nullable: bool, def
             else:
                 p_idx = 0
                 values.insert(0,f'*unknown value: {val}*')
-            str_values, tooltips = _get_str_values(values, f_type, documentation)
+            str_values, tooltips = _get_str_values(values, f_type, o_type_args, documentation)
             imgui.set_next_item_width(get_fields_text_width(str_values,{})+imgui.get_frame_height()+2*imgui.get_style().frame_padding.x)
             changed,p_idx = glassesTools.gui.utils.tooltip_combo(f"##{field_lbl}", p_idx, str_values, tooltips, popup_max_height_in_items=min(10,len(values)))
             if tooltips[p_idx]:
@@ -563,15 +566,16 @@ def draw_value(field_lbl: str, val: _T, f_type: typing.Type, nullable: bool, def
     return new_val, new_edit, removed
 draw_value.should_edit_id = None
 
-def _get_str_values(values: list[typing.Any], f_type: typing.Type, documentation: dict[typing.Any,type_utils.GUIDocInfo]):
-    if f_type in val_to_str_registry:
-        str_values = ['' if v is None else val_to_str_registry[f_type][v] for v in values]
+def _get_str_values(values: list[typing.Any], f_type: typing.Type, o_type_args: tuple[typing.Type], documentation: dict[typing.Any,type_utils.GUIDocInfo]):
+    if f_type in TYPE_TO_STR_REGISTRY or (len(o_type_args)==1 and o_type_args[0] in TYPE_TO_STR_REGISTRY):
+        key = f_type if f_type in TYPE_TO_STR_REGISTRY else o_type_args[0]
+        str_values = ['' if v is None else TYPE_TO_STR_REGISTRY[key][v] if isinstance(TYPE_TO_STR_REGISTRY[key],dict) else TYPE_TO_STR_REGISTRY[key](v) for v in values]
     else:
         str_values = ['' if v is None else str(documentation[v].display_string if v in documentation else v.value if issubclass(type(v), enum.Enum) and isinstance(v.value,str) else v) for v in values]
     tooltips = [documentation[v].doc_str if v in documentation else None for v in values]
     return str_values, tooltips
 
-def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, documentation: dict[typing.Any,type_utils.GUIDocInfo]):
+def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, o_type_args: tuple[typing.Type], documentation: dict[typing.Any,type_utils.GUIDocInfo]):
     val = val.copy()
     win = imgui.internal.get_current_window()
     if win.skip_items:
@@ -608,14 +612,14 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, documenta
     # determine items to show
     tsx = imgui.calc_text_size('x')
     x_padding = imgui.get_style().frame_padding.x
-    val_txt, val_tooltips = _get_str_values(disp_val,f_type,documentation)
+    val_txt, val_tooltips = _get_str_values(disp_val,f_type,o_type_args,documentation)
     t_sizes = [imgui.calc_text_size(t) for t in val_txt]
     w_sizes = [ts + (4*x_padding, 0) + (tsx.x, 0) for ts in t_sizes]
     # prep value adder, if needed
     adder_width = None
     if (miss_values := list(set(all_values)-set(val))):
         miss_values = [v for v in all_values if v in miss_values]   # preserve order
-        str_values, tooltips  = _get_str_values(miss_values,f_type,documentation)
+        str_values, tooltips  = _get_str_values(miss_values,f_type,o_type_args,documentation)
         adder_width = get_fields_text_width(str_values,{})+imgui.get_frame_height()+2*imgui.get_style().frame_padding.x
     # prep value entry box, if needed
     inputter_width = None

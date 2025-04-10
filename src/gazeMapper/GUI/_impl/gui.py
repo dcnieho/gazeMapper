@@ -1324,24 +1324,24 @@ class GUI:
                     self._marker_preview_cache[key].render(width=sz, height=sz)
                 imgui.end_tooltip()
             imgui.table_next_column()
-            new_val = settings_editor.draw_value(f'detect_only_{m.id}##{i}', m.detect_only, marker.marker_parameter_types['detect_only'], False, marker.marker_defaults.get('detect_only',None), None, False, {}, False)[0]
+            new_val = settings_editor.draw_value(f'detect_only_{m.id}##{i}', m.detect_only, marker.marker_parameter_types['detect_only'], tuple(), False, marker.marker_defaults.get('detect_only',None), None, False, {}, False)[0]
             if (this_changed:=m.detect_only!=new_val):
                 m.detect_only = new_val
                 changed |= this_changed
             imgui.table_next_column()
             imgui.set_next_item_width(imgui.calc_text_size('xxxxx.xxxxxx').x+2*imgui.get_style().frame_padding.x)
             f_type = gt_utils.unpack_none_union(marker.marker_parameter_types['size'])[0]
-            new_val = settings_editor.draw_value(f'size_{m.id}##{i}', m.size, f_type, True, marker.marker_defaults.get('size',None), None, False, {}, False, m.size is None, f_type)[0]
+            new_val = settings_editor.draw_value(f'size_{m.id}##{i}', m.size, f_type, tuple(), True, marker.marker_defaults.get('size',None), None, False, {}, False, m.size is None, f_type)[0]
             if (this_changed:=m.size!=new_val):
                 m.size = new_val
                 changed |= this_changed
             imgui.table_next_column()
-            new_val = settings_editor.draw_value(f'aruco_dict_id_{m.id}##{i}', m.aruco_dict_id, marker.marker_parameter_types['aruco_dict_id'], False, marker.marker_defaults.get('aruco_dict_id',None), None, False, {}, False)[0]
+            new_val = settings_editor.draw_value(f'aruco_dict_id_{m.id}##{i}', m.aruco_dict_id, marker.marker_parameter_types['aruco_dict_id'], tuple(), False, marker.marker_defaults.get('aruco_dict_id',None), None, False, {}, False)[0]
             if (this_changed:=m.aruco_dict_id!=new_val):
                 m.aruco_dict_id = new_val
                 changed |= this_changed
             imgui.table_next_column()
-            new_val = settings_editor.draw_value(f'marker_border_bits_{m.id}##{i}', m.marker_border_bits, marker.marker_parameter_types['marker_border_bits'], False, marker.marker_defaults.get('marker_border_bits',None), None, False, {}, False)[0]
+            new_val = settings_editor.draw_value(f'marker_border_bits_{m.id}##{i}', m.marker_border_bits, marker.marker_parameter_types['marker_border_bits'], tuple(), False, marker.marker_defaults.get('marker_border_bits',None), None, False, {}, False)[0]
             if (this_changed:=m.marker_border_bits!=new_val):
                 m.marker_border_bits = new_val
                 changed |= this_changed
