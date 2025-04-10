@@ -14,13 +14,13 @@ from . import naming, type_utils
 class Marker:
     @typeguard.typechecked
     def __init__(self,
-                 id                 : int,
+                 m_id               : int,
                  detect_only        : bool,         # if true, pose will not be determined and only marker presence is detected. That means marker size is not needed
                  size               : float|None                = None,
                  aruco_dict_id      : type_utils.ArucoDictType  = cv2.aruco.DICT_4X4_250,
                  marker_border_bits : int                       = 1
                  ):
-        self.id                 = id
+        self.id                 = m_id
         self.detect_only        = detect_only
         self.size               = size
         self.aruco_dict_id      = aruco_dict_id
@@ -38,6 +38,8 @@ class Marker:
         # backwards compatibility
         if 'detect_only' not in kwargs:
             kwargs['detect_only'] = False
+        if 'id' in kwargs:
+            kwargs['m_id'] = kwargs.pop('id')
         if 'aruco_dict' in kwargs:
             kwargs['aruco_dict_id'] = kwargs.pop('aruco_dict')
         return Marker(**kwargs)
