@@ -1,12 +1,11 @@
 from enum import auto
 import pathlib
 import cv2
-import json
 import typeguard
 import inspect
 import typing
 
-from glassesTools import plane, utils, validation
+from glassesTools import json, plane, utils, validation
 
 from . import type_utils
 
@@ -14,7 +13,7 @@ from . import type_utils
 class Type(utils.AutoName):
     GlassesValidator= auto()
     Plane_2D        = auto()
-utils.register_type(utils.CustomTypeEntry(Type,'__enum.plane.Type__', utils.enum_val_2_str, lambda x: getattr(Type, x.split('.')[1])))
+json.register_type(json.TypeEntry(Type,'__enum.plane.Type__', utils.enum_val_2_str, lambda x: getattr(Type, x.split('.')[1])))
 types = [p for p in Type]
 
 class Definition:
@@ -39,19 +38,17 @@ class Definition:
         path = pathlib.Path(path)
         if path.is_dir():
             path /= self.default_json_file_name
-        with open(path, 'w') as f:
-            to_dump = {k:getattr(self,k) for k in vars(self) if not k.startswith('_') and k not in ['name']+list(self.fixed_fields().keys())}    # name will be populated from the provided path
-            # filter out defaulted
-            to_dump = {k:v for k in to_dump if (v:=to_dump[k]) is not None and (k not in definition_defaults[self.type] or definition_defaults[self.type][k]!=v)}
-            json.dump(to_dump, f, cls=utils.CustomTypeEncoder, indent=2)
+        to_dump = {k:getattr(self,k) for k in vars(self) if not k.startswith('_') and k not in ['name']+list(self.fixed_fields().keys())}    # name will be populated from the provided path
+        # filter out defaulted
+        to_dump = {k:v for k in to_dump if (v:=to_dump[k]) is not None and (k not in definition_defaults[self.type] or definition_defaults[self.type][k]!=v)}
+        json.dump(to_dump, path)
 
     @staticmethod
     def load_from_json(path: str | pathlib.Path):
         path = pathlib.Path(path)
         if path.is_dir():
             path /= Definition.default_json_file_name
-        with open(path, 'r') as f:
-            kwds = json.load(f, object_hook=utils.json_reconstitute)
+        kwds = json.load(path)
         # help with named tuple roundtrip
         for k in ['plane_size', 'origin']:
             if k in kwds:

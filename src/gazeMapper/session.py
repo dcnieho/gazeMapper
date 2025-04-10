@@ -1,10 +1,9 @@
 from enum import auto
 import pathlib
-import json
 import typeguard
 import shutil
 
-from glassesTools import camera_recording, importing, naming, process_pool, utils
+from glassesTools import camera_recording, importing, json, naming, process_pool, utils
 from glassesTools.recording import Recording as EyeTrackerRecording
 from glassesTools.camera_recording import Recording as CameraRecording
 
@@ -14,7 +13,7 @@ from . import process
 class RecordingType(utils.AutoName):
     Eye_Tracker = auto()
     Camera      = auto()
-utils.register_type(utils.CustomTypeEntry(RecordingType,'__enum.session.RecordingType__', utils.enum_val_2_str, lambda x: getattr(RecordingType, x.split('.')[1])))
+json.register_type(json.TypeEntry(RecordingType,'__enum.session.RecordingType__', utils.enum_val_2_str, lambda x: getattr(RecordingType, x.split('.')[1])))
 recording_types = [r for r in RecordingType]
 
 
@@ -40,7 +39,7 @@ class RecordingDefinition:
         cal_path = pathlib.Path(rec_def_path) / f'{self.name}_{RecordingDefinition.cal_file_name}'
         cal_path.unlink(missing_ok=True)
 
-utils.register_type(utils.CustomTypeEntry(RecordingDefinition,'__session.RecordingDefinition__',lambda x: {'name': x.name, 'type': x.type}, lambda x: RecordingDefinition(**x)))
+json.register_type(json.TypeEntry(RecordingDefinition,'__session.RecordingDefinition__',lambda x: {'name': x.name, 'type': x.type}, lambda x: RecordingDefinition(name=x['name'], type=RecordingType(x['type']))))
 
 
 class Recording:
@@ -60,7 +59,7 @@ class Recording:
 
     def load_action_states(self, create_if_missing: bool, upgrade_if_needed: bool):
         self.state |= get_action_states(self.info.working_directory, for_recording=True, create_if_missing=create_if_missing, upgrade_if_needed=upgrade_if_needed)
-utils.register_type(utils.CustomTypeEntry(Recording,'__session.Recording__',lambda x: {'defition': x.defition, 'info': x.info}, lambda x: Recording(**x)))
+json.register_type(json.TypeEntry(Recording,'__session.Recording__',lambda x: {'defition': x.defition, 'info': x.info}, lambda x: Recording(**x)))
 
 def read_recording_info(working_dir: pathlib.Path, rec_type: RecordingType) -> tuple[EyeTrackerRecording|CameraRecording, pathlib.Path]:
     if rec_type==RecordingType.Camera:
@@ -103,19 +102,17 @@ class SessionDefinition:
         path = pathlib.Path(path)
         if path.is_dir():
             path /= self.default_json_file_name
-        with open(path, 'w') as f:
-            to_dump = {k:getattr(self,k) for k in vars(self) if not k.startswith('_')}
-            json.dump(to_dump, f, cls=utils.CustomTypeEncoder, indent=2)
+        to_dump = {k:getattr(self,k) for k in vars(self) if not k.startswith('_')}
+        json.dump(to_dump, path)
 
     @staticmethod
     def load_from_json(path: str | pathlib.Path) -> 'Session':
         path = pathlib.Path(path)
         if path.is_dir():
             path /= SessionDefinition.default_json_file_name
-        with open(path, 'r') as f:
-            kwds = json.load(f, object_hook=utils.json_reconstitute)
+        kwds = json.load(path)
         return SessionDefinition(**kwds)
-utils.register_type(utils.CustomTypeEntry(SessionDefinition,'__session.SessionDefinition__',lambda x: {'recordings': x.recordings}, lambda x: SessionDefinition(**x)))
+json.register_type(json.TypeEntry(SessionDefinition,'__session.SessionDefinition__',lambda x: {'recordings': x.recordings}, lambda x: SessionDefinition(**x)))
 
 
 class Session:
@@ -318,16 +315,14 @@ def _create_action_states_file(file: pathlib.Path, for_recording: bool):
 
 def _write_action_states_to_file(file: pathlib.Path, action_states: dict[process.Action, process_pool.State]):
     action_states = {utils.enum_val_2_str(k):action_states[k] for k in action_states}    # turn key into string so it can be stored in a json file
-    with open(file, 'w') as f:
-        json.dump(action_states, f, cls=utils.CustomTypeEncoder, indent=2)
+    json.dump(action_states, file)
 
 def _read_action_states(file: pathlib.Path) -> dict[process.Action, process_pool.State]:
     if not file.is_file():
         return None
 
-    with open(file, 'r') as f:
-        action_states = json.load(f, object_hook=utils.json_reconstitute)
-        return {process.action_str_to_enum_val(k): process_pool.State(action_states[k]) for k in action_states}  # turn key from string back into enum instance, and same for state value
+    action_states = json.load(file)
+    return {process.action_str_to_enum_val(k): process_pool.State(action_states[k]) for k in action_states}  # turn key from string back into enum instance, and same for state value
 
 def _upgrade_action_states(file: pathlib.Path, action_states: dict[process.Action, process_pool.State], for_recording: bool) -> dict[process.Action, process_pool.State]:
     if file.is_dir():

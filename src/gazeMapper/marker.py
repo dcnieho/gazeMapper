@@ -6,7 +6,7 @@ import typeguard
 import cv2
 import inspect
 
-from glassesTools import marker as gt_marker, utils
+from glassesTools import json, marker as gt_marker
 
 from . import naming, type_utils
 
@@ -42,7 +42,7 @@ class Marker:
             kwargs['aruco_dict_id'] = kwargs.pop('aruco_dict')
         return Marker(**kwargs)
 
-utils.register_type(utils.CustomTypeEntry(Marker,'__marker.Marker__', Marker._to_dict, Marker._from_dict))
+json.register_type(json.TypeEntry(Marker,'__marker.Marker__', Marker._to_dict, Marker._from_dict))
 # get defaults for default argument of Marker constructor
 _params = inspect.signature(Marker.__init__).parameters
 marker_defaults = {k:d for k in _params if (d:=_params[k].default)!=inspect._empty}

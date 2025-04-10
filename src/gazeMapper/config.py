@@ -1,5 +1,4 @@
 import pathlib
-import json
 import inspect
 import copy
 import enum
@@ -7,7 +6,7 @@ import typeguard
 import typing
 from typing import Any, Literal
 
-from glassesTools import annotation, aruco, gaze_worldref, utils
+from glassesTools import annotation, aruco, gaze_worldref, json, utils
 from glassesTools.validation import DataQualityType, get_DataQualityType_explanation
 
 from . import marker, plane, session, typed_dict_defaults, type_utils
@@ -537,24 +536,24 @@ class Study:
             f_path /= self.default_json_file_name
         else:
             path = f_path.parent
-        with open(f_path, 'w') as f:
-            to_dump = {k:copy.deepcopy(getattr(self,k)) for k in vars(self) if not k.startswith('_') and k not in ['session_def','planes','working_directory']}    # session_def and planes will be populated from contents in the provided folder, and working_directory as the provided path
-            to_dump['planes_per_episode'] = [(k, to_dump['planes_per_episode'][k]) for k in to_dump['planes_per_episode']]   # pack as list of tuples for storage
-            # filter out defaulted
-            to_dump = {k:to_dump[k] for k in to_dump if k not in study_defaults or study_defaults[k]!=to_dump[k]}
-            # also filter out defaults in some subfields
-            for k in ['auto_code_sync_points','validate_I2MC_settings']:
-                if k in to_dump:
-                    to_dump[k] = {kk:to_dump[k][kk] for kk in to_dump[k] if kk not in to_dump[k]._field_defaults or to_dump[k]._field_defaults[kk]!=to_dump[k][kk]}
-                    if not to_dump[k] and k in study_defaults and study_defaults[k] is not None:
-                        to_dump.pop(k)
-            if 'auto_code_episodes' in to_dump:
-                for e in to_dump['auto_code_episodes']:
-                    to_dump['auto_code_episodes'][e] = {kk:to_dump['auto_code_episodes'][e][kk] for kk in to_dump['auto_code_episodes'][e] if kk not in to_dump['auto_code_episodes'][e]._field_defaults or to_dump['auto_code_episodes'][e]._field_defaults[kk]!=to_dump['auto_code_episodes'][e][kk]}
-                # pack as list of tuples for storage
-                to_dump['auto_code_episodes'] = [(e, to_dump['auto_code_episodes'][e]) for e in to_dump['auto_code_episodes']]   # pack as list of tuples for storage
-            # dump to file
-            json.dump(to_dump, f, cls=utils.CustomTypeEncoder, indent=2)
+            # prep for dump to file
+        to_dump = {k:copy.deepcopy(getattr(self,k)) for k in vars(self) if not k.startswith('_') and k not in ['session_def','planes','working_directory']}    # session_def and planes will be populated from contents in the provided folder, and working_directory as the provided path
+        to_dump['planes_per_episode'] = [(k, to_dump['planes_per_episode'][k]) for k in to_dump['planes_per_episode']]   # pack as list of tuples for storage
+        # filter out defaulted
+        to_dump = {k:to_dump[k] for k in to_dump if k not in study_defaults or study_defaults[k]!=to_dump[k]}
+        # also filter out defaults in some subfields
+        typed_dict_default_fields = [k for k in to_dump if typed_dict_defaults.is_typeddictdefault(utils.unpack_none_union(study_parameter_types[k])[0])]
+        for k in typed_dict_default_fields:
+            to_dump[k] = {kk:to_dump[k][kk] for kk in to_dump[k] if kk not in to_dump[k]._field_defaults or to_dump[k]._field_defaults[kk]!=to_dump[k][kk]}
+            if not to_dump[k] and k in study_defaults and study_defaults[k] is not None:
+                to_dump.pop(k)
+        if 'auto_code_episodes' in to_dump:
+            for e in to_dump['auto_code_episodes']:
+                to_dump['auto_code_episodes'][e] = {kk:to_dump['auto_code_episodes'][e][kk] for kk in to_dump['auto_code_episodes'][e] if kk not in to_dump['auto_code_episodes'][e]._field_defaults or to_dump['auto_code_episodes'][e]._field_defaults[kk]!=to_dump['auto_code_episodes'][e][kk]}
+            # pack as list of tuples for storage
+            to_dump['auto_code_episodes'] = [(e, to_dump['auto_code_episodes'][e]) for e in to_dump['auto_code_episodes']]   # pack as list of tuples for storage
+        # dump to file
+        json.dump(to_dump, f_path)
         # this doesn't store any files itself, but triggers the contained info to be stored
         self.session_def.store_as_json(path)
         for p in self.planes:
@@ -580,8 +579,7 @@ class Study:
         else:
             d_path = path
         # get kwds
-        with open(d_path, 'r') as f:
-            kwds = json.load(f, object_hook=utils.json_reconstitute)
+        kwds = json.load(d_path)
         # fix up 'video_' parameters for backwards compatibility
         for k in list(kwds.keys()):
             if k.startswith('video_'):
@@ -873,19 +871,17 @@ class StudyOverride:
         path = pathlib.Path(path)
         if path.is_dir():
             path = path / self.default_json_file_name
-        with open(path, 'w') as f:
-            to_dump = {p:getattr(self,p) for p in self._overridden_params}
-            if 'planes_per_episode' in to_dump:
-                to_dump['planes_per_episode'] = [(k, to_dump['planes_per_episode'][k]) for k in to_dump['planes_per_episode']]   # pack as list of tuples for storage
-            json.dump(to_dump, f, cls=utils.CustomTypeEncoder, indent=2)
+        to_dump = {p:getattr(self,p) for p in self._overridden_params}
+        if 'planes_per_episode' in to_dump:
+            to_dump['planes_per_episode'] = [(k, to_dump['planes_per_episode'][k]) for k in to_dump['planes_per_episode']]   # pack as list of tuples for storage
+        json.dump(to_dump, path)
 
     @staticmethod
     def load_from_json(level: OverrideLevel, path: str | pathlib.Path, recording_type: session.RecordingType|None = None) -> 'StudyOverride':
         path = pathlib.Path(path)
         if path.is_dir():
             path = path / StudyOverride.default_json_file_name
-        with open(path, 'r') as f:
-            kwds = json.load(f, object_hook=utils.json_reconstitute)
+        kwds = json.load(path)
         if 'planes_per_episode' in kwds:
             # stored as list of tuples, unpack
             kwds['planes_per_episode'] = {k:v for k,v in kwds['planes_per_episode']}

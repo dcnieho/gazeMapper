@@ -1,7 +1,7 @@
 import enum
 import typing
 
-from glassesTools import annotation, process_pool, utils
+from glassesTools import annotation, json, process_pool, utils
 
 class Action(enum.IntEnum):
     IMPORT = enum.auto()
@@ -49,7 +49,7 @@ class Action(enum.IntEnum):
         return vals
 def action_str_to_enum_val(x: str) -> Action:
     return utils.enum_str_2_val(x, Action, {'MAKE_VIDEO':'MAKE_MAPPED_GAZE_VIDEO', 'RUN_VALIDATION':'VALIDATE', 'AUTO_CODE_TRIALS': 'AUTO_CODE_EPISODES'})
-utils.register_type(utils.CustomTypeEntry(Action, '__enum.process.Action__', utils.enum_val_2_str, action_str_to_enum_val))
+json.register_type(json.TypeEntry(Action, '__enum.process.Action__', utils.enum_val_2_str, action_str_to_enum_val))
 
 def action_to_func(action: Action) -> typing.Callable[..., None]:
     # Returns function to perform the provided action. NB: not for Action.IMPORT,
