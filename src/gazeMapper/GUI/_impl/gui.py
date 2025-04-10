@@ -27,6 +27,9 @@ from .. import async_thread
 from . import callbacks, image_helper, session_lister, settings_editor, utils
 
 
+# add formatter for Marker IDs (marker id + aruco dict pairs)
+settings_editor.register_formatter(config.MarkerID, config.marker_ID_to_str)
+
 class GUI:
     def __init__(self):
         self.popup_stack = []
@@ -561,8 +564,8 @@ class GUI:
             return _get_known_recordings(filter_ref=True)
         def _get_known_recordings_only_eye_tracker() -> set[str]:
             return _get_known_recordings(dev_types=[session.RecordingType.Eye_Tracker])
-        def _get_known_individual_markers() -> set[int]:
-            return {m.id for m in self.study_config.individual_markers}
+        def _get_known_individual_markers() -> set[config.MarkerID]:
+            return {config.MarkerID(m.id, m.aruco_dict_id) for m in self.study_config.individual_markers}
         def _get_known_planes() -> set[str]:
             return {p.name for p in self.study_config.planes}
         def _get_episodes_to_code_for_planes() -> set[annotation.Event]:
