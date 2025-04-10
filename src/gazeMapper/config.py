@@ -398,7 +398,7 @@ class Study:
         for m in self.individual_markers:
             problem = ''
             if m.id>=(ds:=aruco.get_dict_size(m.aruco_dict)):
-                problem = f'dictionary {aruco.dicts_to_str[m.aruco_dict]} only has {ds} markers, {m.id} is thus not a valid marker for this dictionary'
+                problem = f'dictionary {aruco.dicts_to_str[m.aruco_dict]} only has {ds} markers, which means that valid IDs are 0-{ds-1}. {m.id} is thus not a valid marker for this dictionary'
             elif m.detect_only and m.size is not None:
                 problem = f'size should not be set for detect only markers'
             elif not m.detect_only and (m.size is None or m.size<=0):
