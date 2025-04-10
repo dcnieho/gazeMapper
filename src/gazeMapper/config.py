@@ -218,20 +218,16 @@ class Study:
             self._check_auto_coding_setup(strict_check)
             self._check_make_video(strict_check)
 
-        # ensure some members are of the right class, and apply defaults
-        if self.get_cam_movement_for_et_sync_function is not None:
-            self.get_cam_movement_for_et_sync_function = CamMovementForEtSyncFunction(self.get_cam_movement_for_et_sync_function)
-            self.get_cam_movement_for_et_sync_function.apply_defaults()
-        if self.auto_code_sync_points is not None:
-            self.auto_code_sync_points = AutoCodeSyncPoints(self.auto_code_sync_points)
-            self.auto_code_sync_points.apply_defaults()
+        # ensure typed dicts with defaults members are of the right class, and apply defaults
+        to_check = {k:t for k in study_parameter_types if typed_dict_defaults.is_typeddictdefault(t:=utils.unpack_none_union(study_parameter_types[k])[0])}
+        for k in to_check:
+            if getattr(self,k) is not None:
+                setattr(self,k, to_check[k](getattr(self,k)))
+                getattr(self,k).apply_defaults()
         if self.auto_code_episodes is not None:
             self.auto_code_episodes = {e: AutoCodeEpisodes(self.auto_code_episodes[e]) for e in self.auto_code_episodes}
             for e in self.auto_code_episodes:
                 self.auto_code_episodes[e].apply_defaults()
-        if self.validate_I2MC_settings is not None:
-            self.validate_I2MC_settings = I2MCSettings(self.validate_I2MC_settings)
-            self.validate_I2MC_settings.apply_defaults()
 
     def _check_recordings(self, which: list[str]|None, field: str, strict_check) -> type_utils.ProblemDict:
         problems: type_utils.ProblemDict = {}
