@@ -67,6 +67,8 @@ class Definition_GlassesValidator(Definition):
                  marker_border_bits : int,
                  min_num_markers    : int,
                  ref_image_size     : int,
+                 marker_file        : str|pathlib.Path|None,
+                 target_file        : str|pathlib.Path|None,
                  use_default        : bool = True,
                  ):
         super().__init__(Type.GlassesValidator, name)
@@ -76,13 +78,15 @@ class Definition_GlassesValidator(Definition):
         self.marker_border_bits = marker_border_bits
         self.min_num_markers    = min_num_markers       # minimum number of markers that should be to run pose estimation w.r.t. the plane
         self.ref_image_size     = ref_image_size        # largest dimension
+        self.marker_file        = marker_file
+        self.target_file        = target_file
 
     def field_problems(self) -> type_utils.ProblemDict:
         return {}
 
     def fixed_fields(self) -> type_utils.NestedDict:
         # these cannot be edited from the GUI, are for info only
-        return {k:None for k in ['name','aruco_dict', 'marker_border_bits', 'min_num_markers', 'ref_image_size']}
+        return {k:None for k in ['name','aruco_dict', 'marker_border_bits', 'min_num_markers', 'ref_image_size', 'marker_file', 'target_file']}
 
     def has_complete_setup(self) -> bool:
         return True
@@ -138,6 +142,8 @@ def make_definition(p_type: Type, name: str, path: pathlib.Path|None, **kwargs) 
         kwargs['marker_border_bits'] = validation_setup['markerBorderBits']
         kwargs['min_num_markers'] = validation_setup['minNumMarkers']
         kwargs['ref_image_size'] = validation_setup['referencePosterSize']
+        kwargs['marker_file'] = validation_setup['markerPosFile']
+        kwargs['target_file'] = validation_setup['targetPosFile']
     return cls(name=name, **kwargs)
 
 
@@ -157,6 +163,7 @@ definition_parameter_doc = {
     'use_default': type_utils.GUIDocInfo('Use default setup','If enabled, the default glassesValidator plane is used. When not enabled, a custom configuration can be used by editing the files containing the plane setup in the plane configuration folder.'),
     'marker_file': type_utils.GUIDocInfo('Marker file','Name of the file specifying the marker layout on the plane (e.g., markerPositions.csv).'),
     'marker_size': type_utils.GUIDocInfo('Marker size','Length of the edge of a marker (mm, excluding the white edge, only the black part).'),
+    'target_file': type_utils.GUIDocInfo('Target file','Name of the file specifying the targets positions on the plane (e.g., targetPositions.csv).'),
     'plane_size': type_utils.GUIDocInfo('Plane size','Total size of the plane (mm). Can be larger than the area spanned by the fiducial markers.',{
         'x': type_utils.GUIDocInfo('X', 'Horizontal size of the plane (mm).'),
         'y': type_utils.GUIDocInfo('Y', 'Vertical size of the plane (mm).'),
