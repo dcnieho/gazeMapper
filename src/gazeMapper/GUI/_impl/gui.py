@@ -19,7 +19,7 @@ import OpenGL
 import OpenGL.GL as gl
 
 import glassesTools
-from glassesTools import annotation, gui as gt_gui, naming as gt_naming, plane as gt_plane, platform as gt_platform, process_pool, utils as gt_utils
+from glassesTools import annotation, aruco, gui as gt_gui, naming as gt_naming, plane as gt_plane, platform as gt_platform, process_pool, utils as gt_utils
 from glassesTools.gui import colors
 
 from ... import config, marker, plane, process, project_watcher, session, type_utils, version
@@ -645,27 +645,47 @@ class GUI:
             not self.need_setup_individual_markers
 
     def _get_markers(self):
-        markers: dict[str,dict[str,list[int]]] = {}
+        markers: dict[str,dict[str,list[tuple[int,int]]]] = {}
         for p in self.plane_configs:
             if isinstance(self.plane_configs[p], gt_plane.Plane):
                 markers[p] = self.plane_configs[p].get_marker_IDs()
-        markers['xx_individual_markers_xx'] = {'markers': [m.id for m in self.study_config.individual_markers]}
+        markers['xx_individual_markers_xx'] = {'markers': [(m.aruco_dict_id, m.id) for m in self.study_config.individual_markers]}
         return markers
 
+    def _format_duplicate_markers_msg(self, markers: set[tuple[int,int]]):
+        # organize per dictionary
+        dict_markers: dict[int,list[int]] = {}
+        for d,m in markers:
+            if d in dict_markers:
+                dict_markers[d].append(m)
+            else:
+                dict_markers[d] = [m]
+        out = ''
+        for i,d in enumerate(dict_markers):
+            s = 's' if len(dict_markers[d])>1 else ''
+            ids = ', '.join((str(x) for x in dict_markers[d]))
+            msg = f'marker{s} {ids} for dictionary {aruco.dicts_to_str[d]}'
+            if i==0:
+                out = msg
+            elif i==len(dict_markers)-1:
+                out += f' and {msg}'
+            else:
+                out += f', {msg}'
+        return out
+
     def _check_markers(self):
-        seen_markers: set[int] = set()
+        seen_markers: set[tuple[int,int]] = set()
         used_markers = self._get_markers()
         for s in used_markers:
             for m in used_markers[s]:
                 # check unique
-                seen: set[int] = set()
+                seen: set[tuple[int,int]] = set()
                 if (duplicates := {x for x in used_markers[s][m] if x in seen or seen.add(x)}):
-                    markers = ', '.join((str(x) for x in duplicates))
                     if s=='xx_individual_markers_xx':
                         msg = f'The individual markers contain'
                     else:
-                        msg = f'The set of {m} markers in the {s} plane contains'
-                    msg = f'{msg} duplicates: markers {markers}. Markers should be unique, fix this duplication.'
+                        msg = f'The set of {m} markers of the {s} plane contains'
+                    msg = f'{msg} duplicates: {self._format_duplicate_markers_msg(duplicates)}. Markers should be unique, fix this duplication.'
                     if s=='xx_individual_markers_xx':
                         self._problems_cache = type_utils.merge_problem_dicts(self._problems_cache, {'individual_markers': {d: msg for d in duplicates}})
                     else:
@@ -685,9 +705,8 @@ class GUI:
                                     if sx=='xx_individual_markers_xx':
                                         mark_msgs.append(f'individual markers')
                                     else:
-                                        mark_msgs.append(f'{mx} markers in the {sx} plane')
-                                markers = ', '.join((str(x) for x in overlap))
-                                msg = f'Markers {markers} are encountered in the setup both as {mark_msgs[0]} and as {mark_msgs[1]}. Markers must be unique, fix this collision.'
+                                        mark_msgs.append(f'{mx} markers of the {sx} plane')
+                                msg = f'The following markers are encountered in the setup both as {mark_msgs[0]} and as {mark_msgs[1]}: {self._format_duplicate_markers_msg(overlap)}. Markers must be unique, fix this collision.'
                                 # add error message to problem dict
                                 if 'xx_individual_markers_xx' in (s,s2):
                                     self._problems_cache = type_utils.merge_problem_dicts(self._problems_cache, {'individual_markers': {d: msg for d in overlap if d in used_markers['xx_individual_markers_xx']['markers']}})
@@ -1278,7 +1297,7 @@ class GUI:
         imgui.table_headers_row()
         changed = False
         for i,m in enumerate(self.study_config.individual_markers):
-            problem = self._problems_cache['individual_markers'][m.id] if 'individual_markers' in self._problems_cache and m.id in self._problems_cache['individual_markers'] else None
+            problem = self._problems_cache['individual_markers'][(m.aruco_dict_id,m.id)] if 'individual_markers' in self._problems_cache and (m.aruco_dict_id,m.id) in self._problems_cache['individual_markers'] else None
             imgui.table_next_row()
             imgui.table_next_column()
             imgui.align_text_to_frame_padding()

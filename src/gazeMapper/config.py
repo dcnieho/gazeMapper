@@ -407,7 +407,7 @@ class Study:
                 if strict_check:
                     raise ValueError(f'individual_markers marker {m.id}: {problem}')
                 else:
-                    problems = type_utils.merge_problem_dicts(problems, {'individual_markers': {m.id: problem}})
+                    problems = type_utils.merge_problem_dicts(problems, {'individual_markers': {(m.aruco_dict_id, m.id): problem}})
         return problems
 
     def _check_sync_ref(self, strict_check):
