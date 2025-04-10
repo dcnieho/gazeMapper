@@ -154,7 +154,7 @@ def is_typeddictdefault(tp):
     """
     return isinstance(tp, _TypedDictDefaultMeta)
 
-# register type checker with typegaurd. Can use their builtin checker for TypedDict
+# register type checker with typeguard. Can use their builtin checker for TypedDict
 from typeguard import TypeCheckerCallable, checker_lookup_functions
 from typeguard._checkers import check_typed_dict
 def checker_lookup(
