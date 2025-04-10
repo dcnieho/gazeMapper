@@ -589,10 +589,12 @@ class Study:
         for k in list(kwds.keys()):
             if k.startswith('video_'):
                 kwds[f'mapped_{k}'] = kwds.pop(k)
-        # stored as list of tuples, unpack
-        kwds['planes_per_episode'] = {k:v for k,v in kwds['planes_per_episode']}
+        # stored as list of tuples (with enum values as keys), unpack
+        kwds['planes_per_episode'] = {annotation.Event(k):v for k,v in kwds['planes_per_episode']}
         if 'auto_code_episodes' in kwds:
-            kwds['auto_code_episodes'] = {k:v for k,v in kwds['auto_code_episodes']}
+            kwds['auto_code_episodes'] = {annotation.Event(k):v for k,v in kwds['auto_code_episodes']}
+        # help with enum roundtrip
+        kwds['episodes_to_code'] = {annotation.Event(e) for e in kwds['episodes_to_code']}
         # backwards compatibility, rename 'auto_code_trial_episodes'
         if 'auto_code_trial_episodes' in kwds:
             kwds['auto_code_episodes'] = {annotation.Event.Trial: kwds.pop('auto_code_trial_episodes')}
