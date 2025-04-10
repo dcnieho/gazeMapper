@@ -210,9 +210,12 @@ def make_individual_marker(study_config: config.Study, mark_id: int, mark_detect
     # store config
     study_config.store_as_json()
 
-def delete_individual_marker(study_config: config.Study, mark: marker.Marker):
+def delete_individual_marker(study_config: config.Study, mark: marker.Marker|None, index: int|None=None):
     # remove from defined individual markers
-    study_config.individual_markers = [m for m in study_config.individual_markers if m.id!=mark.id]
+    if index is not None:
+        del study_config.individual_markers[index]
+    else:
+        study_config.individual_markers = [m for m in study_config.individual_markers if m.id!=mark.id]
     # store config
     study_config.store_as_json()
 
