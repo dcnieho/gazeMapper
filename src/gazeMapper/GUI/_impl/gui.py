@@ -1354,24 +1354,26 @@ class GUI:
         imgui.end_table()
         if imgui.button('+ new individual marker'):
             new_mark_id = -1
+            new_aruco_dict_id = aruco.default_dict
             new_mark_det_only = False
             new_mark_size = -1.
-            def _valid_mark_id():
-                return new_mark_id>=0 and not any((m.id==new_mark_id for m in self.study_config.individual_markers))
+            def _valid_mark_id_dict():
+                return new_mark_id>=0 and new_mark_id<aruco.get_dict_size(new_aruco_dict_id) and not any((m.id==new_mark_id and aruco.dict_to_family[m.aruco_dict_id]==aruco.dict_to_family[new_aruco_dict_id] for m in self.study_config.individual_markers))
             def _valid_mark_size():
                 return new_mark_det_only or new_mark_size>0.
             def _add_marker_popup():
                 nonlocal new_mark_id
                 nonlocal new_mark_det_only
+                nonlocal new_aruco_dict_id
                 nonlocal new_mark_size
-                imgui.dummy((30*imgui.calc_text_size('x').x,0))
+                imgui.dummy((45*imgui.calc_text_size('x').x,0))
                 if imgui.begin_table("##new_mark_info",2):
                     imgui.table_setup_column("##new_mark_infos_left", imgui.TableColumnFlags_.width_fixed)
                     imgui.table_setup_column("##new_mark_infos_right", imgui.TableColumnFlags_.width_stretch)
                     imgui.table_next_row()
                     imgui.table_next_column()
                     imgui.align_text_to_frame_padding()
-                    invalid = not _valid_mark_id()
+                    invalid = not _valid_mark_id_dict()
                     if invalid:
                         imgui.push_style_color(imgui.Col_.text, colors.error)
                     imgui.text("Marker ID")
@@ -1380,6 +1382,18 @@ class GUI:
                     imgui.table_next_column()
                     imgui.set_next_item_width(-1)
                     _,new_mark_id = imgui.input_int("##new_mark_id",new_mark_id)
+                    imgui.table_next_row()
+                    imgui.table_next_column()
+                    imgui.align_text_to_frame_padding()
+                    invalid = not _valid_mark_id_dict()
+                    if invalid:
+                        imgui.push_style_color(imgui.Col_.text, colors.error)
+                    imgui.text("ArUco dictionary")
+                    if invalid:
+                        imgui.pop_style_color()
+                    imgui.table_next_column()
+                    imgui.set_next_item_width(-1)
+                    _, new_aruco_dict_id = imgui.combo(f"##new_mark_aruco_dict", new_aruco_dict_id, list(aruco.dicts_to_str.values()), popup_max_height_in_items=10)
 
                     imgui.table_next_row()
                     imgui.table_next_column()
@@ -1403,7 +1417,7 @@ class GUI:
                     imgui.end_table()
 
             buttons = {
-                ifa6.ICON_FA_CHECK+" Create marker": (lambda: callbacks.make_individual_marker(self.study_config, new_mark_id, new_mark_det_only, new_mark_size), lambda: not _valid_mark_id() or not _valid_mark_size()),
+                ifa6.ICON_FA_CHECK+" Create marker": (lambda: callbacks.make_individual_marker(self.study_config, new_mark_id, new_aruco_dict_id, new_mark_det_only, new_mark_size), lambda: not _valid_mark_id_dict() or not _valid_mark_size()),
                 ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
             }
             gt_gui.utils.push_popup(self, lambda: gt_gui.utils.popup("Add marker", _add_marker_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, outside=False))

@@ -204,9 +204,9 @@ async def remove_recording_working_dir(project_dir: pathlib.Path, session: str, 
     if rec_dir.is_dir():
         shutil.rmtree(rec_dir)
 
-def make_individual_marker(study_config: config.Study, mark_id: int, mark_detect_only: bool, mark_size: float=None):
+def make_individual_marker(study_config: config.Study, mark_id: int, aruco_dict_id: int, mark_detect_only: bool, mark_size: float=None):
     # append to defined recordings
-    study_config.individual_markers.append(marker.Marker(mark_id, mark_detect_only, None if mark_detect_only else mark_size))
+    study_config.individual_markers.append(marker.Marker(mark_id, mark_detect_only, None if mark_detect_only else mark_size, aruco_dict_id))
     # store config
     study_config.store_as_json()
 
