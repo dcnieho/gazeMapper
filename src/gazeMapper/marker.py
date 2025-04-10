@@ -17,18 +17,18 @@ class Marker:
                  id                 : int,
                  detect_only        : bool,         # if true, pose will not be determined and only marker presence is detected. That means marker size is not needed
                  size               : float|None                = None,
-                 aruco_dict         : type_utils.ArucoDictType  = cv2.aruco.DICT_4X4_250,
+                 aruco_dict_id      : type_utils.ArucoDictType  = cv2.aruco.DICT_4X4_250,
                  marker_border_bits : int                       = 1
                  ):
         self.id                 = id
         self.detect_only        = detect_only
         self.size               = size
-        self.aruco_dict         = aruco_dict
+        self.aruco_dict_id      = aruco_dict_id
         self.marker_border_bits = marker_border_bits
 
     def _to_dict(self) -> dict[str,Any]:
         out = {'id': self.id, 'detect_only': self.detect_only}
-        for f in ['size', 'aruco_dict', 'marker_border_bits']:
+        for f in ['size', 'aruco_dict_id', 'marker_border_bits']:
             if (val:=getattr(self,f))!=marker_defaults[f]:
                 out[f] = val
         return out
@@ -38,6 +38,8 @@ class Marker:
         # backwards compatibility
         if 'detect_only' not in kwargs:
             kwargs['detect_only'] = False
+        if 'aruco_dict' in kwargs:
+            kwargs['aruco_dict_id'] = kwargs.pop('aruco_dict')
         return Marker(**kwargs)
 
 utils.register_type(utils.CustomTypeEntry(Marker,'__marker.Marker__', Marker._to_dict, Marker._from_dict))

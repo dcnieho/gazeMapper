@@ -57,13 +57,16 @@ class Definition:
             if k in kwds:
                 kwds[k] = plane.Coordinate(*kwds[k])
         kwds['p_type'] = kwds.pop('type')
+        # backwards compatibility
+        if 'aruco_dict' in kwds:
+            kwds['aruco_dict_id'] = kwds.pop('aruco_dict')
         return make_definition(path=path.parent, name=path.parent.name, **kwds)
 
 class Definition_GlassesValidator(Definition):
     @typeguard.typechecked(collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
     def __init__(self,
                  name               : str,
-                 aruco_dict         : type_utils.ArucoDictType,
+                 aruco_dict_id      : type_utils.ArucoDictType,
                  marker_border_bits : int,
                  min_num_markers    : int,
                  ref_image_size     : int,
@@ -74,7 +77,7 @@ class Definition_GlassesValidator(Definition):
         super().__init__(Type.GlassesValidator, name)
         self.use_default        = use_default           # If True, denotes this is the default/built-in glassesValidator plane, if False, denotes custom settings are expected
         # custom settings
-        self.aruco_dict         = aruco_dict
+        self.aruco_dict_id      = aruco_dict_id
         self.marker_border_bits = marker_border_bits
         self.min_num_markers    = min_num_markers       # minimum number of markers that should be to run pose estimation w.r.t. the plane
         self.ref_image_size     = ref_image_size        # largest dimension
@@ -86,7 +89,7 @@ class Definition_GlassesValidator(Definition):
 
     def fixed_fields(self) -> type_utils.NestedDict:
         # these cannot be edited from the GUI, are for info only
-        return {k:None for k in ['name','aruco_dict', 'marker_border_bits', 'min_num_markers', 'ref_image_size', 'marker_file', 'target_file']}
+        return {k:None for k in ['name','aruco_dict_id', 'marker_border_bits', 'min_num_markers', 'ref_image_size', 'marker_file', 'target_file']}
 
     def has_complete_setup(self) -> bool:
         return True
@@ -102,7 +105,7 @@ class Definition_Plane_2D(Definition):
                  plane_size         : plane.Coordinate          = plane.Coordinate(0., 0.), # should be set to something non-zero
                  origin             : plane.Coordinate          = plane.Coordinate(0., 0.),
                  unit               : str                       = '',
-                 aruco_dict         : type_utils.ArucoDictType  = cv2.aruco.DICT_4X4_250,
+                 aruco_dict_id      : type_utils.ArucoDictType  = cv2.aruco.DICT_4X4_250,
                  ref_image_size     : int                       = 1920
                  ):
         super().__init__(Type.Plane_2D, name)
@@ -113,7 +116,7 @@ class Definition_Plane_2D(Definition):
         self.min_num_markers    = min_num_markers       # minimum number of markers that should be to run pose estimation w.r.t. the plane
         self.origin             = origin                # center of plane, in coordinates of the input file
         self.unit               = unit
-        self.aruco_dict         = aruco_dict
+        self.aruco_dict_id      = aruco_dict_id
         self.ref_image_size     = ref_image_size        # largest dimension
 
     def field_problems(self) -> type_utils.ProblemDict:
@@ -138,7 +141,7 @@ def make_definition(p_type: Type, name: str, path: pathlib.Path|None, **kwargs) 
         if 'use_default' in kwargs and not kwargs['use_default']:
             validator_config_dir = path
         validation_setup = validation.config.get_validation_setup(validator_config_dir)
-        kwargs['aruco_dict'] = validation.Plane.default_aruco_dict
+        kwargs['aruco_dict_id'] = validation.Plane.default_aruco_dict_id
         kwargs['marker_border_bits'] = validation_setup['markerBorderBits']
         kwargs['min_num_markers'] = validation_setup['minNumMarkers']
         kwargs['ref_image_size'] = validation_setup['referencePosterSize']
@@ -155,8 +158,8 @@ for _t,_cls in zip([Type.GlassesValidator, Type.Plane_2D],[Definition_GlassesVal
     definition_parameter_types[_t] = {k:_params[k].annotation for k in _params if k!='self'}
     del _params
 definition_parameter_doc = {
-    'name': type_utils.GUIDocInfo('Name','The name of thep plane.'),
-    'aruco_dict': type_utils.GUIDocInfo('ArUco dictionary','The ArUco dictionary (see cv::aruco::PREDEFINED_DICTIONARY_NAME) of the markers.'),
+    'name': type_utils.GUIDocInfo('Name','The name of the plane.'),
+    'aruco_dict_id': type_utils.GUIDocInfo('ArUco dictionary','The ArUco dictionary (see cv::aruco::PREDEFINED_DICTIONARY_NAME) of the markers.'),
     'marker_border_bits': type_utils.GUIDocInfo('Marker border bits','Width of the black border around each marker.'),
     'min_num_markers': type_utils.GUIDocInfo('Minimum number of markers','Minimum number of markers belonging to the plane that should be detected to attempt to determine pose and homography transformation.'),
     'ref_image_size': type_utils.GUIDocInfo('Reference image size','The size in pixels of the image that is generated of the plane with fiducial markers.'),
@@ -195,7 +198,7 @@ def get_plane_from_definition(plane_def: Definition, path: str|pathlib.Path) -> 
             markers             = path/plane_def.marker_file,
             marker_size         = plane_def.marker_size,
             plane_size          = plane_def.plane_size,
-            aruco_dict          = plane_def.aruco_dict,
+            aruco_dict_id       = plane_def.aruco_dict_id,
             marker_border_bits  = plane_def.marker_border_bits,
             unit                = plane_def.unit,
             ref_image_store_path= path/plane.Plane.default_ref_image_name,
@@ -206,6 +209,6 @@ def get_plane_from_definition(plane_def: Definition, path: str|pathlib.Path) -> 
         return pl
 
 def get_plane_setup(plane_def: Definition):
-    return {'aruco_dict': plane_def.aruco_dict,
+    return {'aruco_dict_id': plane_def.aruco_dict_id,
             'aruco_params': {'markerBorderBits': plane_def.marker_border_bits},
             'min_num_markers': plane_def.min_num_markers}

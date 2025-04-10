@@ -647,7 +647,7 @@ To be able turn the information of the above file into a plane, further settings
 |`plane_size`|Total size of the plane (mm). Can be larger than the area spanned by the fiducial markers.|
 |`origin`|The position of the origin of the plane (mm).|
 |`unit`|Unit in which sizes and coordinates are expressed. Purely for informational purposes, not used in the software. Should be mm.|
-|`aruco_dict`|The ArUco dictionary (see [`cv::aruco::PREDEFINED_DICTIONARY_NAME`](https://docs.opencv.org/4.10.0/de/d67/group__objdetect__aruco.html#ga4e13135a118f497c6172311d601ce00d)) of the markers.|
+|`aruco_dict_id`|The ArUco dictionary (see [`cv::aruco::PREDEFINED_DICTIONARY_NAME`](https://docs.opencv.org/4.10.0/de/d67/group__objdetect__aruco.html#ga4e13135a118f497c6172311d601ce00d)) of the markers.|
 |`ref_image_size`|The size in pixels of the image that is generated of the plane with fiducial markers.|
 
 These settings are typically stored in a file `plane_def.json` in the plane's configuration folder inside the project's configuration folder.

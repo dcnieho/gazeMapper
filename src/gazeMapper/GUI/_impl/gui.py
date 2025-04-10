@@ -1162,7 +1162,7 @@ class GUI:
                 _hover_img_error_popup(p, load_error)
                 plane_dir = config.guess_config_dir(self.study_config.working_directory)/p.name
                 if p.type==plane.Type.Plane_2D and imgui.button(ifa6.ICON_FA_BARCODE+f' get ArUco markers'):
-                    gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='deploy_aruco', ArUco_dict=p.aruco_dict, markerBorderBits=p.marker_border_bits))
+                    gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='deploy_aruco', ArUco_dict=p.aruco_dict_id, markerBorderBits=p.marker_border_bits))
                 changed, _, new_p, _, _ = settings_editor.draw_dict_editor(copy.deepcopy(p), type(p), 0, {}, list(plane.definition_parameter_types[p.type].keys()), plane.definition_parameter_types[p.type], plane.definition_defaults[p.type], problems=problem_fields, fixed=fixed_fields, documentation=plane.definition_parameter_doc)
                 if changed:
                     # persist changed config
@@ -1291,7 +1291,7 @@ class GUI:
                 imgui.begin_tooltip()
                 if problem:
                     imgui.text_colored(gt_gui.colors.error, problem)
-                key = m.id,m.aruco_dict,m.marker_border_bits
+                key = m.id,m.aruco_dict_id,m.marker_border_bits
                 sz = int(200*hello_imgui.dpi_window_size_factor())
                 if key not in self._marker_preview_cache:
                     self._marker_preview_cache[key] = utils.get_aruco_marker_image(sz, *key)
@@ -1311,9 +1311,9 @@ class GUI:
                 m.size = new_val
                 changed |= this_changed
             imgui.table_next_column()
-            new_val = settings_editor.draw_value(f'aruco_dict_{m.id}##{i}', m.aruco_dict, marker.marker_parameter_types['aruco_dict'], False, marker.marker_defaults.get('aruco_dict',None), None, False, {}, False)[0]
-            if (this_changed:=m.aruco_dict!=new_val):
-                m.aruco_dict = new_val
+            new_val = settings_editor.draw_value(f'aruco_dict_id_{m.id}##{i}', m.aruco_dict_id, marker.marker_parameter_types['aruco_dict_id'], False, marker.marker_defaults.get('aruco_dict_id',None), None, False, {}, False)[0]
+            if (this_changed:=m.aruco_dict_id!=new_val):
+                m.aruco_dict_id = new_val
                 changed |= this_changed
             imgui.table_next_column()
             new_val = settings_editor.draw_value(f'marker_border_bits_{m.id}##{i}', m.marker_border_bits, marker.marker_parameter_types['marker_border_bits'], False, marker.marker_defaults.get('marker_border_bits',None), None, False, {}, False)[0]
