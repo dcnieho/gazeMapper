@@ -647,7 +647,8 @@ class GUI:
     def _get_markers(self):
         markers: dict[str,dict[str,list[int]]] = {}
         for p in self.plane_configs:
-            markers[p] = self.plane_configs[p].get_marker_IDs()
+            if isinstance(self.plane_configs[p], gt_plane.Plane):
+                markers[p] = self.plane_configs[p].get_marker_IDs()
         markers['xx_individual_markers_xx'] = {'markers': [m.id for m in self.study_config.individual_markers]}
         return markers
 
