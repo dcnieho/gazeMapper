@@ -7,7 +7,7 @@ import typeguard
 import typing
 from typing import Any, Literal
 
-from glassesTools import annotation, gaze_worldref, utils
+from glassesTools import annotation, aruco, gaze_worldref, utils
 from glassesTools.validation import DataQualityType, get_DataQualityType_explanation
 
 from . import marker, plane, session, typed_dict_defaults, type_utils
@@ -397,7 +397,9 @@ class Study:
         problems: type_utils.ProblemDict = {}
         for m in self.individual_markers:
             problem = ''
-            if m.detect_only and m.size is not None:
+            if m.id>(ds:=aruco.get_dict_size(m.aruco_dict)):
+                problem = f'dictionary {aruco.dicts_to_str[m.aruco_dict]} only has {ds} markers, {m.id} is thus not a valid marker for this dictionary'
+            elif m.detect_only and m.size is not None:
                 problem = f'size should not be set for detect only markers'
             elif not m.detect_only and (m.size is None or m.size<=0):
                 problem = f'size should be set to a value larger than 0'
