@@ -53,7 +53,7 @@ class Definition:
         for k in ['plane_size', 'origin']:
             if k in kwds:
                 kwds[k] = plane.Coordinate(*kwds[k])
-        kwds['p_type'] = kwds.pop('type')
+        kwds['p_type'] = Type(kwds.pop('type'))
         # backwards compatibility
         if 'aruco_dict' in kwds:
             kwds['aruco_dict_id'] = kwds.pop('aruco_dict')
