@@ -6,7 +6,7 @@ import typeguard
 import cv2
 import inspect
 
-from glassesTools import json, marker as gt_marker
+from glassesTools import aruco, json, marker as gt_marker
 
 from . import naming, type_utils
 
@@ -31,6 +31,9 @@ class Marker:
         for f in ['size', 'aruco_dict_id', 'marker_border_bits']:
             if (val:=getattr(self,f))!=marker_defaults[f]:
                 out[f] = val
+        if 'aruco_dict_id' in out:
+            # print dictionary names for markers instead of hard to understand id
+            out['aruco_dict_id'] = aruco.dicts_to_str[out['aruco_dict_id']]
         return out
 
     @staticmethod
@@ -42,6 +45,10 @@ class Marker:
             kwargs['m_id'] = kwargs.pop('id')
         if 'aruco_dict' in kwargs:
             kwargs['aruco_dict_id'] = kwargs.pop('aruco_dict')
+        if 'aruco_dict_id' in kwargs:
+            # dictionary names might be stored as strings, turn back into int
+            if isinstance(kwargs['aruco_dict_id'],str):
+                kwargs['aruco_dict_id'] = getattr(cv2.aruco,kwargs['aruco_dict_id'])
         return Marker(**kwargs)
 
 json.register_type(json.TypeEntry(Marker,'__marker.Marker__', Marker._to_dict, Marker._from_dict))
