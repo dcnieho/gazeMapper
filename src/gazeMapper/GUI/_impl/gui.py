@@ -625,6 +625,7 @@ class GUI:
     def _check_project_setup_state(self):
         if self.study_config is not None:
             self._problems_cache = self.study_config.field_problems()
+            self._check_markers()
         # need to have:
         # 1. at least one recording defined in the session
         # 2. one plane set up
@@ -632,7 +633,7 @@ class GUI:
         # 4. one plane linked to one episode
         # 5. no individual marker problems
         self.need_setup_recordings = not self.study_config or not self.study_config.session_def.recordings or 'session_def' in self._problems_cache
-        self.need_setup_plane = not self.study_config or not self.study_config.planes or any((not p.has_complete_setup() for p in self.study_config.planes)) or any((p.name not in self.plane_configs or isinstance(self.plane_configs[p.name],Exception) for p in self.study_config.planes))
+        self.need_setup_plane = not self.study_config or not self.study_config.planes or 'planes' in self._problems_cache or any((not p.has_complete_setup() for p in self.study_config.planes)) or any((p.name not in self.plane_configs or isinstance(self.plane_configs[p.name],Exception) for p in self.study_config.planes))
         self.need_setup_episode = not self.study_config or not self.study_config.episodes_to_code or not self.study_config.planes_per_episode or any((x in self._problems_cache for x in ['episodes_to_code', 'planes_per_episode']))
         self.need_setup_individual_markers = not self.study_config or 'individual_markers' in self._problems_cache
 
@@ -642,6 +643,57 @@ class GUI:
             not self.need_setup_plane and \
             not self.need_setup_episode and \
             not self.need_setup_individual_markers
+
+    def _get_markers(self):
+        markers: dict[str,dict[str,list[int]]] = {}
+        for p in self.plane_configs:
+            markers[p] = self.plane_configs[p].get_marker_IDs()
+        markers['xx_individual_markers_xx'] = {'markers': [m.id for m in self.study_config.individual_markers]}
+        return markers
+
+    def _check_markers(self):
+        seen_markers: set[int] = set()
+        used_markers = self._get_markers()
+        for s in used_markers:
+            for m in used_markers[s]:
+                # check unique
+                seen: set[int] = set()
+                if (duplicates := {x for x in used_markers[s][m] if x in seen or seen.add(x)}):
+                    markers = ', '.join((str(x) for x in duplicates))
+                    if s=='xx_individual_markers_xx':
+                        msg = f'The individual markers contain'
+                    else:
+                        msg = f'The set of {m} markers in the {s} plane contains'
+                    msg = f'{msg} duplicates: markers {markers}. Markers should be unique, fix this duplication.'
+                    if s=='xx_individual_markers_xx':
+                        self._problems_cache = type_utils.merge_problem_dicts(self._problems_cache, {'individual_markers': {d: msg for d in duplicates}})
+                    else:
+                        self._problems_cache = type_utils.merge_problem_dicts(self._problems_cache, {'planes': {s: {'marker_file' if m=='plane' else 'target_file': msg}}})
+                # check no collisions
+                if seen_markers.intersection(used_markers[s][m]):
+                    # markers not unique, warn. Find overlap
+                    # yes, this is bad algorithmic complexity, but only run in failure cases
+                    for s2 in used_markers:
+                        for m2 in used_markers[s2]:
+                            if s2==s and m2==m:
+                                continue
+                            if (overlap:=set(used_markers[s2][m2]).intersection(used_markers[s][m])):
+                                # format the error message
+                                mark_msgs: list[str] = []
+                                for sx,mx in zip((s,s2),(m,m2)):
+                                    if sx=='xx_individual_markers_xx':
+                                        mark_msgs.append(f'individual markers')
+                                    else:
+                                        mark_msgs.append(f'{mx} markers in the {sx} plane')
+                                markers = ', '.join((str(x) for x in overlap))
+                                msg = f'Markers {markers} are encountered in the setup both as {mark_msgs[0]} and as {mark_msgs[1]}. Markers must be unique, fix this collision.'
+                                # add error message to problem dict
+                                if 'xx_individual_markers_xx' in (s,s2):
+                                    self._problems_cache = type_utils.merge_problem_dicts(self._problems_cache, {'individual_markers': {d: msg for d in overlap if d in used_markers['xx_individual_markers_xx']['markers']}})
+                                for sx,mx in zip((s,s2),(m,m2)):
+                                    if sx!='xx_individual_markers_xx':
+                                        self._problems_cache = type_utils.merge_problem_dicts(self._problems_cache, {'planes': {sx: {'marker_file' if mx=='plane' else 'target_file': msg}}})
+                seen_markers.update(used_markers[s][m])
 
     def _session_lister_set_actions_to_show(self, lister: session_lister.List):
         if self.study_config is None:
@@ -877,7 +929,7 @@ class GUI:
             self._to_focus = new_win_params[0]
 
         # rest of settings handled here in a settings tree
-        if any((k not in ['session_def', 'episodes_to_code', 'planes_per_episode', 'individual_markers'] for k in self._problems_cache)):
+        if any((k not in ['session_def', 'planes', 'episodes_to_code', 'planes_per_episode', 'individual_markers'] for k in self._problems_cache)):
             imgui.text_colored(colors.error,'*There are problems in the below setup that need to be resolved')
 
         fields = [k for k in config.study_parameter_types.keys() if k in config.study_defaults]
@@ -1094,6 +1146,8 @@ class GUI:
                 imgui.end_tooltip()
         for p in self.study_config.planes:
             problem_fields = p.field_problems()
+            if 'planes' in self._problems_cache and p.name in self._problems_cache['planes']:
+                problem_fields = type_utils.merge_problem_dicts(problem_fields, self._problems_cache['planes'][p.name])
             fixed_fields   = p.fixed_fields()
             load_error     = self.plane_configs[p.name] if p.name in self.plane_configs and isinstance(self.plane_configs[p.name], Exception) else None
             extra = ''
