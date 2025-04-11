@@ -700,8 +700,8 @@ class GUI:
                         self._problems_cache = type_utils.merge_problem_dicts(self._problems_cache, {'planes': {s: {'marker_file' if m=='plane' else 'target_file': msg}}})
                 # check no collisions
                 if seen_markers.intersection(used_markers[s][m]):
-                    # markers not unique, warn. Find overlap
-                    # yes, this is bad algorithmic complexity, but only run in failure cases
+                    # markers not unique, make error. Find exactly where the overlap is
+                    # yes, this is bad algorithmic complexity, but it only runs in failure cases
                     for s2 in used_markers:
                         for m2 in used_markers[s2]:
                             if s2==s and m2==m:
