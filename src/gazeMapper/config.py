@@ -358,6 +358,7 @@ class Study:
 
     def _check_auto_markers(self, strict_check) -> type_utils.ProblemDict:
         problems: type_utils.ProblemDict = {}
+        used_markers: dict[tuple[str,str]|tuple[str,annotation.Event,str],list[MarkerID]] = {}
         if self.auto_code_sync_points:
             if 'markers' not in self.auto_code_sync_points:
                 if strict_check:
@@ -377,6 +378,7 @@ class Study:
                     problems['auto_code_sync_points'] = {}
                     missing_markers = ', '.join((marker_ID_to_str(m) for m in missing_markers))
                     problems['auto_code_sync_points']['markers'] = f'The marker(s) {missing_markers} are not defined in individual_markers'
+                used_markers[('auto_code_sync_points','markers')] = self.auto_code_sync_points['markers']
         if self.auto_code_episodes:
             for e in self.auto_code_episodes:
                 for f in ['start_markers','end_markers']:
@@ -396,6 +398,61 @@ class Study:
                         if missing_markers:
                             missing_markers = ', '.join((marker_ID_to_str(m) for m in missing_markers))
                             type_utils.merge_problem_dicts(problems, {'auto_code_episodes': {e: {f: f'The marker(s) {missing_markers} are not defined in individual_markers'}}})
+                        used_markers[('auto_code_episodes',e,f)] = self.auto_code_episodes[e][f]
+        # check if markers are uniquely used
+        # first transform marker IDs to family so we can properly detect clashes
+        used_markers: dict[tuple[str,str]|tuple[str,annotation.Event,str],list[tuple[int,int]]] = {k:[(aruco.dict_to_family[m.aruco_dict_id],m.m_id) for m in used_markers[k]] for k in used_markers}
+        seen_markers: set[tuple[int,int]] = set()
+        def _format_key(key: tuple[str,str]|tuple[str,annotation.Event,str]):
+            return f'{key[0]}.{key[1]}' if len(key)==2 else f'{key[0]}[{key[1]}].{key[2]}'
+        def _format_duplicate_markers_msg(markers: set[tuple[int,int]]):
+            # organize per family
+            dict_markers: dict[int,list[int]] = {}
+            for d,m in markers:
+                if d in dict_markers:
+                    dict_markers[d].append(m)
+                else:
+                    dict_markers[d] = [m]
+            out = ''
+            for i,d in enumerate(dict_markers):
+                s = 's' if len(dict_markers[d])>1 else ''
+                ids = ', '.join((str(x) for x in dict_markers[d]))
+                d_str,is_family = aruco.family_to_str[d]
+                f_str = ' family' if is_family else ''
+                msg = f'marker{s} {ids} for the {d_str} dictionary{f_str}'
+                if i==0:
+                    out = msg
+                elif i==len(dict_markers)-1:
+                    out += f' and {msg}'
+                else:
+                    out += f', {msg}'
+            return out
+        for s in used_markers:
+            # first check if used markers are unique at the family level
+            seen: set[tuple[int,int]] = set()
+            if (duplicates := {x for x in used_markers[s] if x in seen or seen.add(x)}):
+                msg = f'The markers defined for {_format_key(s)} are not unique. Please resolves the following duplicates: {_format_duplicate_markers_msg(duplicates)}'
+                if strict_check:
+                    raise ValueError(msg)
+                else:
+                    type_utils.merge_problem_dicts(problems, {s[0]: ({s[1]: msg} if len(s)==2 else {s[1]: {s[2]: msg}})})
+            # then check if already used in another setup
+            if seen_markers.intersection(used_markers[s]):
+                # markers not unique, make error. Find exactly where the overlap is
+                # yes, this is bad algorithmic complexity, but it only runs in failure cases
+                for s2 in used_markers:
+                    if s==s2:
+                        continue
+                    if (overlap:=set(used_markers[s2]).intersection(used_markers[s])):
+                        # format the error message
+                        msg = f'The following markers are encountered in the setup for both {_format_key(s)} and {_format_key(s2)}: {_format_duplicate_markers_msg(overlap)}. Markers cannot be used more than once, fix this collision.'
+                        # emit error message
+                        if strict_check:
+                            raise ValueError(msg)
+                        else:
+                            for sx in (s,s2):
+                                type_utils.merge_problem_dicts(problems, {sx[0]: ({sx[1]: msg} if len(sx)==2 else {sx[1]: {sx[2]: msg}})})
+            seen_markers.update(used_markers[s])
         return problems
 
     def _check_individual_markers(self, strict_check):
