@@ -204,8 +204,3 @@ def get_plane_from_definition(plane_def: Definition, path: str|pathlib.Path) -> 
         if plane_def.origin is not None:
             pl.set_origin(plane_def.origin)
         return pl
-
-def get_plane_setup(plane_def: Definition):
-    return {'aruco_dict_id': plane_def.aruco_dict_id,
-            'aruco_params': {'markerBorderBits': plane_def.marker_border_bits},
-            'min_num_markers': plane_def.min_num_markers}

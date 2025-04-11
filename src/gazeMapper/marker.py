@@ -58,10 +58,18 @@ marker_defaults = {k:d for k in _params if (d:=_params[k].default)!=inspect._emp
 marker_parameter_types = {k:_params[k].annotation for k in _params if k!='self'}
 del _params
 
-def get_marker_dict_from_list(markers: list[Marker]) -> dict[int,dict[str]]:
+def get_marker_setup(marker: Marker) -> aruco.MarkerSetup:
+    return aruco.MarkerSetup(aruco_detector_params = {
+                                'markerBorderBits': marker.marker_border_bits
+                             },
+                             detect_only = marker.detect_only,
+                             size= marker.size
+                             )
+
+def get_marker_dict_from_list(markers: list[Marker]) -> dict[int,MarkerSetup]:
     out = {}
     for m in markers:
-        out[m.id] = {'detect_only': m.detect_only, 'size': m.size}
+        out[m.id] = get_marker_setup(m)
     return out
 
 def get_file_name(marker_id: int, folder: str|pathlib.Path) -> pathlib.Path:

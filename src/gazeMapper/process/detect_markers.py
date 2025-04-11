@@ -139,15 +139,15 @@ def _sync_function_output_drawer(frame: np.ndarray, frame_idx: int, tx: float, t
 def _get_plane_setup(study_config: config.Study,
                      config_dir: pathlib.Path,
                      episodes: dict[annotation.Event,list[list[int]]] = None,
-                     want_analyze_frames = False) -> tuple[dict[str, dict[str,Any]], dict[str, list[list[int]]]]:
+                     want_analyze_frames = False) -> tuple[dict[str, aruco.PlaneSetup], dict[str, list[list[int]]]]:
     # process the above into a dict of plane definitions and a dict with frame number intervals for which to use each
     planes = {v for k in study_config.planes_per_episode for v in study_config.planes_per_episode[k]}
-    planes_setup: dict[str, dict[str]] = {}
+    planes_setup: dict[str, aruco.PlaneSetup] = {}
     analyze_frames: dict[str, list[list[int]]] = {} if episodes else None
     for p in planes:
         p_def = [pl for pl in study_config.planes if pl.name==p][0]
         pl = plane.get_plane_from_definition(p_def, config_dir/p)
-        planes_setup[p] = {'plane': pl} | plane.get_plane_setup(p_def)
+        planes_setup[p] = pl.get_plane_setup()
         if episodes:
             # determine for which frames this plane should be used
             anal_episodes = [k for k in study_config.planes_per_episode if p in study_config.planes_per_episode[k]]
