@@ -202,7 +202,7 @@ class Study:
         self.mapped_video_show_camera_in_which                     = mapped_video_show_camera_in_which
         self.mapped_video_which_gaze_type_on_plane                 = mapped_video_which_gaze_type_on_plane
         self.mapped_video_which_gaze_type_on_plane_allow_fallback  = mapped_video_which_gaze_type_on_plane_allow_fallback
-        self.mapped_video_gaze_to_plane_margin                     = mapped_video_gaze_to_plane_margin    # fraction of plane size, added to each side of the plane
+        self.mapped_video_gaze_to_plane_margin                     = mapped_video_gaze_to_plane_margin                      # fraction of plane size, added to each side of the plane
 
         self.gui_num_workers                                = gui_num_workers
 
