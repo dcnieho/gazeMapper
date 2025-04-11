@@ -66,18 +66,18 @@ def get_marker_setup(marker: Marker) -> aruco.MarkerSetup:
                              size= marker.size
                              )
 
-def get_marker_dict_from_list(markers: list[Marker]) -> dict[int,MarkerSetup]:
+def get_marker_dict_from_list(markers: list[Marker]) -> dict[tuple[int,int],aruco.MarkerSetup]:
     out = {}
     for m in markers:
-        out[m.id] = get_marker_setup(m)
+        out[(m.id, m.aruco_dict_id)] = get_marker_setup(m)
     return out
 
-def get_file_name(marker_id: int, folder: str|pathlib.Path) -> pathlib.Path:
+def get_file_name(marker_id: int, aruco_dict_id: int, folder: str|pathlib.Path) -> pathlib.Path:
     folder = pathlib.Path(folder)
-    return folder / f'{naming.marker_pose_prefix}{marker_id}.tsv'
+    return folder / f'{naming.marker_pose_prefix}{marker_id}_{aruco.dicts_to_str[aruco_dict_id]}.tsv'
 
-def load_file(marker_id: int, folder: str|pathlib.Path) -> pd.DataFrame:
-    file = get_file_name(marker_id, folder)
+def load_file(marker_id: int, aruco_dict_id: int, folder: str|pathlib.Path) -> pd.DataFrame:
+    file = get_file_name(marker_id, aruco_dict_id, folder)
     return pd.read_csv(file,sep='\t', dtype=defaultdict(lambda: float, **gt_marker.Pose._non_float))
 
 @overload
