@@ -1312,7 +1312,11 @@ class GUI:
             imgui.align_text_to_frame_padding()
             if problem:
                 imgui.push_style_color(imgui.Col_.text, gt_gui.colors.error)
-            imgui.selectable(f'{m.id}##{i}', False)
+            imgui.set_next_item_width(-1)
+            new_val = imgui.input_int(f'##id_input_{i}', m.id, 0, 0)[1]
+            if (this_changed:=m.id!=new_val):
+                m.id = new_val
+                changed |= this_changed
             if problem:
                 imgui.pop_style_color()
             if imgui.is_item_hovered(imgui.HoveredFlags_.for_tooltip|imgui.HoveredFlags_.delay_normal):
