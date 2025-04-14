@@ -1396,7 +1396,7 @@ class GUI:
                         imgui.pop_style_color()
                     imgui.table_next_column()
                     imgui.set_next_item_width(-1)
-                    _, new_aruco_dict_id = imgui.combo(f"##new_mark_aruco_dict", new_aruco_dict_id, list(aruco.dicts_to_str.values()), popup_max_height_in_items=10)
+                    _, new_aruco_dict_id = imgui.combo(f"##new_mark_aruco_dict", new_aruco_dict_id, list(aruco.dict_to_str.values()), popup_max_height_in_items=10)
 
                     imgui.table_next_row()
                     imgui.table_next_column()

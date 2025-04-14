@@ -16,9 +16,9 @@ from . import marker, plane, session, typed_dict_defaults, type_utils
 class MarkerID(typing.NamedTuple):
     m_id:           int
     aruco_dict_id:  int
-json.register_type(json.TypeEntry(MarkerID, '__config.MarkerID__', lambda x: {'m_id':x.m_id, 'aruco_dict_id':aruco.dicts_to_str[x.aruco_dict_id]}, lambda x: MarkerID(m_id=x['m_id'], aruco_dict_id=getattr(cv2.aruco,x['aruco_dict_id']))))
+json.register_type(json.TypeEntry(MarkerID, '__config.MarkerID__', lambda x: {'m_id':x.m_id, 'aruco_dict_id':aruco.dict_to_str[x.aruco_dict_id]}, lambda x: MarkerID(m_id=x['m_id'], aruco_dict_id=getattr(cv2.aruco,x['aruco_dict_id']))))
 def marker_ID_to_str(m: MarkerID):
-    return f'{m.m_id} ({aruco.dicts_to_str[m.aruco_dict_id]})'
+    return f'{m.m_id} ({aruco.dict_to_str[m.aruco_dict_id]})'
 
 class AutoCodeSyncPoints(typed_dict_defaults.TypedDictDefault, total=False):
     markers         : set[MarkerID]
@@ -460,14 +460,14 @@ class Study:
         for m in self.individual_markers:
             problem = ''
             if m.id>=(ds:=aruco.get_dict_size(m.aruco_dict_id)):
-                problem = f'dictionary {aruco.dicts_to_str[m.aruco_dict_id]} only has {ds} markers, which means that valid IDs are 0-{ds-1}. {m.id} is thus not a valid marker for this dictionary'
+                problem = f'dictionary {aruco.dict_to_str[m.aruco_dict_id]} only has {ds} markers, which means that valid IDs are 0-{ds-1}. {m.id} is thus not a valid marker for this dictionary'
             elif m.detect_only and m.size is not None:
                 problem = f'size should not be set for detect only markers'
             elif not m.detect_only and (m.size is None or m.size<=0):
                 problem = f'size should be set to a value larger than 0'
             if problem:
                 if strict_check:
-                    raise ValueError(f'individual_markers marker {m.id} ({aruco.dicts_to_str[m.aruco_dict_id]}): {problem}')
+                    raise ValueError(f'individual_markers marker {m.id} ({aruco.dict_to_str[m.aruco_dict_id]}): {problem}')
                 else:
                     problems = type_utils.merge_problem_dicts(problems, {'individual_markers': {(aruco.dict_to_family[m.aruco_dict_id], m.id): problem}})
         return problems

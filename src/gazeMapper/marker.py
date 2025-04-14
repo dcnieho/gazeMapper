@@ -33,7 +33,7 @@ class Marker:
                 out[f] = val
         if 'aruco_dict_id' in out:
             # print dictionary names for markers instead of hard to understand id
-            out['aruco_dict_id'] = aruco.dicts_to_str[out['aruco_dict_id']]
+            out['aruco_dict_id'] = aruco.dict_to_str[out['aruco_dict_id']]
         return out
 
     @staticmethod
@@ -74,7 +74,7 @@ def get_marker_dict_from_list(markers: list[Marker]) -> dict[tuple[int,int],aruc
 
 def get_file_name(marker_id: int, aruco_dict_id: int, folder: str|pathlib.Path) -> pathlib.Path:
     folder = pathlib.Path(folder)
-    return folder / f'{naming.marker_pose_prefix}{marker_id}_{aruco.dicts_to_str[aruco_dict_id]}.tsv'
+    return folder / f'{naming.marker_pose_prefix}{marker_id}_{aruco.dict_to_str[aruco_dict_id]}.tsv'
 
 def load_file(marker_id: int, aruco_dict_id: int, folder: str|pathlib.Path) -> pd.DataFrame:
     file = get_file_name(marker_id, aruco_dict_id, folder)
