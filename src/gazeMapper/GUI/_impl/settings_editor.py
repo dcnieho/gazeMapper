@@ -14,11 +14,10 @@ from glassesTools.gui.timeline import color_darken
 from ... import type_utils, typed_dict_defaults
 
 
-TYPE_TO_STR_REGISTRY: dict[typing.Type, dict[typing.Any, str]|typing.Callable[[typing.Any], str]] = {
-    type_utils.ArucoDictType: glassesTools.aruco.dicts_to_str
-}
+TYPE_TO_STR_REGISTRY: dict[typing.Type, dict[typing.Any, str]|typing.Callable[[typing.Any], str]] = {}
 def register_formatter(ttype: typing.Type, formatter: dict[typing.Any, str]|typing.Callable[[typing.Any], str]):
     TYPE_TO_STR_REGISTRY[ttype] = formatter
+register_formatter(type_utils.ArucoDictType, glassesTools.aruco.dicts_to_str)
 
 _C  = typing.TypeVar("_C")
 _C2 = typing.TypeVar("_C2")
