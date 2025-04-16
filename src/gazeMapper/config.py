@@ -7,10 +7,10 @@ import typing
 import cv2
 from typing import Any, Literal
 
-from glassesTools import annotation, aruco, gaze_worldref, json, utils
+from glassesTools import annotation, aruco, gaze_worldref, json, utils as gt_utils
 from glassesTools.validation import DataQualityType, get_DataQualityType_explanation
 
-from . import marker, plane, session, typed_dict_defaults, type_utils
+from . import marker, plane, session, typed_dict_defaults, type_utils, utils
 
 
 class MarkerID(typing.NamedTuple):
@@ -220,7 +220,7 @@ class Study:
             self._check_make_video(strict_check)
 
         # ensure typed dicts with defaults members are of the right class, and apply defaults
-        to_check = {k:t for k in study_parameter_types if typed_dict_defaults.is_typeddictdefault(t:=utils.unpack_none_union(study_parameter_types[k])[0])}
+        to_check = {k:t for k in study_parameter_types if typed_dict_defaults.is_typeddictdefault(t:=gt_utils.unpack_none_union(study_parameter_types[k])[0])}
         for k in to_check:
             if getattr(self,k) is not None:
                 setattr(self,k, to_check[k](getattr(self,k)))
@@ -399,39 +399,20 @@ class Study:
                             missing_markers = ', '.join((marker_ID_to_str(m) for m in missing_markers))
                             type_utils.merge_problem_dicts(problems, {'auto_code_episodes': {e: {f: f'The marker(s) {missing_markers} are not defined in individual_markers'}}})
                         used_markers[('auto_code_episodes',e,f)] = self.auto_code_episodes[e][f]
-        # check if markers are uniquely used
+        # check if markers  or marker sequences are uniquely used:
+        # 1. marker used for auto_code_sync_points cannot appear anywhere else
+        # 2. marker sequences used for auto_code_episodes must be unique (markers can be reused)
         # first transform marker IDs to family so we can properly detect clashes
-        used_markers: dict[tuple[str,str]|tuple[str,annotation.Event,str],list[tuple[int,int]]] = {k:[(aruco.dict_to_family[m.aruco_dict_id],m.m_id) for m in used_markers[k]] for k in used_markers}
-        seen_markers: set[tuple[int,int]] = set()
+        used_markers      : dict[tuple[str,str]|tuple[str,annotation.Event,str],list[tuple[int,int]]] = {k:[(aruco.dict_to_family[m.aruco_dict_id],m.m_id) for m in used_markers[k]] for k in used_markers}
+        seen_markers      : set[tuple[int,int]] = set()
+        seen_markers_sets : set[tuple[tuple[int,int]]] = set()
         def _format_key(key: tuple[str,str]|tuple[str,annotation.Event,str]):
             return f'{key[0]}.{key[1]}' if len(key)==2 else f'{key[0]}[{key[1]}].{key[2]}'
-        def _format_duplicate_markers_msg(markers: set[tuple[int,int]]):
-            # organize per family
-            dict_markers: dict[int,list[int]] = {}
-            for d,m in markers:
-                if d in dict_markers:
-                    dict_markers[d].append(m)
-                else:
-                    dict_markers[d] = [m]
-            out = ''
-            for i,d in enumerate(dict_markers):
-                s = 's' if len(dict_markers[d])>1 else ''
-                ids = ', '.join((str(x) for x in dict_markers[d]))
-                d_str,is_family = aruco.family_to_str[d]
-                f_str = ' family' if is_family else ''
-                msg = f'marker{s} {ids} for the {d_str} dictionary{f_str}'
-                if i==0:
-                    out = msg
-                elif i==len(dict_markers)-1:
-                    out += f' and {msg}'
-                else:
-                    out += f', {msg}'
-            return out
         for s in used_markers:
             # first check if used markers are unique at the family level
             seen: set[tuple[int,int]] = set()
             if (duplicates := {x for x in used_markers[s] if x in seen or seen.add(x)}):
-                msg = f'The markers defined for {_format_key(s)} are not unique. Please resolves the following duplicates: {_format_duplicate_markers_msg(duplicates)}'
+                msg = f'The markers defined for {_format_key(s)} are not unique. Please resolves the following duplicates: {utils.format_duplicate_markers_msg(duplicates)}'
                 if strict_check:
                     raise ValueError(msg)
                 else:
@@ -441,11 +422,13 @@ class Study:
                 # markers not unique, make error. Find exactly where the overlap is
                 # yes, this is bad algorithmic complexity, but it only runs in failure cases
                 for s2 in used_markers:
-                    if s==s2:
+                    if s==s2 or s[0]=='auto_code_episodes' and s[0]==s2[0]:
+                        # if both are different entries in 'auto_code_episodes', that is not an error
+                        # for 'auto_code_episodes' we need to check marker sequences are unique, not
+                        # individual entries. e.g. start is 80 81, and end is 81 80 is valid
                         continue
                     if (overlap:=set(used_markers[s2]).intersection(used_markers[s])):
-                        # format the error message
-                        msg = f'The following markers are encountered in the setup for both {_format_key(s)} and {_format_key(s2)}: {_format_duplicate_markers_msg(overlap)}. Markers cannot be used more than once, fix this collision.'
+                        msg = f'The following markers are encountered in the setup for both {_format_key(s)} and {_format_key(s2)}: {utils.format_duplicate_markers_msg(overlap)}. Markers cannot be used more than once, fix this collision.'
                         # emit error message
                         if strict_check:
                             raise ValueError(msg)
@@ -453,6 +436,20 @@ class Study:
                             for sx in (s,s2):
                                 type_utils.merge_problem_dicts(problems, {sx[0]: ({sx[1]: msg} if len(sx)==2 else {sx[1]: {sx[2]: msg}})})
             seen_markers.update(used_markers[s])
+            # check if marker sequence is already used
+            if seen_markers_sets.intersection((tuple(used_markers[s]),)):
+                for s2 in used_markers:
+                    if s==s2:
+                        continue
+                    if set((tuple(used_markers[s2]),)).intersection((tuple(used_markers[s]),)):
+                        msg = f'The marker sequence {utils.format_marker_sequence_msg(used_markers[s])} specified for {_format_key(s)} has already been used for {_format_key(s2)}. Markers sequences must be unique, please fix this collision.'
+                        # emit error message
+                        if strict_check:
+                            raise ValueError(msg)
+                        else:
+                            for sx in (s,s2):
+                                type_utils.merge_problem_dicts(problems, {sx[0]: {sx[1]: {sx[2]: msg}}})
+            seen_markers_sets.add(tuple(used_markers[s]))
         return problems
 
     def _check_individual_markers(self, strict_check):
@@ -537,7 +534,7 @@ class Study:
                 if not self.get_cam_movement_for_et_sync_function or not all([x in self.get_cam_movement_for_et_sync_function for x in ["module_or_file","function","parameters"]]):
                     raise ValueError('if get_cam_movement_for_et_sync_method is set to "function", get_cam_movement_for_et_sync_function should be a dict specifying "module_or_file", "function", and "parameters"')
             else:
-                t = utils.unpack_none_union(study_parameter_types['get_cam_movement_for_et_sync_function'])[0]
+                t = gt_utils.unpack_none_union(study_parameter_types['get_cam_movement_for_et_sync_function'])[0]
                 keys = t.__required_keys__|t.__optional_keys__
                 this_problems = {k:f'{k} should be set when get_cam_movement_for_et_sync_function is set to "function"' for k in keys if not self.get_cam_movement_for_et_sync_function or (k not in t._field_defaults and (k not in self.get_cam_movement_for_et_sync_function or not self.get_cam_movement_for_et_sync_function[k]))}
                 if this_problems:
@@ -605,7 +602,7 @@ class Study:
         # filter out defaulted
         to_dump = {k:to_dump[k] for k in to_dump if k not in study_defaults or study_defaults[k]!=to_dump[k]}
         # also filter out defaults in some subfields
-        typed_dict_default_fields = [k for k in to_dump if typed_dict_defaults.is_typeddictdefault(utils.unpack_none_union(study_parameter_types[k])[0])]
+        typed_dict_default_fields = [k for k in to_dump if typed_dict_defaults.is_typeddictdefault(gt_utils.unpack_none_union(study_parameter_types[k])[0])]
         for k in typed_dict_default_fields:
             to_dump[k] = {kk:to_dump[k][kk] for kk in to_dump[k] if kk not in to_dump[k]._field_defaults or to_dump[k]._field_defaults[kk]!=to_dump[k][kk]}
             if not to_dump[k] and k in study_defaults and study_defaults[k] is not None:
@@ -1023,7 +1020,7 @@ def _apply_impl(obj, overrides: dict[str,Any], annotations: dict[str,typing.Type
             val = _apply_impl(ori_val, {p2: val[p2] if isinstance(val,dict) else getattr(val,p2) for p2 in type_utils.get_fields(val) if (isinstance(val,dict) and p2 in val) or hasattr(val,p2)}, type_utils.get_annotations(ori_val))
 
         # special case: for dict-like object we can unset specific fields, so allow those by skipping check for them
-        if not just_set and val is None and (annotations is None or p not in annotations or not utils.unpack_none_union(annotations[p])[1]):
+        if not just_set and val is None and (annotations is None or p not in annotations or not gt_utils.unpack_none_union(annotations[p])[1]):
             if isinstance(obj,dict):
                 if p in obj:
                     del obj[p]
