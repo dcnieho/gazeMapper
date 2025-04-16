@@ -41,7 +41,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
     # get marker files
     all_marker_ids = [study_config.auto_code_episodes[e]['start_markers']+study_config.auto_code_episodes[e]['end_markers'] for e in study_config.auto_code_episodes]
     all_marker_ids = {m for ms in all_marker_ids for m in ms}
-    ori_markers = {m.id: marker.load_file(m.id, m.aruco_dict_id, working_dir) for m in study_config.individual_markers if (m.id,m.aruco_dict_id) in all_marker_ids}
+    ori_markers = {config.MarkerID(m.id, m.aruco_dict_id): marker.load_file(m.id, m.aruco_dict_id, working_dir) for m in study_config.individual_markers if (m.id,m.aruco_dict_id) in all_marker_ids}
     # recode so we have a boolean with when markers are present
     ori_markers = {i: marker.code_marker_for_presence(ori_markers[i], allow_failed=True) for i in ori_markers if not ori_markers[i].empty}
     # now auto code indicated intervals
