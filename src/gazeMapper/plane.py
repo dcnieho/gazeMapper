@@ -197,6 +197,7 @@ def get_plane_from_definition(plane_def: Definition, path: str|pathlib.Path) -> 
             plane_size          = plane_def.plane_size,
             aruco_dict_id       = plane_def.aruco_dict_id,
             marker_border_bits  = plane_def.marker_border_bits,
+            min_num_markers     = plane_def.min_num_markers,
             unit                = plane_def.unit,
             ref_image_store_path= path/plane.Plane.default_ref_image_name,
             ref_image_size      = plane_def.ref_image_size
