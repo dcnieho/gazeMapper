@@ -506,7 +506,8 @@ class GUI:
                 lbl += f', recording "{job.recording}"'
             lbl_complete = lbl + f' (work item {job_id}, action {job.action.displayable_name})'
             gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Processing error", f"An error occurred when processing {lbl}:\n\n{exc}", gt_gui.msg_box.MsgBox.error, more=f'{lbl_complete}\n\n{tb}')
-            self.job_scheduler.jobs[job_id].error = tb
+            if job_id in self.job_scheduler.jobs:
+                self.job_scheduler.jobs[job_id].error = tb
 
         # clean up, if needed, when a task failed or was canceled
         if job.action==process.Action.IMPORT and state in [process_pool.State.Canceled, process_pool.State.Failed]:
