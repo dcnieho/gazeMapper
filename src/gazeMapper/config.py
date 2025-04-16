@@ -650,6 +650,10 @@ class Study:
             kwds['auto_code_episodes'] = {annotation.Event(k):v for k,v in kwds['auto_code_episodes']}
         # help with enum roundtrip
         kwds['episodes_to_code'] = {annotation.Event(e) for e in kwds['episodes_to_code']}
+        if 'validate_dq_types' in kwds:
+            kwds['validate_dq_types']= {DataQualityType(d) for d in kwds['validate_dq_types']}
+        if 'mapped_video_which_gaze_type_on_plane' in kwds:
+            kwds['mapped_video_which_gaze_type_on_plane'] = gaze_worldref.Type(kwds['mapped_video_which_gaze_type_on_plane'])
         # backwards compatibility, help with named tuple roundtrip
         for k in ('overlay_video_gaze_vid_pos_color','overlay_video_gaze_world_pos_color','mapped_video_projected_vidPos_color','mapped_video_projected_world_pos_color','mapped_video_projected_left_ray_color','mapped_video_projected_right_ray_color','mapped_video_projected_average_ray_color'):
             if k in kwds and kwds[k] is not None and not isinstance(kwds[k],RgbColor):
