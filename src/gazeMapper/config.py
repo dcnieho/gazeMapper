@@ -988,6 +988,13 @@ class StudyOverride:
         if 'planes_per_episode' in kwds:
             # stored as list of tuples, unpack
             kwds['planes_per_episode'] = {k:v for k,v in kwds['planes_per_episode']}
+        # help with enum roundtrip
+        if 'episodes_to_code' in kwds:
+            kwds['episodes_to_code'] = {annotation.Event(e) for e in kwds['episodes_to_code']}
+        if 'validate_dq_types' in kwds:
+            kwds['validate_dq_types']= {DataQualityType(d) for d in kwds['validate_dq_types']}
+        if 'mapped_video_which_gaze_type_on_plane' in kwds:
+            kwds['mapped_video_which_gaze_type_on_plane'] = gaze_worldref.Type(kwds['mapped_video_which_gaze_type_on_plane'])
         return StudyOverride(level, recording_type, **kwds)
 
     @staticmethod
