@@ -1565,7 +1565,7 @@ class GUI:
         # draw source/working folder interactions
         if len(recs)==1 and imgui.begin_menu('Camera calibration'):
             working_directory = sess.recordings[recs[0]].info.working_directory
-            has_cam_cal_file = (working_directory/gt_naming.scene_camera_calibration_fname).is_file()
+            has_cam_cal_file = working_directory and (working_directory/gt_naming.scene_camera_calibration_fname).is_file()
             if not has_cam_cal_file:
                 imgui.text_colored(colors.error,'No camera calibration!')
             else:
