@@ -558,7 +558,7 @@ async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[record
 
     gt_gui.utils.push_popup(g, lambda: gt_gui.utils.popup("Preparing import", prepping_recs_popup, buttons=None, button_keymap={0:imgui.Key.enter}, closable=False, outside=False))
 
-    # step 1, find what recordings of this type of eye tracker are in the path
+    # step 1, find what recordings of this type of eye tracker/camera files are in the path
     recs = rec_getter()
     all_recs: list[recording.Recording] = []
     dup_recs: list[recording.Recording] = []
