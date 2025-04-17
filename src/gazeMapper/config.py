@@ -654,6 +654,12 @@ class Study:
             kwds['validate_dq_types']= {DataQualityType(d) for d in kwds['validate_dq_types']}
         if 'mapped_video_which_gaze_type_on_plane' in kwds:
             kwds['mapped_video_which_gaze_type_on_plane'] = gaze_worldref.Type(kwds['mapped_video_which_gaze_type_on_plane'])
+        # backward compatibility: ensure value are stored in sets, not lists
+        kwds['planes_per_episode'] = {k:set(v) for k,v in kwds['planes_per_episode'].items()}
+        if 'sync_ref_average_recordings' in kwds:
+            kwds['sync_ref_average_recordings'] = set(kwds['sync_ref_average_recordings'])
+        if 'mapped_video_make_which' in kwds:
+            kwds['mapped_video_make_which'] = set(kwds['mapped_video_make_which'])
         # backwards compatibility, help with named tuple roundtrip
         for k in ('overlay_video_gaze_vid_pos_color','overlay_video_gaze_world_pos_color','mapped_video_projected_vidPos_color','mapped_video_projected_world_pos_color','mapped_video_projected_left_ray_color','mapped_video_projected_right_ray_color','mapped_video_projected_average_ray_color'):
             if k in kwds and kwds[k] is not None and not isinstance(kwds[k],RgbColor):
@@ -664,7 +670,7 @@ class Study:
         if 'auto_code_trial_episodes' in kwds:
             kwds['auto_code_episodes'] = {annotation.Event.Trial: kwds.pop('auto_code_trial_episodes')}
         # backwards compatibility, upgrade markers to markerIDs if they're bare ints
-        if 'auto_code_sync_points' in kwds and 'markers' in kwds['auto_code_sync_points']:
+        if 'auto_code_sync_points' in kwds and kwds['auto_code_sync_points'] is not None and 'markers' in kwds['auto_code_sync_points']:
             markers = kwds['auto_code_sync_points']['markers']
             kwds['auto_code_sync_points']['markers'] = set()
             for m in markers:
