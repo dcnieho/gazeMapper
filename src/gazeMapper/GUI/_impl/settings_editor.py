@@ -509,7 +509,11 @@ def draw_value(field_lbl: str, val: _T, f_type: typing.Type, o_type_args: tuple[
             if isinstance(val,pathlib.Path):
                 new_val = pathlib.Path(new_val)
         case builtins.int:
-            new_val = imgui.input_int(f'##{field_lbl}', val)[1]
+            extra = {}
+            if fixed:
+                extra['step']       = 0
+                extra['step_fast']  = 0
+            new_val = imgui.input_int(f'##{field_lbl}', val, **extra)[1]
         case builtins.float:
             new_val = imgui.input_double(f'##{field_lbl}', val)[1]
         case builtins.list | builtins.set:
