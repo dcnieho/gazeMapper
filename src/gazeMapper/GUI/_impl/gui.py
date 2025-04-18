@@ -612,6 +612,7 @@ class GUI:
         config_dir = config.guess_config_dir(self.study_config.working_directory)
         if not p_def.has_complete_setup():
             self.plane_configs[p_def.name] = None
+            self._plane_preview_cache.pop(p_def.name,None)
             return
 
         try:
