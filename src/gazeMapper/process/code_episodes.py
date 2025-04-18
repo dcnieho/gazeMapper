@@ -23,9 +23,8 @@ from .. import config, episode, naming, plane, process, session, synchronization
 # instance be the exact interval during which the subject performs the
 # validation task.
 # This script can be run directly on recordings converted to the common format,
-# but output from steps c_detectMarkers and d_gazeToPoster
-# (which can be run before this script, they will just process the whole video)
-# will also be shown if available.
+# but output from the detectMarkers and gazeToPoster actions (if available)
+# will also be shown.
 
 _event_type_to_key_map = {
     annotation.Event.Validate       : imgui.Key.v,
