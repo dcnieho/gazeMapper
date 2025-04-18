@@ -24,6 +24,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show
         gui = GUI(use_thread = False)
         gui.add_window(working_dir.name)
         gui.set_interruptible(False)
+        gui.set_detachable(True)
         gui.set_show_controls(True)
         gui.set_show_play_percentage(True)
         gui.set_show_action_tooltip(True)

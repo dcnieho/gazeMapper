@@ -275,6 +275,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
                     gui.set_window_title(f'{working_dir.name}: {v}', gui.main_window_id)
                 else:
                     gui_window_ids[v] = gui.add_window(f'{working_dir.name}: {v}')
+                gui.set_detachable(True)
                 gui.set_show_timeline(True, videos_ts[lead_vid], episodes_as_ref_flat[v], gui_window_ids[v])
                 gui.set_frame_size(vid_info[v], gui_window_ids[v])
                 gui.set_show_controls(True, gui_window_ids[v])
@@ -443,9 +444,12 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
 
                 requests = gui.get_requests()
                 for r,_ in requests:
-                    if r=='exit':   # only request we need to handle
+                    if r=='exit':   # only requests we need to handle
                         should_exit = True
                         break
+                    if r=='close':
+                        has_gui = False
+                        gui.stop()
 
         # done with this set of videos
         # clean up as needed (close GUI when nothing to show anymore)
