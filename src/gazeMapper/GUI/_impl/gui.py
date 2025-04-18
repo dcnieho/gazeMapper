@@ -1303,9 +1303,9 @@ class GUI:
                     imgui.text_colored(gt_gui.colors.error, problem)
                 key = m.id,m.aruco_dict_id,m.marker_border_bits
                 sz = int(200*hello_imgui.dpi_window_size_factor())
-                if key not in self._marker_preview_cache:
+                if key not in self._marker_preview_cache and not problem:
                     self._marker_preview_cache[key] = utils.get_aruco_marker_image(sz, *key)
-                if self._marker_preview_cache[key] is not None:
+                if key in self._marker_preview_cache and self._marker_preview_cache[key] is not None:
                     self._marker_preview_cache[key].render(width=sz, height=sz)
                 imgui.end_tooltip()
             imgui.table_next_column()
