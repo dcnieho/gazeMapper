@@ -464,6 +464,8 @@ class Study:
                 problem = f'size should not be set for detect only markers'
             elif not m.detect_only and (m.size is None or m.size<=0):
                 problem = f'size should be set to a value larger than 0'
+            elif m.marker_border_bits<1:
+                problem = 'marker_border_bits must be at least 1'
             if problem:
                 if strict_check:
                     raise ValueError(f'individual_markers marker {m.id} ({aruco.dict_to_str[m.aruco_dict_id]}): {problem}')
