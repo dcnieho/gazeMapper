@@ -82,7 +82,10 @@ class Definition_GlassesValidator(Definition):
         self.target_file        = target_file
 
     def field_problems(self) -> type_utils.ProblemDict:
-        return {}
+        problem = {}
+        if self.marker_border_bits<1:
+            problem['marker_border_bits'] = f'marker_border_bits must be at least 1'
+        return problem
 
     def fixed_fields(self) -> type_utils.NestedDict:
         # these cannot be edited from the GUI, are for info only
@@ -117,13 +120,15 @@ class Definition_Plane_2D(Definition):
         self.ref_image_size     = ref_image_size        # largest dimension
 
     def field_problems(self) -> type_utils.ProblemDict:
-        wrong: dict[str,None|dict[str,None]] = {}
+        problem: dict[str,None|dict[str,None]] = {}
         for a in ['marker_file','marker_size','plane_size']:
             if not getattr(self,a):
-                wrong[a] = None
+                problem[a] = None
             elif a=='plane_size' and any(missing:=[c==0 for c in self.plane_size]):
-                wrong[a] = {k:None for k,m in zip(self.plane_size._fields,missing) if m}
-        return wrong
+                problem[a] = {k:None for k,m in zip(self.plane_size._fields,missing) if m}
+        if self.marker_border_bits<1:
+            problem['marker_border_bits'] = f'marker_border_bits must be at least 1'
+        return problem
 
     def fixed_fields(self) -> type_utils.NestedDict:
         return {k:None for k in ['name']}
