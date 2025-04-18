@@ -1,9 +1,7 @@
 {
   "planes_per_episode": [
     [
-      {
-        "__enum.Event__": "Event.Sync_ET_Data"
-      },
+      "Sync ET Data",
       {
         "builtin.set": [
           "validate"
@@ -11,20 +9,16 @@
       }
     ],
     [
-      {
-        "__enum.Event__": "Event.Trial"
-      },
+      "Trial",
       {
         "builtin.set": [
-          "follow_screen",
-          "lead_screen"
+          "lead_screen",
+          "follow_screen"
         ]
       }
     ],
     [
-      {
-        "__enum.Event__": "Event.Validate"
-      },
+      "Validate",
       {
         "builtin.set": [
           "validate"
@@ -34,18 +28,10 @@
   ],
   "episodes_to_code": {
     "builtin.set": [
-      {
-        "__enum.Event__": "Event.Trial"
-      },
-      {
-        "__enum.Event__": "Event.Validate"
-      },
-      {
-        "__enum.Event__": "Event.Sync_Camera"
-      },
-      {
-        "__enum.Event__": "Event.Sync_ET_Data"
-      }
+      "Sync ET Data",
+      "Trial",
+      "Sync Camera",
+      "Validate"
     ]
   },
   "individual_markers": [
@@ -74,23 +60,46 @@
   "auto_code_sync_points": {
     "markers": {
       "builtin.set": [
-        50
+        {
+          "__config.MarkerID__": {
+            "m_id": 50,
+            "aruco_dict_id": "DICT_4X4_250"
+          }
+        }
       ]
     }
   },
   "auto_code_episodes": [
     [
-      {
-        "__enum.Event__": "Event.Trial"
-      },
+      "Trial",
       {
         "start_markers": [
-          80,
-          81
+          {
+            "__config.MarkerID__": {
+              "m_id": 80,
+              "aruco_dict_id": "DICT_4X4_250"
+            }
+          },
+          {
+            "__config.MarkerID__": {
+              "m_id": 81,
+              "aruco_dict_id": "DICT_4X4_250"
+            }
+          }
         ],
         "end_markers": [
-          81,
-          80
+          {
+            "__config.MarkerID__": {
+              "m_id": 81,
+              "aruco_dict_id": "DICT_4X4_250"
+            }
+          },
+          {
+            "__config.MarkerID__": {
+              "m_id": 80,
+              "aruco_dict_id": "DICT_4X4_250"
+            }
+          }
         ]
       }
     ]
@@ -102,16 +111,20 @@
     ]
   },
   "mapped_video_recording_colors": {
-    "follow": [
-      0,
-      95,
-      191
-    ],
-    "lead": [
-      255,
-      127,
-      0
-    ]
+    "follow": {
+      "__config.RgbColor__": {
+        "r": 0,
+        "g": 95,
+        "b": 191
+      }
+    },
+    "lead": {
+      "__config.RgbColor__": {
+        "r": 255,
+        "g": 127,
+        "b": 0
+      }
+    }
   },
   "mapped_video_projected_world_pos_color": null,
   "mapped_video_show_gaze_on_plane_in_which": {
@@ -122,8 +135,8 @@
   },
   "mapped_video_show_gaze_vec_in_which": {
     "builtin.set": [
-      "follow",
-      "lead"
+      "lead",
+      "follow"
     ]
   },
   "mapped_video_show_camera_in_which": {
@@ -132,7 +145,5 @@
       "follow"
     ]
   },
-  "mapped_video_which_gaze_type_on_plane": {
-    "__enum.gaze_worldref.Type__": "Type.Average_Gaze_Vector"
-  }
+  "mapped_video_which_gaze_type_on_plane": "Average Gaze Vector"
 }

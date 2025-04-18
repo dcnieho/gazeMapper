@@ -3,17 +3,13 @@
     {
       "__session.RecordingDefinition__": {
         "name": "eye tracker",
-        "type": {
-          "__enum.session.RecordingType__": "RecordingType.Eye_Tracker"
-        }
+        "type": "Eye Tracker"
       }
     },
     {
       "__session.RecordingDefinition__": {
         "name": "overview",
-        "type": {
-          "__enum.session.RecordingType__": "RecordingType.Camera"
-        }
+        "type": "Camera"
       }
     }
   ]

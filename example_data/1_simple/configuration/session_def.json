@@ -3,9 +3,7 @@
     {
       "__session.RecordingDefinition__": {
         "name": "eye tracker",
-        "type": {
-          "__enum.session.RecordingType__": "RecordingType.Eye_Tracker"
-        }
+        "type": "Eye Tracker"
       }
     }
   ]

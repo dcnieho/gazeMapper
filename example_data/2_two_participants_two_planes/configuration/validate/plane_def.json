@@ -1,6 +1,4 @@
 {
-  "type": {
-    "__enum.plane.Type__": "Type.GlassesValidator"
-  },
+  "type": "GlassesValidator",
   "use_default": false
 }

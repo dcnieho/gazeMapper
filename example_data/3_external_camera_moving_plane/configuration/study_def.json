@@ -1,9 +1,7 @@
 {
   "planes_per_episode": [
     [
-      {
-        "__enum.Event__": "Event.Sync_ET_Data"
-      },
+      "Sync ET Data",
       {
         "builtin.set": [
           "validate"
@@ -11,22 +9,18 @@
       }
     ],
     [
-      {
-        "__enum.Event__": "Event.Trial"
-      },
+      "Trial",
       {
         "builtin.set": [
-          "tablet",
-          "pears",
           "apples",
-          "mangos"
+          "mangos",
+          "pears",
+          "tablet"
         ]
       }
     ],
     [
-      {
-        "__enum.Event__": "Event.Validate"
-      },
+      "Validate",
       {
         "builtin.set": [
           "validate"
@@ -36,18 +30,10 @@
   ],
   "episodes_to_code": {
     "builtin.set": [
-      {
-        "__enum.Event__": "Event.Sync_ET_Data"
-      },
-      {
-        "__enum.Event__": "Event.Sync_Camera"
-      },
-      {
-        "__enum.Event__": "Event.Validate"
-      },
-      {
-        "__enum.Event__": "Event.Trial"
-      }
+      "Sync ET Data",
+      "Trial",
+      "Sync Camera",
+      "Validate"
     ]
   },
   "individual_markers": [
@@ -80,44 +66,69 @@
   "auto_code_sync_points": {
     "markers": {
       "builtin.set": [
-        50
+        {
+          "__config.MarkerID__": {
+            "m_id": 50,
+            "aruco_dict_id": "DICT_4X4_250"
+          }
+        }
       ]
     }
   },
   "auto_code_episodes": [
     [
-      {
-        "__enum.Event__": "Event.Trial"
-      },
+      "Trial",
       {
         "start_markers": [
-          80,
-          81
+          {
+            "__config.MarkerID__": {
+              "m_id": 80,
+              "aruco_dict_id": "DICT_4X4_250"
+            }
+          },
+          {
+            "__config.MarkerID__": {
+              "m_id": 81,
+              "aruco_dict_id": "DICT_4X4_250"
+            }
+          }
         ],
         "end_markers": [
-          81,
-          80
+          {
+            "__config.MarkerID__": {
+              "m_id": 81,
+              "aruco_dict_id": "DICT_4X4_250"
+            }
+          },
+          {
+            "__config.MarkerID__": {
+              "m_id": 80,
+              "aruco_dict_id": "DICT_4X4_250"
+            }
+          }
         ]
       }
     ]
   ],
   "mapped_video_make_which": {
     "builtin.set": [
-      "overview",
-      "eye tracker"
+      "eye tracker",
+      "overview"
     ]
   },
   "mapped_video_recording_colors": {
-    "eye tracker": [
-      255,
-      127,
-      0
-    ]
+    "eye tracker": {
+      "__config.RgbColor__": {
+        "r": 255,
+        "g": 127,
+        "b": 0
+      }
+    }
   },
   "mapped_video_show_gaze_on_plane_in_which": {
     "builtin.set": [
-      "overview",
-      "eye tracker"
+      "eye tracker",
+      "overview"
     ]
   },
   "mapped_video_show_gaze_vec_in_which": {
