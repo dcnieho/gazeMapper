@@ -1242,7 +1242,7 @@ class GUI:
     def _episode_setup_pane_drawer(self):
         if not self.study_config.planes:
             imgui.align_text_to_frame_padding()
-            imgui.text_colored(colors.error,'*At minimum one plane should be defined.')
+            imgui.text_colored(colors.error,'*At minimum one plane should be defined. Go to')
             imgui.same_line()
             tab_lbl = 'Plane editor'
             if imgui.button('Edit planes'):
