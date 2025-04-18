@@ -319,7 +319,11 @@ class GUI:
             if change_path.suffix != '.json':
                 # irrelevant
                 return
-            # TODO
+            # reload config
+            try:
+                self.study_config = config.Study.load_from_json(config_dir, strict_check=False)
+            except Exception as exc:
+                gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Project reloading error", f"The project's settings were changed, but failed to reload:\n{exc}", gt_gui.msg_box.MsgBox.error, more=gt_gui.utils.get_traceback(type(exc), exc, exc.__traceback__))
         elif change_path.parent.parent!=config_dir:
             # we're also not dealing with a plane directory, skip
             return
