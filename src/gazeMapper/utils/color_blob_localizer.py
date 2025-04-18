@@ -1,10 +1,11 @@
 import numpy as np
 import cv2
 
+from glassesTools import ocv
 
 border_mask_cache: dict[tuple[int,int,float], np.ndarray] = {}
 
-def detect_blob_HSV(frame: np.ndarray, low: tuple[int], high: tuple[int], edge_cut_fac=9.):
+def detect_blob_HSV(proc_name: str, frame_idx: int, frame: np.ndarray, cam_params: ocv.CameraParams, low: tuple[int], high: tuple[int], edge_cut_fac=9.):
     # for instance:
     # low = (40, 60, 40)
     # high= (70, 255, 255)

@@ -121,13 +121,14 @@ class Study:
                  mapped_video_projected_average_ray_color              : RgbColor|None                     = RgbColor(255,  0,255),
                  mapped_video_process_planes_for_all_frames            : bool                              = False,
                  mapped_video_process_annotations_for_all_recordings   : bool                              = True,
-                 mapped_video_show_detected_markers                    : bool                              = True,
-                 mapped_video_show_plane_axes                          : bool                              = True,
-                 mapped_video_process_individual_markers_for_all_frames: bool                              = True,
-                 mapped_video_show_individual_marker_axes              : bool                              = True,
+                 mapped_video_plane_marker_color                       : RgbColor|None                     = RgbColor(  0,255,  0),
+                 mapped_video_recovered_plane_marker_color             : RgbColor|None                     = RgbColor(  0,255,255),
+                 mapped_video_plane_axis_arm_length                    : float                             = 25,
+                 mapped_video_individual_marker_color                  : RgbColor|None                     = RgbColor(255,  0,255),
+                 mapped_video_individual_marker_axis_arm_length        : float                             = 25,
+                 mapped_video_unexpected_marker_color                  : RgbColor|None                     = RgbColor(255,255,128),
+                 mapped_video_rejected_marker_color                    : RgbColor|None                     = None,
                  mapped_video_show_sync_func_output                    : bool                              = True,
-                 mapped_video_show_unexpected_markers                  : bool                              = False,
-                 mapped_video_show_rejected_markers                    : bool                              = False,
                  mapped_video_show_gaze_on_plane_in_which              : set[str]|None                     = None,
                  mapped_video_show_gaze_vec_in_which                   : set[str]|None                     = None,
                  mapped_video_show_camera_in_which                     : set[str]|None                     = None,
@@ -190,13 +191,14 @@ class Study:
         self.mapped_video_projected_average_ray_color              = mapped_video_projected_average_ray_color
         self.mapped_video_process_planes_for_all_frames            = mapped_video_process_planes_for_all_frames             # if True, all planes are processed for all frames, if False, only according to the planes_per_episode setup and the coding
         self.mapped_video_process_annotations_for_all_recordings   = mapped_video_process_annotations_for_all_recordings    # if True, all coded episodes for all planes of all recordings are processed (so e.g. if validation coded for one recording in the session, that plane is processed for all)
-        self.mapped_video_show_detected_markers                    = mapped_video_show_detected_markers
-        self.mapped_video_show_plane_axes                          = mapped_video_show_plane_axes
-        self.mapped_video_process_individual_markers_for_all_frames= mapped_video_process_individual_markers_for_all_frames # if True, all frames are processed in search of individual markers, if False, individual markers are only searched for when in a coded episode of any of the planes specified in planes_per_episode setup
-        self.mapped_video_show_individual_marker_axes              = mapped_video_show_individual_marker_axes
+        self.mapped_video_plane_marker_color                       = mapped_video_plane_marker_color
+        self.mapped_video_recovered_plane_marker_color             = mapped_video_recovered_plane_marker_color
+        self.mapped_video_plane_axis_arm_length                    = mapped_video_plane_axis_arm_length
+        self.mapped_video_individual_marker_color                  = mapped_video_individual_marker_color
+        self.mapped_video_individual_marker_axis_arm_length        = mapped_video_individual_marker_axis_arm_length
+        self.mapped_video_unexpected_marker_color                  = mapped_video_unexpected_marker_color
+        self.mapped_video_rejected_marker_color                    = mapped_video_rejected_marker_color
         self.mapped_video_show_sync_func_output                    = mapped_video_show_sync_func_output
-        self.mapped_video_show_unexpected_markers                  = mapped_video_show_unexpected_markers
-        self.mapped_video_show_rejected_markers                    = mapped_video_show_rejected_markers
         self.mapped_video_show_gaze_on_plane_in_which              = mapped_video_show_gaze_on_plane_in_which
         self.mapped_video_show_gaze_vec_in_which                   = mapped_video_show_gaze_vec_in_which
         self.mapped_video_show_camera_in_which                     = mapped_video_show_camera_in_which
@@ -702,6 +704,24 @@ class Study:
                             continue
                         else:
                             kwds['auto_code_episodes'][e][f].append(MarkerID(im[0].id, im[0].aruco_dict_id))
+        # backwards compatibility for mapped video marker and axes settings
+        kwds.pop('mapped_video_process_individual_markers_for_all_frames',None) # setting doesn't exist anymore
+        if 'mapped_video_show_detected_markers' in kwds:
+            mapped_video_show_detected_markers = kwds.pop('mapped_video_show_detected_markers')
+            kwds['mapped_video_plane_marker_color'] = study_defaults['mapped_video_plane_marker_color'] if mapped_video_show_detected_markers else None
+            kwds['mapped_video_recovered_plane_marker_color'] = study_defaults['mapped_video_recovered_plane_marker_color'] if mapped_video_show_detected_markers else None
+        if 'mapped_video_show_plane_axes' in kwds or 'mapped_video_show_board_axes' in kwds:
+            mapped_video_show_plane_axes = kwds.pop('mapped_video_show_plane_axes') if 'mapped_video_show_plane_axes' in kwds else kwds.pop('mapped_video_show_board_axes')
+            kwds['mapped_video_plane_axis_arm_length'] = study_defaults['mapped_video_plane_axis_arm_length'] if mapped_video_show_plane_axes else None
+        if 'mapped_video_show_individual_marker_axes' in kwds:
+            mapped_video_show_individual_marker_axes = kwds.pop('mapped_video_show_individual_marker_axes')
+            kwds['mapped_video_individual_marker_axis_arm_length'] = study_defaults['mapped_video_individual_marker_axis_arm_length'] if mapped_video_show_individual_marker_axes else None
+        if 'mapped_video_show_unexpected_markers' in kwds:
+            mapped_video_show_unexpected_markers = kwds.pop('mapped_video_show_unexpected_markers')
+            kwds['mapped_video_unexpected_marker_color'] = study_defaults['mapped_video_unexpected_marker_color'] if mapped_video_show_unexpected_markers else None
+        if 'mapped_video_show_rejected_markers' in kwds:
+            mapped_video_show_rejected_markers = kwds.pop('mapped_video_show_rejected_markers')
+            kwds['mapped_video_rejected_marker_color'] = study_defaults['mapped_video_rejected_marker_color'] if mapped_video_show_rejected_markers else None
 
         # get session def
         s_path = path / 'session_def.json'
@@ -843,13 +863,14 @@ study_parameter_doc = {
     'mapped_video_projected_average_ray_color': type_utils.GUIDocInfo('Mapped video: Color for average of gaze vectors projected to plane', 'Color used for drawing the average projection to a plane of the recorded left and right eyes\' gaze vectors. Not drawn if value is not set.', _rgb_doc),
     'mapped_video_process_planes_for_all_frames': type_utils.GUIDocInfo('Mapped video: Process all planes for all frames?', 'If enabled, shows detection results for all planes for all frames. If not enabled, detection of each plane is only shown during the episode(s) to which it is assigned.'),
     'mapped_video_process_annotations_for_all_recordings': type_utils.GUIDocInfo('Mapped video: Process all annotations for all recordings?', 'Episode annotations are shown in a bar on the bottom of the screen. If enabled, annotations for not only the recording for which the video is made, but also for the other recordings are shown in this bar.'),
-    'mapped_video_show_detected_markers': type_utils.GUIDocInfo('Mapped video: Show detected markers?', 'If enabled, known detected markers are indicated in the output video.'),
-    'mapped_video_show_plane_axes': type_utils.GUIDocInfo('Mapped video: Show planes axes?', 'If enabled, axes indicating the orientation of the detected plane are drawn at the plane\'s origin.'),
-    'mapped_video_process_individual_markers_for_all_frames': type_utils.GUIDocInfo('Mapped video: Process individual markers for all frames?', 'If enabled, detection results are shown for all frames in the video. If not enabled, detection results are only shown during coded episodes of the video.'),
-    'mapped_video_show_individual_marker_axes': type_utils.GUIDocInfo('Mapped video: Show individual markers?', 'If enabled, the pose axis and not only an outline of detected individual markers is shown.'),
+    'mapped_video_plane_marker_color': type_utils.GUIDocInfo('Mapped video: Plane marker color', 'Color used for drawing the detected markers belonging to planes. Not drawn if value is not set.', _rgb_doc),
+    'mapped_video_recovered_plane_marker_color': type_utils.GUIDocInfo('Mapped video: Plane marker color (recovered)', 'Color used for drawing the detected markers belonging to planes that were identified during a second stage in the ArUco pipeline where markers are found based on their expected position extrapolated from identified nearby markers on the plane. Not drawn if value is not set.', _rgb_doc),
+    'mapped_video_plane_axis_arm_length': type_utils.GUIDocInfo('Mapped video: Plane axis arm length','Length used for drawing axes that indicate the orientation of a detected plane. In the same unit as the plane (usually mm). Not drawn if value is not set.'),
+    'mapped_video_individual_marker_color': type_utils.GUIDocInfo('Mapped video: Individual marker color', 'Color used for drawing the detected individual markers. Not drawn if value is not set.', _rgb_doc),
+    'mapped_video_individual_marker_axis_arm_length': type_utils.GUIDocInfo('Mapped video: Individual marker axis arm length','Length used for drawing axes that indicate the orientation of a detected individual marker (if its size is set). In the same unit as the markers (usually mm). Not drawn if value is not set.'),
+    'mapped_video_unexpected_marker_color': type_utils.GUIDocInfo('Mapped video: Unexpected marker color', 'Color used for drawing the detected markers belonging to planes. Not drawn if value is not set.', _rgb_doc),
+    'mapped_video_rejected_marker_color': type_utils.GUIDocInfo('Mapped video: Rejected marker color', 'Color used for drawing marker candidates that were rejected at some stage in the ArUco pipeline. For (setup) debug purposes. Not drawn if value is not set. (255,0,0) may be a good color.', _rgb_doc),
     'mapped_video_show_sync_func_output': type_utils.GUIDocInfo('Mapped video: Show sync function output?', 'If enabled, draw the output of the function on the output video. Applies if the "Gaze data synchronization: Function for camera movement" setting is set to "function".'),
-    'mapped_video_show_unexpected_markers': type_utils.GUIDocInfo('Mapped video: Show unexpected markers?', 'If not enabled, only markers that are part of defined planes or configured individual markers will be drawn on the video. If enabled, also other, unexpected markers will be drawn.'),
-    'mapped_video_show_rejected_markers': type_utils.GUIDocInfo('Mapped video: Show rejected markers?', 'If enabled, all shapes that potentially are markers but were rejected by OpenCV\'s ArUco detector are shown. For debug purposes.'),
     'mapped_video_show_gaze_on_plane_in_which': type_utils.GUIDocInfo('Mapped video: Videos on which to draw gaze projected to plane', 'For the listed recordings, gaze projected to the plane (both the gaze point on the scene video, and the left and right eyes\' gaze vectors if available) is drawn on the video for eye tracker recordings. If there are multiple recordings in a session, gaze positions for the other recordings (if available) will also be drawn on the indicated video(s).'),
     'mapped_video_show_gaze_vec_in_which': type_utils.GUIDocInfo('Mapped video: Videos on which to draw gaze vectors(s)', 'For the listed recordings, a line is drawn between the positions of the cameras of other recordings and the gaze position of these recordings projected to the plane in the generated video. Only for eye tracker recordings.'),
     'mapped_video_show_camera_in_which': type_utils.GUIDocInfo('Mapped video: Videos on which to draw camera position(s)', 'For the listed recordings, the position of the cameras of other recordings is marked in the generated video.'),

@@ -1,6 +1,6 @@
 import pathlib
 
-from glassesTools import annotation, gaze_headref, gaze_worldref, naming as gt_naming, ocv, plane as gt_plane, process_pool, propagating_thread
+from glassesTools import annotation, gaze_headref, gaze_worldref, naming as gt_naming, ocv, pose as gt_pose, process_pool, propagating_thread
 from glassesTools.gui import worldgaze as worldgaze_gui
 from glassesTools.gui.video_player import GUI
 
@@ -75,7 +75,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, s
     processing_intervals = [e for p in mapping_setup for e in mapping_setup[p]] # NB: doesn't need to be sorted
     should_load_part = not gui or show_only_intervals
     head_gazes = gaze_headref.read_dict_from_file(working_dir / gt_naming.gaze_data_fname, processing_intervals if should_load_part else None, ts_column_suffixes=['VOR', ''])[0]
-    poses = {p:gt_plane.read_dict_from_file(working_dir/f'{naming.plane_pose_prefix}{p}.tsv', mapping_setup[p] if should_load_part else None) for p in mapping_setup}
+    poses = {p:gt_pose.read_dict_from_file(working_dir/f'{naming.plane_pose_prefix}{p}.tsv', mapping_setup[p] if should_load_part else None) for p in mapping_setup}
 
     # get camera calibration info
     camera_params = ocv.CameraParams.read_from_file(working_dir / gt_naming.scene_camera_calibration_fname)

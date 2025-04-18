@@ -11,7 +11,7 @@ isMacOS = sys.platform.startswith("darwin")
 if isMacOS:
     import AppKit
 
-from glassesTools import annotation, drawing, gaze_headref, gaze_worldref, naming as gt_naming, ocv, plane as gt_plane, process_pool, propagating_thread, timestamps
+from glassesTools import annotation, drawing, gaze_headref, gaze_worldref, naming as gt_naming, ocv, pose as gt_pose, process_pool, propagating_thread, timestamps
 from glassesTools.gui.video_player import GUI
 
 
@@ -92,7 +92,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
 
         # Read plane poses, if available
         plane_files = [working_dir/f'{naming.plane_pose_prefix}{p}.tsv' for p in planes]
-        poses = {p:gt_plane.read_dict_from_file(f) for p,f in zip(planes,plane_files) if f.is_file()}
+        poses = {p:gt_pose.read_dict_from_file(f) for p,f in zip(planes,plane_files) if f.is_file()}
         has_plane_pose = not not poses
     else:
         raise ValueError(f'recording type "{rec_def.type}" is not understood')

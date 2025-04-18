@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from typing import Any, Callable
 
-from glassesTools import annotation, aruco, drawing, marker as gt_marker, naming as gt_naming, plane as gt_plane, process_pool, propagating_thread, timestamps
+from glassesTools import annotation, aruco, drawing, marker as gt_marker, naming as gt_naming, plane as gt_plane, pose, process_pool, propagating_thread, ocv, timestamps
 from glassesTools.gui.video_player import GUI
 
 from .. import config, episode, marker, naming, plane, process, session, synchronization
@@ -67,26 +67,36 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
     sync_target_function         = _get_sync_function(study_config, rec_def, None if annotation.Event.Sync_ET_Data not in episodes else episodes[annotation.Event.Sync_ET_Data])
     planes_setup, analyze_frames = _get_plane_setup(study_config, config_dir, episodes)
 
-    # set up pose estimator and run it
-    estimator = aruco.PoseEstimator(in_video, working_dir / gt_naming.frame_timestamps_fname, working_dir / gt_naming.scene_camera_calibration_fname)
+    # set up pose estimator
+    estimator = pose.Estimator(in_video, working_dir / gt_naming.frame_timestamps_fname, working_dir / gt_naming.scene_camera_calibration_fname)
+    # first, register all ArUco planes and individual markers with ArUco manager, which
+    # will then wrap their detection and register them with the pose estimator
+    aruco_manager = aruco.Manager()
     for p in planes_setup:
-        estimator.add_plane(p, planes_setup[p], analyze_frames[p])
+        aruco_manager.add_plane(p, planes_setup[p], analyze_frames[p])
     for i in (markers:=marker.get_marker_dict_from_list(study_config.individual_markers)):
-        estimator.add_individual_marker(i, markers[i])
-    if markers and has_auto_code:
-        # if auto coding is set up, ensure individual markers are processed for all frames
-        estimator.proc_individual_markers_all_frames = True
+        aruco_manager.add_individual_marker(i[1], i[0], markers[i])
+    aruco_manager.consolidate_setup()
+    aruco_manager.register_with_estimator(estimator)
+    # other setup of estimator
     if sync_target_function is not None:
         estimator.register_extra_processing_fun('sync', *sync_target_function)
     estimator.attach_gui(gui)
     if gui is not None:
         gui.set_show_timeline(True, timestamps.VideoTimestamps(working_dir / gt_naming.frame_timestamps_fname), annotation.flatten_annotation_dict(episodes), window_id=gui.main_window_id)
-        estimator.show_rejected_markers = visualization_show_rejected_markers
+        # override colors with settings, but do not disable drawing ones that settings disable
+        colors = {}
+        for c in ('mapped_video_plane_marker_color','mapped_video_recovered_plane_marker_color','mapped_video_individual_marker_color','mapped_video_unexpected_marker_color'):
+            clr = getattr(study_config,c) if getattr(study_config,c) is not None else config.study_defaults[c]
+            colors[c.removeprefix('mapped_video_')] = clr
+        if visualization_show_rejected_markers:
+            colors['rejected_marker_color'] = study_config.mapped_video_rejected_marker_color or (255,0,0)
+        aruco_manager.set_visualization_colors(**colors)
 
     poses, individual_markers, sync_target_signal = estimator.process_video()
 
     for p in poses:
-        gt_plane.write_list_to_file(poses[p], working_dir/f'{naming.plane_pose_prefix}{p}.tsv', skip_failed=True)
+        pose.write_list_to_file(poses[p], working_dir/f'{naming.plane_pose_prefix}{p}.tsv', skip_failed=True)
     for i in individual_markers:
         gt_marker.write_list_to_file(individual_markers[i], marker.get_file_name(i[1],i[0],working_dir), skip_failed=False)
     if sync_target_signal:
@@ -99,8 +109,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
 
 def _get_sync_function(study_config: config.Study,
                        rec_def: session.RecordingDefinition,
-                       episodes: list[list[int]]) -> None | list[Callable[[np.ndarray,Any], tuple[float,float]], list[list[int]], dict[str], Callable[[np.ndarray,int,float,float], None]]:
-    sync_target_function: list[Callable[[np.ndarray,Any], tuple[float,float]], list[int]|list[list[int]], dict[str], Callable[[np.ndarray,int,float,float], None]] = None
+                       episodes: list[list[int]]) -> None | list[Callable[[str,int,np.ndarray,ocv.CameraParams,Any], tuple[float,float]], list[list[int]], dict[str], Callable[[str,int,np.ndarray,int,float,float], None]]:
+    sync_target_function: list[Callable[[str,int,np.ndarray,ocv.CameraParams,Any], tuple[float,float]], list[int]|list[list[int]], dict[str], Callable[[str,int,np.ndarray,int,float,float], None]] = None
     if rec_def.type==session.RecordingType.Eye_Tracker:
         # NB: only for eye tracker recordings, others don't have eye tracking data and thus nothing to sync
         match study_config.get_cam_movement_for_et_sync_method:
@@ -129,7 +139,7 @@ def _get_sync_function(study_config: config.Study,
 
     return sync_target_function
 
-def _sync_function_output_drawer(frame: np.ndarray, frame_idx: int, tx: float, ty: float, sub_pixel_fac=8):
+def _sync_function_output_drawer(proc_name: str, frame: np.ndarray, frame_idx: int, tx: float, ty: float, sub_pixel_fac=8):
     # input is tx, ty pixel positions on the camera image
     ll = 20
     drawing.openCVLine(frame, (tx,ty-ll), (tx,ty+ll), (0,255,0), 1, sub_pixel_fac)

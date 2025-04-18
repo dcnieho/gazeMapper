@@ -147,7 +147,11 @@ def _determine_to_invalidate(action: Action, study_config: 'config.Study') -> se
             return actions
         case Action.DETECT_MARKERS:
             actions = {a for a in action.next_values() if a not in [Action.SYNC_TO_REFERENCE]}
-            if study_config.mapped_video_process_planes_for_all_frames or study_config.mapped_video_process_individual_markers_for_all_frames or study_config.mapped_video_show_detected_markers or study_config.mapped_video_show_rejected_markers:
+            if (study_config.mapped_video_process_planes_for_all_frames or
+                study_config.mapped_video_plane_marker_color is not None or # NB: no need to check mapped_video_recovered_plane_marker_color as it only overrides colors for some plane markers
+                study_config.mapped_video_individual_marker_color is not None or
+                study_config.mapped_video_unexpected_marker_color is not None or
+                study_config.mapped_video_rejected_marker_color is not None):
                 # in this case MAKE_VIDEO processes each frame itself, so output of DETECT_MARKERS is not used
                 actions.discard(Action.MAKE_MAPPED_GAZE_VIDEO)
             return actions

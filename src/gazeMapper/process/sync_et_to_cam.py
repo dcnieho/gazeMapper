@@ -10,7 +10,7 @@ isMacOS = sys.platform.startswith("darwin")
 if isMacOS:
     import AppKit
 
-from glassesTools import annotation, gaze_headref, naming as gt_naming, ocv, plane, process_pool, propagating_thread, timestamps, video_utils
+from glassesTools import annotation, gaze_headref, naming as gt_naming, ocv, pose, process_pool, propagating_thread, timestamps, video_utils
 from glassesTools.gui.signal_sync import GUI, TargetPos
 
 from . import _utils
@@ -77,7 +77,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
             pln_file = working_dir/f'{naming.plane_pose_prefix}{pln}.tsv'
             if not pln_file.is_file():
                 raise FileNotFoundError(f'A planePose file for the {pln} plane is not found, but is needed. Run detect_markers to create this file.')
-            poses = plane.read_dict_from_file(pln_file, episodes)
+            poses = pose.read_dict_from_file(pln_file, episodes)
 
             # get camera calibration info
             camera_params= ocv.CameraParams.read_from_file(working_dir / gt_naming.scene_camera_calibration_fname)
