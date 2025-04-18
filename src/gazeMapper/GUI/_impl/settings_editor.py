@@ -11,7 +11,7 @@ import glassesTools
 import glassesTools.gui
 from glassesTools.gui.timeline import color_darken
 
-from ... import type_utils, typed_dict_defaults
+from ... import config, type_utils, typed_dict_defaults
 
 
 TYPE_TO_STR_REGISTRY: dict[typing.Type, dict[typing.Any, str]|typing.Callable[[typing.Any], str]] = {}
@@ -110,7 +110,7 @@ def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_get
         case _ if typed_dict_defaults.is_typeddictdefault(f_type):
             is_dict = True
         case _ if type_utils.is_NamedTuple_type(f_type):
-            is_dict = True
+            is_dict = f_type != config.RgbColor # NB: we handle config.RGBColor separately
         case builtins.dict | builtins.list | builtins.set:
             is_dict = base_type==builtins.dict
             # possibly replace inner type of container
@@ -536,6 +536,9 @@ def draw_value(field_lbl: str, val: _T, f_type: typing.Type, o_type_args: tuple[
                 new_val = values[p_idx]
             else:
                 new_val = val
+        case config.RgbColor:
+            new_val = imgui.color_edit3(f'##{field_lbl}', [x/255. for x in val], imgui.ColorEditFlags_.picker_hue_wheel | imgui.ColorEditFlags_.uint8 | imgui.ColorEditFlags_.display_rgb | imgui.ColorEditFlags_.input_rgb)[1]
+            new_val = config.RgbColor(*tuple(int(x*255) for x in new_val))
         case _:
             if new_edit:
                 new_val = val
