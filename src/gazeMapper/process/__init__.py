@@ -99,6 +99,9 @@ def is_session_level_action(action: Action) -> bool:
 
 def is_action_possible_given_config(action: Action, study_config: 'config.Study') -> bool:
     match action:
+        case Action.CODE_EPISODES | Action.DETECT_MARKERS | Action.GAZE_TO_PLANE:
+            # if there is any form of config beyond a session definition, these will be possible (whether config is complete is handled by error messages so no need to worry about that here)
+            return not not study_config.planes or not not study_config.episodes_to_code or not not study_config.planes_per_episode or not not study_config.individual_markers
         case Action.AUTO_CODE_SYNC:
             return not not study_config.auto_code_sync_points
         case Action.AUTO_CODE_EPISODES:

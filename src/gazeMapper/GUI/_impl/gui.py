@@ -632,15 +632,27 @@ class GUI:
             self._problems_cache = self.study_config.field_problems()
             self._check_markers()
         # need to have:
-        # 1. at least one recording defined in the session
-        # 2. one plane set up
-        # 3. one episode to code
-        # 4. one plane linked to one episode
-        # 5. no individual marker problems
+        #   1. at least one recording defined in the session
+        # if you want to do more than only export gaze overlay videos, you also need to:
+        #   2. one plane set up
+        #   3. one episode to code
+        #   4. one plane linked to one episode
+        #   5. no individual marker problems
         self.need_setup_recordings = not self.study_config or not self.study_config.session_def.recordings or 'session_def' in self._problems_cache
-        self.need_setup_plane = not self.study_config or not self.study_config.planes or 'planes' in self._problems_cache or any((not p.has_complete_setup() for p in self.study_config.planes)) or any((p.name not in self.plane_configs or isinstance(self.plane_configs[p.name],Exception) for p in self.study_config.planes))
-        self.need_setup_episode = not self.study_config or not self.study_config.episodes_to_code or not self.study_config.planes_per_episode or any((x in self._problems_cache for x in ['episodes_to_code', 'planes_per_episode']))
-        self.need_setup_individual_markers = not self.study_config or 'individual_markers' in self._problems_cache
+        has_any_plane_setup = not not self.study_config and not not self.study_config.planes
+        has_any_episode_setup = not not self.study_config and (not not self.study_config.episodes_to_code or not not self.study_config.planes_per_episode)
+        has_any_indiv_marker_setup = not not self.study_config and not not self.study_config.individual_markers
+        if self.need_setup_recordings or has_any_plane_setup or has_any_episode_setup or has_any_indiv_marker_setup:
+            self.need_setup_plane = not self.study_config or not self.study_config.planes or 'planes' in self._problems_cache or any((not p.has_complete_setup() for p in self.study_config.planes)) or any((p.name not in self.plane_configs or isinstance(self.plane_configs[p.name],Exception) for p in self.study_config.planes))
+            self.need_setup_episode = not self.study_config or not self.study_config.episodes_to_code or not self.study_config.planes_per_episode or any((x in self._problems_cache for x in ['episodes_to_code', 'planes_per_episode']))
+            self.need_setup_individual_markers = not self.study_config or 'individual_markers' in self._problems_cache
+        else:
+            self.need_setup_plane = self.need_setup_episode = self.need_setup_individual_markers = False
+            # remove all problems related to unused setup
+            self._problems_cache.pop('planes',None)
+            self._problems_cache.pop('episodes_to_code',None)
+            self._problems_cache.pop('planes_per_episode',None)
+            self._problems_cache.pop('individual_markers',None)
 
         self.can_accept_sessions = \
             not self._problems_cache and \
