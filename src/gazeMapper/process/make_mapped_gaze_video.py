@@ -249,7 +249,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
         video_sets.extend([(r,set(),recs) for r in study_config.mapped_video_make_which])
 
     # per set of videos
-    for lead_vid, other_vids, proc_vids in video_sets:
+    for vs_idx, (lead_vid, other_vids, proc_vids) in enumerate(video_sets):
         vid_writer          : dict[str, MediaWriter]            = {}
         frame               : dict[str, np.ndarray]             = {}
         frame_idx           : dict[str, int]                    = {}
@@ -448,6 +448,10 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
                         break
 
         # done with this set of videos
+        # clean up as needed (close GUI when nothing to show anymore)
+        if has_gui and vs_idx==len(video_sets)-1:
+            gui.stop()
+        # close videos
         for v in write_vids:
             vid_writer[v].close()
 
@@ -497,10 +501,6 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
                 else:
                     # something failed. Put file without audio back under output name
                     shutil.move(tempName, file)
-
-    # done with all videos, clean up
-    if has_gui:
-        gui.stop()
 
     # update state
     session.update_action_states(working_dir, process.Action.MAKE_MAPPED_GAZE_VIDEO, process_pool.State.Completed, study_config)
