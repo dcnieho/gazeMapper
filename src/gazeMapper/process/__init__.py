@@ -311,10 +311,10 @@ def _get_precond_fails_for_rec(states: dict[str,tuple[bool,list[Action]]]) -> di
                 out[a].append(r)
     return out
 
-def get_impossible_reason_text(action: Action, states: dict[str, dict[Action,tuple[bool|list[str],dict[Action,list[str]]]]], for_recording=False, for_single=False) -> str:
+def get_impossible_reason_text(action: Action, states: dict[str, dict[Action,tuple[bool|list[str],dict[Action,list[str]]]]], study_config: 'config.Study', for_recording=False, for_single=False) -> str:
     reason = f'Cannot run {action.displayable_name} because required actions have not yet been run'
     if for_single:
-        reason += f':\n{_get_impossible_reason_text_impl(states[action][1], "")}'
+        reason += f':\n{_get_impossible_reason_text_impl(states[action][1], "", study_config)}'
     else:
         reason += ' for the following '
         if for_recording:
@@ -325,12 +325,14 @@ def get_impossible_reason_text(action: Action, states: dict[str, dict[Action,tup
             if action not in states[s]:
                 continue
             ac = states[s][action][1]
-            reason += f'- {s}:\n{_get_impossible_reason_text_impl(ac, s)}'
+            reason += f'- {s}:\n{_get_impossible_reason_text_impl(ac, s, study_config)}'
     return reason
 
-def _get_impossible_reason_text_impl(fails: dict[Action,list[str]], ref: str) -> str:
+def _get_impossible_reason_text_impl(fails: dict[Action,list[str]], ref: str, study_config: 'config.Study') -> str:
     reason = ''
     for a in fails:
+        if not is_action_possible_given_config(a, study_config):
+            continue
         reason += f'  - {a.displayable_name}'
         if not not fails[a] and (len(fails[a])>1 or fails[a][0]!=ref):
             reason += f' ({", ".join(fails[a])})'

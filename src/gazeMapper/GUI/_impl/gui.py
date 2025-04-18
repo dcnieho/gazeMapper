@@ -1467,7 +1467,7 @@ class GUI:
                     if possible:
                         hover_text = f'Run {a.displayable_name} for session(s):\n- '+'\n- '.join([s for s in actions if a in actions[s] and actions[s][a][0]])
                     else:
-                        hover_text = process.get_impossible_reason_text(a, actions)
+                        hover_text = process.get_impossible_reason_text(a, actions, self.study_config)
                     status = max([self.sessions[s].state[a] for s in actions])
                 else:
                     to_run = [(s,r) for s in actions if a in actions[s] for r in actions[s][a][0]]
@@ -1475,7 +1475,7 @@ class GUI:
                     if possible:
                         hover_text = f'Run {a.displayable_name} for session(s):\n- '+'\n- '.join([f'{s}, recording(s):\n  - '+'\n  - '.join(actions[s][a][0]) for s in actions if a in actions[s] and actions[s][a][0]])
                     else:
-                        hover_text = process.get_impossible_reason_text(a, actions)
+                        hover_text = process.get_impossible_reason_text(a, actions, self.study_config)
                     status = [self.sessions[s].recordings[r].state[a] for s in actions if a in actions[s] for r in actions[s][a][0]]
                     status = max(status) if status else process_pool.State.Not_Run
                 if a.has_options and possible:
@@ -1545,7 +1545,7 @@ class GUI:
                 if possible:
                     hover_text = f'Run {a.displayable_name} for recordings:\n- '+'\n- '.join(to_run)
                 else:
-                    hover_text = process.get_impossible_reason_text(a, actions, for_recording=True)
+                    hover_text = process.get_impossible_reason_text(a, actions, self.study_config, for_recording=True)
                 status = [sess.recordings[r].state[a] for r in to_run]
                 status = max(status) if status else process_pool.State.Not_Run
                 if a.has_options and possible:
@@ -1706,7 +1706,7 @@ class GUI:
                         if possible:
                             hover_text = f'Run {a.displayable_name} for session: {sess.name}'
                         else:
-                            hover_text = process.get_impossible_reason_text(a, menu_actions, for_single=True)
+                            hover_text = process.get_impossible_reason_text(a, menu_actions, self.study_config, for_single=True)
                         if a.has_options and possible:
                             hover_text += '\nShift-click to bring up a popup with configuration options for this run.'
                         status = self.sessions[sess.name].state[a]
