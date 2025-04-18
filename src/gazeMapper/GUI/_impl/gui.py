@@ -1512,6 +1512,9 @@ class GUI:
                 callbacks.open_folder(self, s.working_directory)
         if imgui.selectable(ifa6.ICON_FA_TRASH_CAN + " Delete session", False)[0]:
             for s in sess:
+                # if any import actions are happening, cancel those first
+                for r in (r for r in s.recordings if s.recordings[r].state[process.Action.IMPORT]):
+                    self.job_scheduler.cancel_job(actions_running[s.name][process.Action.IMPORT][r])
                 callbacks.remove_folder(s.working_directory)
             changed = True
         changed |= self._draw_context_menu_items_for_recording_folders(sess, None)
