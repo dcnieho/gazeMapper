@@ -136,6 +136,8 @@ class GUI:
         else:
             if self.project_dir is not None:
                 # import recordings
+                if not self.can_accept_sessions:
+                    return
                 callbacks.add_recordings(self, paths, [s for s in self._selected_sessions if self._selected_sessions[s] and not self.sessions[s].has_all_recordings()])
             else:
                 # load project
