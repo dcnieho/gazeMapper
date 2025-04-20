@@ -89,7 +89,7 @@ class Definition_GlassesValidator(Definition):
 
     def fixed_fields(self) -> type_utils.NestedDict:
         # these cannot be edited from the GUI, are for info only
-        return {k:None for k in ['name','aruco_dict_id', 'marker_border_bits', 'min_num_markers', 'ref_image_size', 'marker_file', 'target_file']}
+        return {k:None for k in ['name', 'aruco_dict_id', 'marker_border_bits', 'min_num_markers', 'ref_image_size', 'marker_file', 'target_file']}
 
     def has_complete_setup(self) -> bool:
         return True
