@@ -75,8 +75,16 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
     aruco_manager = aruco.Manager()
     for p in planes_setup:
         aruco_manager.add_plane(p, planes_setup[p], analyze_frames[p])
-    for i in (markers:=marker.get_marker_dict_from_list(study_config.individual_markers)):
-        aruco_manager.add_individual_marker(i[1], i[0], markers[i])
+        if hasattr(planes_setup[p]['plane'],'is_dynamic') and planes_setup[p]['plane'].is_dynamic():
+            markers = planes_setup[p]['plane'].get_marker_IDs()
+            marker_setup = planes_setup[p]['plane'].get_dynamic_marker_setup()
+            for c in markers:
+                if c=='plane':
+                    continue
+                for m in markers[c]:
+                    aruco_manager.add_individual_marker(m[1], m[0], marker_setup, analyze_frames[p])
+    for m in (markers:=marker.get_marker_dict_from_list(study_config.individual_markers)):
+        aruco_manager.add_individual_marker(m[1], m[0], markers[m])
     aruco_manager.consolidate_setup()
     aruco_manager.register_with_estimator(estimator)
     # other setup of estimator
