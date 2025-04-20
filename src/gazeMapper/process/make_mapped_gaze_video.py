@@ -208,7 +208,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
         # first, register all ArUco planes and individual markers with ArUco manager, which
         # will then wrap their detection and register them with the pose estimator
         aruco_manager = aruco.Manager()
-        planes_setup, analyze_frames = _get_plane_setup(study_config, config_dir, episodes[rec], want_analyze_frames=True)
+        planes_setup, analyze_frames = _get_plane_setup(study_config, config_dir, episodes[rec])
         for p in planes_setup:
             planes[p] = planes_setup[p]['plane']
             aruco_manager.add_plane(p, planes_setup[p], None if study_config.mapped_video_process_planes_for_all_frames else analyze_frames[p])
