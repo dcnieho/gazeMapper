@@ -969,9 +969,9 @@ class GUI:
         if changed:
             try:
                 new_config.check_valid(strict_check=False)
-            except Exception as e:
+            except Exception as exc:
                 # do not persist invalid config, inform user of problem
-                gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Settings error", f"You cannot make this change to the project's settings:\n{e}", gt_gui.msg_box.MsgBox.error)
+                gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Settings error", f"You cannot make this change to the project's settings:\n{exc}", gt_gui.msg_box.MsgBox.error, more=gt_gui.utils.get_traceback(type(exc), exc, exc.__traceback__))
             else:
                 # persist changed config
                 self.study_config = new_config
@@ -1288,9 +1288,9 @@ class GUI:
         if changed:
             try:
                 new_config.check_valid(strict_check=False)
-            except Exception as e:
+            except Exception as exc:
                 # do not persist invalid config, inform user of problem
-                gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Settings error", f"You cannot make this change to the project's settings:\n{e}", gt_gui.msg_box.MsgBox.error)
+                gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Settings error", f"You cannot make this change to the project's settings:\n{exc}", gt_gui.msg_box.MsgBox.error, more=gt_gui.utils.get_traceback(type(exc), exc, exc.__traceback__))
             else:
                 # persist changed config
                 self.study_config = new_config
@@ -1765,9 +1765,9 @@ class GUI:
                 try:
                     new_config.check_valid(strict_check=False)
                     self.session_config_overrides[sess.name] = config.StudyOverride.from_study_diff(new_config, self.study_config, config.OverrideLevel.Session)
-                except Exception as e:
+                except Exception as exc:
                     # do not persist invalid config, inform user of problem
-                    gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Settings error", f"You cannot make this change to the settings for session {sess.name}:\n{e}", gt_gui.msg_box.MsgBox.error)
+                    gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Settings error", f"You cannot make this change to the settings for session {sess.name}:\n{exc}", gt_gui.msg_box.MsgBox.error, more=gt_gui.utils.get_traceback(type(exc), exc, exc.__traceback__))
                 else:
                     # persist changed config
                     self.session_config_overrides[sess.name].store_as_json(sess.working_directory)
@@ -1785,9 +1785,9 @@ class GUI:
                         try:
                             new_config.check_valid(strict_check=False)
                             self.recording_config_overrides[sess.name][r] = config.StudyOverride.from_study_diff(new_config, effective_config_for_session, config.OverrideLevel.Recording, sess.recordings[r].definition.type)
-                        except Exception as e:
+                        except Exception as exc:
                             # do not persist invalid config, inform user of problem
-                            gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Settings error", f"You cannot make this change to the settings for recording {r} in session {sess.name}:\n{e}", gt_gui.msg_box.MsgBox.error)
+                            gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Settings error", f"You cannot make this change to the settings for recording {r} in session {sess.name}:\n{exc}", gt_gui.msg_box.MsgBox.error, more=gt_gui.utils.get_traceback(type(exc), exc, exc.__traceback__))
                         else:
                             # persist changed config
                             self.recording_config_overrides[sess.name][r].store_as_json(sess.recordings[r].info.working_directory)
