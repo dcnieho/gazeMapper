@@ -92,7 +92,7 @@ class Definition_GlassesValidator(Definition):
         return {k:None for k in ['name', 'aruco_dict_id', 'marker_border_bits', 'min_num_markers', 'ref_image_size', 'marker_file', 'target_file']}
 
     def has_complete_setup(self) -> bool:
-        return True
+        return not self.field_problems()
 
 class Definition_Plane_2D(Definition):
     @typeguard.typechecked(collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
