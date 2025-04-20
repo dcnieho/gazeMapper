@@ -60,11 +60,11 @@ del _params
 
 def get_marker_setup(marker: Marker) -> aruco.MarkerSetup:
     return aruco.MarkerSetup(aruco_detector_params = {
-                                'markerBorderBits': marker.marker_border_bits
-                             },
-                             detect_only = marker.detect_only,
-                             size= marker.size
-                             )
+                                    'markerBorderBits': marker.marker_border_bits
+                                },
+                                detect_only = marker.detect_only,
+                                size= marker.size
+                            )
 
 def get_marker_dict_from_list(markers: list[Marker]) -> dict[tuple[int,int],aruco.MarkerSetup]:
     out = {}
