@@ -70,9 +70,16 @@ class Definition_GlassesValidator(Definition):
                  marker_file        : str|pathlib.Path|None,
                  target_file        : str|pathlib.Path|None,
                  use_default        : bool = True,
+                 is_dynamic         : bool = False,
                  ):
         super().__init__(Type.GlassesValidator, name)
+        # These two together mean the following:
+        #  use_default & !is_dynamic: the default/built-in static glassesValidator poster is used
+        # !use_default & !is_dynamic: a non-default static glassesValidator poster is used. Custom settings files are expected in the plane folder
+        #  use_default &  is_dynamic: the default/built-in dynamic validation procedure (using a PsychoPy script) is used. Settings files (converted from the default dynamic procedure setup) are expected in the plane folder
+        # !use_default &  is_dynamic: a non-default dynamic validation procedure (using a PsychoPy script) is used. Custom settings files are expected in the plane folder (converted from a custom dynamic procedure setup)
         self.use_default        = use_default           # If True, denotes this is the default/built-in glassesValidator plane, if False, denotes custom settings are expected
+        self.is_dynamic         = is_dynamic            # If True, indicates this is a dynamic (using PsychoPy script) validation plane, not a static (poster) one
         # custom settings
         self.aruco_dict_id      = aruco_dict_id
         self.marker_border_bits = marker_border_bits
@@ -139,8 +146,8 @@ class Definition_Plane_2D(Definition):
 def make_definition(p_type: Type, name: str, path: pathlib.Path|None, **kwargs) -> Definition_GlassesValidator|Definition_Plane_2D:
     cls = Definition_GlassesValidator if p_type==Type.GlassesValidator else Definition_Plane_2D
     if p_type==Type.GlassesValidator:
-        validator_config_dir = None # use glassesValidator built-in/default
-        if 'use_default' in kwargs and not kwargs['use_default']:
+        validator_config_dir = None # use glassesValidator built-in/default static poster
+        if ('use_default' in kwargs and not kwargs['use_default']) or ('is_dynamic' in kwargs and kwargs['is_dynamic']):
             validator_config_dir = path
         validation_setup = validation.config.get_validation_setup(validator_config_dir)
         kwargs['aruco_dict_id'] = validation.Plane.default_aruco_dict_id
@@ -166,6 +173,7 @@ definition_parameter_doc = {
     'min_num_markers': type_utils.GUIDocInfo('Minimum number of markers','Minimum number of markers belonging to the plane that should be detected to attempt to determine pose and homography transformation.'),
     'ref_image_size': type_utils.GUIDocInfo('Reference image size','The size in pixels of the image that is generated of the plane with fiducial markers.'),
     'use_default': type_utils.GUIDocInfo('Use default setup','If enabled, the default glassesValidator plane is used. When not enabled, a custom configuration can be used by editing the files containing the plane setup in the plane configuration folder.'),
+    'is_dynamic': type_utils.GUIDocInfo('Dynamic validation procedure?','If enabled, this indicates that a dynamic validation procedure run with the PsychoPy script was used.'),
     'marker_file': type_utils.GUIDocInfo('Marker file','Name of the file specifying the marker layout on the plane (e.g., markerPositions.csv).'),
     'marker_size': type_utils.GUIDocInfo('Marker size','Length of the edge of a marker (mm, excluding the white edge, only the black part).'),
     'target_file': type_utils.GUIDocInfo('Target file','Name of the file specifying the targets positions on the plane (e.g., targetPositions.csv).'),
@@ -191,7 +199,7 @@ def get_plane_from_definition(plane_def: Definition, path: str|pathlib.Path) -> 
     # use the provided definition instead
     if plane_def.type==Type.GlassesValidator:
         validator_config_dir = None # use glassesValidator built-in/default
-        if not plane_def.use_default:
+        if not plane_def.use_default or plane_def.is_dynamic:
             validator_config_dir = path
         validation_config = validation.config.get_validation_setup(validator_config_dir)
         return validation.Plane(validator_config_dir, validation_config, ref_image_store_path=path/plane.Plane.default_ref_image_name)

@@ -9,7 +9,7 @@ import threading
 from imgui_bundle import imgui, imspinner, hello_imgui, icons_fontawesome_6 as ifa6
 
 from glassesTools import annotation, aruco, async_thread, camera_recording, eyetracker, gui as gt_gui, naming as gt_naming, platform, process_pool, recording, video_utils
-from glassesTools.validation import config as val_config, default_poster, DataQualityType, export, get_DataQualityType_explanation
+from glassesTools.validation import config as val_config, default_poster, DataQualityType, dynamic as val_dynamic, export, get_DataQualityType_explanation
 from glassesTools.gui import colors
 
 from . import utils
@@ -42,6 +42,19 @@ def get_folder_picker(g, reason: str, *args, **kwargs):
                 default_poster.deploy_default_pdf(selected[0])
             case 'export':
                 show_export_config(g, selected[0], *args, **kwargs)
+            case 'new_plane_dyn_dir':
+                kwargs['callback'](selected[0])
+            case 'deploy_gv_dynamic_script':
+                not_copied = val_dynamic.deploy_setup_and_script(selected[0])
+                if not_copied:
+                    buttons = {
+                        ifa6.ICON_FA_CHECK+" Yes": lambda: val_dynamic.deploy_setup_and_script(selected[0], overwrite=True),
+                        ifa6.ICON_FA_CIRCLE_XMARK+" No": None
+                    }
+                    files = '- '+('\n- '.join(not_copied))
+                    gt_gui.utils.push_popup(g, gt_gui.msg_box.msgbox, "Overwrite files", f"The following files were not deployed as they already exist\nin the selected folder:\n{files}\n\nDo you want to overwrite these files?", gt_gui.msg_box.MsgBox.question, buttons)
+            case 'gv_dynamic_import_setup':
+                set_dynamic_validation_plane_config(g, selected[0], **kwargs)
             case _:
                 raise ValueError(f'reason "{reason}" not understood')
 
@@ -72,6 +85,14 @@ def get_folder_picker(g, reason: str, *args, **kwargs):
             picker_type = gt_gui.file_picker.DirPicker
         case 'export':
             header = "Select folder to store results export"
+            allow_multiple = False
+            picker_type = gt_gui.file_picker.DirPicker
+        case 'new_plane_dyn_dir' | 'gv_dynamic_import_setup':
+            header = "Select or drop setup json file for dynamic validation PsychoPy script"
+            allow_multiple = False
+            picker_type = gt_gui.file_picker.FilePicker
+        case 'deploy_gv_dynamic_script':
+            header = "Select folder to store dynamic validation PsychoPy script and default configuration"
             allow_multiple = False
             picker_type = gt_gui.file_picker.DirPicker
         case _:
@@ -125,6 +146,20 @@ def try_load_project(g, path: str|pathlib.Path, action='loading'):
             }
             gt_gui.utils.push_popup(g, gt_gui.msg_box.msgbox, "Create new project", "The selected folder is empty. Do you want to use it as a new project folder?", gt_gui.msg_box.MsgBox.warn, buttons)
 
+def set_dynamic_validation_plane_config(g, config_file_path: pathlib.Path, p_def: plane.Definition_GlassesValidator):
+    from . import gui
+    g = typing.cast(gui.GUI,g)  # indicate type to typechecker
+    path = config.guess_config_dir(g.study_config.working_directory)
+    p_dir = path / p_def.name
+    try:
+        if config_file_path.suffix!='.json':
+            raise ValueError('The selected file is not a json file. Please select a json file.')
+        val_dynamic.setup_to_plane_config(p_dir, config_file_path.parent, config_file_path.name)
+    except Exception as exc:
+        gt_gui.utils.push_popup(g, gt_gui.msg_box.msgbox, "Error converting setup", f"There was an error trying to load the dynamic validation setup:\n{exc}", gt_gui.msg_box.MsgBox.error, more=gt_gui.utils.get_traceback(type(exc), exc, exc.__traceback__))
+        return
+    # N.B.: all we have to do here. File watcher will catch the change and reload the plane
+
 def set_default_cam_cal(cal_path: str|pathlib.Path, rec_def: session.RecordingDefinition, rec_def_path: pathlib.Path):
     rec_def.set_default_cal_file(cal_path, rec_def_path)
 
@@ -136,17 +171,36 @@ def set_cam_cal(cal_path: str|pathlib.Path, working_directory: str|pathlib.Path)
 def delete_cam_cal(working_directory: str|pathlib.Path):
     pathlib.Path(working_directory / gt_naming.scene_camera_calibration_fname).unlink(missing_ok=True)
 
-def make_plane(study_config: config.Study, p_type: plane.Type, name: str):
-    path = config.guess_config_dir(study_config.working_directory)
+def make_plane(g, p_type: plane.Type, name: str, is_dynamic: bool, dynamic_config_file: str):
+    from . import gui
+    g = typing.cast(gui.GUI,g)  # indicate type to typechecker
+    path = config.guess_config_dir(g.study_config.working_directory)
     p_dir = path / name
+    # deal with dynamic glassesValidator plane
+    extra = {}
+    if is_dynamic:
+        extra['use_default'] = not dynamic_config_file
+        extra['is_dynamic'] = True
+        # deploy converted config files
+        p_dir.mkdir(exist_ok=True)
+        try:
+            if dynamic_config_file:
+                dynamic_config_file = pathlib.Path(dynamic_config_file)
+                val_dynamic.setup_to_plane_config(p_dir, dynamic_config_file.parent, dynamic_config_file.name)
+            else:
+                val_dynamic.setup_to_plane_config(p_dir)
+        except Exception as exc:
+            gt_gui.utils.push_popup(g, gt_gui.msg_box.msgbox, "Error converting setup", f"There was an error trying to load the dynamic validation\nsetup when creating the new validation plane:\n{exc}", gt_gui.msg_box.MsgBox.error, more=gt_gui.utils.get_traceback(type(exc), exc, exc.__traceback__))
+            shutil.rmtree(p_dir)
+            return
     # make plane
-    p_def = plane.make_definition(p_type, name, p_dir)
+    p_def = plane.make_definition(p_type, name, p_dir, **extra)
     # store to file
     if not p_dir.is_dir():
         p_dir.mkdir()
     p_def.store_as_json(p_dir)
     # append to known planes
-    study_config.planes.append(p_def)
+    g.study_config.planes.append(p_def)
 
 def delete_plane(study_config: config.Study, plane: plane.Definition):
     # remove config directory for the plane

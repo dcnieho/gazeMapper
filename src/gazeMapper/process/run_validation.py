@@ -34,7 +34,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
         if plane_def.type!=plane.Type.GlassesValidator:
             raise ValueError(f'Plane {p} is not a glassesValidator plane, cannot be used for validation')
         validator_config_dir = None # None -> use glassesValidator built-in/default
-        if not plane_def.use_default:
+        if not plane_def.use_default or plane_def.is_dynamic:
             validator_config_dir = config_dir/p
 
         validation_plane = ValidationPlane(validator_config_dir)

@@ -577,6 +577,8 @@ class GUI:
             return {config.MarkerID(m.id, m.aruco_dict_id) for m in self.study_config.individual_markers}
         def _get_known_planes() -> set[str]:
             return {p.name for p in self.study_config.planes}
+        def _get_known_validation_planes() -> set[str]:
+            return {p.name for p in self.study_config.planes if p.type==plane.Type.GlassesValidator}
         def _get_episodes_to_code_for_planes() -> set[annotation.Event]:
             return {e for e in self.study_config.episodes_to_code if e!=annotation.Event.Sync_Camera}
         self._possible_value_getters = {
@@ -589,7 +591,8 @@ class GUI:
             'sync_ref_average_recordings': _get_known_recordings_no_ref,
             'planes_per_episode': [_get_episodes_to_code_for_planes, _get_known_planes],
             'auto_code_sync_points': {'markers': _get_known_individual_markers},
-            'auto_code_episodes': [_get_episodes_to_code_for_planes, {None: {'start_markers': _get_known_individual_markers, 'end_markers': _get_known_individual_markers}}]
+            'auto_code_episodes': [_get_episodes_to_code_for_planes, {None: {'start_markers': _get_known_individual_markers, 'end_markers': _get_known_individual_markers}}],
+            'validate_use_dynamic_for_planes': _get_known_validation_planes
         }
 
         self._need_set_window_title = True
@@ -1205,11 +1208,17 @@ class GUI:
                     callbacks.open_folder(self, plane_dir)
                 imgui.same_line()
                 if p.type==plane.Type.GlassesValidator:
-                    imgui.same_line()
-                    if p.use_default and imgui.button(ifa6.ICON_FA_TICKET+f' get glassesValidator poster pdf'):
-                        gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='deploy_gv_poster_pdf'))
-                    elif not p.use_default and imgui.button(ifa6.ICON_FA_CLIPBOARD_LIST+f' deploy default config'):
-                        callbacks.glasses_validator_deploy_config(self, p)
+                    if p.is_dynamic:
+                        if p.use_default and imgui.button(ifa6.ICON_FA_TICKET+f' get glassesValidator dynamic script'):
+                            gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='deploy_gv_dynamic_script'))
+                        elif not p.use_default and imgui.button(ifa6.ICON_FA_FILE_IMPORT+f' import dynamic setup'):
+                            gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='gv_dynamic_import_setup', p_def=p))
+                    else:
+                        imgui.same_line()
+                        if p.use_default and imgui.button(ifa6.ICON_FA_TICKET+f' get glassesValidator poster pdf'):
+                            gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='deploy_gv_poster_pdf'))
+                        elif not p.use_default and imgui.button(ifa6.ICON_FA_CLIPBOARD_LIST+f' deploy default config'):
+                            callbacks.glasses_validator_deploy_config(self, p)
                 imgui.same_line()
                 if imgui.button(ifa6.ICON_FA_TRASH_CAN+' delete plane'):
                     self._remove_plane(p)
@@ -1220,13 +1229,18 @@ class GUI:
         if imgui.button('+ new plane'):
             new_plane_name = ''
             new_plane_type: plane.Type = None
+            new_plane_is_dyn = False
+            new_plane_dyn_config_file: str = ''
             def _valid_plane_name():
-                nonlocal new_plane_name
                 return new_plane_name and not any((p.name==new_plane_name for p in self.study_config.planes))
+            def _valid_config_file():
+                return new_plane_dyn_config_file=='' or ((p:=pathlib.Path(new_plane_dyn_config_file)).suffix=='.json' and p.is_file())
             def _add_plane_popup():
                 nonlocal new_plane_name
                 nonlocal new_plane_type
-                imgui.dummy((30*imgui.calc_text_size('x').x,0))
+                nonlocal new_plane_is_dyn
+                nonlocal new_plane_dyn_config_file
+                imgui.dummy(((30+30*(new_plane_type==plane.Type.GlassesValidator))*imgui.calc_text_size('x').x,0))
                 if imgui.begin_table("##new_plane_info",2):
                     imgui.table_setup_column("##new_plane_infos_left", imgui.TableColumnFlags_.width_fixed)
                     imgui.table_setup_column("##new_plane_infos_right", imgui.TableColumnFlags_.width_stretch)
@@ -1256,10 +1270,39 @@ class GUI:
                     p_idx = plane.types.index(new_plane_type) if new_plane_type is not None else -1
                     _,p_idx = imgui.combo("##plane_type_selector", p_idx, [p.value for p in plane.types])
                     new_plane_type = None if p_idx==-1 else plane.types[p_idx]
+
+                    if new_plane_type==plane.Type.GlassesValidator:
+                        imgui.table_next_row()
+                        imgui.table_next_column()
+                        imgui.align_text_to_frame_padding()
+                        imgui.text('Dynamic validation procedure?')
+                        imgui.table_next_column()
+                        _, new_plane_is_dyn = imgui.checkbox('##plane_is_dyn', new_plane_is_dyn)
+                        if new_plane_is_dyn:
+                            imgui.table_next_row()
+                            imgui.table_next_column()
+                            imgui.align_text_to_frame_padding()
+                            invalid = not _valid_config_file()
+                            if invalid:
+                                imgui.push_style_color(imgui.Col_.text, colors.error)
+                            imgui.text('Config file')
+                            if invalid:
+                                imgui.pop_style_color()
+                            gt_gui.utils.draw_hover_text('If not selected, the default dynamic validation procedure will be used','')
+                            imgui.table_next_column()
+                            but_txt = 'Select file'
+                            imgui.set_next_item_width(-imgui.get_style().item_spacing.x-2*imgui.get_style().frame_padding.x-imgui.calc_text_size(but_txt).x)
+                            _, new_plane_dyn_config_file = imgui.input_text(f'##plane_dyn_config_file', new_plane_dyn_config_file)
+                            imgui.same_line()
+                            if imgui.button(but_txt):
+                                def sel_callback(path: pathlib.Path):
+                                    nonlocal new_plane_dyn_config_file
+                                    new_plane_dyn_config_file = str(path)
+                                gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self,'new_plane_dyn_dir', callback=sel_callback))
                     imgui.end_table()
 
             buttons = {
-                ifa6.ICON_FA_CHECK+" Create plane": (lambda: callbacks.make_plane(self.study_config, new_plane_type, new_plane_name), lambda: not _valid_plane_name() or new_plane_type is None),
+                ifa6.ICON_FA_CHECK+" Create plane": (lambda: callbacks.make_plane(self, new_plane_type, new_plane_name, new_plane_is_dyn, new_plane_dyn_config_file), lambda: not _valid_plane_name() or new_plane_type is None or (new_plane_is_dyn and not _valid_config_file())),
                 ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
             }
             gt_gui.utils.push_popup(self, lambda: gt_gui.utils.popup("Add plane", _add_plane_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, outside=False))
