@@ -13,16 +13,16 @@ def detect_blob_HSV(proc_name: str, frame_idx: int, frame: np.ndarray, cam_param
 
     n_rows = frame.shape[0]
     n_cols = frame.shape[1]
-    if (n_cols, n_rows) not in border_mask_cache:
+    if (n_cols, n_rows, edge_cut_fac) not in border_mask_cache:
         border_pad_row = int(n_rows/edge_cut_fac)
-        border_pad_col = int(n_cols/edge_cut_fac / 2)
+        border_pad_col = int(n_cols/edge_cut_fac)
 
         border_mask = np.zeros(frame.shape[:2])
         border_mask[border_pad_row:(n_rows - border_pad_row), border_pad_col : (n_cols - border_pad_col)] = 1
 
-        border_mask_cache[(n_cols, n_rows)] = border_mask
+        border_mask_cache[(n_cols, n_rows, edge_cut_fac)] = border_mask
     else:
-        border_mask = border_mask_cache[(n_cols, n_rows)]
+        border_mask = border_mask_cache[(n_cols, n_rows, edge_cut_fac)]
 
     if low[0]>high[0]:
         mask = cv2.inRange(frame, (*low,), (180, *high[1:])) + cv2.inRange(frame, (0,*low[1:]), (*high,))
