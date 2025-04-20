@@ -1459,7 +1459,7 @@ class GUI:
                     imgui.text_colored(clr, f'{n_rec-len(not_completed)}/{n_rec}')
                 if not_completed:
                     rec_strs = [f'{r} ({states[r].displayable_name})' for r in not_completed]
-                    glassesTools.gui.utils.draw_hover_text('not completed for recordings:\n'+'\n'.join(rec_strs),'')
+                    gt_gui.utils.draw_hover_text('not completed for recordings:\n'+'\n'.join(rec_strs),'')
 
     def _session_context_menu(self, session_name: str) -> bool:
         # ignore input session name, get selected sessions
