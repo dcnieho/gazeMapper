@@ -202,7 +202,7 @@ def get_plane_from_definition(plane_def: Definition, path: str|pathlib.Path) -> 
         if not plane_def.use_default or plane_def.is_dynamic:
             validator_config_dir = path
         validation_config = validation.config.get_validation_setup(validator_config_dir)
-        return validation.Plane(validator_config_dir, validation_config, ref_image_store_path=path/plane.Plane.default_ref_image_name)
+        return validation.Plane(validator_config_dir, validation_config, is_dynamic=plane_def.is_dynamic, ref_image_store_path=path/plane.Plane.default_ref_image_name)
     else:
         pl = plane.Plane(
             markers             = path/plane_def.marker_file,
