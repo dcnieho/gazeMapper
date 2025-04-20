@@ -10,6 +10,7 @@ def format_duplicate_markers_msg(markers: set[tuple[int,int]]):
             dict_markers[d].append(m)
         else:
             dict_markers[d] = [m]
+    dict_markers = {d:sorted(dict_markers[d]) for d in dict_markers}
     out = ''
     for i,d in enumerate(dict_markers):
         s = 's' if len(dict_markers[d])>1 else ''
@@ -30,6 +31,9 @@ def format_marker_sequence_msg(marker_set: list[tuple[int,int]]):
     # turn each dict into a string/family
     marker_set_str: list[tuple[str,bool,int]] = []
     all_same_family_or_dict = len(set((x[0] for x in marker_set)))==1
+    marker_set.sort(key=lambda x: x[1])
+    if not all_same_family_or_dict:
+        marker_set.sort(key=lambda x: x[0])
     for m in marker_set:
         d_str,is_family = aruco.family_to_str[m[0]]
         marker_set_str.append((d_str, is_family, m[1]))
