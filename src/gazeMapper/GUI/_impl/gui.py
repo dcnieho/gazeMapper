@@ -720,7 +720,8 @@ class GUI:
                                     if sx=='xx_individual_markers_xx':
                                         mark_msgs.append(f'individual markers')
                                     else:
-                                        mark_msgs.append(f'{mx} markers of the {sx} plane')
+                                        lbl = f'{mx} markers' if isinstance(mx,str) else f'dynamic validation target markers (column {mx})'
+                                        mark_msgs.append(f'{lbl} of the {sx} plane')
                                 msg = f'The following markers are encountered in the setup both as {mark_msgs[0]} and as {mark_msgs[1]}: {gm_utils.format_duplicate_markers_msg(overlap)}. Markers must be unique, fix this collision.'
                                 # add error message to problem dict
                                 if 'xx_individual_markers_xx' in (s,s2):
