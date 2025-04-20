@@ -154,8 +154,6 @@ def delete_plane(study_config: config.Study, plane: plane.Definition):
     p_dir = path / plane.name
     if p_dir.is_dir():
         shutil.rmtree(p_dir)
-    # remove from known planes
-    study_config.planes = [p for p in study_config.planes if p.name!=plane.name]
 
 def glasses_validator_plane_check_or_deploy_config(study_config: config.Study, pl: plane.Definition_GlassesValidator):
     if not isinstance(pl, plane.Definition_GlassesValidator) or pl.use_default:

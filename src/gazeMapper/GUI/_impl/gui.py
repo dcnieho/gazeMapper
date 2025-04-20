@@ -335,7 +335,9 @@ class GUI:
         if change_type=='deleted':
             if change_path.name==plane.Definition.default_json_file_name:
                 # plane removed
-                self.study_config.planes = [p for p in self.study_config.planes if p.name!=plane_name]
+                pls = [pl for pl in self.study_config.planes if pl.name==plane_name]
+                if pls: # may already have been removed
+                    self._remove_plane(pls[0])
             return
 
         # for all addition or change events, reload the concerned plane
@@ -632,6 +634,11 @@ class GUI:
                 self._plane_preview_cache[p_def.name] = utils.load_image_with_helper(self.plane_configs[p_def.name].get_ref_image(as_RGB=True))
     def _upload_plane_image(self, p_def: plane.Definition):
         self._plane_preview_cache[p_def.name] = utils.load_image_with_helper(self.plane_configs[p_def.name].get_ref_image(as_RGB=True))
+    def _remove_plane(self, p_def: plane.Definition):
+        callbacks.delete_plane(self.study_config, p_def)
+        self.study_config.planes = [p for p in self.study_config.planes if p.name!=p_def.name]
+        self.plane_configs.pop(p_def.name, None)
+        self._plane_preview_cache.pop(p_def.name, None)
 
     def _check_project_setup_state(self):
         if self.study_config is not None:
@@ -1205,7 +1212,7 @@ class GUI:
                         callbacks.glasses_validator_deploy_config(self, p)
                 imgui.same_line()
                 if imgui.button(ifa6.ICON_FA_TRASH_CAN+' delete plane'):
-                    callbacks.delete_plane(self.study_config, p)
+                    self._remove_plane(p)
                 imgui.tree_pop()
             elif has_error:
                 imgui.pop_style_color()
