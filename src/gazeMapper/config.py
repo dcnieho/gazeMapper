@@ -111,7 +111,6 @@ class Study:
                  validate_allow_dq_fallback                     : bool                              = False,
                  validate_include_data_loss                     : bool                              = False,
                  validate_I2MC_settings                         : I2MCSettings|None                 = None,
-                 validate_use_dynamic_for_planes                : set[str]|None                     = None,
 
                  mapped_video_make_which                               : set[str]|None                     = None,
                  mapped_video_recording_colors                         : dict[str,RgbColor]|None           = None,
@@ -182,7 +181,6 @@ class Study:
         self.validate_allow_dq_fallback                     = validate_allow_dq_fallback
         self.validate_include_data_loss                     = validate_include_data_loss
         self.validate_I2MC_settings                         = validate_I2MC_settings
-        self.validate_use_dynamic_for_planes                = validate_use_dynamic_for_planes
 
         self.mapped_video_make_which                               = mapped_video_make_which
         self.mapped_video_recording_colors                         = mapped_video_recording_colors
@@ -221,7 +219,6 @@ class Study:
             self._check_sync_ref(strict_check)
             self._check_et_sync_method(strict_check)
             self._check_auto_coding_setup(strict_check)
-            self._check_validation_setup(strict_check)
             self._check_make_video(strict_check)
 
         # ensure typed dicts with defaults members are of the right class, and apply defaults
@@ -555,23 +552,6 @@ class Study:
                     type_utils.merge_problem_dicts(problems, {'get_cam_movement_for_et_sync_method': f'get_cam_movement_for_et_sync_method is set to "plane", but no plane specified for syncing eye tracker data to the scene cam (i.e., for {annotation.tooltip_map[annotation.Event.Sync_ET_Data]}s) in planes_per_episode'})
         return problems
 
-    def _check_validation_setup(self, strict_check) -> type_utils.ProblemDict:
-        problems: type_utils.ProblemDict = {}
-        if self.validate_use_dynamic_for_planes is not None:
-            gv_planes = {p.name for p in self.planes if p.type==plane.Type.GlassesValidator}
-            msg = ''
-            if not gv_planes:
-                msg = 'validate_use_dynamic_for_planes is enabled but there are no glassesValidator planes. Not possible, unset validate_use_dynamic_for_planes.'
-            elif (wrong:=[p for p in self.validate_use_dynamic_for_planes if p not in gv_planes]):
-                msg_p = ', '.join(wrong)
-                msg = f'The following planes were specified as dynamic validation planes in validate_use_dynamic_for_planes, but these planes are not glassesValidator planes: {msg_p}. Remove from validate_use_dynamic_for_planes.'
-            if msg:
-                if strict_check:
-                    raise ValueError(msg)
-                else:
-                    type_utils.merge_problem_dicts(problems, {'validate_use_dynamic_for_planes': msg})
-        return problems
-
     def _check_make_video(self, strict_check) -> type_utils.ProblemDict:
         problems = self._check_recordings(self.mapped_video_make_which, 'mapped_video_make_which', strict_check)
         type_utils.merge_problem_dicts(problems,
@@ -606,7 +586,6 @@ class Study:
         type_utils.merge_problem_dicts(problems, self._check_individual_markers(False))
         type_utils.merge_problem_dicts(problems, self._check_sync_ref(False))
         type_utils.merge_problem_dicts(problems, self._check_et_sync_method(False))
-        type_utils.merge_problem_dicts(problems, self._check_validation_setup(False))
         type_utils.merge_problem_dicts(problems, self._check_make_video(False))
         return problems
 
@@ -870,7 +849,6 @@ study_parameter_doc = {
         'maxMergeTime': type_utils.GUIDocInfo('Maximum gap duration for merging', 'Maximum time (ms) between fixations for merging to be possible.'),
         'minFixDur': type_utils.GUIDocInfo('Minimum fixation duration', 'Minimum fixation duration (ms) after merging, fixations with shorter duration are removed from output.'),
     }),
-    'validate_use_dynamic_for_planes': type_utils.GUIDocInfo('glassesValidator: Dynamic planes', 'TODO.'),
     'mapped_video_make_which': type_utils.GUIDocInfo('Mapped video: Which recordings', 'Indicates one or multiple recordings for which to make videos of the eye tracker scene camera or external camera (synchronized to one of the recordings if there are multiple) showing detected plane origins, detected individual markers and gaze from any other recordings eye tracker recordings. Also shown for eye tracker recordings are gaze on the scene video from the eye tracker, gaze projected to the detected planes. Each only if available, and enabled in the below video generation settings.'),
     'mapped_video_recording_colors': type_utils.GUIDocInfo('Mapped video: Recording colors', 'Colors used for drawing each recording\'s gaze point, scene camera and gaze vector (depending on settings).'),
     'mapped_video_projected_vidPos_color': type_utils.GUIDocInfo('Mapped video: Color for gaze position on plane', 'Color used for drawing the recorded gaze position on the scene video transformed to the plane. Not drawn if value is not set.'),

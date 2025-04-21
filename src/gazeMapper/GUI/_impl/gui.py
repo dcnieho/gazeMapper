@@ -577,8 +577,6 @@ class GUI:
             return {config.MarkerID(m.id, m.aruco_dict_id) for m in self.study_config.individual_markers}
         def _get_known_planes() -> set[str]:
             return {p.name for p in self.study_config.planes}
-        def _get_known_validation_planes() -> set[str]:
-            return {p.name for p in self.study_config.planes if p.type==plane.Type.GlassesValidator}
         def _get_episodes_to_code_for_planes() -> set[annotation.Event]:
             return {e for e in self.study_config.episodes_to_code if e!=annotation.Event.Sync_Camera}
         self._possible_value_getters = {
@@ -592,7 +590,6 @@ class GUI:
             'planes_per_episode': [_get_episodes_to_code_for_planes, _get_known_planes],
             'auto_code_sync_points': {'markers': _get_known_individual_markers},
             'auto_code_episodes': [_get_episodes_to_code_for_planes, {None: {'start_markers': _get_known_individual_markers, 'end_markers': _get_known_individual_markers}}],
-            'validate_use_dynamic_for_planes': _get_known_validation_planes
         }
 
         self._need_set_window_title = True
