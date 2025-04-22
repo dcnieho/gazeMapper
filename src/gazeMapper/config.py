@@ -799,17 +799,17 @@ study_parameter_doc = {
     'sync_et_to_cam_use_average': type_utils.GUIDocInfo('Gaze data synchronization: Use average?', 'Whether to use the average offset of multiple sync episodes. If not enabled, the offset for the first sync episode is used, the rest are ignored.'),
     'auto_code_sync_points': type_utils.GUIDocInfo('Automated coding of synchronization points','Setup for automatic coding of synchronization timepoints.',{
         'markers': type_utils.GUIDocInfo('Marker(s)', 'Set of marker IDs whose appearance indicates a synchronization timepoint.'),
-        'max_gap_duration': type_utils.GUIDocInfo('Maximum gap duration', 'Maximum gap (number of frames) to be filled in sequences of marker detections.'),
-        'min_duration': type_utils.GUIDocInfo('Minimum duration', 'Minimum length (number of frames) of a sequence of marker detections. Shorter runs are removed.')
+        'max_gap_duration': type_utils.GUIDocInfo('Maximum gap duration', 'Maximum gap (number of frames) in marker detections that will be filled in (ignored).'),
+        'min_duration': type_utils.GUIDocInfo('Minimum duration', 'Minimum duration (number of frames) that a marker should be detected. Shorter runs are removed.')
     }),
     'auto_code_episodes': type_utils.GUIDocInfo('Automated coding of episodes','Setup for automatic coding of episodes.',{
         None: # None indicates the doc specification applies to the contained values
             dict([_get_annotation_event_doc(a,{
                 'start_markers': type_utils.GUIDocInfo('Start marker(s)', 'A single marker ID or a sequence of marker IDs that indicate the start of an episode.'),
                 'end_markers': type_utils.GUIDocInfo('End marker(s)', 'A single marker ID or a sequence of marker IDs that indicate the end of an episode.'),
-                'max_gap_duration': type_utils.GUIDocInfo('Maximum gap duration', 'Maximum gap (number of frames) to be filled in sequences of marker detections.'),
-                'max_intermarker_gap_duration': type_utils.GUIDocInfo('Maximum intermarker gap duration', 'Maximum gap (number of frames) between the detection of two markers in a sequence.'),
-                'min_duration': type_utils.GUIDocInfo('Minimum duration', 'Minimum length (number of frames) of a sequence of marker detections. Shorter runs are removed.')
+                'max_gap_duration': type_utils.GUIDocInfo('Maximum gap duration', 'Maximum gap (number of frames) in marker detections that will be filled in (ignored).'),
+                'max_intermarker_gap_duration': type_utils.GUIDocInfo('Maximum intermarker gap duration', 'Maximum gap (number of frames) that is allowed between the detection of two markers in a sequence.'),
+                'min_duration': type_utils.GUIDocInfo('Minimum duration', 'Minimum duration (number of frames) that a marker should be detected. Shorter runs are removed.')
                 }
             ) for a in annotation.Event if a!=annotation.Event.Sync_Camera])
     }),

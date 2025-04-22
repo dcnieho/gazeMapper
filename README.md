@@ -794,8 +794,8 @@ These settings are discussed [here](#automatic-coding-of-synchronization-timepoi
 |Setting<br>name in GUI|Setting name<br>in settings file|Default<br>value|Description|
 | --- | --- | --- | --- |
 |Markers|`markers`||Set of marker IDs whose appearance indicates a sync point.|
-|Maximum gap duration|`max_gap_duration`|`4`|Maximum gap (number of frames) to be filled in sequences of marker detections.|
-|Minimum duration|`min_duration`|`6`|Minimum length (number of frames) of a sequence of marker detections. Shorter runs are removed.|
+|Maximum gap duration|`max_gap_duration`|`4`|Maximum gap (number of frames) in marker detections that will be filled in (ignored).|
+|Minimum duration|`min_duration`|`6`|Minimum duration (number of frames) that a marker should be detected. Shorter runs are removed.|
 
 ## `gazeMapper.config.AutoCodeEpisodes`
 These settings are discussed [here](#automatic-coding-of-episodes).
@@ -803,9 +803,9 @@ These settings are discussed [here](#automatic-coding-of-episodes).
 | --- | --- | --- | --- |
 |Start marker(s)|`start_markers`||A single marker ID or a sequence (`list`) of marker IDs that indicate the start of an episode.|
 |End marker(s)|`end_markers`||A single marker ID or a sequence (`list`) of marker IDs that indicate the end of an episode.|
-|Maximum gap duration|`max_gap_duration`|`4`|Maximum gap (number of frames) to be filled in sequences of marker detections.|
-|Maximum intermarker gap duration|`max_intermarker_gap_duration`|`15`|Maximum gap (number of frames) between the detection of two markers in a sequence.|
-|Minimum duration|`min_duration`|`6`|Minimum length (number of frames) of a sequence of marker detections. Shorter runs are removed.|
+|Maximum gap duration|`max_gap_duration`|`4`|Maximum gap (number of frames) in marker detections that will be filled in (ignored).|
+|Maximum intermarker gap duration|`max_intermarker_gap_duration`|`15`|Maximum gap (number of frames) that is allowed between the detection of two markers in a sequence.|
+|Minimum duration|`min_duration`|`6`|Minimum duration (number of frames) that a marker should be detected. Shorter runs are removed.|
 
 ## `gazeMapper.config.CamMovementForEtSyncFunction`
 These settings are used for when the `get_cam_movement_for_et_sync_method` setting is set to `'function'`, see [here](#synchronizing-eye-tracker-data-and-scene-camera).
