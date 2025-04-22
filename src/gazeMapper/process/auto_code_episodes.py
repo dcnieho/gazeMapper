@@ -6,7 +6,6 @@ import copy
 from glassesTools import annotation, process_pool
 
 from .. import config, episode, marker, naming, process, session
-from . import _utils
 
 
 def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **study_settings):
@@ -54,14 +53,14 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
         marker_starts: dict[int,list[int]] = {}
         marker_ends  : dict[int,list[int]] = {}
         for i in markers:
-            marker_starts[i], marker_ends[i] = _utils.get_marker_starts_ends(markers[i], study_config.auto_code_episodes[e]['max_gap_duration'], study_config.auto_code_episodes[e]['min_duration'])
+            marker_starts[i], marker_ends[i] = marker.get_marker_starts_ends(markers[i], study_config.auto_code_episodes[e]['max_gap_duration'], study_config.auto_code_episodes[e]['min_duration'])
         # find potential trial starts and ends
         if len(study_config.auto_code_episodes[e]['start_markers'])>1:
-            starts = _utils.get_trial_from_markers(marker_starts, marker_ends, study_config.auto_code_episodes[e]['start_markers'], study_config.auto_code_episodes[e]['max_intermarker_gap_duration'], side='end')
+            starts = marker.get_interval_from_markers(marker_starts, marker_ends, study_config.auto_code_episodes[e]['start_markers'], study_config.auto_code_episodes[e]['max_intermarker_gap_duration'], side='end')
         else:
             starts = marker_ends  [study_config.auto_code_episodes[e]['start_markers'][0]]
         if len(study_config.auto_code_episodes[e][ 'end_markers' ])>1:
-            ends   = _utils.get_trial_from_markers(marker_starts, marker_ends, study_config.auto_code_episodes[e][ 'end_markers' ], study_config.auto_code_episodes[e]['max_intermarker_gap_duration'], side='start')
+            ends   = marker.get_interval_from_markers(marker_starts, marker_ends, study_config.auto_code_episodes[e][ 'end_markers' ], study_config.auto_code_episodes[e]['max_intermarker_gap_duration'], side='start')
         else:
             ends   = marker_starts[study_config.auto_code_episodes[e][ 'end_markers' ][0]]
         # now match trial starts and ends

@@ -6,7 +6,6 @@ import shutil
 from glassesTools import annotation, process_pool
 
 from .. import config, episode, marker, naming, process, session
-from . import _utils
 
 
 def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **study_settings):
@@ -43,7 +42,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
     # see where stretches of True (marker presence) start
     marker_starts = []
     for i in range(len(markers)):
-        start_frames,_ = _utils.get_marker_starts_ends(markers[i], study_config.auto_code_sync_points['max_gap_duration'], study_config.auto_code_sync_points['min_duration'])
+        start_frames,_ = marker.get_marker_starts_ends(markers[i], study_config.auto_code_sync_points['max_gap_duration'], study_config.auto_code_sync_points['min_duration'])
         marker_starts.extend(start_frames)
     # insert in episodes
     [episodes[annotation.Event.Sync_Camera].append(i) for i in marker_starts if i not in episodes[annotation.Event.Sync_Camera]]
