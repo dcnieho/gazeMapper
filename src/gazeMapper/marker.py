@@ -73,9 +73,12 @@ def get_marker_dict_from_list(markers: list[Marker]) -> dict[tuple[int,int],aruc
         out[(m.aruco_dict_id, m.id)] = get_marker_setup(m)
     return out
 
-def get_file_name(marker_id: int, aruco_dict_id: int, folder: str|pathlib.Path) -> pathlib.Path:
+def get_file_name(marker_id: int, aruco_dict_id: int, folder: str|pathlib.Path|None) -> pathlib.Path:
+    file_name = f'{naming.marker_pose_prefix}{aruco.dict_to_str[aruco_dict_id]}_{marker_id}.tsv'
+    if folder is None:
+        return file_name
     folder = pathlib.Path(folder)
-    return folder / f'{naming.marker_pose_prefix}{aruco.dict_to_str[aruco_dict_id]}_{marker_id}.tsv'
+    return folder / file_name
 
 def load_file(marker_id: int, aruco_dict_id: int, folder: str|pathlib.Path) -> pd.DataFrame:
     file = get_file_name(marker_id, aruco_dict_id, folder)
