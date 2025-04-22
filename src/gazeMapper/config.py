@@ -105,6 +105,7 @@ class Study:
                  validate_I2MC_settings                         : I2MCSettings|None                 = None,
                  validate_dynamic_skip_first_duration           : float                             = .2,
                  validate_dynamic_max_gap_duration              : int                               = 4,
+                 validate_dynamic_min_duration                  : int                               = 6,
 
                  mapped_video_make_which                               : set[str]|None                     = None,
                  mapped_video_recording_colors                         : dict[str,RgbColor]|None           = None,
@@ -177,6 +178,7 @@ class Study:
         self.validate_I2MC_settings                         = validate_I2MC_settings
         self.validate_dynamic_skip_first_duration           = validate_dynamic_skip_first_duration
         self.validate_dynamic_max_gap_duration              = validate_dynamic_max_gap_duration
+        self.validate_dynamic_min_duration                  = validate_dynamic_min_duration
 
         self.mapped_video_make_which                               = mapped_video_make_which
         self.mapped_video_recording_colors                         = mapped_video_recording_colors
@@ -847,6 +849,7 @@ study_parameter_doc = {
     }),
     'validate_dynamic_skip_first_duration': type_utils.GUIDocInfo('glassesValidator: Dynamic skip first duration', 'For a glassesValidator plane that is marked as dynamic (i.e. for a validation procedure using the PsychoPy script), how many seconds of data to not use from the beginning of each target interval.'),
     'validate_dynamic_max_gap_duration': type_utils.GUIDocInfo('glassesValidator: Dynamic, maximum gap duration', 'For a glassesValidator plane that is marked as dynamic (i.e. for a validation procedure using the PsychoPy script), maximum gap (number of frames) in marker detections that will be filled in (ignored).'),
+    'validate_dynamic_min_duration': type_utils.GUIDocInfo('glassesValidator: Dynamic, minimum duration', 'Minimum duration (number of frames) that a marker should be detected. Shorter runs are removed.'),
     'mapped_video_make_which': type_utils.GUIDocInfo('Mapped video: Which recordings', 'Indicates one or multiple recordings for which to make videos of the eye tracker scene camera or external camera (synchronized to one of the recordings if there are multiple) showing detected plane origins, detected individual markers and gaze from any other recordings eye tracker recordings. Also shown for eye tracker recordings are gaze on the scene video from the eye tracker, gaze projected to the detected planes. Each only if available, and enabled in the below video generation settings.'),
     'mapped_video_recording_colors': type_utils.GUIDocInfo('Mapped video: Recording colors', 'Colors used for drawing each recording\'s gaze point, scene camera and gaze vector (depending on settings).'),
     'mapped_video_projected_vidPos_color': type_utils.GUIDocInfo('Mapped video: Color for gaze position on plane', 'Color used for drawing the recorded gaze position on the scene video transformed to the plane. Not drawn if value is not set.'),
@@ -923,7 +926,7 @@ class StudyOverride:
             else:
                 include = {'get_cam_movement_for_et_sync_method','get_cam_movement_for_et_sync_function',
                            'auto_code_sync_points', 'auto_code_episodes',
-                           'validate_do_global_shift', 'validate_max_dist_fac', 'validate_dq_types', 'validate_allow_dq_fallback', 'validate_include_data_loss', 'validate_I2MC_settings', 'validate_dynamic_skip_first_duration', 'validate_dynamic_max_gap_duration'}
+                           'validate_do_global_shift', 'validate_max_dist_fac', 'validate_dq_types', 'validate_allow_dq_fallback', 'validate_include_data_loss', 'validate_I2MC_settings', 'validate_dynamic_skip_first_duration', 'validate_dynamic_max_gap_duration', 'validate_dynamic_min_duration'}
             exclude = set(all_params)-include
         allowed_params = [a for a in all_params if a not in exclude]
         return allowed_params, exclude

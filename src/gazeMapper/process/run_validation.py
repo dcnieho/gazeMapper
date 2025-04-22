@@ -91,7 +91,8 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
                                                      marker_observations,
                                                      episodes[idx],
                                                      study_config.validate_dynamic_skip_first_duration,
-                                                     study_config.validate_dynamic_max_gap_duration)
+                                                     study_config.validate_dynamic_max_gap_duration,
+                                                     study_config.validate_dynamic_min_duration)
             else:
                 fix_file = working_dir / f'{naming.validation_prefix}{p}_fixations_interval_{idx+1:02d}.tsv'
                 selected_intervals, other_intervals = \
