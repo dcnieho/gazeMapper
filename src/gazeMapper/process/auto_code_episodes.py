@@ -40,6 +40,11 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
     # get marker files
     all_marker_ids = [study_config.auto_code_episodes[e]['start_markers']+study_config.auto_code_episodes[e]['end_markers'] for e in study_config.auto_code_episodes]
     all_marker_ids = {m for ms in all_marker_ids for m in ms}
+    file_missing   = [not marker.get_file_name(m.m_id, m.aruco_dict_id, working_dir).is_file() for m in all_marker_ids]
+    if any(file_missing):
+        file_missing = [marker.get_file_name(m.m_id, m.aruco_dict_id, None) for m,miss in zip(all_marker_ids,file_missing) if miss]
+        missing_str  = '\n- '.join(file_missing)
+        raise FileNotFoundError(f'The following marker files were not found:\n- {missing_str}')
     ori_markers = {m: marker.load_file(m.m_id, m.aruco_dict_id, working_dir) for m in all_marker_ids}
     # recode so we have a boolean with when markers are present
     ori_markers = {m: gt_marker.code_for_presence(ori_markers[m], allow_failed=True) for m in ori_markers if not ori_markers[m].empty}
