@@ -562,23 +562,23 @@ class GUI:
         self._config_watcher_stop_event = asyncio.Event()
         self._config_watcher = async_thread.run(project_watcher.watch_and_report_changes(config_dir, self._config_change_callback, self._config_watcher_stop_event, watch_filter=project_watcher.ChangeFilter(('.json','.csv','.txt'), do_report_directories=True, do_report_files=True)))
 
-        def _get_known_recordings(filter_ref=False, dev_types:list[session.RecordingType]|None=None) -> set[str]:
-            recs = {r.name for r in self.study_config.session_def.recordings}
+        def _get_known_recordings(filter_ref=False, dev_types:list[session.RecordingType]|None=None) -> list[str]:
+            recs = [r.name for r in self.study_config.session_def.recordings]
             if filter_ref and self.study_config.sync_ref_recording:
-                recs = {r for r in recs if r!=self.study_config.sync_ref_recording}
+                recs = [r for r in recs if r!=self.study_config.sync_ref_recording]
             if dev_types:
-                recs = {r for r in recs if self.study_config.session_def.get_recording_def(r).type in dev_types}
-            return recs
-        def _get_known_recordings_no_ref() -> set[str]:
+                recs = [r for r in recs if self.study_config.session_def.get_recording_def(r).type in dev_types]
+            return sorted(recs)
+        def _get_known_recordings_no_ref() -> list[str]:
             return _get_known_recordings(filter_ref=True)
-        def _get_known_recordings_only_eye_tracker() -> set[str]:
+        def _get_known_recordings_only_eye_tracker() -> list[str]:
             return _get_known_recordings(dev_types=[session.RecordingType.Eye_Tracker])
-        def _get_known_individual_markers() -> set[config.MarkerID]:
-            return {config.MarkerID(m.id, m.aruco_dict_id) for m in self.study_config.individual_markers}
-        def _get_known_planes() -> set[str]:
-            return {p.name for p in self.study_config.planes}
-        def _get_episodes_to_code_for_planes() -> set[annotation.Event]:
-            return {e for e in self.study_config.episodes_to_code if e!=annotation.Event.Sync_Camera}
+        def _get_known_individual_markers() -> list[config.MarkerID]:
+            return sorted([config.MarkerID(m.id, m.aruco_dict_id) for m in self.study_config.individual_markers])
+        def _get_known_planes() -> list[str]:
+            return sorted([p.name for p in self.study_config.planes])
+        def _get_episodes_to_code_for_planes() -> list[annotation.Event]:
+            return sorted([e for e in self.study_config.episodes_to_code if e!=annotation.Event.Sync_Camera], key=lambda x: x.value)
         self._possible_value_getters = {
             'mapped_video_make_which': _get_known_recordings,
             'mapped_video_recording_colors': _get_known_recordings_only_eye_tracker,

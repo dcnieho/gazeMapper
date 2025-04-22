@@ -238,13 +238,13 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, actual_types: dic
                 all_fields = possible_value_getters[0]() # first one should be for keys
                 possible_value_getters = possible_value_getters[1]  # second one for values, and thus the one to be passed on
             else:
-                all_fields = set(possible_value_getters())
+                all_fields = possible_value_getters()
         else:
             if kv_type:
                 if typing.get_origin(kv_type[0])==typing.Literal:
-                    all_fields = set(typing.get_args(kv_type[0]))
+                    all_fields = list(typing.get_args(kv_type[0]))
                 elif issubclass(kv_type[0], enum.Enum):
-                    all_fields = set((e for e in kv_type[0]))
+                    all_fields = [e for e in kv_type[0]]
         if kv_type and len(kv_type)==2:
             # get value type, if meaningful
             if kv_type[1]!=typing.Any and typing.get_origin(kv_type[1]) not in [typing.Union]:
@@ -257,7 +257,8 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, actual_types: dic
         if fields is None:
             fields = list(obj.keys())
             if all_fields is not None:
-                missing_fields = all_fields-set(fields)
+                missing_fields = set(all_fields)-set(fields)
+                missing_fields = [f for f in all_fields if f in missing_fields] # preserve order
                 if not missing_fields:
                     # nothing more to add, all possible keys exhausted
                     has_add = False
