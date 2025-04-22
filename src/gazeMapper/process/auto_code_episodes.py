@@ -42,13 +42,12 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
     all_marker_ids = {m for ms in all_marker_ids for m in ms}
     ori_markers = {m: marker.load_file(m.m_id, m.aruco_dict_id, working_dir) for m in all_marker_ids}
     # recode so we have a boolean with when markers are present
-    ori_markers = {i: marker.code_marker_for_presence(ori_markers[i], allow_failed=True) for i in ori_markers if not ori_markers[i].empty}
+    ori_markers = {m: marker.code_marker_for_presence(ori_markers[m], allow_failed=True) for m in ori_markers if not ori_markers[m].empty}
+    # marker presence signal only contains marker detections (True). We need to fill the gaps in between detections with False (not detected) so we have a continuous signal without gaps
+    ori_markers = {m: marker.expand_marker_detection(ori_markers[m], fill_value=False) for m in ori_markers}
     # now auto code indicated intervals
     for e in study_config.auto_code_episodes:
         markers = {i: copy.deepcopy(ori_markers[i]) for i in study_config.auto_code_episodes[e]['start_markers']+study_config.auto_code_episodes[e]['end_markers']}
-        # fill gaps in marker detection
-        for i in markers:
-            markers[i] = marker.fill_gaps_in_marker_detection(markers[i], fill_value=False)
         # see where stretches of marker presence start and end
         marker_starts: dict[int,list[int]] = {}
         marker_ends  : dict[int,list[int]] = {}

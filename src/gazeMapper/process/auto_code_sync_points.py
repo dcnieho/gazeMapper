@@ -36,9 +36,9 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
     markers = [marker.code_marker_for_presence(m, allow_failed=True) for m in markers if not m.empty]
     if not markers:
         raise RuntimeError(f'No markers found in the marker detection files for session "{working_dir.parent.name}", recording "{working_dir.name}"')
-    # fill gaps in marker detection
+    # marker presence signal only contains marker detections (True). We need to fill the gaps in between detections with False (not detected) so we have a continuous signal without gaps
     for i in range(len(markers)):
-        markers[i] = marker.fill_gaps_in_marker_detection(markers[i], fill_value=False)
+        markers[i] = marker.expand_marker_detection(markers[i], fill_value=False)
     # see where stretches of True (marker presence) start
     marker_starts = []
     for i in range(len(markers)):
