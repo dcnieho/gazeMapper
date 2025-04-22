@@ -83,7 +83,8 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
             # and bail out if there are no ends left
             gaps[gaps<=0] = np.iinfo(gaps.dtype).max
             mini = np.argmin(gaps)
-            intervals.append((starts[s_idx+mini], ends[e_idx]))
+            # NB: intervals start the frame *after* the marker is last observed, and intervals end the frame *before* the marker is first observed
+            intervals.append((starts[s_idx+mini]+1, ends[e_idx]-1))
             # these are consumed
             s_idx+=mini+1
             e_idx+=1
