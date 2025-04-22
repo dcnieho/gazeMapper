@@ -35,13 +35,9 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
     if not markers:
         raise RuntimeError(f'No markers found in the marker detection files for session "{working_dir.parent.name}", recording "{working_dir.name}"')
     # marker presence signal only contains marker detections (True). We need to fill the gaps in between detections with False (not detected) so we have a continuous signal without gaps
-    for i in range(len(markers)):
-        markers[i] = gt_marker.expand_detection(markers[i], fill_value=False)
+    markers = [gt_marker.expand_detection(m, fill_value=False) for m in markers]
     # see where stretches of True (marker presence) start
-    marker_starts = []
-    for i in range(len(markers)):
-        start_frames,_ = gt_marker.get_appearance_starts_ends(markers[i], study_config.auto_code_sync_points['max_gap_duration'], study_config.auto_code_sync_points['min_duration'])
-        marker_starts.extend(start_frames)
+    marker_starts = [s for m in markers for s in gt_marker.get_appearance_starts_ends(m, study_config.auto_code_sync_points['max_gap_duration'], study_config.auto_code_sync_points['min_duration'])[0]]
     # insert in episodes
     [episodes[annotation.Event.Sync_Camera].append(i) for i in marker_starts if i not in episodes[annotation.Event.Sync_Camera]]
 
