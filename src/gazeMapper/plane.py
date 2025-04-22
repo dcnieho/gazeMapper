@@ -1,11 +1,10 @@
 from enum import auto
 import pathlib
-import cv2
 import typeguard
 import inspect
 import typing
 
-from glassesTools import json, plane, utils, validation
+from glassesTools import aruco, json, plane, utils, validation
 
 from . import type_utils
 
@@ -112,7 +111,7 @@ class Definition_Plane_2D(Definition):
                  plane_size         : plane.Coordinate          = plane.Coordinate(0., 0.), # should be set to something non-zero
                  origin             : plane.Coordinate          = plane.Coordinate(0., 0.),
                  unit               : str                       = '',
-                 aruco_dict_id      : type_utils.ArucoDictType  = cv2.aruco.DICT_4X4_250,
+                 aruco_dict_id      : type_utils.ArucoDictType  = aruco.default_dict,
                  ref_image_size     : int                       = 1920
                  ):
         super().__init__(Type.Plane_2D, name)

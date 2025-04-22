@@ -1,7 +1,6 @@
 import pathlib
-import numpy as np
 import pandas as pd
-from typing import overload, Any
+import typing
 from collections import defaultdict
 import typeguard
 import cv2
@@ -18,7 +17,7 @@ class Marker:
                  m_id               : int,
                  detect_only        : bool,         # if true, pose will not be determined and only marker presence is detected. That means marker size is not needed
                  size               : float|None                = None,
-                 aruco_dict_id      : type_utils.ArucoDictType  = cv2.aruco.DICT_4X4_250,
+                 aruco_dict_id      : type_utils.ArucoDictType  = aruco.default_dict,
                  marker_border_bits : int                       = 1
                  ):
         self.id                 = m_id
@@ -27,7 +26,7 @@ class Marker:
         self.aruco_dict_id      = aruco_dict_id
         self.marker_border_bits = marker_border_bits
 
-    def _to_dict(self) -> dict[str,Any]:
+    def _to_dict(self) -> dict[str,typing.Any]:
         out = {'id': self.id, 'detect_only': self.detect_only}
         for f in ['size', 'aruco_dict_id', 'marker_border_bits']:
             if (val:=getattr(self,f))!=marker_defaults[f]:
@@ -38,7 +37,7 @@ class Marker:
         return out
 
     @staticmethod
-    def _from_dict(kwargs: dict[str,Any]):
+    def _from_dict(kwargs: dict[str,typing.Any]):
         # backwards compatibility
         if 'detect_only' not in kwargs:
             kwargs['detect_only'] = False
