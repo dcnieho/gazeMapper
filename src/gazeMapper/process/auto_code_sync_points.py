@@ -29,7 +29,10 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
         episodes = episode.get_empty_marker_dict(study_config.episodes_to_code)
 
     # get marker files
-    markers = [marker.load_file(m.m_id, m.aruco_dict_id, working_dir) for m in study_config.auto_code_sync_points['markers']]
+    markers = [marker.load_file(m.m_id, m.aruco_dict_id, working_dir) for m in study_config.auto_code_sync_points['markers'] if marker.get_file_name(m.m_id, m.aruco_dict_id, working_dir).is_file()]
+    if not markers:
+        missing_str = '\n- '.join([marker.get_file_name(m.m_id, m.aruco_dict_id, None) for m in study_config.auto_code_sync_points['markers']])
+        raise FileNotFoundError(f'None of the following marker files were found:\n- {missing_str}')
     # recode so we have a boolean with when markers are present
     markers = [gt_marker.code_for_presence(m, allow_failed=True) for m in markers if not m.empty]
     if not markers:
