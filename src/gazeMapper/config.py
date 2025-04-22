@@ -4,30 +4,22 @@ import copy
 import enum
 import typeguard
 import typing
-import cv2
 from typing import Any, Literal
 
-from glassesTools import annotation, aruco, gaze_worldref, json, utils as gt_utils
+from glassesTools import annotation, aruco, gaze_worldref, json, marker as gt_marker, utils as gt_utils
 from glassesTools.validation import DataQualityType, get_DataQualityType_explanation
 
 from . import marker, plane, session, typed_dict_defaults, type_utils, utils
 
 
-class MarkerID(typing.NamedTuple):
-    m_id:           int
-    aruco_dict_id:  int
-json.register_type(json.TypeEntry(MarkerID, '__config.MarkerID__', lambda x: {'m_id':x.m_id, 'aruco_dict_id':aruco.dict_to_str[x.aruco_dict_id]}, lambda x: MarkerID(m_id=x['m_id'], aruco_dict_id=getattr(cv2.aruco,x['aruco_dict_id']))))
-def marker_ID_to_str(m: MarkerID):
-    return f'{m.m_id} ({aruco.dict_to_str[m.aruco_dict_id]})'
-
 class AutoCodeSyncPoints(typed_dict_defaults.TypedDictDefault, total=False):
-    markers         : set[MarkerID]
+    markers         : set[gt_marker.MarkerID]
     max_gap_duration: int       = 4
     min_duration    : int       = 6
 
 class AutoCodeEpisodes(typed_dict_defaults.TypedDictDefault, total=False):
-    start_markers               : list[MarkerID]
-    end_markers                 : list[MarkerID]
+    start_markers               : list[gt_marker.MarkerID]
+    end_markers                 : list[gt_marker.MarkerID]
     max_gap_duration            : int       = 4
     max_intermarker_gap_duration: int       = 15
     min_duration                : int       = 6
@@ -360,7 +352,7 @@ class Study:
 
     def _check_auto_markers(self, strict_check) -> type_utils.ProblemDict:
         problems: type_utils.ProblemDict = {}
-        used_markers: dict[tuple[str,str]|tuple[str,annotation.Event,str],list[MarkerID]] = {}
+        used_markers: dict[tuple[str,str]|tuple[str,annotation.Event,str],list[gt_marker.MarkerID]] = {}
         if self.auto_code_sync_points:
             if 'markers' not in self.auto_code_sync_points:
                 if strict_check:
@@ -369,16 +361,16 @@ class Study:
                     problems['auto_code_sync_points'] = {}
                     problems['auto_code_sync_points']['markers'] = 'auto_code_sync_points.markers cannot be empty or unspecified'
             else:
-                missing_markers: list[MarkerID] = []
+                missing_markers: list[gt_marker.MarkerID] = []
                 for i in self.auto_code_sync_points['markers']:
                     if not any([m.id==i.m_id and m.aruco_dict_id==i.aruco_dict_id for m in self.individual_markers]):
                         if strict_check:
-                            raise ValueError(f'Marker "{marker_ID_to_str(i)}" specified in auto_code_sync_points.markers, but unknown because not present in individual_markers')
+                            raise ValueError(f'Marker "{gt_marker.marker_ID_to_str(i)}" specified in auto_code_sync_points.markers, but unknown because not present in individual_markers')
                         else:
                             missing_markers.append(i)
                 if missing_markers:
                     problems['auto_code_sync_points'] = {}
-                    missing_markers = ', '.join((marker_ID_to_str(m) for m in missing_markers))
+                    missing_markers = ', '.join((gt_marker.marker_ID_to_str(m) for m in missing_markers))
                     problems['auto_code_sync_points']['markers'] = f'The marker(s) {missing_markers} are not defined in individual_markers'
                 used_markers[('auto_code_sync_points','markers')] = self.auto_code_sync_points['markers']
         if self.auto_code_episodes:
@@ -390,15 +382,15 @@ class Study:
                         else:
                             type_utils.merge_problem_dicts(problems, {'auto_code_episodes': {e: {f: f'auto_code_episodes[{e}].{f} cannot be empty or unspecified'}}})
                     else:
-                        missing_markers: list[MarkerID] = []
+                        missing_markers: list[gt_marker.MarkerID] = []
                         for i in self.auto_code_episodes[e][f]:
                             if not any([m.id==i.m_id and m.aruco_dict_id==i.aruco_dict_id for m in self.individual_markers]):
                                 if strict_check:
-                                    raise ValueError(f'Marker "{marker_ID_to_str(i)}" specified in auto_code_episodes.[{e}].{f}, but unknown because not present in individual_markers')
+                                    raise ValueError(f'Marker "{gt_marker.marker_ID_to_str(i)}" specified in auto_code_episodes.[{e}].{f}, but unknown because not present in individual_markers')
                                 else:
                                     missing_markers.append(i)
                         if missing_markers:
-                            missing_markers = ', '.join((marker_ID_to_str(m) for m in missing_markers))
+                            missing_markers = ', '.join((gt_marker.marker_ID_to_str(m) for m in missing_markers))
                             type_utils.merge_problem_dicts(problems, {'auto_code_episodes': {e: {f: f'The marker(s) {missing_markers} are not defined in individual_markers'}}})
                         used_markers[('auto_code_episodes',e,f)] = self.auto_code_episodes[e][f]
         # check if markers  or marker sequences are uniquely used:
@@ -687,7 +679,7 @@ class Study:
                     # incorrect setup, referring to a non-existing individual marker. ignore
                     continue
                 else:
-                    kwds['auto_code_sync_points']['markers'].add(MarkerID(im[0].id, im[0].aruco_dict_id))
+                    kwds['auto_code_sync_points']['markers'].add(gt_marker.MarkerID(im[0].id, im[0].aruco_dict_id))
         if 'auto_code_episodes' in kwds:
             for e in kwds['auto_code_episodes']:
                 for f in ('start_markers','end_markers'):
@@ -705,7 +697,7 @@ class Study:
                             # incorrect setup, referring to a non-existing individual marker. ignore
                             continue
                         else:
-                            kwds['auto_code_episodes'][e][f].append(MarkerID(im[0].id, im[0].aruco_dict_id))
+                            kwds['auto_code_episodes'][e][f].append(gt_marker.MarkerID(im[0].id, im[0].aruco_dict_id))
         # backwards compatibility for mapped video marker and axes settings
         kwds.pop('mapped_video_process_individual_markers_for_all_frames',None) # setting doesn't exist anymore
         if 'mapped_video_show_detected_markers' in kwds:

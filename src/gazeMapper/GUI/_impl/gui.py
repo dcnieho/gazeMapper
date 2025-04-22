@@ -19,7 +19,7 @@ import OpenGL
 import OpenGL.GL as gl
 
 import glassesTools
-from glassesTools import annotation, aruco, gui as gt_gui, naming as gt_naming, plane as gt_plane, platform as gt_platform, process_pool, utils as gt_utils
+from glassesTools import annotation, aruco, gui as gt_gui, naming as gt_naming, marker as gt_marker, plane as gt_plane, platform as gt_platform, process_pool, utils as gt_utils
 from glassesTools.gui import colors
 
 from ... import config, marker, plane, process, project_watcher, session, type_utils, utils as gm_utils, version
@@ -28,7 +28,7 @@ from . import callbacks, image_helper, session_lister, settings_editor, utils
 
 
 # add formatter for Marker IDs (marker id + aruco dict pairs)
-settings_editor.register_formatter(config.MarkerID, config.marker_ID_to_str)
+settings_editor.register_formatter(gt_marker.MarkerID, gt_marker.marker_ID_to_str)
 
 class GUI:
     def __init__(self):
@@ -573,8 +573,8 @@ class GUI:
             return _get_known_recordings(filter_ref=True)
         def _get_known_recordings_only_eye_tracker() -> list[str]:
             return _get_known_recordings(dev_types=[session.RecordingType.Eye_Tracker])
-        def _get_known_individual_markers() -> list[config.MarkerID]:
-            return sorted([config.MarkerID(m.id, m.aruco_dict_id) for m in self.study_config.individual_markers])
+        def _get_known_individual_markers() -> list[gt_marker.MarkerID]:
+            return sorted([gt_marker.MarkerID(m.id, m.aruco_dict_id) for m in self.study_config.individual_markers])
         def _get_known_planes() -> list[str]:
             return sorted([p.name for p in self.study_config.planes])
         def _get_episodes_to_code_for_planes() -> list[annotation.Event]:

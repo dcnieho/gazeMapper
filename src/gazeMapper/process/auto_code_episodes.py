@@ -49,8 +49,8 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
     for e in study_config.auto_code_episodes:
         markers = {m: copy.deepcopy(ori_markers[m]) for m in study_config.auto_code_episodes[e]['start_markers']+study_config.auto_code_episodes[e]['end_markers']}
         # see where stretches of marker presence start and end
-        marker_starts: dict[config.MarkerID,list[int]] = {}
-        marker_ends  : dict[config.MarkerID,list[int]] = {}
+        marker_starts: dict[gt_marker.MarkerID,list[int]] = {}
+        marker_ends  : dict[gt_marker.MarkerID,list[int]] = {}
         for m in markers:
             marker_starts[m], marker_ends[m] = gt_marker.get_appearance_starts_ends(markers[m], study_config.auto_code_episodes[e]['max_gap_duration'], study_config.auto_code_episodes[e]['min_duration'])
         # find potential interval starts and ends
