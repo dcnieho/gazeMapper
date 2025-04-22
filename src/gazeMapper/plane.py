@@ -150,7 +150,7 @@ def make_definition(p_type: Type, name: str, path: pathlib.Path|None, **kwargs) 
         if ('use_default' in kwargs and not kwargs['use_default']) or ('is_dynamic' in kwargs and kwargs['is_dynamic']):
             validator_config_dir = path
         validation_setup = validation.config.get_validation_setup(validator_config_dir)
-        kwargs['aruco_dict_id'] = validation.Plane.default_aruco_dict_id
+        kwargs['aruco_dict_id'] = validation_setup['arucoDictionary']
         kwargs['marker_border_bits'] = validation_setup['markerBorderBits']
         kwargs['min_num_markers'] = validation_setup['minNumMarkers']
         kwargs['ref_image_size'] = validation_setup['referencePosterSize']
