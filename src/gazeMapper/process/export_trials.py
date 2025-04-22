@@ -5,7 +5,7 @@ import pandas as pd
 import polars as pl
 from collections import defaultdict
 
-from glassesTools import annotation, gaze_worldref, naming as gt_naming, process_pool
+from glassesTools import annotation, gaze_worldref, marker as gt_marker, naming as gt_naming, process_pool
 
 from .. import config, episode, marker, naming, process, session
 
@@ -94,7 +94,7 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
         markers = {m.id: marker.load_file(m.id, m.aruco_dict_id, working_dir / r) for m in study_config.individual_markers}
         # recode to presence/absence if wanted
         if study_config.export_only_code_marker_presence:
-            markers = marker.code_marker_for_presence(markers, allow_failed=True)
+            markers = gt_marker.code_for_presence(markers, allow_failed=True)
         else:
             # rename columns to unique names
             for i in markers:

@@ -3,7 +3,7 @@ import numpy as np
 import shutil
 import copy
 
-from glassesTools import annotation, process_pool
+from glassesTools import annotation, marker as gt_marker, process_pool
 
 from .. import config, episode, marker, naming, process, session
 
@@ -42,9 +42,9 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
     all_marker_ids = {m for ms in all_marker_ids for m in ms}
     ori_markers = {m: marker.load_file(m.m_id, m.aruco_dict_id, working_dir) for m in all_marker_ids}
     # recode so we have a boolean with when markers are present
-    ori_markers = {m: marker.code_marker_for_presence(ori_markers[m], allow_failed=True) for m in ori_markers if not ori_markers[m].empty}
+    ori_markers = {m: gt_marker.code_for_presence(ori_markers[m], allow_failed=True) for m in ori_markers if not ori_markers[m].empty}
     # marker presence signal only contains marker detections (True). We need to fill the gaps in between detections with False (not detected) so we have a continuous signal without gaps
-    ori_markers = {m: marker.expand_marker_detection(ori_markers[m], fill_value=False) for m in ori_markers}
+    ori_markers = {m: gt_marker.expand_detection(ori_markers[m], fill_value=False) for m in ori_markers}
     # now auto code indicated intervals
     for e in study_config.auto_code_episodes:
         markers = {m: copy.deepcopy(ori_markers[m]) for m in study_config.auto_code_episodes[e]['start_markers']+study_config.auto_code_episodes[e]['end_markers']}
@@ -52,14 +52,14 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
         marker_starts: dict[config.MarkerID,list[int]] = {}
         marker_ends  : dict[config.MarkerID,list[int]] = {}
         for m in markers:
-            marker_starts[m], marker_ends[m] = marker.get_marker_starts_ends(markers[m], study_config.auto_code_episodes[e]['max_gap_duration'], study_config.auto_code_episodes[e]['min_duration'])
+            marker_starts[m], marker_ends[m] = gt_marker.get_appearance_starts_ends(markers[m], study_config.auto_code_episodes[e]['max_gap_duration'], study_config.auto_code_episodes[e]['min_duration'])
         # find potential interval starts and ends
         if len(study_config.auto_code_episodes[e]['start_markers'])>1:
-            starts = marker.get_interval_from_markers(marker_starts, marker_ends, study_config.auto_code_episodes[e]['start_markers'], study_config.auto_code_episodes[e]['max_intermarker_gap_duration'], side='end')
+            starts = gt_marker.get_sequence_interval(marker_starts, marker_ends, study_config.auto_code_episodes[e]['start_markers'], study_config.auto_code_episodes[e]['max_intermarker_gap_duration'], side='end')
         else:
             starts = marker_ends  [study_config.auto_code_episodes[e]['start_markers'][0]]
         if len(study_config.auto_code_episodes[e][ 'end_markers' ])>1:
-            ends   = marker.get_interval_from_markers(marker_starts, marker_ends, study_config.auto_code_episodes[e][ 'end_markers' ], study_config.auto_code_episodes[e]['max_intermarker_gap_duration'], side='start')
+            ends   = gt_marker.get_sequence_interval(marker_starts, marker_ends, study_config.auto_code_episodes[e][ 'end_markers' ], study_config.auto_code_episodes[e]['max_intermarker_gap_duration'], side='start')
         else:
             ends   = marker_starts[study_config.auto_code_episodes[e][ 'end_markers' ][0]]
         # now match interval starts and ends

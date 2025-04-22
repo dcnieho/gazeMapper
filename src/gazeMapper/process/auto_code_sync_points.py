@@ -1,9 +1,7 @@
 import pathlib
-import numpy as np
-import pandas as pd
 import shutil
 
-from glassesTools import annotation, process_pool
+from glassesTools import annotation, marker as gt_marker, process_pool
 
 from .. import config, episode, marker, naming, process, session
 
@@ -33,16 +31,16 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
     # get marker files
     markers = [marker.load_file(m.m_id, m.aruco_dict_id, working_dir) for m in study_config.auto_code_sync_points['markers']]
     # recode so we have a boolean with when markers are present
-    markers = [marker.code_marker_for_presence(m, allow_failed=True) for m in markers if not m.empty]
+    markers = [gt_marker.code_for_presence(m, allow_failed=True) for m in markers if not m.empty]
     if not markers:
         raise RuntimeError(f'No markers found in the marker detection files for session "{working_dir.parent.name}", recording "{working_dir.name}"')
     # marker presence signal only contains marker detections (True). We need to fill the gaps in between detections with False (not detected) so we have a continuous signal without gaps
     for i in range(len(markers)):
-        markers[i] = marker.expand_marker_detection(markers[i], fill_value=False)
+        markers[i] = gt_marker.expand_detection(markers[i], fill_value=False)
     # see where stretches of True (marker presence) start
     marker_starts = []
     for i in range(len(markers)):
-        start_frames,_ = marker.get_marker_starts_ends(markers[i], study_config.auto_code_sync_points['max_gap_duration'], study_config.auto_code_sync_points['min_duration'])
+        start_frames,_ = gt_marker.get_appearance_starts_ends(markers[i], study_config.auto_code_sync_points['max_gap_duration'], study_config.auto_code_sync_points['min_duration'])
         marker_starts.extend(start_frames)
     # insert in episodes
     [episodes[annotation.Event.Sync_Camera].append(i) for i in marker_starts if i not in episodes[annotation.Event.Sync_Camera]]
