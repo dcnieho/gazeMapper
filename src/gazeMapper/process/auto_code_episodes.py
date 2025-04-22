@@ -47,13 +47,13 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
     ori_markers = {m: marker.expand_marker_detection(ori_markers[m], fill_value=False) for m in ori_markers}
     # now auto code indicated intervals
     for e in study_config.auto_code_episodes:
-        markers = {i: copy.deepcopy(ori_markers[i]) for i in study_config.auto_code_episodes[e]['start_markers']+study_config.auto_code_episodes[e]['end_markers']}
+        markers = {m: copy.deepcopy(ori_markers[m]) for m in study_config.auto_code_episodes[e]['start_markers']+study_config.auto_code_episodes[e]['end_markers']}
         # see where stretches of marker presence start and end
-        marker_starts: dict[int,list[int]] = {}
-        marker_ends  : dict[int,list[int]] = {}
-        for i in markers:
-            marker_starts[i], marker_ends[i] = marker.get_marker_starts_ends(markers[i], study_config.auto_code_episodes[e]['max_gap_duration'], study_config.auto_code_episodes[e]['min_duration'])
-        # find potential trial starts and ends
+        marker_starts: dict[config.MarkerID,list[int]] = {}
+        marker_ends  : dict[config.MarkerID,list[int]] = {}
+        for m in markers:
+            marker_starts[m], marker_ends[m] = marker.get_marker_starts_ends(markers[m], study_config.auto_code_episodes[e]['max_gap_duration'], study_config.auto_code_episodes[e]['min_duration'])
+        # find potential interval starts and ends
         if len(study_config.auto_code_episodes[e]['start_markers'])>1:
             starts = marker.get_interval_from_markers(marker_starts, marker_ends, study_config.auto_code_episodes[e]['start_markers'], study_config.auto_code_episodes[e]['max_intermarker_gap_duration'], side='end')
         else:
@@ -62,11 +62,11 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
             ends   = marker.get_interval_from_markers(marker_starts, marker_ends, study_config.auto_code_episodes[e][ 'end_markers' ], study_config.auto_code_episodes[e]['max_intermarker_gap_duration'], side='start')
         else:
             ends   = marker_starts[study_config.auto_code_episodes[e][ 'end_markers' ][0]]
-        # now match trial starts and ends
+        # now match interval starts and ends
         # strategy: run through starts and find latest start that is before first end (discard ends that are before the start)
-        # keep pointer into array keeping track of ends and start already discarded or consumed
+        # keep pointer into array keeping track of ends and start that have already been discarded or consumed
         # NB: this assumes starts and ends are sorted, which the above procedures should indeed deliver
-        trials: list[tuple[int,int]] = []
+        intervals: list[tuple[int,int]] = []
         s_idx = 0
         e_idx = 0
         while s_idx<len(starts):
@@ -83,12 +83,12 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
             # and bail out if there are no ends left
             gaps[gaps<=0] = np.iinfo(gaps.dtype).max
             mini = np.argmin(gaps)
-            trials.append((starts[s_idx+mini], ends[e_idx]))
+            intervals.append((starts[s_idx+mini], ends[e_idx]))
             # these are consumed
             s_idx+=mini+1
             e_idx+=1
         # now insert into coding file. This just overwrites whatever is there
-        episodes[e] = [y for x in trials for y in x]
+        episodes[e] = [y for x in intervals for y in x]
 
     # back up coding file if it exists
     if coding_file.is_file():
