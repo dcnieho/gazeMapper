@@ -468,7 +468,7 @@ class Study:
                 if strict_check:
                     raise ValueError(f'individual_markers marker {m.id} ({aruco.dict_id_to_str[m.aruco_dict_id]}): {problem}')
                 else:
-                    problems = type_utils.merge_problem_dicts(problems, {'individual_markers': {(aruco.dict_id_to_family[m.aruco_dict_id], m.id): problem}})
+                    problems = type_utils.merge_problem_dicts(problems, {'individual_markers': {(m.id, aruco.dict_id_to_family[m.aruco_dict_id]): problem}})
         return problems
 
     def _check_sync_ref(self, strict_check):

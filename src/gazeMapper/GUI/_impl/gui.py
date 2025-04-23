@@ -1350,7 +1350,7 @@ class GUI:
         imgui.table_headers_row()
         changed = False
         for i,m in enumerate(self.study_config.individual_markers):
-            p_key = (aruco.dict_id_to_family[m.aruco_dict_id],m.id)
+            p_key = (m.id, aruco.dict_id_to_family[m.aruco_dict_id])
             problem = self._problems_cache['individual_markers'][p_key] if 'individual_markers' in self._problems_cache and p_key in self._problems_cache['individual_markers'] else None
             imgui.table_next_row()
             imgui.table_next_column()
