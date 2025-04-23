@@ -38,6 +38,9 @@ class Definition:
         if path.is_dir():
             path /= self.default_json_file_name
         to_dump = {k:getattr(self,k) for k in vars(self) if not k.startswith('_') and k not in ['name']+list(self.fixed_fields().keys())}    # name will be populated from the provided path
+        if 'aruco_dict_id' in to_dump:
+            # store as string (and always store, also if defaulted, this rename means the below line never filters it out)
+            to_dump['aruco_dict'] = aruco.dict_id_to_str[to_dump.pop('aruco_dict_id')]
         # filter out defaulted
         to_dump = {k:v for k in to_dump if (v:=to_dump[k]) is not None and (k not in definition_defaults[self.type] or definition_defaults[self.type][k]!=v)}
         json.dump(to_dump, path)
@@ -56,6 +59,10 @@ class Definition:
         # backwards compatibility
         if 'aruco_dict' in kwds:
             kwds['aruco_dict_id'] = kwds.pop('aruco_dict')
+        if 'aruco_dict_id' in kwds:
+            # dictionary names might be stored as strings, turn back into int
+            if isinstance(kwds['aruco_dict_id'],str):
+                kwds['aruco_dict_id'] = aruco.str_to_dict_id(kwds['aruco_dict_id'])
         return make_definition(path=path.parent, name=path.parent.name, **kwds)
 
 class Definition_GlassesValidator(Definition):
