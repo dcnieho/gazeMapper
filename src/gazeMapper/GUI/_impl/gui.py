@@ -696,7 +696,7 @@ class GUI:
                     if s=='xx_individual_markers_xx':
                         msg = f'The individual markers contain'
                     else:
-                        msg = f'The set of {m} markers of the {s} plane contains'
+                        msg = f'The set of {m} markers of the {s} "plane" contains'
                     msg = f'{msg} duplicates: {gm_utils.format_duplicate_markers_msg(duplicates)}. Markers should be unique, fix this duplication.'
                     if s=='xx_individual_markers_xx':
                         self._problems_cache = type_utils.merge_problem_dicts(self._problems_cache, {'individual_markers': {d: msg for d in duplicates}})
@@ -718,7 +718,7 @@ class GUI:
                                         mark_msgs.append(f'individual markers')
                                     else:
                                         lbl = f'{mx} markers' if isinstance(mx,str) else f'dynamic validation target markers (column {mx})'
-                                        mark_msgs.append(f'{lbl} of the {sx} plane')
+                                        mark_msgs.append(f'{lbl} of the "{sx}" plane')
                                 msg = f'The following markers are encountered in the setup both as {mark_msgs[0]} and as {mark_msgs[1]}: {gm_utils.format_duplicate_markers_msg(overlap)}. Markers must be unique, fix this collision.'
                                 # add error message to problem dict
                                 if 'xx_individual_markers_xx' in (s,s2):
