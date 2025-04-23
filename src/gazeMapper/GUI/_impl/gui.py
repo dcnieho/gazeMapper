@@ -679,10 +679,10 @@ class GUI:
         for p in self.plane_configs:
             if isinstance(self.plane_configs[p], gt_plane.Plane):
                 markers[p] = self.plane_configs[p].get_marker_IDs()
-        markers['xx_individual_markers_xx'] = {'markers': [(m.aruco_dict_id, m.id) for m in self.study_config.individual_markers]}
+        markers['xx_individual_markers_xx'] = {'markers': [(m.id, m.aruco_dict_id) for m in self.study_config.individual_markers]}
         if use_family:
             for s in markers:
-                markers[s] = {m: [(aruco.dict_id_to_family[d],i) for d,i in markers[s][m]] for m in markers[s]}
+                markers[s] = {m: [(i, aruco.dict_id_to_family[d]) for i,d in markers[s][m]] for m in markers[s]}
         return markers
 
     def _check_markers(self):

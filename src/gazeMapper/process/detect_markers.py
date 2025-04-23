@@ -82,9 +82,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
                 if c=='plane':
                     continue
                 for m in markers[c]:
-                    aruco_manager.add_individual_marker(m[1], m[0], marker_setup, analyze_frames[p])
+                    aruco_manager.add_individual_marker(m, marker_setup, analyze_frames[p])
     for m in (markers:=marker.get_marker_dict_from_list(study_config.individual_markers)):
-        aruco_manager.add_individual_marker(m[1], m[0], markers[m])
+        aruco_manager.add_individual_marker(m, markers[m])
     aruco_manager.consolidate_setup()
     aruco_manager.register_with_estimator(estimator)
     # other setup of estimator

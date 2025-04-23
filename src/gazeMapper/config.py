@@ -403,7 +403,7 @@ class Study:
         # 1. marker used for auto_code_sync_points cannot appear anywhere else
         # 2. marker sequences used for auto_code_episodes must be unique (markers can be reused)
         # first transform marker IDs to family so we can properly detect clashes
-        used_markers      : dict[tuple[str,str]|tuple[str,annotation.Event,str],list[tuple[int,int]]] = {k:[(aruco.dict_id_to_family[m.aruco_dict_id],m.m_id) for m in used_markers[k]] for k in used_markers}
+        used_markers      : dict[tuple[str,str]|tuple[str,annotation.Event,str],list[tuple[int,int]]] = {k:[(m.m_id, aruco.dict_id_to_family[m.aruco_dict_id]) for m in used_markers[k]] for k in used_markers}
         seen_markers      : set[tuple[int,int]] = set()
         seen_markers_sets : set[tuple[tuple[int,int]]] = set()
         def _format_key(key: tuple[str,str]|tuple[str,annotation.Event,str]):

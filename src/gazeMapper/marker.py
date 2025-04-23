@@ -65,10 +65,10 @@ def get_marker_setup(marker: Marker) -> aruco.MarkerSetup:
                                 size= marker.size
                             )
 
-def get_marker_dict_from_list(markers: list[Marker]) -> dict[tuple[int,int],aruco.MarkerSetup]:
+def get_marker_dict_from_list(markers: list[Marker]) -> dict[gt_marker.MarkerID,aruco.MarkerSetup]:
     out = {}
     for m in markers:
-        out[(m.aruco_dict_id, m.id)] = get_marker_setup(m)
+        out[gt_marker.MarkerID(m.id, m.aruco_dict_id)] = get_marker_setup(m)
     return out
 
 def get_file_name(marker_id: int, aruco_dict_id: int, folder: str|pathlib.Path|None) -> pathlib.Path:

@@ -212,8 +212,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
         for p in planes_setup:
             planes[p] = planes_setup[p]['plane']
             aruco_manager.add_plane(p, planes_setup[p], None if study_config.mapped_video_process_planes_for_all_frames else analyze_frames[p])
-        for i in (markers:=marker.get_marker_dict_from_list(study_config.individual_markers)):
-            aruco_manager.add_individual_marker(i[1], i[0], markers[i])
+        for m in (markers:=marker.get_marker_dict_from_list(study_config.individual_markers)):
+            aruco_manager.add_individual_marker(m, markers[m])
         aruco_manager.consolidate_setup()
         aruco_manager.register_with_estimator(pose_estimators[rec])
         # other setup of estimator
