@@ -399,7 +399,7 @@ class Study:
                             missing_markers = ', '.join((gt_marker.marker_ID_to_str(m) for m in missing_markers))
                             type_utils.merge_problem_dicts(problems, {'auto_code_episodes': {e: {f: f'The marker(s) {missing_markers} are not defined in individual_markers'}}})
                         used_markers[('auto_code_episodes',e,f)] = self.auto_code_episodes[e][f]
-        # check if markers  or marker sequences are uniquely used:
+        # check if markers or marker sequences are uniquely used:
         # 1. marker used for auto_code_sync_points cannot appear anywhere else
         # 2. marker sequences used for auto_code_episodes must be unique (markers can be reused)
         # first transform marker IDs to family so we can properly detect clashes
