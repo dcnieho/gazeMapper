@@ -27,13 +27,12 @@ class Marker:
         self.marker_border_bits = marker_border_bits
 
     def _to_dict(self) -> dict[str,typing.Any]:
-        out = {'id': self.id, 'detect_only': self.detect_only}
-        for f in ['size', 'aruco_dict_id', 'marker_border_bits']:
+        # N.B.: print dictionary names for markers instead of hard to understand integer id
+        # always store dictionary even if its the default, so its easier to read the config file by eye
+        out = {'id': self.id, 'aruco_dict': aruco.dict_id_to_str[self.aruco_dict_id], 'detect_only': self.detect_only}
+        for f in ['size', 'marker_border_bits']:
             if (val:=getattr(self,f))!=marker_defaults[f]:
                 out[f] = val
-        if 'aruco_dict_id' in out:
-            # print dictionary names for markers instead of hard to understand id
-            out['aruco_dict_id'] = aruco.dict_to_str[out['aruco_dict_id']]
         return out
 
     @staticmethod
