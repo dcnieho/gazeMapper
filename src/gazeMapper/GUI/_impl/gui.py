@@ -1572,6 +1572,7 @@ class GUI:
                 imgui.end_disabled()
             gt_gui.utils.draw_hover_text(hover_text, '')
         # draw working folder interactions
+        imgui.separator()
         changed = False
         if imgui.selectable(ifa6.ICON_FA_FOLDER_OPEN + " Open session folder", False)[0]:
             for s in sess:
@@ -1633,6 +1634,7 @@ class GUI:
                 imgui.end_disabled()
             gt_gui.utils.draw_hover_text(hover_text, '')
         # draw source/working folder interactions
+        imgui.separator()
         if len(recs)==1 and imgui.begin_menu('Camera calibration'):
             working_directory = sess.recordings[recs[0]].info.working_directory
             has_cam_cal_file = working_directory and (working_directory/gt_naming.scene_camera_calibration_fname).is_file()
