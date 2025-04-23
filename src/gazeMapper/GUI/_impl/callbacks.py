@@ -8,7 +8,7 @@ import pathvalidate
 import threading
 from imgui_bundle import imgui, imspinner, hello_imgui, icons_fontawesome_6 as ifa6
 
-from glassesTools import annotation, aruco, async_thread, camera_recording, eyetracker, gui as gt_gui, naming as gt_naming, platform, process_pool, recording, video_utils
+from glassesTools import annotation, aruco, async_thread, camera_recording, eyetracker, gui as gt_gui, marker as gt_marker, naming as gt_naming, platform, process_pool, recording, video_utils
 from glassesTools.validation import config as val_config, default_poster, DataQualityType, dynamic as val_dynamic, export, get_DataQualityType_explanation
 from glassesTools.gui import colors
 
@@ -154,11 +154,59 @@ def set_dynamic_validation_plane_config(g, config_file_path: pathlib.Path, p_def
     try:
         if config_file_path.suffix!='.json':
             raise ValueError('The selected file is not a json file. Please select a json file.')
-        val_dynamic.setup_to_plane_config(p_dir, config_file_path.parent, config_file_path.name)
+        auto_coding_setup = val_dynamic.setup_to_plane_config(p_dir, config_file_path.parent, config_file_path.name)
     except Exception as exc:
         gt_gui.utils.push_popup(g, gt_gui.msg_box.msgbox, "Error converting setup", f"There was an error trying to load the dynamic validation setup:\n{exc}", gt_gui.msg_box.MsgBox.error, more=gt_gui.utils.get_traceback(type(exc), exc, exc.__traceback__))
         return
-    # N.B.: all we have to do here. File watcher will catch the change and reload the plane
+    # N.B.: all we have to do here for the plane. File watcher will catch the change and reload the plane
+    set_auto_coding_for_dynamic_validation_plane(g, p_def, auto_coding_setup)
+
+def set_auto_coding_for_dynamic_validation_plane(g, p_def: plane.Definition_GlassesValidator, auto_coding_setup: dict[str,list[gt_marker.MarkerID]]):
+    def _apply_individual_markers_if_needed():
+        all_markers = set(g.study_config.auto_code_episodes[annotation.Event.Validate]['start_markers'])
+        all_markers.update(g.study_config.auto_code_episodes[annotation.Event.Validate]['end_markers'])
+        applied = False
+        for m in all_markers:
+            if not any((im.id==m.m_id and im.aruco_dict_id==m.aruco_dict_id for im in g.study_config.individual_markers)):
+                g.study_config.individual_markers.append(marker.Marker(m.m_id, detect_only=True, aruco_dict_id=m.aruco_dict_id, marker_border_bits=auto_coding_setup['marker_border_bits']))
+                applied = True
+        return applied
+    def _apply_automatic_val_coding():
+        if not g.study_config.auto_code_episodes:
+            g.study_config.auto_code_episodes = {}
+        g.study_config.auto_code_episodes[annotation.Event.Validate] = config.AutoCodeEpisodes(start_markers=auto_coding_setup['start_markers'], end_markers=auto_coding_setup['end_markers'])
+        g.study_config.auto_code_episodes[annotation.Event.Validate].apply_defaults()
+        _apply_individual_markers_if_needed()
+        # persist changed config
+        g.study_config.store_as_json()
+
+    from . import gui
+    g = typing.cast(gui.GUI,g)  # indicate type to typechecker
+    exists = g.study_config.auto_code_episodes and annotation.Event.Validate in g.study_config.auto_code_episodes
+    if exists:
+        matches = all((g.study_config.auto_code_episodes[annotation.Event.Validate][f]==auto_coding_setup[f] for f in ('start_markers','end_markers')))
+        if matches:
+            # nothing to do, do check all individual markers are there
+            if _apply_individual_markers_if_needed():
+                # persist changed config
+                g.study_config.store_as_json()
+            return
+    # ask user if they want to apply settings
+    buttons = {
+        ifa6.ICON_FA_CHECK+" Yes": lambda: _apply_automatic_val_coding(),
+        ifa6.ICON_FA_CIRCLE_XMARK+" No": None
+    }
+    msg = f'The following setup for automatic coding of {annotation.tooltip_map[annotation.Event.Validate]}s was found upon import of the dynamic validation setup for the {p_def.name} plane:\n'
+    for f in ('start_markers','end_markers'):
+        msg += f'{f}: ['+(', '.join((gt_marker.marker_ID_to_str(m) for m in auto_coding_setup[f])))+']\n'
+    if exists:
+        msg += f'\nThe following setup for automatic coding of {annotation.tooltip_map[annotation.Event.Validate]}s is already set:\n'
+        for f in ('start_markers','end_markers'):
+            msg += f'{f}: ['+(', '.join((gt_marker.marker_ID_to_str(m) for m in g.study_config.auto_code_episodes[annotation.Event.Validate][f])))+']\n'
+        msg += '\nDo you want to overwrite this configuration with the above?'
+    else:
+        msg += '\nDo you want to apply this configuration?'
+    gt_gui.utils.push_popup(g, gt_gui.msg_box.msgbox, ("Overwrite" if exists else "Apply")+f" automated {annotation.tooltip_map[annotation.Event.Validate]} coding config?", msg, gt_gui.msg_box.MsgBox.question, buttons)
 
 def set_default_cam_cal(cal_path: str|pathlib.Path, rec_def: session.RecordingDefinition, rec_def_path: pathlib.Path):
     rec_def.set_default_cal_file(cal_path, rec_def_path)
@@ -186,9 +234,9 @@ def make_plane(g, p_type: plane.Type, name: str, is_dynamic: bool, dynamic_confi
         try:
             if dynamic_config_file:
                 dynamic_config_file = pathlib.Path(dynamic_config_file)
-                val_dynamic.setup_to_plane_config(p_dir, dynamic_config_file.parent, dynamic_config_file.name)
+                auto_coding_setup = val_dynamic.setup_to_plane_config(p_dir, dynamic_config_file.parent, dynamic_config_file.name)
             else:
-                val_dynamic.setup_to_plane_config(p_dir)
+                auto_coding_setup = val_dynamic.setup_to_plane_config(p_dir)
         except Exception as exc:
             gt_gui.utils.push_popup(g, gt_gui.msg_box.msgbox, "Error converting setup", f"There was an error trying to load the dynamic validation\nsetup when creating the new validation plane:\n{exc}", gt_gui.msg_box.MsgBox.error, more=gt_gui.utils.get_traceback(type(exc), exc, exc.__traceback__))
             shutil.rmtree(p_dir)
@@ -201,6 +249,9 @@ def make_plane(g, p_type: plane.Type, name: str, is_dynamic: bool, dynamic_confi
     p_def.store_as_json(p_dir)
     # append to known planes
     g.study_config.planes.append(p_def)
+    # deal with further setup for dynamic plane
+    if is_dynamic:
+        set_auto_coding_for_dynamic_validation_plane(g, p_def, auto_coding_setup)
 
 def delete_plane(study_config: config.Study, plane: plane.Definition):
     # remove config directory for the plane
