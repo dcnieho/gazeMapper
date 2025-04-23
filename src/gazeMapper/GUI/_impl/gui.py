@@ -682,7 +682,7 @@ class GUI:
         markers['xx_individual_markers_xx'] = {'markers': [(m.aruco_dict_id, m.id) for m in self.study_config.individual_markers]}
         if use_family:
             for s in markers:
-                markers[s] = {m: [(aruco.dict_to_family[d],i) for d,i in markers[s][m]] for m in markers[s]}
+                markers[s] = {m: [(aruco.dict_id_to_family[d],i) for d,i in markers[s][m]] for m in markers[s]}
         return markers
 
     def _check_markers(self):
@@ -1350,7 +1350,7 @@ class GUI:
         imgui.table_headers_row()
         changed = False
         for i,m in enumerate(self.study_config.individual_markers):
-            p_key = (aruco.dict_to_family[m.aruco_dict_id],m.id)
+            p_key = (aruco.dict_id_to_family[m.aruco_dict_id],m.id)
             problem = self._problems_cache['individual_markers'][p_key] if 'individual_markers' in self._problems_cache and p_key in self._problems_cache['individual_markers'] else None
             imgui.table_next_row()
             imgui.table_next_column()
@@ -1410,7 +1410,7 @@ class GUI:
             new_mark_det_only = False
             new_mark_size = -1.
             def _valid_mark_id_dict():
-                return new_mark_id>=0 and new_mark_id<aruco.get_dict_size(new_aruco_dict_id) and not any((m.id==new_mark_id and aruco.dict_to_family[m.aruco_dict_id]==aruco.dict_to_family[new_aruco_dict_id] for m in self.study_config.individual_markers))
+                return new_mark_id>=0 and new_mark_id<aruco.get_dict_size(new_aruco_dict_id) and not any((m.id==new_mark_id and aruco.dict_id_to_family[m.aruco_dict_id]==aruco.dict_id_to_family[new_aruco_dict_id] for m in self.study_config.individual_markers))
             def _valid_mark_size():
                 return new_mark_det_only or new_mark_size>0.
             def _add_marker_popup():
@@ -1445,7 +1445,7 @@ class GUI:
                         imgui.pop_style_color()
                     imgui.table_next_column()
                     imgui.set_next_item_width(-1)
-                    _, new_aruco_dict_id = imgui.combo(f"##new_mark_aruco_dict", new_aruco_dict_id, list(aruco.dict_to_str.values()), popup_max_height_in_items=10)
+                    _, new_aruco_dict_id = imgui.combo(f"##new_mark_aruco_dict", new_aruco_dict_id, list(aruco.dict_id_to_str.values()), popup_max_height_in_items=10)
 
                     imgui.table_next_row()
                     imgui.table_next_column()

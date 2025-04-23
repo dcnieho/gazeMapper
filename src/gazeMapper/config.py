@@ -403,7 +403,7 @@ class Study:
         # 1. marker used for auto_code_sync_points cannot appear anywhere else
         # 2. marker sequences used for auto_code_episodes must be unique (markers can be reused)
         # first transform marker IDs to family so we can properly detect clashes
-        used_markers      : dict[tuple[str,str]|tuple[str,annotation.Event,str],list[tuple[int,int]]] = {k:[(aruco.dict_to_family[m.aruco_dict_id],m.m_id) for m in used_markers[k]] for k in used_markers}
+        used_markers      : dict[tuple[str,str]|tuple[str,annotation.Event,str],list[tuple[int,int]]] = {k:[(aruco.dict_id_to_family[m.aruco_dict_id],m.m_id) for m in used_markers[k]] for k in used_markers}
         seen_markers      : set[tuple[int,int]] = set()
         seen_markers_sets : set[tuple[tuple[int,int]]] = set()
         def _format_key(key: tuple[str,str]|tuple[str,annotation.Event,str]):
@@ -457,7 +457,7 @@ class Study:
         for m in self.individual_markers:
             problem = ''
             if m.id>=(ds:=aruco.get_dict_size(m.aruco_dict_id)):
-                problem = f'dictionary {aruco.dict_to_str[m.aruco_dict_id]} only has {ds} markers, which means that valid IDs are 0-{ds-1}. {m.id} is thus not a valid marker for this dictionary'
+                problem = f'dictionary {aruco.dict_id_to_str[m.aruco_dict_id]} only has {ds} markers, which means that valid IDs are 0-{ds-1}. {m.id} is thus not a valid marker for this dictionary'
             elif m.detect_only and m.size is not None:
                 problem = f'size should not be set for detect only markers'
             elif not m.detect_only and (m.size is None or m.size<=0):
@@ -466,9 +466,9 @@ class Study:
                 problem = 'marker_border_bits must be at least 1'
             if problem:
                 if strict_check:
-                    raise ValueError(f'individual_markers marker {m.id} ({aruco.dict_to_str[m.aruco_dict_id]}): {problem}')
+                    raise ValueError(f'individual_markers marker {m.id} ({aruco.dict_id_to_str[m.aruco_dict_id]}): {problem}')
                 else:
-                    problems = type_utils.merge_problem_dicts(problems, {'individual_markers': {(aruco.dict_to_family[m.aruco_dict_id], m.id): problem}})
+                    problems = type_utils.merge_problem_dicts(problems, {'individual_markers': {(aruco.dict_id_to_family[m.aruco_dict_id], m.id): problem}})
         return problems
 
     def _check_sync_ref(self, strict_check):

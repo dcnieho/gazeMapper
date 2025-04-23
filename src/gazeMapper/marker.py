@@ -47,7 +47,7 @@ class Marker:
         if 'aruco_dict_id' in kwargs:
             # dictionary names might be stored as strings, turn back into int
             if isinstance(kwargs['aruco_dict_id'],str):
-                kwargs['aruco_dict_id'] = getattr(cv2.aruco,kwargs['aruco_dict_id'])
+                kwargs['aruco_dict_id'] = aruco.str_to_dict_id(kwargs['aruco_dict_id'])
         return Marker(**kwargs)
 
 json.register_type(json.TypeEntry(Marker,'__marker.Marker__', Marker._to_dict, Marker._from_dict))
@@ -72,7 +72,7 @@ def get_marker_dict_from_list(markers: list[Marker]) -> dict[tuple[int,int],aruc
     return out
 
 def get_file_name(marker_id: int, aruco_dict_id: int, folder: str|pathlib.Path|None) -> pathlib.Path:
-    file_name = f'{naming.marker_pose_prefix}{aruco.dict_to_str[aruco_dict_id]}_{marker_id}.tsv'
+    file_name = f'{naming.marker_pose_prefix}{aruco.dict_id_to_str[aruco_dict_id]}_{marker_id}.tsv'
     if folder is None:
         return file_name
     folder = pathlib.Path(folder)

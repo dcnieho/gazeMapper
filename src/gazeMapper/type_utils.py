@@ -15,7 +15,7 @@ class GUIDocInfo:
     doc_str:        str
     children:       dict[str,'GUIDocInfo'] = dataclasses.field(default_factory=lambda: {})
 
-ArucoDictType = typing.Literal[tuple(aruco.dict_to_str.keys())]
+ArucoDictType = typing.Literal[tuple(aruco.dict_id_to_str.keys())]
 
 
 def merge_problem_dicts(a: ProblemDict, b: ProblemDict):
