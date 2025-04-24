@@ -106,8 +106,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
 
     for p in poses:
         pose.write_list_to_file(poses[p], working_dir/f'{naming.plane_pose_prefix}{p}.tsv', skip_failed=True)
-    for i in individual_markers:
-        gt_marker.write_list_to_file(individual_markers[i], marker.get_file_name(i[1],i[0],working_dir), skip_failed=False)
+    for m in individual_markers:
+        gt_marker.write_list_to_file(individual_markers[m], marker.get_file_name(m.m_id, m.aruco_dict_id, working_dir), skip_failed=False)
     if sync_target_signal:
         df = pd.DataFrame(sync_target_signal['sync'],columns=['frame_idx','target_x','target_y'])
         df.to_csv(working_dir/naming.target_sync_file, sep='\t', index=False, na_rep='nan', float_format="%.8f")
