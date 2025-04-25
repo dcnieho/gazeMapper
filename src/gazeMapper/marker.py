@@ -61,7 +61,7 @@ def get_marker_setup(marker: Marker) -> aruco.MarkerSetup:
                                 size= marker.size
                             )
 
-def get_marker_dict_from_list(markers: list[Marker]) -> dict[gt_marker.MarkerID,aruco.MarkerSetup]:
+def get_setup_for_markers(markers: list[Marker]) -> dict[gt_marker.MarkerID,aruco.MarkerSetup]:
     out = {}
     for m in markers:
         out[gt_marker.MarkerID(m.id, m.aruco_dict_id)] = get_marker_setup(m)
