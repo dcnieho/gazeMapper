@@ -364,8 +364,19 @@ def _apply_mutations_and_store(file, action_state_mutations, skip_if_missing=Fal
 
     _write_action_states_to_file(file, action_states)
 
-def update_action_states(working_dir: str|pathlib.Path, action: process.Action, state: process_pool.State, study_config: 'config.Study', skip_if_missing=False) -> dict[process.Action, process_pool.State]:
+def update_action_states(working_dir: str|pathlib.Path, action: process.Action, state: process_pool.State, study_config: 'config.Study', skip_if_missing=False, unchanged=False) -> dict[process.Action, process_pool.State]:
     for_recording = not process.is_session_level_action(action)
+
+    if unchanged:
+        # just update state of this task, don't cascade
+        action_state_mutations = {action: state}
+        if for_recording:
+            file = working_dir / _get_action_status_fname(True)
+            _apply_mutations_and_store(file, action_state_mutations, skip_if_missing=skip_if_missing)
+        else:
+            file = working_dir / _get_action_status_fname(False)
+            _apply_mutations_and_store(file, action_state_mutations, skip_if_missing=skip_if_missing)
+        return
 
     action_state_mutations  = process.action_update_and_invalidate(action, state, study_config)
     # split in session-level and recording-level actions, report them separately

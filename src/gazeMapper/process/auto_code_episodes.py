@@ -36,6 +36,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
             episodes[e] = [i for iv in episodes[e] for i in iv]
     else:
         episodes = episode.get_empty_marker_dict(study_config.episodes_to_code)
+    episodes_original = copy.deepcopy(episodes)
 
     # get marker files
     all_marker_ids = [study_config.auto_code_episodes[e]['start_markers']+study_config.auto_code_episodes[e]['end_markers'] for e in study_config.auto_code_episodes]
@@ -95,6 +96,13 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
             e_idx+=1
         # now insert into coding file. This just overwrites whatever is there
         episodes[e] = [y for x in intervals for y in x]
+
+    # early exit if nothing has changed
+    if episodes==episodes_original:
+        if session.get_action_states(working_dir, True)[process.Action.AUTO_CODE_EPISODES]==process_pool.State.Completed:
+            return
+        session.update_action_states(working_dir, process.Action.AUTO_CODE_EPISODES, process_pool.State.Completed, study_config, unchanged=True)
+        return
 
     # back up coding file if it exists
     if coding_file.is_file():

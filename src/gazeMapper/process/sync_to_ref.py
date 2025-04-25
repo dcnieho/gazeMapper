@@ -18,12 +18,16 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
 
     # get settings for the study
     study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir}, **study_settings)
+    sync_file = working_dir / 'ref_sync.tsv'
 
     # check there is a sync setup
     if not study_config.sync_ref_recording:
         raise ValueError('Synchronization to a reference recording is not defined, should not run this function')
     if annotation.Event.Sync_Camera not in study_config.episodes_to_code:
         raise ValueError('Camera sync points are not set up to be coded, nothing to do here')
+
+    # load any existing sync if its already available
+    sync_original = pd.read_csv(sync, sep='\t') if sync_file.is_file() else None
 
     # documentation for some settings in the json file:
     # 1. sync_ref_recording. Name of one of the recordings that is part of the session, the one w.r.t. which
@@ -53,8 +57,15 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
     recs = [r for r in session_info.recordings if r!=study_config.sync_ref_recording]
     sync = synchronization.get_sync_for_recs(working_dir, recs, study_config.sync_ref_recording, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings)
 
+    # early exit if nothing has changed
+    if sync_original is not None and sync.equals(sync_original):
+        if session.get_action_states(working_dir, False)[process.Action.SYNC_TO_REFERENCE]==process_pool.State.Completed:
+            return
+        session.update_action_states(working_dir, process.Action.SYNC_TO_REFERENCE, process_pool.State.Completed, study_config, unchanged=True)
+        return
+
     # store sync info
-    sync.to_csv(working_dir / 'ref_sync.tsv', sep='\t', na_rep='nan', float_format="%.16f")
+    sync.to_csv(sync_file, sep='\t', na_rep='nan', float_format="%.16f")
 
     # now that we have determined how to sync, apply
     for r in recs:

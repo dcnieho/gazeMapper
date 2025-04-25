@@ -1,6 +1,7 @@
 import pathlib
 import numpy as np
 import cv2
+import copy
 from imgui_bundle import imgui
 
 from ffpyplayer.player import MediaPlayer
@@ -122,6 +123,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
             if not episodes[annotation.Event.Trial]:
                 episodes.pop(annotation.Event.Trial, None)
     episodes = annotation.flatten_annotation_dict(episodes) # NB: also ensures ordering is consistent
+    episodes_original = copy.deepcopy(episodes)
 
     # set up video playback
     # 1. timestamp info for relating audio to video frames
@@ -230,6 +232,13 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
 
     player.close_player()
     gui.stop()
+
+    # early exit if nothing has changed
+    if episodes==episodes_original:
+        if session.get_action_states(working_dir, True)[process.Action.CODE_EPISODES]==process_pool.State.Completed:
+            return
+        session.update_action_states(working_dir, process.Action.CODE_EPISODES, process_pool.State.Completed, study_config, unchanged=True)
+        return
 
     # store coded intervals to file
     if study_config.sync_ref_recording and rec_def.name!=study_config.sync_ref_recording:

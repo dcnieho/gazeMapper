@@ -103,6 +103,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
             VOR_sync.loc[i] = np.nan
     else:
         VOR_sync = pd.DataFrame(columns=['offset_t'], dtype=float, index=pd.Index(list(range(len(episodes))),name='interval'))
+    VOR_sync_original = VOR_sync.copy() if VOR_sync_file.is_file() else None
 
     # show
     has_requested_focus = not isMacOS # False only if on Mac OS, else True since its a no-op
@@ -149,6 +150,13 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
                 need_to_load = True
 
     gui.stop()
+
+    # early exit if nothing has changed
+    if VOR_sync_original is not None and VOR_sync.equals(VOR_sync_original):
+        if session.get_action_states(working_dir, True)[process.Action.SYNC_ET_TO_CAM]==process_pool.State.Completed:
+            return
+        session.update_action_states(working_dir, process.Action.SYNC_ET_TO_CAM, process_pool.State.Completed, study_config, unchanged=True)
+        return
 
     # store to file
     VOR_sync.to_csv(VOR_sync_file, sep='\t', float_format="%.4f") # .1 ms resolution
