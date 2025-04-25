@@ -144,9 +144,6 @@ def _determine_to_invalidate(action: Action, study_config: 'config.Study') -> se
             return {Action.EXPORT_TRIALS}
         case Action.CODE_EPISODES:
             actions = {a for a in action.next_values() if a not in [Action.AUTO_CODE_SYNC, Action.AUTO_CODE_EPISODES]}
-            if study_config.auto_code_sync_points or study_config.auto_code_episodes:
-                # if there is some form of automatic coding configured, then the whole video will be processed for each recording in a session, and thus coding doesn't invalidate the processed video
-                actions.discard(Action.DETECT_MARKERS)
             return actions
         case Action.DETECT_MARKERS:
             actions = {a for a in action.next_values() if a not in [Action.SYNC_TO_REFERENCE]}
