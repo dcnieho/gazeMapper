@@ -69,12 +69,12 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
             marker_observations = {m: marker.load_file(m.m_id, m.aruco_dict_id, working_dir) for m in all_marker_ids}
             marker_observations = {m: gt_marker.code_for_presence(marker_observations[m], allow_failed=True) for m in marker_observations if not marker_observations[m].empty}
             # marker presence signal only contains marker detections (True). We need to fill the gaps in between detections with False (not detected) so we have a continuous signal without gaps
-            marker_observations = {m: gt_marker.expand_detection(marker_observations[m], fill_value=False) for m in marker_observations}
+            marker_observations = {m: gt_marker.expand_detection(marker_observations[m], fill_value=False).set_index('frame_idx') for m in marker_observations}
             # also need frame timestamps as intervals are expressed in time, not as frame indices. Add a timestamp column based on scene video timestamps
             timestamps  = pd.read_csv(working_dir/gt_naming.frame_timestamps_fname, delimiter='\t', index_col='frame_idx')
             ts_col      = 'timestamp_stretched' if 'timestamp_stretched' in timestamps else 'timestamp'
             for m in marker_observations:
-                marker_observations[m]['timestamp'] = timestamps.loc[marker_observations[m]['frame_idx'],ts_col].reset_index(drop=True)
+                marker_observations[m]['timestamp'] = timestamps.loc[marker_observations[m].index.array,ts_col].array
         else:
             fixation_classification.from_plane_gaze(working_dir/f'{naming.world_gaze_prefix}{p}.tsv',
                                                     episodes,
