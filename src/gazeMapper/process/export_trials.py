@@ -7,7 +7,7 @@ from collections import defaultdict
 
 from glassesTools import annotation, gaze_worldref, marker as gt_marker, naming as gt_naming, process_pool
 
-from .. import config, episode, marker, naming, process, session
+from .. import config, episode, naming, process, session
 
 
 def run(working_dir: str|pathlib.Path, export_path: str|pathlib.Path, to_export: list[str], config_dir: str|pathlib.Path = None, **study_settings):
@@ -50,7 +50,7 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
         if not all(((working_dir / r / f'{naming.world_gaze_prefix}{p}.tsv').is_file() for p in planes)):
             print(f'Warning: not all plane gaze files found for recording {r} in session {working_dir.name}. Skipping...')
             continue
-        if not all((marker.get_file_name(m.id, m.aruco_dict_id, working_dir / r).is_file() for m in study_config.individual_markers)):
+        if not all((gt_marker.get_file_name(m.id, m.aruco_dict_id, working_dir/r).is_file() for m in study_config.individual_markers)):
             print(f'Warning: not all individual marker detection files found for recording {r} in session {working_dir.name}. Skipping...')
             continue
         # get trial coding
@@ -91,7 +91,7 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
 
         # if there are individual markers, add them
         # load
-        markers = {m.id: marker.load_file(m.id, m.aruco_dict_id, working_dir / r) for m in study_config.individual_markers}
+        markers = {m.id: gt_marker.read_dataframe_from_file(m.id, m.aruco_dict_id, working_dir/r) for m in study_config.individual_markers}
         # recode to presence/absence if wanted
         if study_config.export_only_code_marker_presence:
             markers = gt_marker.code_for_presence(markers, allow_failed=True)

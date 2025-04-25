@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from typing import Any, Callable
 
-from glassesTools import annotation, aruco, drawing, marker as gt_marker, naming as gt_naming, plane as gt_plane, pose, process_pool, propagating_thread, ocv, timestamps
+from glassesTools import annotation, aruco, drawing, marker as gt_marker, naming as gt_naming, pose, process_pool, propagating_thread, ocv, timestamps
 from glassesTools.gui.video_player import GUI
 
 from .. import config, episode, marker, naming, plane, process, session, synchronization
@@ -83,7 +83,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
                     continue
                 for m in markers[c]:
                     aruco_manager.add_individual_marker(m, marker_setup, analyze_frames[p])
-    for m in (markers:=marker.get_marker_dict_from_list(study_config.individual_markers)):
+    for m in (markers:=marker.get_setup_for_markers(study_config.individual_markers)):
         aruco_manager.add_individual_marker(m, markers[m])
     aruco_manager.consolidate_setup()
     aruco_manager.register_with_estimator(estimator)
@@ -107,7 +107,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
     for p in poses:
         pose.write_list_to_file(poses[p], working_dir/f'{naming.plane_pose_prefix}{p}.tsv', skip_failed=True)
     for m in individual_markers:
-        gt_marker.write_list_to_file(individual_markers[m], marker.get_file_name(m.m_id, m.aruco_dict_id, working_dir), skip_failed=False)
+        gt_marker.write_list_to_file(individual_markers[m], gt_marker.get_file_name(m.m_id, m.aruco_dict_id, working_dir), skip_failed=False)
     if sync_target_signal:
         df = pd.DataFrame(sync_target_signal['sync'],columns=['frame_idx','target_x','target_y'])
         df.to_csv(working_dir/naming.target_sync_file, sep='\t', index=False, na_rep='nan', float_format="%.8f")

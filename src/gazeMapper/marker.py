@@ -1,9 +1,5 @@
-import pathlib
-import pandas as pd
 import typing
-from collections import defaultdict
 import typeguard
-import cv2
 import inspect
 
 from glassesTools import aruco, json, marker as gt_marker
@@ -70,14 +66,3 @@ def get_marker_dict_from_list(markers: list[Marker]) -> dict[gt_marker.MarkerID,
     for m in markers:
         out[gt_marker.MarkerID(m.id, m.aruco_dict_id)] = get_marker_setup(m)
     return out
-
-def get_file_name(marker_id: int, aruco_dict_id: int, folder: str|pathlib.Path|None) -> pathlib.Path:
-    file_name = f'{naming.marker_pose_prefix}{aruco.dict_id_to_str[aruco_dict_id]}_{marker_id}.tsv'
-    if folder is None:
-        return file_name
-    folder = pathlib.Path(folder)
-    return folder / file_name
-
-def load_file(marker_id: int, aruco_dict_id: int, folder: str|pathlib.Path) -> pd.DataFrame:
-    file = get_file_name(marker_id, aruco_dict_id, folder)
-    return pd.read_csv(file,sep='\t', dtype=defaultdict(lambda: float, **gt_marker.Pose._non_float))
