@@ -1,12 +1,10 @@
 import pathlib
 import numpy as np
-import pandas as pd
-from collections import defaultdict
 
-from glassesTools import annotation, fixation_classification, marker as gt_marker, naming as gt_naming, process_pool
+from glassesTools import annotation, fixation_classification, naming as gt_naming, process_pool, validation
 from glassesTools.validation import assign_intervals, compute_offsets
 
-from .. import config, episode, marker, naming, plane, process, session
+from .. import config, episode, naming, plane, process, session
 
 
 stopAllProcessing = False
@@ -45,36 +43,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
 
         # find intervals
         if validation_plane.is_dynamic():
-            # organize markers
-            markers_per_target: dict[int,list[gt_marker.MarkerID]] = defaultdict(list)
-            for m in validation_plane.dynamic_markers:
-                t = validation_plane.dynamic_markers[m][0]
-                markers_per_target[t].append(gt_marker.MarkerID(m, validation_plane.aruco_dict_id))
-            markers_per_target = dict(markers_per_target)   # get rid of defaultdict now its no longer needed so we get normal indexing
-            all_marker_ids = [m for ms in markers_per_target for m in markers_per_target[ms]]
-            # for each target, check at least one of the marker files exists
-            for t in markers_per_target:
-                missing = [not marker.get_file_name(m.m_id, m.aruco_dict_id, working_dir).is_file() for m in markers_per_target[t]]
-                if all(missing):
-                    file_missing = [marker.get_file_name(m.m_id, m.aruco_dict_id, None) for m in markers_per_target[t]]
-                    missing_str  = '\n- '.join(file_missing)
-                    raise FileNotFoundError(f'None of the marker files for target {t} were found:\n- {missing_str}')
-                # remove missing from list of markers to load
-                if any(missing):
-                    for i,m in enumerate(missing):
-                        if not m:
-                            continue
-                        all_marker_ids.remove(markers_per_target[t][i])
-            # load all markers and recode so we just have a boolean indicating when markers are present
-            marker_observations = {m: marker.load_file(m.m_id, m.aruco_dict_id, working_dir) for m in all_marker_ids}
-            marker_observations = {m: gt_marker.code_for_presence(marker_observations[m], allow_failed=True) for m in marker_observations if not marker_observations[m].empty}
-            # marker presence signal only contains marker detections (True). We need to fill the gaps in between detections with False (not detected) so we have a continuous signal without gaps
-            marker_observations = {m: gt_marker.expand_detection(marker_observations[m], fill_value=False).set_index('frame_idx') for m in marker_observations}
-            # also need frame timestamps as intervals are expressed in time, not as frame indices. Add a timestamp column based on scene video timestamps
-            timestamps  = pd.read_csv(working_dir/gt_naming.frame_timestamps_fname, delimiter='\t', index_col='frame_idx')
-            ts_col      = 'timestamp_stretched' if 'timestamp_stretched' in timestamps else 'timestamp'
-            for m in marker_observations:
-                marker_observations[m]['timestamp'] = timestamps.loc[marker_observations[m].index.array,ts_col].array
+            marker_observations_per_target, markers_per_target = validation.dynamic.get_marker_observations(validation_plane, working_dir)
         else:
             fixation_classification.from_plane_gaze(working_dir/f'{naming.world_gaze_prefix}{p}.tsv',
                                                     episodes,
@@ -87,8 +56,9 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
         for idx,_ in enumerate(episodes):
             if validation_plane.is_dynamic():
                 selected_intervals, other_intervals = \
-                    assign_intervals.dynamic_markers(markers_per_target,
-                                                     marker_observations,
+                    assign_intervals.dynamic_markers(marker_observations_per_target,
+                                                     markers_per_target,
+                                                     working_dir/gt_naming.frame_timestamps_fname,
                                                      episodes[idx],
                                                      study_config.validate_dynamic_skip_first_duration,
                                                      study_config.validate_dynamic_max_gap_duration,
