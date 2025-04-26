@@ -27,7 +27,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
         raise ValueError('Camera sync points are not set up to be coded, nothing to do here')
 
     # load any existing sync if its already available
-    sync_original = pd.read_csv(sync, sep='\t') if sync_file.is_file() else None
+    sync_original = pd.read_csv(sync_file, sep='\t') if sync_file.is_file() else None
 
     # documentation for some settings in the json file:
     # 1. sync_ref_recording. Name of one of the recordings that is part of the session, the one w.r.t. which
