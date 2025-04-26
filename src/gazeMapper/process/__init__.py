@@ -162,9 +162,6 @@ def _determine_to_invalidate(action: Action, study_config: 'config.Study') -> se
             return {Action.CODE_EPISODES, Action.GAZE_TO_PLANE, Action.SYNC_TO_REFERENCE, Action.EXPORT_TRIALS, Action.MAKE_MAPPED_GAZE_VIDEO}
         case Action.AUTO_CODE_EPISODES:
             actions = {a for a in Action.CODE_EPISODES.next_values(inclusive=True) if a not in [Action.AUTO_CODE_EPISODES, Action.AUTO_CODE_SYNC, Action.SYNC_ET_TO_CAM, Action.SYNC_TO_REFERENCE, Action.VALIDATE]}
-            if study_config.auto_code_sync_points or study_config.auto_code_episodes:
-                # if there is some form of automatic coding configured, then the whole video will be processed for each recording in a session, and thus coding doesn't invalidate the processed video
-                actions.discard(Action.DETECT_MARKERS)
             return actions
         case Action.SYNC_ET_TO_CAM:
             return {a for a in Action.GAZE_TO_PLANE.next_values(inclusive=True) if a not in [Action.AUTO_CODE_EPISODES, Action.AUTO_CODE_SYNC, Action.SYNC_ET_TO_CAM]}
