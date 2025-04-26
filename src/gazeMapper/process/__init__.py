@@ -154,7 +154,7 @@ def _determine_to_invalidate(action: Action, study_config: 'config.Study') -> se
                 study_config.mapped_video_individual_marker_color is not None or
                 study_config.mapped_video_unexpected_marker_color is not None or
                 study_config.mapped_video_rejected_marker_color is not None):
-                # in this case MAKE_VIDEO processes each frame itself, so output of DETECT_MARKERS is not used
+                # in this case MAKE_MAPPED_GAZE_VIDEO processes each frame itself, so output of DETECT_MARKERS is not used
                 actions.discard(Action.MAKE_MAPPED_GAZE_VIDEO)
             return actions
         case Action.GAZE_TO_PLANE:
