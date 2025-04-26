@@ -378,26 +378,25 @@ def update_action_states(working_dir: str|pathlib.Path, action: process.Action, 
             _apply_mutations_and_store(file, action_state_mutations, skip_if_missing=skip_if_missing)
         return
 
-    action_state_mutations  = process.action_update_and_invalidate(action, state, study_config)
+    # determine state mutations
+    action_state_mutations, for_all_recs = process.action_update_and_invalidate(action, state, study_config)
     # split in session-level and recording-level actions, report them separately
     session_state_mutations   = {a:action_state_mutations[a] for a in action_state_mutations if     process.is_session_level_action(a)}
     recording_state_mutations = {a:action_state_mutations[a] for a in action_state_mutations if not process.is_session_level_action(a)}
 
-    # apply to current level
-    if for_recording:
-        file = working_dir / _get_action_status_fname(True)
-        _apply_mutations_and_store(file, recording_state_mutations, skip_if_missing=skip_if_missing)
-        # also apply and store session-level mutations, if any
-        if session_state_mutations:
-            file = working_dir.parent / _get_action_status_fname(False)
-            _apply_mutations_and_store(file, session_state_mutations, skip_if_missing=skip_if_missing)
+    # get which recordings to apply to
+    if not for_recording or for_all_recs:
+        sess = get_session_from_directory(session_dir)
+        recs = list(sess.recordings.keys())
     else:
-        file = working_dir / _get_action_status_fname(False)
-        _apply_mutations_and_store(file, session_state_mutations, skip_if_missing=skip_if_missing)
-        # also apply and store recording-level mutations, if any
-        sess = get_session_from_directory(working_dir)
-        for r in sess.recordings:
-            f = working_dir / r / _get_action_status_fname(True)
-            _apply_mutations_and_store(f, recording_state_mutations, skip_if_missing=skip_if_missing)
+        recs = [working_dir.name]
+    # and apply and store recording-level mutations
+    for r in recs:
+        f = session_dir / r / _get_action_status_fname(True)
+        _apply_mutations_and_store(f, recording_state_mutations, skip_if_missing=skip_if_missing)
+    # also apply and store session-level mutations
+    if session_state_mutations:
+        f = session_dir /     _get_action_status_fname(False)
+        _apply_mutations_and_store(f, session_state_mutations, skip_if_missing=skip_if_missing)
 
     return session_state_mutations, recording_state_mutations

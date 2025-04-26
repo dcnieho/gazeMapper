@@ -136,15 +136,16 @@ def get_actions_for_config(study_config: 'config.Study', exclude_session_level: 
         actions = {a for a in actions if not is_session_level_action(a)}
     return actions
 
-def _determine_to_invalidate(action: Action, study_config: 'config.Study') -> set[Action]:
+def _determine_to_invalidate(action: Action, study_config: 'config.Study') -> tuple[set[Action],bool]:
+    for_all_recs = False    # if True, recording-level states should be invalidated for all recordings in a session
     match action:
         case Action.IMPORT:
-            return action.next_values()
+            states_to_invalidate = action.next_values()
         case Action.MAKE_GAZE_OVERLAY_VIDEO:
-            return {Action.EXPORT_TRIALS}
+            states_to_invalidate = {Action.EXPORT_TRIALS}
         case Action.CODE_EPISODES:
-            actions = {a for a in action.next_values() if a not in [Action.AUTO_CODE_SYNC, Action.AUTO_CODE_EPISODES]}
-            return actions
+            states_to_invalidate = {a for a in action.next_values() if a not in [Action.AUTO_CODE_SYNC, Action.AUTO_CODE_EPISODES]}
+            for_all_recs = not not study_config.sync_ref_recording
         case Action.DETECT_MARKERS:
             # N.B.: don't invalidate auto code sync and auto code episodes as the individual markers used for these
             # automated coding actions are always detected throughout the whole video
@@ -156,39 +157,41 @@ def _determine_to_invalidate(action: Action, study_config: 'config.Study') -> se
                 study_config.mapped_video_rejected_marker_color is not None):
                 # in this case MAKE_MAPPED_GAZE_VIDEO processes each frame itself, so output of DETECT_MARKERS is not used
                 actions.discard(Action.MAKE_MAPPED_GAZE_VIDEO)
-            return actions
+            states_to_invalidate = actions
         case Action.GAZE_TO_PLANE:
             # NB: SYNC_ET_TO_CAM and SYNC_TO_REFERENCE operate on gazeData not gaze on plane data, and MAKE_VIDEO does the job itself/doesn't use this file
-            return {a for a in action.next_values() if a not in [Action.AUTO_CODE_SYNC, Action.AUTO_CODE_EPISODES, Action.SYNC_ET_TO_CAM, Action.SYNC_TO_REFERENCE, Action.MAKE_MAPPED_GAZE_VIDEO]}
+            states_to_invalidate = {a for a in action.next_values() if a not in [Action.AUTO_CODE_SYNC, Action.AUTO_CODE_EPISODES, Action.SYNC_ET_TO_CAM, Action.SYNC_TO_REFERENCE, Action.MAKE_MAPPED_GAZE_VIDEO]}
         case Action.AUTO_CODE_SYNC:
-            return {Action.CODE_EPISODES, Action.GAZE_TO_PLANE, Action.SYNC_TO_REFERENCE, Action.EXPORT_TRIALS, Action.MAKE_MAPPED_GAZE_VIDEO}
+            states_to_invalidate = {Action.CODE_EPISODES, Action.GAZE_TO_PLANE, Action.SYNC_TO_REFERENCE, Action.EXPORT_TRIALS, Action.MAKE_MAPPED_GAZE_VIDEO}
         case Action.AUTO_CODE_EPISODES:
-            actions = {a for a in Action.CODE_EPISODES.next_values(inclusive=True) if a not in [Action.AUTO_CODE_EPISODES, Action.AUTO_CODE_SYNC, Action.SYNC_ET_TO_CAM, Action.SYNC_TO_REFERENCE, Action.VALIDATE]}
-            return actions
+            states_to_invalidate = {a for a in Action.CODE_EPISODES.next_values(inclusive=True) if a not in [Action.AUTO_CODE_EPISODES, Action.AUTO_CODE_SYNC, Action.SYNC_ET_TO_CAM, Action.SYNC_TO_REFERENCE, Action.VALIDATE]}
+            for_all_recs = not not study_config.sync_ref_recording and annotation.Event.Trial in study_config.auto_code_episodes
         case Action.SYNC_ET_TO_CAM:
-            return {a for a in Action.GAZE_TO_PLANE.next_values(inclusive=True) if a not in [Action.AUTO_CODE_EPISODES, Action.AUTO_CODE_SYNC, Action.SYNC_ET_TO_CAM]}
+            states_to_invalidate = {a for a in Action.GAZE_TO_PLANE.next_values(inclusive=True) if a not in [Action.AUTO_CODE_EPISODES, Action.AUTO_CODE_SYNC, Action.SYNC_ET_TO_CAM]}
         case Action.SYNC_TO_REFERENCE:
-            return {a for a in Action.GAZE_TO_PLANE.next_values(inclusive=True) if a not in [Action.AUTO_CODE_EPISODES, Action.AUTO_CODE_SYNC, Action.SYNC_ET_TO_CAM, Action.SYNC_TO_REFERENCE]}
+            states_to_invalidate = {a for a in Action.GAZE_TO_PLANE.next_values(inclusive=True) if a not in [Action.AUTO_CODE_EPISODES, Action.AUTO_CODE_SYNC, Action.SYNC_ET_TO_CAM, Action.SYNC_TO_REFERENCE]}
         case Action.VALIDATE:
-            return {Action.EXPORT_TRIALS}
+            states_to_invalidate = {Action.EXPORT_TRIALS}
         case Action.EXPORT_TRIALS:
-            return set()
+            states_to_invalidate = set()
         case Action.MAKE_MAPPED_GAZE_VIDEO:
-            return set()
+            states_to_invalidate = set()
         case _:
             raise NotImplementedError(f'Logic is not implemented for {action.displayable_name} ({action}), major developer oversight! Let him know.')
+    return states_to_invalidate, for_all_recs
 
-def action_update_and_invalidate(action: Action, state: process_pool.State, study_config: 'config.Study') -> dict[Action, process_pool.State]:
+def action_update_and_invalidate(action: Action, state: process_pool.State, study_config: 'config.Study') -> tuple[dict[Action, process_pool.State], bool]:
     # set status of indicated task
     action_state_mutations = {action: state}
 
     # determine what other (later) actions are invalidated (and should thus be reset to not started state) by this action
     # being performed. There may be a better way of doing this, but i prefer to actively, per case, think this through
     # and explicitly write it out
-    for a in _determine_to_invalidate(action, study_config):
+    states_to_invalidate, for_all_recs = _determine_to_invalidate(action, study_config)
+    for a in states_to_invalidate:
         action_state_mutations[a] = process_pool.State.Not_Run
 
-    return action_state_mutations
+    return action_state_mutations, for_all_recs
 
 def _is_recording_action_possible(rec: str, action_states: dict[Action, process_pool.State], study_config: 'config.Study', rec_type: 'session.RecordingType', action: Action) -> tuple[bool,list[Action]]:
     if not is_action_possible_given_config(action, study_config):
