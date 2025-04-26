@@ -146,7 +146,9 @@ def _determine_to_invalidate(action: Action, study_config: 'config.Study') -> se
             actions = {a for a in action.next_values() if a not in [Action.AUTO_CODE_SYNC, Action.AUTO_CODE_EPISODES]}
             return actions
         case Action.DETECT_MARKERS:
-            actions = {a for a in action.next_values() if a not in [Action.SYNC_TO_REFERENCE]}
+            # N.B.: don't invalidate auto code sync and auto code episodes as the individual markers used for these
+            # automated coding actions are always detected throughout the whole video
+            actions = {a for a in action.next_values() if a not in [Action.SYNC_TO_REFERENCE, Action.AUTO_CODE_SYNC, Action.AUTO_CODE_EPISODES]}
             if (study_config.mapped_video_process_planes_for_all_frames or
                 study_config.mapped_video_plane_marker_color is not None or # NB: no need to check mapped_video_recovered_plane_marker_color as it only overrides colors for some plane markers
                 study_config.mapped_video_individual_marker_color is not None or
