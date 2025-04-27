@@ -397,6 +397,6 @@ def update_action_states(working_dir: str|pathlib.Path, action: process.Action, 
     # also apply and store session-level mutations
     if session_state_mutations:
         f = session_dir /     _get_action_status_fname(False)
-        _apply_mutations_and_store(f, session_state_mutations, skip_if_missing=skip_if_missing)
+        _apply_mutations_and_store(f,   session_state_mutations, skip_if_missing=skip_if_missing)
 
     return session_state_mutations, recording_state_mutations
