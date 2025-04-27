@@ -477,8 +477,7 @@ class GUI:
             # set pending and running states since these are not stored in the states file
             for job_id in self.job_scheduler.jobs:
                 job_state = self.job_scheduler.jobs[job_id].get_state()
-                if job_state in [process_pool.State.Pending, process_pool.State.Running]:
-                    self._update_job_states_impl(self.job_scheduler.jobs[job_id].user_data, job_state)
+                self._update_job_states_impl(self.job_scheduler.jobs[job_id].user_data, job_state)
 
         # if there are no jobs left, clean up process pool
         self.process_pool.cleanup_if_no_jobs()
@@ -499,9 +498,11 @@ class GUI:
             rec = sess.recordings.get(job.recording,None)
             if rec is None:
                 return
-            rec.state[job.action] = job_state
+            if job_state!=  rec.state[job.action] and (job_state in [process_pool.State.Pending, process_pool.State.Running] or  rec.state[job.action] in [process_pool.State.Pending, process_pool.State.Running]):
+                rec.state[job.action] = job_state
         else:
-            sess.state[job.action] = job_state
+            if job_state!= sess.state[job.action] and (job_state in [process_pool.State.Pending, process_pool.State.Running] or sess.state[job.action] in [process_pool.State.Pending, process_pool.State.Running]):
+                sess.state[job.action] = job_state
 
     def _action_done_callback(self, future: process_pool.ProcessFuture, job_id: int, job: utils.JobInfo, state: process_pool.State):
         # if process failed, notify error
