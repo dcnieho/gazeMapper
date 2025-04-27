@@ -385,6 +385,7 @@ def update_action_states(working_dir: str|pathlib.Path, action: process.Action, 
     recording_state_mutations = {a:action_state_mutations[a] for a in action_state_mutations if not process.is_session_level_action(a)}
 
     # get which recordings to apply to
+    session_dir = working_dir.parent if for_recording else working_dir
     if not for_recording or for_all_recs:
         sess = get_session_from_directory(session_dir)
         recs = list(sess.recordings.keys())
