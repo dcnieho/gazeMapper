@@ -36,40 +36,42 @@ class GUI:
         self.running     = False
         settings_editor.set_gui_instance(self)
 
-        self.project_dir: pathlib.Path = None
-        self.study_config: config.Study = None
-        self.plane_configs: dict[str,gt_plane.Plane|None] = {}  # None is plane config has errors
-        self._dict_type_rec: dict[str, typing.Type]|None = None
+        self.project_dir    : pathlib.Path                  = None
+        self.study_config   : config.Study                  = None
+        self.plane_configs  : dict[str,gt_plane.Plane|None] = {}  # None is plane config has errors
+        self._dict_type_rec : dict[str, typing.Type]|None   = None
 
-        self.sessions: dict[str, session.Session]                       = {}
-        self.session_config_overrides: dict[str, config.StudyOverride]  = {}
-        self._session_dict_type_rec: dict[str, dict[str, typing.Type]]  = {}
-        self._sessions_lock: threading.Lock                             = threading.Lock()
-        self._selected_sessions: dict[str, bool]                        = {}
-        self._session_lister = session_lister.List(self.sessions, self._sessions_lock, self._selected_sessions, info_callback=self._open_session_detail, draw_action_status_callback=self._session_action_status, item_context_callback=self._session_context_menu)
-        self._et_widget_drawer = gt_gui.recording_table.EyeTrackerName()
+        self.sessions                   : dict[str, session.Session]        = {}
+        self.session_config_overrides   : dict[str, config.StudyOverride]   = {}
+        self._session_dict_type_rec     : dict[str, dict[str, typing.Type]] = {}
+        self._sessions_lock             : threading.Lock                    = threading.Lock()
+        self._selected_sessions         : dict[str, bool]                   = {}
+        self._session_lister                                                = session_lister.List(self.sessions, self._sessions_lock, self._selected_sessions, info_callback=self._open_session_detail, draw_action_status_callback=self._session_action_status, item_context_callback=self._session_context_menu)
+        self._et_widget_drawer                                              = gt_gui.recording_table.EyeTrackerName()
 
-        self.recording_config_overrides: dict[str, dict[str, config.StudyOverride]]   = {}
-        self._recording_dict_type_rec: dict[str, dict[str, dict[str, typing.Type]]]   = {}
-        self._recording_listers  : dict[str, gt_gui.recording_table.RecordingTable]   = {}
-        self._selected_recordings: dict[str, dict[str, bool]]                         = {}
+        self.recording_config_overrides : dict[str, dict[str, config.StudyOverride]]        = {}
+        self._recording_dict_type_rec   : dict[str, dict[str, dict[str, typing.Type]]]      = {}
+        self._recording_listers         : dict[str, gt_gui.recording_table.RecordingTable]  = {}
+        self._selected_recordings       : dict[str, dict[str, bool]]                        = {}
 
-        self._possible_value_getters: dict[str] = {}
+        self._possible_value_getters    : dict[str]                                         = {}
 
-        self.need_setup_recordings          = True
-        self.need_setup_plane               = True
-        self.need_setup_episode             = True
-        self.need_setup_individual_markers  = True
-        self.can_accept_sessions            = False
-        self._session_actions: set[process.Action] = set()
+        self.need_setup_recordings                                  = True
+        self.need_setup_plane                                       = True
+        self.need_setup_episode                                     = True
+        self.need_setup_individual_markers                          = True
+        self.can_accept_sessions                                    = False
+        self._session_actions           : set[process.Action]       = set()
+        self._problems_cache            : type_utils.ProblemDict    = {}
 
         self._session_watcher           : concurrent.futures.Future = None
         self._session_watcher_stop_event: asyncio.Event             = None
         self._config_watcher            : concurrent.futures.Future = None
         self._config_watcher_stop_event : asyncio.Event             = None
 
-        self.process_pool   = process_pool.ProcessPool()
-        self.job_scheduler  = process_pool.JobScheduler[utils.JobInfo](self.process_pool, self._check_job_valid)
+        self.process_pool                                           = process_pool.ProcessPool()
+        self.job_scheduler                                          = process_pool.JobScheduler[utils.JobInfo](self.process_pool, self._check_job_valid)
+        self._active_jobs_cache         : dict[utils.JobInfo, int]  = {}
 
         self._window_list                   : list[hello_imgui.DockableWindow]  = []
         self._to_dock                                                           = []
@@ -78,15 +80,14 @@ class GUI:
         self._need_set_window_title                                             = False
         self._main_dock_node_id                                                 = None
 
-        self._sessions_pane         : hello_imgui.DockableWindow = None
-        self._project_settings_pane : hello_imgui.DockableWindow = None
-        self._action_list_pane      : hello_imgui.DockableWindow = None
-        self._show_demo_window                                   = False
+        self._sessions_pane         : hello_imgui.DockableWindow    = None
+        self._project_settings_pane : hello_imgui.DockableWindow    = None
+        self._action_list_pane      : hello_imgui.DockableWindow    = None
+        self._show_demo_window                                      = False
 
-        self._icon_font: imgui.ImFont   = None
-        self._big_font: imgui.ImFont    = None
+        self._icon_font             : imgui.ImFont                  = None
+        self._big_font              : imgui.ImFont                  = None
 
-        self._problems_cache        : type_utils.ProblemDict                            = {}
         self._marker_preview_cache  : dict[tuple[int,int,int], image_helper.ImageHelper]= {}
         self._plane_preview_cache   : dict[str               , image_helper.ImageHelper]= {}
 
@@ -283,8 +284,8 @@ class GUI:
     def _show_menu_gui(self):
         # this is always called, so we handle popups and other state here
         self._check_project_setup_state()
-        gt_gui.utils.handle_popup_stack(self.popup_stack)
         self._update_jobs_and_process_pool()
+        gt_gui.utils.handle_popup_stack(self.popup_stack)
         # also handle showing of debug windows
         if self._show_demo_window:
             self._show_demo_window = imgui.show_demo_window(self._show_demo_window)
@@ -446,7 +447,7 @@ class GUI:
     def launch_task(self, sess: str, recording: str|None, action: process.Action, **kwargs):
         # NB: this is run under lock, so sess and recording are valid
         job = utils.JobInfo(action, sess, recording)
-        if job in self._get_pending_running_job_list():
+        if job in self._active_jobs_cache:
             # already scheduled, nothing to do
             return
         if action==process.Action.IMPORT:
@@ -467,7 +468,8 @@ class GUI:
 
         # add to scheduler
         payload = process_pool.JobPayload(func, args, kwargs)
-        self.job_scheduler.add_job(job, payload, self._action_done_callback, exclusive_id=exclusive_id, priority=priority)
+        progress_indicator = self.job_scheduler.get_progress_indicator() if action.has_progress_indication else None
+        self.job_scheduler.add_job(job, payload, self._action_done_callback, exclusive_id=exclusive_id, priority=priority, progress_indicator=progress_indicator)
 
     def _update_jobs_and_process_pool(self):
         with self._sessions_lock:
@@ -479,6 +481,12 @@ class GUI:
                 job_state = self.job_scheduler.jobs[job_id].get_state()
                 self._update_job_states_impl(self.job_scheduler.jobs[job_id].user_data, job_state)
 
+            # build cache for easy access to running jobs
+            self._active_jobs_cache.clear()
+            for job_id in self.job_scheduler.jobs:
+                if self.job_scheduler.jobs[job_id].get_state() in [process_pool.State.Pending, process_pool.State.Running]:
+                    self._active_jobs_cache[self.job_scheduler.jobs[job_id].user_data] = job_id
+
         # if there are no jobs left, clean up process pool
         self.process_pool.cleanup_if_no_jobs()
 
@@ -489,6 +497,13 @@ class GUI:
         if job.recording and job.recording not in sess.recordings:
             return False
         return True
+
+    def _get_active_job(self, action: process.Action, session_name: str, recording_name: str=None):
+        j = utils.JobInfo(action, session_name, recording_name)
+        if (job_id := self._active_jobs_cache.get(j, None)) is not None:
+            return job_id, self.job_scheduler.jobs[job_id]
+        else:
+            return None, None
 
     def _update_job_states_impl(self, job: utils.JobInfo, job_state: process_pool.State):
         sess = self.sessions.get(job.session,None)
@@ -742,7 +757,10 @@ class GUI:
         actions = process.get_actions_for_config(cfg, exclude_session_level=True)
         def _draw_status(action: process.Action, item: session.Recording):
             if process.is_action_possible_for_recording(item.definition.name, item.definition.type, action, cfg):
-                gt_gui.utils.draw_process_state(item.state[action])
+                progress = None
+                if item.state[action]==process_pool.State.Running and (job_desc:=self._get_active_job(action, item.info.working_directory.parent.name, item.definition.name)[1]):
+                    progress = job_desc.progress.get_progress() if job_desc.progress is not None else None
+                gt_gui.utils.draw_process_state(item.state[action], progress=progress)
             else:
                 imgui.text('-')
                 if action==process.Action.AUTO_CODE_EPISODES and cfg.sync_ref_recording and item.definition.name!=cfg.sync_ref_recording:
@@ -860,6 +878,8 @@ class GUI:
         self._selected_recordings.clear()
         self._plane_preview_cache.clear()
         self._marker_preview_cache.clear()
+        self._problems_cache.clear()
+        self._active_jobs_cache.clear()
 
 
     def _sessions_pane_drawer(self):
@@ -1054,7 +1074,11 @@ class GUI:
                             imgui.text(f'{job_id}')
                         case 1:
                             # Status
-                            gt_gui.utils.draw_process_state((job_state:=jobs[job_id].get_state()))
+                            job_state = jobs[job_id].get_state()
+                            progress = None
+                            if job_state==process_pool.State.Running:
+                                progress = jobs[job_id].progress.get_progress() if jobs[job_id].progress is not None else None
+                            gt_gui.utils.draw_process_state(job_state, progress=progress)
                             if jobs[job_id].error:
                                 gt_gui.utils.draw_hover_text(jobs[job_id].error, text='')
                                 imgui.same_line()
@@ -1475,32 +1499,37 @@ class GUI:
             }
             gt_gui.utils.push_popup(self, lambda: gt_gui.utils.popup("Add marker", _add_marker_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, outside=False))
 
-    def _get_pending_running_job_list(self) -> dict[utils.JobInfo, int]:
-        active_jobs: dict[utils.JobInfo, int] = {}
-        for job_id in self.job_scheduler.jobs:
-            if self.job_scheduler.jobs[job_id].get_state() in [process_pool.State.Pending, process_pool.State.Running]:
-                active_jobs[self.job_scheduler.jobs[job_id].user_data] = job_id
-        return active_jobs
-
     def _session_action_status(self, item: session.Session, action: process.Action):
         if not item.has_all_recordings():
             imgui.text_colored(colors.error, '-')
         else:
             if process.is_session_level_action(action):
-                gt_gui.utils.draw_process_state(item.state[action])
+                progress = None
+                if item.state[action]==process_pool.State.Running and (job_desc:=self._get_active_job(action, item.name)[1]):
+                    progress = job_desc.progress.get_progress() if job_desc.progress is not None else None
+                gt_gui.utils.draw_process_state(item.state[action], progress=progress)
             else:
                 cfg = self.session_config_overrides[item.name].apply(self.study_config, strict_check=False) if item.name in self.session_config_overrides else self.study_config
                 states = {r:item.recordings[r].state[action] for r in item.recordings if process.is_action_possible_for_recording(r, item.definition.get_recording_def(r).type, action, cfg)}
                 not_completed = [r for r in states if states[r]!=process_pool.State.Completed]
-                if any(st:=[s for r in states if (s:=states[r]) in [process_pool.State.Pending, process_pool.State.Running]]):
+                progress: dict[str,tuple[float,str]] = {}
+                if any(st:={s for r in states if (s:=states[r]) in [process_pool.State.Pending, process_pool.State.Running]}):
                     # progress marker
-                    gt_gui.utils.draw_process_state(process_pool.State.Running if process_pool.State.Running in st else process_pool.State.Pending, have_hover_popup=False)
+                    if process_pool.State.Running in st:
+                        # figure out progress, if available
+                        for r in states:
+                            if (job_desc:=self._get_active_job(action, item.name, r)[1]) and job_desc.progress is not None:
+                                progress[r] = job_desc.progress.get_progress()
+                    gt_gui.utils.draw_process_state(process_pool.State.Running if process_pool.State.Running in st else process_pool.State.Pending, have_hover_popup=False, progress=(sum((progress[r][0] for r in progress))/len(progress),'') if progress else None)
                 else:
                     n_rec = len(states)
                     clr = colors.error if not_completed else colors.ok
                     imgui.text_colored(clr, f'{n_rec-len(not_completed)}/{n_rec}')
                 if not_completed:
-                    rec_strs = [f'{r} ({states[r].displayable_name})' for r in not_completed]
+                    rec_strs: list[str] = []
+                    for r in not_completed:
+                        extra = (', '+progress[r][1]) if r in progress else ''
+                        rec_strs.append(f'{r} ({states[r].displayable_name}{extra})')
                     gt_gui.utils.draw_hover_text('not completed for recordings:\n'+'\n'.join(rec_strs),'')
 
     def _session_context_menu(self, session_name: str) -> bool:
@@ -1679,40 +1708,33 @@ class GUI:
             return {}, {}
 
         # first get list of scheduled actions for this session/recordings
-        active_jobs = self._get_pending_running_job_list()
         actions_running : dict[process.Action,int|dict[str,int]] = {}
         for a in process.Action:
             if process.is_session_level_action(a):
-                if (j:=utils.JobInfo(a, session_name)) in active_jobs:
-                    actions_running[a]  = active_jobs[j]
+                recs = None
+            elif rec_name:
+                recs = rec_name
             else:
-                if rec_name:
-                    if (j:=utils.JobInfo(a, session_name, rec_name)) in active_jobs:
-                        actions_running[a] = active_jobs[j]
-                else:
-                    # check each recording
-                    recs = {r.name:active_jobs[j] for r in self.study_config.session_def.recordings if (j:=utils.JobInfo(a, session_name, r.name)) in active_jobs}
-                    if recs:
-                        actions_running[a] = recs
+                recs = [r.name for r in self.study_config.session_def.recordings]
+
+            if isinstance(recs,list):
+                recs = {r:job_id for r in recs if (job_id:=self._get_active_job(a, session_name, r)[0]) is not None}
+                if recs:
+                    actions_running[a] = recs
+            else:
+                if (job_id:=self._get_active_job(a, session_name, recs)[0]):
+                    actions_running[a] = job_id
 
         # filter out running actions from possible actions
         actions_possible: dict[process.Action,bool|list[str]] = {}
         for a in actions:
-            if process.is_session_level_action(a):
-                if a not in actions_running:
-                    actions_possible[a] = actions[a]
-            else:
-                if rec_name:
-                    if a not in actions_running:
-                        actions_possible[a] = actions[a]
-                else:
-                    # check each recording
-                    if a not in actions_running:
-                        actions_possible[a] = actions[a]
-                    else:
-                        recs = [r for r in actions[a][0] if r not in actions_running[a]]
-                        if recs:
-                            actions_possible[a] = recs
+            if a not in actions_running:
+                actions_possible[a] = actions[a]
+            elif not process.is_session_level_action(a) and not rec_name:
+                # check each recording
+                recs = [r for r in actions[a][0] if r not in actions_running[a]]
+                if recs:
+                    actions_possible[a] = recs
         return actions_possible, actions_running
 
     def _open_session_detail(self, sess: session.Session):
@@ -1763,7 +1785,10 @@ class GUI:
         if session_level_actions and imgui.begin_table(f'##{sess.name}_session_level', 2, imgui.TableFlags_.sizing_fixed_fit):
             for a in session_level_actions:
                 imgui.table_next_column()
-                gt_gui.utils.draw_process_state(sess.state[a])
+                progress = None
+                if sess.state[a]==process_pool.State.Running and (job_desc:=self._get_active_job(a, sess.name)[1]):
+                    progress = job_desc.progress.get_progress() if job_desc.progress is not None else None
+                gt_gui.utils.draw_process_state(sess.state[a], progress=progress)
                 imgui.table_next_column()
                 imgui.selectable(a.displayable_name, False, imgui.SelectableFlags_.span_all_columns|imgui.SelectableFlags_.allow_overlap)
                 if (a in menu_actions or a in menu_actions_running) and imgui.begin_popup_context_item(f"##{sess.name}_{a}_context"):
