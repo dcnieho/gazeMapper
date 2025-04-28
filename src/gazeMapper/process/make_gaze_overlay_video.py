@@ -6,7 +6,7 @@ from glassesTools.gui import video_player
 from .. import config, process, session
 
 
-def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show_visualization=False, **study_settings):
+def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show_visualization=False, progress_indicator: process_pool.JobProgress=None, **study_settings):
     # if show_visualization, each frame is shown in a viewer as video is generated
     working_dir = pathlib.Path(working_dir)
     if config_dir is None:
@@ -25,15 +25,21 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show
         gui.set_show_action_tooltip(True)
         gui.set_button_props_for_action(video_player.Action.Quit, 'Stop', tooltip='Interrupt (cut short) the video generation')
 
-        proc_thread = propagating_thread.PropagatingThread(target=do_the_work, args=(working_dir, config_dir, gui), kwargs=study_settings, cleanup_fun=gui.stop)
+        proc_thread = propagating_thread.PropagatingThread(target=do_the_work, args=(working_dir, config_dir, gui, progress_indicator), kwargs=study_settings, cleanup_fun=gui.stop)
         proc_thread.start()
         gui.start()
         proc_thread.join()
     else:
-        do_the_work(working_dir, config_dir, None, **study_settings)
+        do_the_work(working_dir, config_dir, None, progress_indicator, **study_settings)
 
 
-def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_player.GUI, **study_settings):
+def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_player.GUI, progress_indicator: process_pool.JobProgress, **study_settings):
+    # progress indicator
+    if progress_indicator is None:
+        progress_indicator = process_pool.JobProgress(printer=lambda x: print(x))
+    progress_indicator.set_unit('frames')
+    progress_indicator.set_start_time_to_now()
+
     # get settings for the study
     study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent, config.OverrideLevel.Recording: working_dir}, **study_settings)
 
@@ -52,11 +58,16 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
     if gui is not None:
         gui.set_show_timeline(True, video_ts, window_id=gui.main_window_id)
 
+    # prep progress indicator
+    total = video_ts.get_last()[0]
+    progress_indicator.set_total(total)
+    progress_indicator.set_intervals(int(total/200), int(total/200))
+
     # update state: set to not run so that if we crash or cancel below the task is correctly marked as not run (video files are corrupt)
     session.update_action_states(working_dir, process.Action.MAKE_GAZE_OVERLAY_VIDEO, process_pool.State.Not_Run, study_config)
 
     # now run
-    video_maker.process_video()
+    video_maker.process_video(progress_indicator.update)
 
     # update state
     session.update_action_states(working_dir, process.Action.MAKE_GAZE_OVERLAY_VIDEO, process_pool.State.Completed, study_config)

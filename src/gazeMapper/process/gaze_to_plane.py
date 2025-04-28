@@ -7,7 +7,7 @@ from glassesTools.gui.video_player import GUI
 from .. import config, episode, naming, plane, process, session, synchronization
 
 
-def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show_visualization=False, show_planes=True, show_only_intervals=True, **study_settings):
+def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show_visualization=False, show_planes=True, show_only_intervals=True, progress_indicator: process_pool.JobProgress=None, **study_settings):
     # if show_visualization, each frame is shown in a viewer, overlaid with info about detected planes and projected gaze
     # if show_poster, gaze in space of each plane is also drawn in a separate windows
     # if show_only_intervals, only the coded mapping episodes (if available) are shown in the viewer while the rest of the scene video is skipped past
@@ -26,15 +26,21 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show
         gui.set_show_play_percentage(True)
         gui.set_show_action_tooltip(True)
 
-        proc_thread = propagating_thread.PropagatingThread(target=do_the_work, args=(working_dir, config_dir, gui, show_planes, show_only_intervals), kwargs=study_settings, cleanup_fun=gui.stop)
+        proc_thread = propagating_thread.PropagatingThread(target=do_the_work, args=(working_dir, config_dir, gui, show_planes, show_only_intervals, progress_indicator), kwargs=study_settings, cleanup_fun=gui.stop)
         proc_thread.start()
         gui.start()
         proc_thread.join()
     else:
-        do_the_work(working_dir, config_dir, None, False, False, **study_settings)
+        do_the_work(working_dir, config_dir, None, False, False, progress_indicator, **study_settings)
 
 
-def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, show_planes: bool, show_only_intervals: bool, **study_settings):
+def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, show_planes: bool, show_only_intervals: bool, progress_indicator: process_pool.JobProgress, **study_settings):
+    # progress indicator
+    if progress_indicator is None:
+        progress_indicator = process_pool.JobProgress(printer=lambda x: print(x))
+    progress_indicator.set_unit('samples')
+    progress_indicator.set_start_time_to_now()
+
     # get settings for the study
     study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent, config.OverrideLevel.Recording: working_dir}, **study_settings)
 
@@ -77,13 +83,17 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, s
     head_gazes = gaze_headref.read_dict_from_file(working_dir / gt_naming.gaze_data_fname, processing_intervals if should_load_part else None, ts_column_suffixes=['VOR', ''])[0]
     poses = {p:gt_pose.read_dict_from_file(working_dir/f'{naming.plane_pose_prefix}{p}.tsv', mapping_setup[p] if should_load_part else None) for p in mapping_setup}
 
+    # prep progress indicator
+    total = sum(len(head_gazes[f]) for p in poses for f in poses[p] if f in head_gazes)
+    progress_indicator.set_total(total)
+    progress_indicator.set_intervals(int(total/200), int(total/200))
     # get camera calibration info
     camera_params = ocv.CameraParams.read_from_file(working_dir / gt_naming.scene_camera_calibration_fname)
 
     # transform gaze to plane(s)
     plane_gazes: dict[str, dict[int,list[gaze_worldref.Gaze]]] = {}
     for p in planes:
-        plane_gazes[p] = gaze_worldref.from_head(poses[p], head_gazes, camera_params)
+        plane_gazes[p] = gaze_worldref.from_head(poses[p], head_gazes, camera_params, progress_indicator.update)
         gaze_worldref.write_dict_to_file(plane_gazes[p], working_dir/f'{naming.world_gaze_prefix}{p}.tsv', skip_missing=True)
 
     # update state

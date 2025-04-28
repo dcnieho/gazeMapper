@@ -9,7 +9,7 @@ from glassesTools.gui.video_player import GUI
 from .. import config, episode, marker, naming, plane, process, session, synchronization
 
 
-def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show_visualization=False, visualization_show_rejected_markers=False, **study_settings):
+def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show_visualization=False, visualization_show_rejected_markers=False, progress_indicator: process_pool.JobProgress=None, **study_settings):
     # if show_visualization, each frame is shown in a viewer, overlaid with info about detected markers and planes
     # if show_rejected_markers, rejected ArUco marker candidates are also shown in the viewer. Possibly useful for debug
     working_dir = pathlib.Path(working_dir)
@@ -29,15 +29,21 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show
         gui.set_show_play_percentage(True)
         gui.set_show_action_tooltip(True)
 
-        proc_thread = propagating_thread.PropagatingThread(target=do_the_work, args=(working_dir, config_dir, gui, visualization_show_rejected_markers), kwargs=study_settings, cleanup_fun=gui.stop)
+        proc_thread = propagating_thread.PropagatingThread(target=do_the_work, args=(working_dir, config_dir, gui, visualization_show_rejected_markers, progress_indicator), kwargs=study_settings, cleanup_fun=gui.stop)
         proc_thread.start()
         gui.start()
         proc_thread.join()
     else:
-        do_the_work(working_dir, config_dir, None, False, **study_settings)
+        do_the_work(working_dir, config_dir, None, False, progress_indicator, **study_settings)
 
 
-def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, visualization_show_rejected_markers: bool, **study_settings):
+def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, visualization_show_rejected_markers: bool, progress_indicator: process_pool.JobProgress, **study_settings):
+    # progress indicator
+    if progress_indicator is None:
+        progress_indicator = process_pool.JobProgress(printer=lambda x: print(x))
+    progress_indicator.set_unit('frames')
+    progress_indicator.set_start_time_to_now()
+
     # get settings for the study
     study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent, config.OverrideLevel.Recording: working_dir}, **study_settings)
 
@@ -101,6 +107,12 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
         if visualization_show_rejected_markers:
             colors['rejected_marker_color'] = study_config.mapped_video_rejected_marker_color or (255,0,0)
         aruco_manager.set_visualization_colors(**colors)
+
+    # prep progress indicator
+    total = estimator.video_ts.get_last()[0]
+    progress_indicator.set_total(total)
+    progress_indicator.set_intervals(int(total/200), int(total/200))
+    estimator.set_progress_updater(progress_indicator.update)
 
     poses, individual_markers, sync_target_signal = estimator.process_video()
 

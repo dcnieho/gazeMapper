@@ -19,7 +19,7 @@ from .. import config, episode, marker, naming, process, session, synchronizatio
 from .detect_markers import _get_plane_setup, _get_sync_function
 
 
-def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show_visualization=False, **study_settings):
+def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show_visualization=False, progress_indicator: process_pool.JobProgress=None, **study_settings):
     # if show_visualization, the generated video(s) are shown as they are created in a viewer
     working_dir  = pathlib.Path(working_dir) # working directory of a session, not of a recording
     if config_dir is None:
@@ -32,16 +32,22 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show
         gui = video_player.GUI(use_thread = False)
         gui.add_window(working_dir.name)
 
-        proc_thread = propagating_thread.PropagatingThread(target=do_the_work, args=(working_dir, config_dir, gui), kwargs=study_settings, cleanup_fun=gui.stop)
+        proc_thread = propagating_thread.PropagatingThread(target=do_the_work, args=(working_dir, config_dir, gui, progress_indicator), kwargs=study_settings, cleanup_fun=gui.stop)
         proc_thread.start()
         gui.start()
         proc_thread.join()
     else:
-        do_the_work(working_dir, config_dir, None, **study_settings)
+        do_the_work(working_dir, config_dir, None, progress_indicator, **study_settings)
 
-def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_player.GUI, **study_settings):
+def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_player.GUI, progress_indicator: process_pool.JobProgress, **study_settings):
     has_gui = gui is not None
     sub_pixel_fac = 8   # for anti-aliased drawing
+
+    # progress indicator
+    if progress_indicator is None:
+        progress_indicator = process_pool.JobProgress(printer=lambda x: print(x))
+    progress_indicator.set_unit('frames')
+    progress_indicator.set_start_time_to_now()
 
     # get settings for the study
     study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir}, **study_settings)
@@ -229,8 +235,6 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
         if sync_target_function is not None:
             pose_estimators[rec].register_extra_processing_fun('sync', *sync_target_function)
             pose_estimators[rec].show_extra_processing_output = study_config.mapped_video_show_sync_func_output
-        if study_config.sync_ref_recording and rec!=study_config.sync_ref_recording:
-            pose_estimators[rec].set_do_report_frames(False)
 
         if rec in study_config.mapped_video_make_which:
             pose_estimators[rec].set_visualize_on_frame(True)
@@ -291,6 +295,11 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
                 gui.set_show_play_percentage(True, gui_window_ids[v])
                 gui.set_show_action_tooltip(True, gui_window_ids[v])
                 gui.set_button_props_for_action(video_player.Action.Quit, 'Stop', tooltip='Interrupt (cut short) the video generation')
+
+        # prep progress indicator
+        total = videos_ts[lead_vid].get_last()[0]
+        progress_indicator.set_total(total)
+        progress_indicator.set_intervals(int(total/200), int(total/200))
 
         # open output video files
         for v in write_vids:
@@ -444,6 +453,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
             for v in write_vids:
                 img = Image(plane_buffers=[frame[v].flatten().tobytes()], pix_fmt='bgr24', size=(frame[v].shape[1], frame[v].shape[0]))
                 vid_writer[v].write_frame(img=img, pts=frame_idx[lead_vid]/vid_info[lead_vid][2])
+            progress_indicator.update()
 
             # update gui, if any
             if has_gui:

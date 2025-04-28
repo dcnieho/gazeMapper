@@ -8,11 +8,17 @@ from .. import config, episode, naming, plane, process, session
 
 
 stopAllProcessing = False
-def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **study_settings):
+def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path=None, progress_indicator: process_pool.JobProgress=None, **study_settings):
     working_dir = pathlib.Path(working_dir)
     if config_dir is None:
         config_dir = config.guess_config_dir(working_dir)
     config_dir  = pathlib.Path(config_dir)
+
+    # progress indicator
+    if progress_indicator is None:
+        progress_indicator = process_pool.JobProgress(printer=lambda x: print(x))
+    progress_indicator.set_unit('steps')
+    progress_indicator.set_start_time_to_now()
 
     # get settings for the study
     study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent, config.OverrideLevel.Recording: working_dir}, **study_settings)
@@ -27,6 +33,12 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
 
     # get interval(s) coded to be analyzed, if any
     episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / naming.coding_file))[annotation.Event.Validate]
+
+    # prep progress indicator
+    total = len(planes)*(2+len(episodes)*3)
+    progress_indicator.set_total(total)
+    progress_indicator.set_intervals(int(total/200), int(total/200))
+    progress_indicator.update(n=0)  # ensure a complete hover text appears before first processing step is finished
 
     # per plane, run the glassesValidator steps
     for p in planes:
@@ -51,6 +63,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
                                                     I2MC_settings_override=study_config.validate_I2MC_settings,
                                                     filename_stem=f'{naming.validation_prefix}{p}_fixations',
                                                     plot_limits=plot_limits)
+        progress_indicator.update()
 
         # assign intervals
         for idx,_ in enumerate(episodes):
@@ -70,6 +83,8 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
                                               fix_file,
                                               do_global_shift=study_config.validate_do_global_shift,
                                               max_dist_fac=study_config.validate_max_dist_fac)
+            progress_indicator.update()
+
             # plot output
             assign_intervals.plot(selected_intervals,
                                   other_intervals,
@@ -81,11 +96,14 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
                                   iteration=idx,
                                   background_image=background_image,
                                   plot_limits=plot_limits)
+            progress_indicator.update()
+
             # store output to file
             assign_intervals.to_tsv(selected_intervals,
                                     working_dir,
                                     filename_stem=f'{naming.validation_prefix}{p}_fixation_assignment',
                                     iteration=idx)
+            progress_indicator.update()
 
         compute_offsets.compute(working_dir/f'{naming.world_gaze_prefix}{p}.tsv',
                                 working_dir/f'{naming.plane_pose_prefix}{p}.tsv',
@@ -98,6 +116,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
                                 dq_types=study_config.validate_dq_types,
                                 allow_dq_fallback=study_config.validate_allow_dq_fallback,
                                 include_data_loss=study_config.validate_include_data_loss)
+        progress_indicator.update()
 
     # update state
     session.update_action_states(working_dir, process.Action.VALIDATE, process_pool.State.Completed, study_config)
