@@ -25,6 +25,9 @@ class Action(enum.IntEnum):
     @property
     def has_options(self):
         return self in [Action.MAKE_GAZE_OVERLAY_VIDEO, Action.DETECT_MARKERS, Action.GAZE_TO_PLANE, Action.MAKE_MAPPED_GAZE_VIDEO]
+    @property
+    def has_progress_indication(self):
+        return self in [Action.MAKE_GAZE_OVERLAY_VIDEO, Action.DETECT_MARKERS, Action.GAZE_TO_PLANE, Action.VALIDATE, Action.MAKE_MAPPED_GAZE_VIDEO]
     def succ(self):
         v = self.value+1
         if v > Action.MAKE_MAPPED_GAZE_VIDEO.value:
