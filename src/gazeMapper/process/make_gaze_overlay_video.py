@@ -62,12 +62,13 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
     total = video_ts.get_last()[0]
     progress_indicator.set_total(total)
     progress_indicator.set_intervals(int(total/200), int(total/200))
+    video_maker.set_progress_updater(progress_indicator.update)
 
     # update state: set to not run so that if we crash or cancel below the task is correctly marked as not run (video files are corrupt)
     session.update_action_states(working_dir, process.Action.MAKE_GAZE_OVERLAY_VIDEO, process_pool.State.Not_Run, study_config)
 
     # now run
-    video_maker.process_video(progress_indicator.update)
+    video_maker.process_video()
 
     # update state
     session.update_action_states(working_dir, process.Action.MAKE_GAZE_OVERLAY_VIDEO, process_pool.State.Completed, study_config)
