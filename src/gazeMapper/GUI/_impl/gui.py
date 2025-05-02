@@ -1614,7 +1614,7 @@ class GUI:
                     self.job_scheduler.cancel_job(actions_running[s.name][process.Action.IMPORT][r])
                 callbacks.remove_folder(s.working_directory)
             changed = True
-        changed |= self._draw_context_menu_items_for_recording_folders(sess, None)
+        changed |= self._draw_context_menu_items_for_recording_folders(sess, None, actions_running)
         return changed
     def _recording_context_menu(self, session_name: str, rec_name: str) -> bool:
         # ignore input recording name, get selected sessions
@@ -1676,9 +1676,9 @@ class GUI:
             if imgui.selectable(ifa6.ICON_FA_DOWNLOAD+' Set calibration XML', False)[0]:
                 gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='set_cam_cal', working_directory=working_directory))
             imgui.end_menu()
-        changed = self._draw_context_menu_items_for_recording_folders([sess], recs)
+        changed = self._draw_context_menu_items_for_recording_folders([sess], recs, actions_running)
         return changed
-    def _draw_context_menu_items_for_recording_folders(self, sess: list[session.Session], recs: list[str]|None):
+    def _draw_context_menu_items_for_recording_folders(self, sess: list[session.Session], recs: list[str]|None, actions_running: dict[str, dict[process.Action, bool|list[str]]]):
         if recs is None:
             recs = [(i,r) for i,s in enumerate(sess) for r in s.recordings]
         else:
@@ -1699,6 +1699,9 @@ class GUI:
                 callbacks.open_folder(self, sess[s].recordings[r].info.working_directory)
         if working_directories and imgui.selectable(ifa6.ICON_FA_TRASH_CAN + " Delete recording"+plural, False)[0]:
             for s,r in recs:
+                # if an import action is currently running, cancel that first
+                if sess[s].name in actions_running and process.Action.IMPORT in actions_running[sess[s].name] and r in actions_running[sess[s].name][process.Action.IMPORT]:
+                    self.job_scheduler.cancel_job(actions_running[s.name][process.Action.IMPORT][r])
                 callbacks.remove_folder(sess[s].recordings[r].info.working_directory)
             changed = True
         return changed
