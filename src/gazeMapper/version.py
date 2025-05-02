@@ -1,4 +1,4 @@
-__version__ = "1.8.2"
+__version__ = "1.8.3"
 
 __title__ = "gazeMapper"
 __description__ = "Automated world-based analysis of wearable eye tracker data."
