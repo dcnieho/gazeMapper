@@ -758,7 +758,7 @@ class GUI:
         def _draw_status(action: process.Action, item: session.Recording):
             if process.is_action_possible_for_recording(item.definition.name, item.definition.type, action, cfg):
                 progress = None
-                if item.state[action]==process_pool.State.Running and (job_desc:=self._get_active_job(action, item.info.working_directory.parent.name, item.definition.name)[1]):
+                if item.state[action]==process_pool.State.Running and item.info.working_directory and (job_desc:=self._get_active_job(action, item.info.working_directory.parent.name, item.definition.name)[1]):
                     progress = job_desc.progress.get_progress() if job_desc.progress is not None else None
                 gt_gui.utils.draw_process_state(item.state[action], progress=progress)
             else:
