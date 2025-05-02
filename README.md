@@ -2,7 +2,7 @@
 [![PyPI Latest Release](https://img.shields.io/pypi/v/gazeMapper.svg)](https://pypi.org/project/gazeMapper/)
 [![image](https://img.shields.io/pypi/pyversions/gazeMapper.svg)](https://pypi.org/project/gazeMapper/)
 
-# gazeMapper v1.8.1
+# gazeMapper v1.8.2
 Tool for automated world-based analysis of wearable eye tracker data.
 gazeMapper is an open-source tool for automated mapping and processing of eye-tracking data to enable automated world-based analysis.
 gazeMapper can:
