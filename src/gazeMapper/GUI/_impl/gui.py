@@ -1610,7 +1610,7 @@ class GUI:
         if imgui.selectable(ifa6.ICON_FA_TRASH_CAN + " Delete session", False)[0]:
             for s in sess:
                 # if any import actions are happening, cancel those first
-                for r in (r for r in s.recordings if s.recordings[r].state[process.Action.IMPORT]):
+                for r in (r for r in s.recordings if s.name in actions_running and process.Action.IMPORT in actions_running[s.name] and r in actions_running[s.name][process.Action.IMPORT]):
                     self.job_scheduler.cancel_job(actions_running[s.name][process.Action.IMPORT][r])
                 callbacks.remove_folder(s.working_directory)
             changed = True
