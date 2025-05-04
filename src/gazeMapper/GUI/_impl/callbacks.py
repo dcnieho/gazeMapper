@@ -327,7 +327,7 @@ def new_session_button(g, notify_func: typing.Callable[[str], None]|None = None)
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
     new_sess_name = ''
     def _valid_sess_name():
-        return new_sess_name and pathvalidate.is_valid_filename(new_sess_name, "auto") and g.sessions.get(new_sess_name, None) is None
+        return new_sess_name and pathvalidate.is_valid_filename(new_sess_name, "auto") and new_sess_name!='config' and g.sessions.get(new_sess_name, None) is None
     def _add_sess_popup():
         nonlocal new_sess_name
         imgui.dummy((30*imgui.calc_text_size('x').x,0))
