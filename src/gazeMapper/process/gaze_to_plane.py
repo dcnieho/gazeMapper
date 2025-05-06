@@ -86,7 +86,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, s
     # prep progress indicator
     total = sum(len(head_gazes[f]) for p in poses for f in poses[p] if f in head_gazes)
     progress_indicator.set_total(total)
-    progress_indicator.set_intervals(int(total/200), int(total/200))
+    progress_indicator.set_intervals(step:=min(50,int(total/200)), step)
     # get camera calibration info
     camera_params = ocv.CameraParams.read_from_file(working_dir / gt_naming.scene_camera_calibration_fname)
 

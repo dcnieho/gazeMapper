@@ -297,9 +297,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
                 gui.set_button_props_for_action(video_player.Action.Quit, 'Stop', tooltip='Interrupt (cut short) the video generation')
 
         # prep progress indicator
-        total = videos_ts[lead_vid].get_last()[0]
-        progress_indicator.set_total(total)
-        progress_indicator.set_intervals(int(total/200), int(total/200))
+        progress_indicator.set_total(total:=videos_ts[lead_vid].get_last()[0])
+        progress_indicator.set_intervals(step:=min(20,int(total/200)), step)
 
         # open output video files
         for v in write_vids:

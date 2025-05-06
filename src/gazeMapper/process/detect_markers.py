@@ -109,9 +109,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
         aruco_manager.set_visualization_colors(**colors)
 
     # prep progress indicator
-    total = estimator.video_ts.get_last()[0]
-    progress_indicator.set_total(total)
-    progress_indicator.set_intervals(int(total/200), int(total/200))
+    progress_indicator.set_total(total:=estimator.video_ts.get_last()[0])
+    progress_indicator.set_intervals(step:=min(20,int(total/200)), step)
     estimator.set_progress_updater(progress_indicator.update)
 
     poses, individual_markers, sync_target_signal = estimator.process_video()
