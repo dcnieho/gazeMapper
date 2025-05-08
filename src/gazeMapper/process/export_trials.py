@@ -67,7 +67,7 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
         episodes = episodes[annotation.Event.Trial]
 
         # get all gaze data
-        plane_gazes = {p:pd.read_csv(working_dir / r / f'{naming.world_gaze_prefix}{p}.tsv',sep='\t', dtype=defaultdict(lambda: float, **gaze_worldref.Gaze._non_float)) for p in planes}
+        plane_gazes = {p:pd.read_csv(working_dir / r / f'{naming.world_gaze_prefix}{p}.tsv', sep='\t', dtype=defaultdict(lambda: float, **gaze_worldref.Gaze._non_float)) for p in planes}
 
         # throw away unwanted columns
         if not study_config.export_output3D:
