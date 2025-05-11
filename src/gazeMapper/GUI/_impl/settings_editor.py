@@ -491,6 +491,8 @@ def draw_value(field_lbl: str, val: _T, f_type: typing.Type, o_type_args: tuple[
                 val = typing.get_args(f_type)[0]
             elif base_type==typing.Union and f_type==typing.Union[str, pathlib.Path]:
                 val = ''
+            elif inspect.isclass(base_type) and issubclass(base_type, enum.Enum):
+                val = [x for x in base_type][0]
             else:
                 val = f_type()
         draw_value.should_edit_id = None
