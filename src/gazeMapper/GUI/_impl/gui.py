@@ -11,6 +11,7 @@ import threading
 import time
 import datetime
 import typing
+import pathvalidate
 
 import imgui_bundle
 from imgui_bundle import imgui, immapp, imgui_md, hello_imgui, glfw_utils, icons_fontawesome_6 as ifa6
@@ -1147,7 +1148,7 @@ class GUI:
             new_rec_type: session.RecordingType = None
             def _valid_rec_name():
                 nonlocal new_rec_name
-                return new_rec_name and not any((r.name==new_rec_name for r in self.study_config.session_def.recordings))
+                return new_rec_name and pathvalidate.is_valid_filename(new_rec_name, "auto") and not any((r.name==new_rec_name for r in self.study_config.session_def.recordings))
             def _add_rec_popup():
                 nonlocal new_rec_name
                 nonlocal new_rec_type
