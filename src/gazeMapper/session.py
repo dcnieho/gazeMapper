@@ -5,7 +5,7 @@ import shutil
 
 from glassesTools import camera_recording, importing, json, naming, process_pool, utils
 from glassesTools.recording import Recording as EyeTrackerRecording
-from glassesTools.camera_recording import Recording as CameraRecording
+from glassesTools.camera_recording import Recording as CameraRecording, Type as CameraRecordingType
 
 from . import process
 
@@ -20,9 +20,11 @@ recording_types = [r for r in RecordingType]
 class RecordingDefinition:
     cal_file_name = naming.scene_camera_calibration_fname
     @typeguard.typechecked
-    def __init__(self, name:str, type:RecordingType):
-        self.name = name
-        self.type = type
+    def __init__(self, name:str, type:RecordingType, camera_recording_type:CameraRecordingType|None, associated_recording:str|None):
+        self.name                 = name
+        self.type                 = type
+        self.camera_recording_type= camera_recording_type
+        self.associated_recording = associated_recording
 
     def set_default_cal_file(self, cal_path: str|pathlib.Path, rec_def_path: str|pathlib.Path):
         cal_path = pathlib.Path(cal_path)
@@ -39,7 +41,29 @@ class RecordingDefinition:
         cal_path = pathlib.Path(rec_def_path) / f'{self.name}_{RecordingDefinition.cal_file_name}'
         cal_path.unlink(missing_ok=True)
 
-json.register_type(json.TypeEntry(RecordingDefinition,'__session.RecordingDefinition__',lambda x: {'name': x.name, 'type': x.type}, lambda x: RecordingDefinition(name=x['name'], type=RecordingType(x['type']))))
+    @staticmethod
+    def from_dict(payload: dict[str]):
+        # roundtrip the enums
+        if 'type' in payload:
+            payload['type'] = RecordingType(payload['type'])
+        if 'camera_recording_type' in payload and payload['camera_recording_type'] is not None:
+            payload['camera_recording_type'] = CameraRecordingType(payload['camera_recording_type'])
+        # backwards compat
+        if 'camera_recording_type' not in payload:
+            payload['camera_recording_type'] = CameraRecordingType.External if payload['type']==RecordingType.Camera else None
+        if 'associated_recording' not in payload:
+            payload['associated_recording'] = None
+        return RecordingDefinition(**payload)
+
+    def to_dict(self) -> dict[str]:
+        out = {'name': self.name, 'type': self.type}
+        if self.camera_recording_type is not None:
+            out['camera_recording_type'] = self.camera_recording_type
+        if self.associated_recording is not None:
+            out['associated_recording'] = self.associated_recording
+        return out
+
+json.register_type(json.TypeEntry(RecordingDefinition,'__session.RecordingDefinition__',lambda x: x.to_dict(), RecordingDefinition.from_dict))
 
 
 class Recording:

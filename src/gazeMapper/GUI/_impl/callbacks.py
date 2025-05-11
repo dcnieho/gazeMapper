@@ -290,7 +290,7 @@ def glasses_validator_deploy_config(g, pl: plane.Definition_GlassesValidator):
 
 def make_recording_definition(study_config: config.Study, r_type: session.RecordingType, name: str):
     # append to defined recordings
-    study_config.session_def.recordings.append(session.RecordingDefinition(name,r_type))
+    study_config.session_def.recordings.append(session.RecordingDefinition(name,r_type, None, None))
     # store config
     path = config.guess_config_dir(study_config.working_directory)
     study_config.session_def.store_as_json(path)

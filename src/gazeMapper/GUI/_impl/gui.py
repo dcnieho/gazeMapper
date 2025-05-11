@@ -20,7 +20,7 @@ import OpenGL
 import OpenGL.GL as gl
 
 import glassesTools
-from glassesTools import annotation, aruco, gui as gt_gui, naming as gt_naming, marker as gt_marker, plane as gt_plane, platform as gt_platform, process_pool, utils as gt_utils
+from glassesTools import annotation, aruco, camera_recording, gui as gt_gui, naming as gt_naming, marker as gt_marker, plane as gt_plane, platform as gt_platform, process_pool, utils as gt_utils
 from glassesTools.gui import colors
 
 from ... import config, marker, plane, process, project_watcher, session, type_utils, utils as gm_utils, version
@@ -607,6 +607,7 @@ class GUI:
             'planes_per_episode': [_get_episodes_to_code_for_planes, _get_known_planes],
             'auto_code_sync_points': {'markers': _get_known_individual_markers},
             'auto_code_episodes': [_get_episodes_to_code_for_planes, {None: {'start_markers': _get_known_individual_markers, 'end_markers': _get_known_individual_markers}}],
+            'session_def_et_recordings': _get_known_recordings_only_eye_tracker
         }
 
         self._need_set_window_title = True
@@ -1107,27 +1108,61 @@ class GUI:
     def _session_definition_pane_drawer(self):
         if not self.study_config.session_def.recordings:
             imgui.text_colored(colors.error,'*At minimum one recording should be defined')
-        if 'session_def' in self._problems_cache:
-            imgui.text_colored(colors.error,f"*{self._problems_cache['session_def']}")
-        table_is_started = imgui.begin_table(f"##session_def_list", 3)
+        if 'session_def' in self._problems_cache and (not isinstance(self._problems_cache['session_def'],dict) or 'problem_with_this_key' in self._problems_cache['session_def']):
+            problem = self._problems_cache['session_def']['problem_with_this_key'] if isinstance(self._problems_cache['session_def'],dict) else self._problems_cache['session_def']
+            imgui.text_colored(colors.error,f"*{problem}")
+        have_camera_recordings = any((r.type==session.RecordingType.Camera for r in self.study_config.session_def.recordings))
+        table_is_started = imgui.begin_table(f"##session_def_list", 3+2*have_camera_recordings)
         if not table_is_started:
             return
         imgui.table_setup_column("Recording", imgui.TableColumnFlags_.width_fixed)
         imgui.table_setup_column("Type", imgui.TableColumnFlags_.width_fixed)
+        if have_camera_recordings:
+            imgui.table_setup_column("Camera type", imgui.TableColumnFlags_.width_fixed)
+            imgui.table_setup_column("Associated recording", imgui.TableColumnFlags_.width_fixed)
         imgui.table_setup_column("Camera calibration", imgui.TableColumnFlags_.width_stretch)
         imgui.table_headers_row()
         config_path = config.guess_config_dir(self.study_config.working_directory)
+        changed = False
         for r in self.study_config.session_def.recordings:
+            problem = None if 'session_def' not in self._problems_cache or not isinstance(self._problems_cache['session_def'],dict) else self._problems_cache['session_def'].get(r.name,None)
             imgui.table_next_row()
             imgui.table_next_column()
             if imgui.button(ifa6.ICON_FA_TRASH_CAN+f'##{r.name}'):
                 callbacks.delete_recording_definition(self.study_config, r)
                 self._reload_sessions()
             imgui.same_line()
+            if problem is not None:
+                imgui.push_style_color(imgui.Col_.text, colors.error)
             imgui.text(r.name)
+            if problem is not None:
+                gt_gui.utils.draw_hover_text(problem, '')
+                imgui.pop_style_color()
             imgui.table_next_column()
             imgui.align_text_to_frame_padding()
             imgui.text(r.type.value)
+            if have_camera_recordings:
+                imgui.table_next_column()
+                if r.type==session.RecordingType.Camera:
+                    new_val = settings_editor.draw_value(f'recording_type_{r.name}', r.camera_recording_type, camera_recording.Type, tuple(), False, None, None, False, {}, False, is_none=r.camera_recording_type==None)[0]
+                    if r.camera_recording_type!=new_val:
+                        r.camera_recording_type = new_val
+                        changed = True
+                    imgui.table_next_column()
+                    if r.camera_recording_type==camera_recording.Type.Head_attached or r.associated_recording is not None:
+                        new_val = settings_editor.draw_value(f'assoc_recording_{r.name}', r.associated_recording, typing.Literal[tuple(self._possible_value_getters['session_def_et_recordings']())], tuple(), True, None, None, False, {}, False, is_none=r.associated_recording==None, base_type=typing.Literal)[0]
+                        if r.associated_recording!=new_val:
+                            r.associated_recording = new_val
+                            changed = True
+                    else:
+                        imgui.align_text_to_frame_padding()
+                        imgui.text('-')
+                else:
+                    imgui.align_text_to_frame_padding()
+                    imgui.text('-')
+                    imgui.table_next_column()
+                    imgui.align_text_to_frame_padding()
+                    imgui.text('-')
             imgui.table_next_column()
             imgui.align_text_to_frame_padding()
             cal_path = r.get_default_cal_file(config_path)
@@ -1143,6 +1178,9 @@ class GUI:
             if imgui.button(ifa6.ICON_FA_DOWNLOAD+f' select calibration xml##cal_{r.name}'):
                 gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='set_default_cam_cal', rec_def=r, rec_def_path=config_path))
         imgui.end_table()
+        if changed:
+            self.study_config.store_as_json()
+            self._update_shown_actions_for_config()
         if imgui.button('+ new recording'):
             new_rec_name = ''
             new_rec_type: session.RecordingType = None

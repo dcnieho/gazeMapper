@@ -6,7 +6,7 @@ import typeguard
 import typing
 from typing import Any, Literal
 
-from glassesTools import annotation, aruco, gaze_worldref, json, marker as gt_marker, utils as gt_utils
+from glassesTools import annotation, aruco, camera_recording, gaze_worldref, json, marker as gt_marker, utils as gt_utils
 from glassesTools.validation import DataQualityType, get_DataQualityType_explanation
 
 from . import marker, plane, session, typed_dict_defaults, type_utils, utils
@@ -251,13 +251,42 @@ class Study:
         return any([r.name==rec for r in self.session_def.recordings])
 
     def _check_session_def(self, strict_check) -> type_utils.ProblemDict:
+        problems: type_utils.ProblemDict = {}
         # require at least one eye tracker recording
         if not any(r.type==session.RecordingType.Eye_Tracker for r in self.session_def.recordings):
             if strict_check:
                 raise ValueError('At least one recording should be an eye tracker recording')
             else:
-                return {'session_def': 'At least one recording should be an eye tracker recording'}
-        return {}
+                problems['session_def'] = 'At least one recording should be an eye tracker recording'
+        # additional checks for camera recordings
+        for r in self.session_def.recordings:
+            if r.type==session.RecordingType.Camera:
+                msg = None
+                if r.camera_recording_type is None:
+                    # for camera recordings, require that camera recording type is set
+                    msg = 'For a camera recording, the type of camera recording should be set'
+                elif r.camera_recording_type==camera_recording.Type.External:
+                    # for external camera recordings, associated recording should not be set
+                    if r.associated_recording is not None:
+                        msg = 'For an external camera recording, the associated recording field should not be set'
+                elif r.camera_recording_type==camera_recording.Type.Head_attached:
+                    # for head-attached camera recordings, require that the associated eye tracker recording is set,
+                    # that the defined recording exists, and that it is an eye tracker recording
+                    if r.associated_recording is None:
+                        msg = 'For a head-attached camera recording, the associated recording field should be set'
+                    elif not any(r2.name==r.associated_recording for r2 in self.session_def.recordings):
+                        msg = f'The defined associated recording, "{r.associated_recording}" is not known'
+                    elif not any(r2.name==r.associated_recording and r2.type==session.RecordingType.Eye_Tracker for r2 in self.session_def.recordings):
+                        msg = f'The defined associated recording, "{r.associated_recording}" should be an eye tracker recording, but it is not'
+                if msg is not None:
+                    if strict_check:
+                        raise ValueError(f'problem with set up of "{r.name}" recording in session_def: {msg}')
+                    else:
+                        type_utils.merge_problem_dicts(problems, {'session_def': {r.name: msg}})
+
+        # TODO: have setting to indicate what each head-attached camera is used for. If more than one head-attached camera for
+        # a given ET recording, check roles don't conflict (e.g. can't have more than one set to replace scene camera)
+        return problems
 
     def _check_planes_per_episode(self, strict_check) -> type_utils.ProblemDict:
         problems: type_utils.ProblemDict = {}
