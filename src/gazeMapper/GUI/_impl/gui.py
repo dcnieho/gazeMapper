@@ -579,17 +579,21 @@ class GUI:
         self._config_watcher_stop_event = asyncio.Event()
         self._config_watcher = async_thread.run(project_watcher.watch_and_report_changes(config_dir, self._config_change_callback, self._config_watcher_stop_event, watch_filter=project_watcher.ChangeFilter(('.json','.csv','.txt'), do_report_directories=True, do_report_files=True)))
 
-        def _get_known_recordings(filter_ref=False, dev_types:list[session.RecordingType]|None=None) -> list[str]:
+        def _get_known_recordings(filter_ref=False, dev_types:list[session.RecordingType]|None=None, dev_sub_types:list[camera_recording.Type]|None=None) -> list[str]:
             recs = [r.name for r in self.study_config.session_def.recordings]
             if filter_ref and self.study_config.sync_ref_recording:
                 recs = [r for r in recs if r!=self.study_config.sync_ref_recording]
             if dev_types:
                 recs = [r for r in recs if self.study_config.session_def.get_recording_def(r).type in dev_types]
+                if dev_sub_types:
+                    recs = [r for r in recs if self.study_config.session_def.get_recording_def(r).camera_recording_type in dev_sub_types]
             return sorted(recs)
         def _get_known_recordings_no_ref() -> list[str]:
             return _get_known_recordings(filter_ref=True)
         def _get_known_recordings_only_eye_tracker() -> list[str]:
             return _get_known_recordings(dev_types=[session.RecordingType.Eye_Tracker])
+        def _get_known_recordings_only_camera_head_attached() -> list[str]:
+            return _get_known_recordings(dev_types=[session.RecordingType.Camera], dev_sub_types=[camera_recording.Type.Head_attached])
         def _get_known_individual_markers() -> list[gt_marker.MarkerID]:
             return sorted([gt_marker.MarkerID(m.id, m.aruco_dict_id) for m in self.study_config.individual_markers])
         def _get_known_planes() -> list[str]:
@@ -607,6 +611,7 @@ class GUI:
             'planes_per_episode': [_get_episodes_to_code_for_planes, _get_known_planes],
             'auto_code_sync_points': {'markers': _get_known_individual_markers},
             'auto_code_episodes': [_get_episodes_to_code_for_planes, {None: {'start_markers': _get_known_individual_markers, 'end_markers': _get_known_individual_markers}}],
+            'head_attached_recordings_replace_et_scene': _get_known_recordings_only_camera_head_attached,
             'session_def_et_recordings': _get_known_recordings_only_eye_tracker
         }
 

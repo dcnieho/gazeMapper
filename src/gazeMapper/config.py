@@ -70,6 +70,8 @@ class Study:
                  import_source_dir_as_relative_path             : bool                              = False,
                  import_known_custom_eye_trackers               : list[str]|None                    = None,
 
+                 head_attached_recordings_replace_et_scene      : set[str]|None                     = None,
+
                  overlay_video_gaze_vid_pos_color               : RgbColor                          = RgbColor(  0,255,  0),
                  overlay_video_gaze_world_pos_color             : RgbColor|None                     = RgbColor(255,  0,255),
                  overlay_video_gaze_vid_pos_radius              : int                               = 8,
@@ -147,6 +149,8 @@ class Study:
         self.import_source_dir_as_relative_path             = import_source_dir_as_relative_path
         self.import_known_custom_eye_trackers               = import_known_custom_eye_trackers
 
+        self.head_attached_recordings_replace_et_scene      = head_attached_recordings_replace_et_scene
+
         self.overlay_video_gaze_vid_pos_color               = overlay_video_gaze_vid_pos_color
         self.overlay_video_gaze_world_pos_color             = overlay_video_gaze_world_pos_color
         self.overlay_video_gaze_vid_pos_radius              = overlay_video_gaze_vid_pos_radius
@@ -214,6 +218,7 @@ class Study:
             self._check_planes_per_episode(strict_check)
             self._check_episodes_to_code(strict_check)
             self._check_individual_markers(strict_check)
+            self._check_head_attached_recordings(strict_check)
             self._check_sync_ref(strict_check)
             self._check_et_sync_method(strict_check)
             self._check_auto_coding_setup(strict_check)
@@ -283,9 +288,6 @@ class Study:
                         raise ValueError(f'problem with set up of "{r.name}" recording in session_def: {msg}')
                     else:
                         type_utils.merge_problem_dicts(problems, {'session_def': {r.name: msg}})
-
-        # TODO: have setting to indicate what each head-attached camera is used for. If more than one head-attached camera for
-        # a given ET recording, check roles don't conflict (e.g. can't have more than one set to replace scene camera)
         return problems
 
     def _check_planes_per_episode(self, strict_check) -> type_utils.ProblemDict:
@@ -500,6 +502,34 @@ class Study:
                     problems = type_utils.merge_problem_dicts(problems, {'individual_markers': {(m.id, aruco.dict_id_to_family[m.aruco_dict_id]): problem}})
         return problems
 
+    def _check_head_attached_recordings(self, strict_check):
+        problems: type_utils.ProblemDict = {}
+        if self.head_attached_recordings_replace_et_scene:
+            # check listed recordings exist
+            type_utils.merge_problem_dicts(problems, self._check_recordings(self.head_attached_recordings_replace_et_scene, 'head_attached_recordings_replace_et_scene', strict_check))
+            # check listed recordings are head-attached camera recordings
+            wrong = [r for r in self.head_attached_recordings_replace_et_scene for r2 in self.session_def.recordings if r2.name==r and (r2.type!=session.RecordingType.Camera or r2.camera_recording_type!=camera_recording.Type.Head_attached)]
+            if wrong:
+                msg = 'the following recordings are not head-attached camera recordings:\n- ' + ('\n- '.join(wrong))
+                if strict_check:
+                    raise ValueError(msg)
+                else:
+                    problems = type_utils.merge_problem_dicts(problems, {'head_attached_recordings_replace_et_scene': msg})
+            # check that there is not more than one head-attached recording overriding a given ET recording
+            overridden = [(r, r2.associated_recording) for r in self.head_attached_recordings_replace_et_scene for r2 in self.session_def.recordings if r2.name==r]
+            # get duplicates
+            seen: set[str] = set()
+            if (duplicates := {x[1] for x in overridden if x[1] in seen or seen.add(x[1])}):
+                for d in duplicates:
+                    recs = [r[0] for r in overridden if r[1]==d]
+                    msg = 'the recordings:\n- ' + ('\n- '.join(recs)) + f'\nare all listed as overriding the scene camera of the {d} recording. That is not possible, only a single override is allowed per eye tracker recording'
+                    if strict_check:
+                        raise ValueError(msg)
+                    else:
+                        problems = type_utils.merge_problem_dicts(problems, {'head_attached_recordings_replace_et_scene': msg})
+
+        return problems
+
     def _check_sync_ref(self, strict_check):
         problems: type_utils.ProblemDict = {}
         if self.sync_ref_recording is None:
@@ -611,6 +641,7 @@ class Study:
         type_utils.merge_problem_dicts(problems, self._check_episodes_to_code(False))
         type_utils.merge_problem_dicts(problems, self._check_auto_coding_setup(False))
         type_utils.merge_problem_dicts(problems, self._check_individual_markers(False))
+        type_utils.merge_problem_dicts(problems, self._check_head_attached_recordings(False))
         type_utils.merge_problem_dicts(problems, self._check_sync_ref(False))
         type_utils.merge_problem_dicts(problems, self._check_et_sync_method(False))
         type_utils.merge_problem_dicts(problems, self._check_make_video(False))
@@ -804,6 +835,7 @@ study_parameter_doc = {
     'import_do_copy_video': type_utils.GUIDocInfo('Copy video during import?', 'If not enabled, the scene video of an eye tracker recording, or the video of an external camera is not copied to the gazeMapper recording directory during import. Instead, the video will be loaded from the recording\'s source directory (so do not move it). Ignored when the video must be transcoded to be processed with gazeMapper.'),
     'import_source_dir_as_relative_path': type_utils.GUIDocInfo('Store source directory as relative path?', 'Specifies whether the path to the source directory stored in the recording info file is an absolute path (this option is not enabled) or a relative path (enabled). If a relative path is used, the imported recording and the source directory can be moved to another location, and the source directory can still be found as long as the relative path (e.g., one folder up and in the directory "original recordings": "../original recordings") doesn\'t change.'),
     'import_known_custom_eye_trackers': type_utils.GUIDocInfo('Registered custom eye trackers', 'gazeMapper allows importing generic eye trackers for which no specific support is implemented, if their recording data is preprocessed to conform to glassesTools\' generic data format. Here you can define specific known generic eye tracker names that you may import.'),
+    'head_attached_recordings_replace_et_scene': type_utils.GUIDocInfo('Head-attached recording: override scene camera', 'gazeMapper allows using recordings from a head-attached camera to replace pose determination done from the scene camera image. It might make sense to enable this when the image quality of the scene camera is not good enough. Requires instrinsics of the head-attached camera to be known and extrinsics (transformation from scene camera to head-attached camera) to be known.'),
     'overlay_video_gaze_vid_pos_color': type_utils.GUIDocInfo('Gaze overlay video: Color for gaze position on video', 'Color used for drawing the recorded gaze position on the scene video.'),
     'overlay_video_gaze_world_pos_color': type_utils.GUIDocInfo('Gaze overlay video: Color for 3D gaze position', 'Color used for drawing the recorded 3D gaze position in the world. Not drawn if value is not set.'),
     'overlay_video_gaze_vid_pos_radius': type_utils.GUIDocInfo('Gaze overlay video: Radius for gaze position on video', 'Radius of circle used for drawing the recorded gaze position on the scene video.'),
