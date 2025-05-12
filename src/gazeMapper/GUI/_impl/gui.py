@@ -20,7 +20,7 @@ import OpenGL
 import OpenGL.GL as gl
 
 import glassesTools
-from glassesTools import annotation, aruco, camera_recording, gui as gt_gui, naming as gt_naming, marker as gt_marker, plane as gt_plane, platform as gt_platform, process_pool, utils as gt_utils
+from glassesTools import annotation, aruco, camera_recording, gui as gt_gui, naming as gt_naming, marker as gt_marker, ocv, plane as gt_plane, platform as gt_platform, process_pool, utils as gt_utils
 from glassesTools.gui import colors
 
 from ... import config, marker, plane, process, project_watcher, session, type_utils, utils as gm_utils, version
@@ -37,10 +37,11 @@ class GUI:
         self.running     = False
         settings_editor.set_gui_instance(self)
 
-        self.project_dir    : pathlib.Path                  = None
-        self.study_config   : config.Study                  = None
-        self.plane_configs  : dict[str,gt_plane.Plane|None] = {}  # None is plane config has errors
-        self._dict_type_rec : dict[str, typing.Type]|None   = None
+        self.project_dir      : pathlib.Path                            = None
+        self.study_config     : config.Study                            = None
+        self.plane_configs    : dict[str,gt_plane.Plane|Exception|None] = {}
+        self.cam_calibrations : dict[str,ocv.CameraParams|Exception]    = {}
+        self._dict_type_rec   : dict[str, typing.Type]|None             = None
 
         self.sessions                   : dict[str, session.Session]        = {}
         self.session_config_overrides   : dict[str, config.StudyOverride]   = {}
@@ -319,20 +320,35 @@ class GUI:
         # (get ignored) but this is pretty quick, so not worth the additional complexity
         config_dir = config.guess_config_dir(change_path.parent)
         if change_path.parent==config_dir:
-            # we're dealing with a change in the main config json files
-            if change_path.suffix != '.json':
-                # irrelevant
-                return
-            # reload config
-            try:
-                self.study_config = config.Study.load_from_json(config_dir, strict_check=False)
-            except Exception as exc:
-                gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Project reloading error", f"The project's settings were changed, but failed to reload:\n{exc}", gt_gui.msg_box.MsgBox.error, more=gt_gui.utils.get_traceback(type(exc), exc, exc.__traceback__))
+            # we're dealing with a change in the main config folder
+            # check if its in the json files or default calibration xml files
+            if change_path.suffix == '.json':
+                # reload config
+                try:
+                    self.study_config = config.Study.load_from_json(config_dir, strict_check=False)
+                except Exception as exc:
+                    gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Project reloading error", f"The project's settings were changed, but failed to reload:\n{exc}", gt_gui.msg_box.MsgBox.error, more=gt_gui.utils.get_traceback(type(exc), exc, exc.__traceback__))
+            elif change_path.suffix == '.xml':
+                # figure out which recording it is for
+                rec_name = change_path.name.removesuffix(f'_{session.RecordingDefinition.cal_file_name}')
+                rec_defs = [r for r in self.study_config.session_def.recordings if r.name==rec_name]
+                if not rec_defs:
+                    return
+                rec_def = rec_defs[0]
+                # apply change
+                if change_type=='deleted':
+                    self._remove_calibration(rec_def)
+                else:
+                    self._load_calibration(rec_def)
+            else:
+                # anything else is irrelevant
+                pass
+            return
         elif change_path.parent.parent!=config_dir:
             # we're also not dealing with a plane directory, skip
             return
 
-        # we're dealing with a plane directory
+        # if we got here, we're dealing with a plane directory
         plane_name = change_path.parent.name
         if change_type=='deleted':
             if change_path.name==plane.Definition.default_json_file_name:
@@ -568,6 +584,7 @@ class GUI:
             self.study_config = config.Study.load_from_json(config_dir, strict_check=False)
             self._reload_sessions()
             self._reload_planes()
+            self._reload_calibrations()
             self.process_pool.set_num_workers(self.study_config.gui_num_workers)
         except Exception as exc:
             gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Project loading error", f"Failed to load the project at {self.project_dir}:\n{exc}", gt_gui.msg_box.MsgBox.error, more=gt_gui.utils.get_traceback(type(exc), exc, exc.__traceback__))
@@ -577,7 +594,7 @@ class GUI:
         self._session_watcher_stop_event = asyncio.Event()
         self._session_watcher = async_thread.run(project_watcher.watch_and_report_changes(self.project_dir, self._session_change_callback, self._session_watcher_stop_event, watch_filter=project_watcher.ChangeFilter(('.gazeMapper',), True, {config_dir}, True)))
         self._config_watcher_stop_event = asyncio.Event()
-        self._config_watcher = async_thread.run(project_watcher.watch_and_report_changes(config_dir, self._config_change_callback, self._config_watcher_stop_event, watch_filter=project_watcher.ChangeFilter(('.json','.csv','.txt'), do_report_directories=True, do_report_files=True)))
+        self._config_watcher = async_thread.run(project_watcher.watch_and_report_changes(config_dir, self._config_change_callback, self._config_watcher_stop_event, watch_filter=project_watcher.ChangeFilter(('.json','.csv','.txt','.xml'), do_report_directories=True, do_report_files=True)))
 
         def _get_known_recordings(filter_ref=False, dev_types:list[session.RecordingType]|None=None, dev_sub_types:list[camera_recording.Type]|None=None) -> list[str]:
             recs = [r.name for r in self.study_config.session_def.recordings]
@@ -638,7 +655,6 @@ class GUI:
         self._plane_preview_cache.clear()
         for p_def in self.study_config.planes:
             self._load_plane(p_def)
-
     def _load_plane(self, p_def: plane.Definition, defer_image_upload=False):
         config_dir = config.guess_config_dir(self.study_config.working_directory)
         if not p_def.has_complete_setup():
@@ -663,6 +679,22 @@ class GUI:
         self.plane_configs.pop(p_def.name, None)
         self._plane_preview_cache.pop(p_def.name, None)
 
+    def _reload_calibrations(self):
+        self.cam_calibrations.clear()
+        for r in self.study_config.session_def.recordings:
+            self._load_calibration(r)
+    def _load_calibration(self, r_def: session.RecordingDefinition):
+        cal_path = r_def.get_default_cal_file(config.guess_config_dir(self.study_config.working_directory))
+        if not cal_path:
+            return
+
+        try:
+            self.cam_calibrations[r_def.name] = ocv.CameraParams.read_from_file(cal_path)
+        except Exception as exc:
+            self.cam_calibrations[r_def.name] = exc
+    def _remove_calibration(self, r_def: session.RecordingDefinition):
+        self.cam_calibrations.pop(r_def.name, None)
+
     def _check_project_setup_state(self):
         if self.study_config is not None:
             self._problems_cache = self.study_config.field_problems()
@@ -674,7 +706,7 @@ class GUI:
         #   3. one episode to code
         #   4. one plane linked to one episode
         #   5. no individual marker problems
-        self.need_setup_recordings = not self.study_config or not self.study_config.session_def.recordings or 'session_def' in self._problems_cache
+        self.need_setup_recordings = not self.study_config or not self.study_config.session_def.recordings or 'session_def' in self._problems_cache or any((r.name in self.cam_calibrations and isinstance(self.cam_calibrations[r.name],Exception) for r in self.study_config.session_def.recordings))
         has_any_plane_setup = not not self.study_config and not not self.study_config.planes
         has_any_episode_setup = not not self.study_config and (not not self.study_config.episodes_to_code or not not self.study_config.planes_per_episode)
         has_any_indiv_marker_setup = not not self.study_config and not not self.study_config.individual_markers
@@ -1131,6 +1163,12 @@ class GUI:
         changed = False
         for r in self.study_config.session_def.recordings:
             problem = None if 'session_def' not in self._problems_cache or not isinstance(self._problems_cache['session_def'],dict) else self._problems_cache['session_def'].get(r.name,None)
+            if has_cal_error := r.name in self.cam_calibrations and isinstance(self.cam_calibrations[r.name],Exception):
+                msg = 'There is a problem with the configured calibration'
+                if not problem:
+                    problem = msg
+                else:
+                    problem += '\n'+msg
             imgui.table_next_row()
             imgui.table_next_column()
             if imgui.button(ifa6.ICON_FA_TRASH_CAN+f'##{r.name}'):
@@ -1170,14 +1208,20 @@ class GUI:
                     imgui.text('-')
             imgui.table_next_column()
             imgui.align_text_to_frame_padding()
-            cal_path = r.get_default_cal_file(config_path)
-            if cal_path is None:
+            if r.name not in self.cam_calibrations:
                 imgui.text('Default camera calibration not set')
-                gt_gui.utils.draw_hover_text('This is not a problem for most eye trackers, as the recording contains the camera calibration', '')
+                if r.type==session.RecordingType.Eye_Tracker:
+                    gt_gui.utils.draw_hover_text('This is not a problem for most eye trackers, as the recording contains the camera calibration', '')
             else:
-                imgui.text('Default camera calibration set')
+                if has_cal_error:
+                    imgui.push_style_color(imgui.Col_.text, colors.error)
+                    imgui.text('Error loading provided camera calibration')
+                    gt_gui.utils.draw_hover_text(str(self.cam_calibrations[r.name]), '')
+                    imgui.pop_style_color()
+                else:
+                    imgui.text('Camera calibration set')
                 imgui.same_line()
-                if imgui.button(ifa6.ICON_FA_TRASH_CAN+f' delete default calibration##{r.name}'):
+                if imgui.button(ifa6.ICON_FA_TRASH_CAN+f' delete calibration##{r.name}'):
                     r.remove_default_cal_file(config_path)
             imgui.same_line()
             if imgui.button(ifa6.ICON_FA_DOWNLOAD+f' select calibration xml##cal_{r.name}'):

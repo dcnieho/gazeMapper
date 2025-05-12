@@ -33,7 +33,7 @@ def get_folder_picker(g, reason: str, *args, **kwargs):
             case 'add_cam_recordings':
                 camera_show_glob_filter_config(g, selected, *args, **kwargs)
             case 'set_default_cam_cal':
-                set_default_cam_cal(selected[0], *args, **kwargs)
+                set_default_cam_cal(g, selected[0], *args, **kwargs)
             case 'set_cam_cal':
                 set_cam_cal(selected[0], *args, **kwargs)
             case 'deploy_aruco':
@@ -208,8 +208,11 @@ def set_auto_coding_for_dynamic_validation_plane(g, p_def: plane.Definition_Glas
         msg += '\nDo you want to apply this configuration?'
     gt_gui.utils.push_popup(g, gt_gui.msg_box.msgbox, ("Overwrite" if exists else "Apply")+f" automated {annotation.tooltip_map[annotation.Event.Validate]} coding config?", msg, gt_gui.msg_box.MsgBox.question, buttons)
 
-def set_default_cam_cal(cal_path: str|pathlib.Path, rec_def: session.RecordingDefinition, rec_def_path: pathlib.Path):
+def set_default_cam_cal(g, cal_path: str|pathlib.Path, rec_def: session.RecordingDefinition, rec_def_path: pathlib.Path):
+    from . import gui
+    g = typing.cast(gui.GUI,g)  # indicate type to typechecker
     rec_def.set_default_cal_file(cal_path, rec_def_path)
+    g._load_calibration(rec_def)
 
 def set_cam_cal(cal_path: str|pathlib.Path, working_directory: str|pathlib.Path):
     cal_path = pathlib.Path(cal_path)
