@@ -510,8 +510,8 @@ class Study:
         elif len(self.session_def.recordings)==1:
             return {'sync_ref_recording': f'sync_ref_recording must not be set when sessions consist of only one recording'}
 
-        type_utils.merge_problem_dicts(problems, self._check_recordings([self.sync_ref_recording], 'sync_ref_recording', False))
-        type_utils.merge_problem_dicts(problems, self._check_recordings(self.sync_ref_average_recordings, 'sync_average_recordings', False))
+        type_utils.merge_problem_dicts(problems, self._check_recordings([self.sync_ref_recording], 'sync_ref_recording', strict_check))
+        type_utils.merge_problem_dicts(problems, self._check_recordings(self.sync_ref_average_recordings, 'sync_average_recordings', strict_check))
         if self.sync_ref_do_time_stretch is None:
             if strict_check:
                 raise ValueError(f'sync_ref_do_time_stretch should be set in the study setup when sync_ref_recording is set')
