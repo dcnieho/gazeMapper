@@ -699,6 +699,7 @@ class GUI:
         if self.study_config is not None:
             self._problems_cache = self.study_config.field_problems()
             self._check_markers()
+            self._check_camera_calibrations()
         # need to have:
         #   1. at least one recording defined in the session
         # if you want to do more than only export gaze overlay videos, you also need to:
@@ -782,6 +783,15 @@ class GUI:
                                     if sx!='xx_individual_markers_xx':
                                         type_utils.merge_problem_dicts(self._problems_cache, {'planes': {sx: {'marker_file' if mx=='plane' else 'target_file': msg}}})
                 seen_markers.update(used_markers[s][m])
+
+    def _check_camera_calibrations(self):
+        for r in self.study_config.session_def.recordings:
+            if not r.name in self.cam_calibrations or not isinstance(self.cam_calibrations[r.name],ocv.CameraParams):
+                continue
+            if not self.cam_calibrations[r.name].has_intrinsics():
+                type_utils.merge_problem_dicts(self._problems_cache, {'session_def': {r.name: f'The provided calibration file does not include camera intrinsics, not usable'}})
+            if self.study_config.head_attached_recordings_replace_et_scene is not None and r.name in self.study_config.head_attached_recordings_replace_et_scene and not self.cam_calibrations[r.name].has_extrinsics():
+                type_utils.merge_problem_dicts(self._problems_cache, {'session_def': {r.name: f'The provided calibration file does not include camera extrinsics (transformation between this head-attached camera and the scene camera of the associated eye tracker recording), but these are required because the recording is configured to replace the eye tracker recording\'s scene camera (see the head_attached_recordings_replace_et_scene setting)'}})
 
     def _session_lister_set_actions_to_show(self, lister: session_lister.List):
         if self.study_config is None:
