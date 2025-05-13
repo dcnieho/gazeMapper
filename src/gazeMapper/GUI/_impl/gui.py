@@ -754,9 +754,9 @@ class GUI:
                         msg = f'The set of {m} markers of the {s} "plane" contains'
                     msg = f'{msg} duplicates: {gm_utils.format_duplicate_markers_msg(duplicates)}. Markers should be unique, fix this duplication.'
                     if s=='xx_individual_markers_xx':
-                        self._problems_cache = type_utils.merge_problem_dicts(self._problems_cache, {'individual_markers': {d: msg for d in duplicates}})
+                        type_utils.merge_problem_dicts(self._problems_cache, {'individual_markers': {d: msg for d in duplicates}})
                     else:
-                        self._problems_cache = type_utils.merge_problem_dicts(self._problems_cache, {'planes': {s: {'marker_file' if m=='plane' else 'target_file': msg}}})
+                        type_utils.merge_problem_dicts(self._problems_cache, {'planes': {s: {'marker_file' if m=='plane' else 'target_file': msg}}})
                 # check no collisions
                 if seen_markers.intersection(used_markers[s][m]):
                     # markers not unique, make error. Find exactly where the overlap is
@@ -777,10 +777,10 @@ class GUI:
                                 msg = f'The following markers are encountered in the setup both as {mark_msgs[0]} and as {mark_msgs[1]}: {gm_utils.format_duplicate_markers_msg(overlap)}. Markers must be unique, fix this collision.'
                                 # add error message to problem dict
                                 if 'xx_individual_markers_xx' in (s,s2):
-                                    self._problems_cache = type_utils.merge_problem_dicts(self._problems_cache, {'individual_markers': {d: msg for d in overlap if d in used_markers['xx_individual_markers_xx']['markers']}})
+                                    type_utils.merge_problem_dicts(self._problems_cache, {'individual_markers': {d: msg for d in overlap if d in used_markers['xx_individual_markers_xx']['markers']}})
                                 for sx,mx in zip((s,s2),(m,m2)):
                                     if sx!='xx_individual_markers_xx':
-                                        self._problems_cache = type_utils.merge_problem_dicts(self._problems_cache, {'planes': {sx: {'marker_file' if mx=='plane' else 'target_file': msg}}})
+                                        type_utils.merge_problem_dicts(self._problems_cache, {'planes': {sx: {'marker_file' if mx=='plane' else 'target_file': msg}}})
                 seen_markers.update(used_markers[s][m])
 
     def _session_lister_set_actions_to_show(self, lister: session_lister.List):
