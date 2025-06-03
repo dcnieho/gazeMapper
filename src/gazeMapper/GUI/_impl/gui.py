@@ -1346,9 +1346,10 @@ class GUI:
                 if imgui.button(ifa6.ICON_FA_TRASH_CAN+' delete plane'):
                     self._remove_plane(p)
                 imgui.tree_pop()
-            elif has_error:
-                imgui.pop_style_color()
-            _hover_img_error_popup(p, load_error)
+            else:
+                if has_error:
+                    imgui.pop_style_color()
+                _hover_img_error_popup(p, load_error)
         if imgui.button('+ new plane'):
             new_plane_name = ''
             new_plane_type: plane.Type = None
