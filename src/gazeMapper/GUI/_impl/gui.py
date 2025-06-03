@@ -1035,7 +1035,7 @@ class GUI:
 
         # rest of settings handled here in a settings tree
         if any((k not in ['session_def', 'planes', 'episodes_to_code', 'planes_per_episode', 'individual_markers'] for k in self._problems_cache)):
-            imgui.text_colored(colors.error,'*There are problems in the below setup that need to be resolved')
+            imgui.text_colored(colors.error,'*There are problems in the below setup that need to be resolved.\nHover over red text to get information about the error')
 
         fields = [k for k in config.study_parameter_types.keys() if k in config.study_defaults]
         changed, new_config, self._dict_type_rec = settings_editor.draw(copy.deepcopy(self.study_config), fields, config.study_parameter_types, config.study_defaults, self._possible_value_getters, None, self._dict_type_rec, self._problems_cache, config.study_parameter_doc)
@@ -1292,6 +1292,8 @@ class GUI:
     def _plane_editor_pane_drawer(self):
         if not self.study_config.planes:
             imgui.text_colored(colors.error,'*At minimum one plane should be defined')
+        if any((x in self._problems_cache for x in ['planes'])):
+            imgui.text_colored(colors.error,'*There are problems in the below setup that need to be resolved.\nHover over red text to get information about the error')
         def _hover_img_error_popup(p_def: plane.Definition, load_error: Exception):
             if imgui.is_item_hovered(imgui.HoveredFlags_.for_tooltip|imgui.HoveredFlags_.delay_normal):
                 imgui.begin_tooltip()
@@ -1448,7 +1450,7 @@ class GUI:
             imgui.same_line()
             imgui.text_colored(colors.error,'to set this up.')
         if any((x in self._problems_cache for x in ['episodes_to_code', 'planes_per_episode'])):
-            imgui.text_colored(colors.error,'*There are problems in the below setup that need to be resolved')
+            imgui.text_colored(colors.error,'*There are problems in the below setup that need to be resolved.\nHover over red text to get information about the error')
 
         # episodes to be coded
         changed, new_config, _ = settings_editor.draw(copy.deepcopy(self.study_config), ['episodes_to_code', 'planes_per_episode'], config.study_parameter_types, {}, self._possible_value_getters, None, None, self._problems_cache, config.study_parameter_doc)
@@ -1465,6 +1467,8 @@ class GUI:
                 self._update_shown_actions_for_config()
 
     def _individual_marker_setup_pane_drawer(self):
+        if any((x in self._problems_cache for x in ['individual_markers'])):
+            imgui.text_colored(colors.error,'*There are problems in the below setup that need to be resolved.\nHover over red text to get information about the error')
         table_is_started = imgui.begin_table(f"##markers_def_list", 5)
         if not table_is_started:
             return
