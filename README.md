@@ -533,6 +533,7 @@ downward, which means that (-,-) coordinates are to the left and above of the pl
 ## Eye trackers
 gazeMapper supports the following eye trackers:
 - AdHawk MindLink
+- Argus Science ETVision
 - Generic*
 - Meta Project Aria Generation 1
 - Pupil Core
