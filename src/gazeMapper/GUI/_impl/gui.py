@@ -326,6 +326,8 @@ class GUI:
                 # reload config
                 try:
                     self.study_config = config.Study.load_from_json(config_dir, strict_check=False)
+                    self._update_shown_actions_for_config()
+                    self._session_lister_set_extra_columns_to_show()
                 except Exception as exc:
                     gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Project reloading error", f"The project's settings were changed, but failed to reload:\n{exc}", gt_gui.msg_box.MsgBox.error, more=gt_gui.utils.get_traceback(type(exc), exc, exc.__traceback__))
             elif change_path.suffix == '.xml':
@@ -648,7 +650,7 @@ class GUI:
             self._selected_sessions.clear()
             self._selected_sessions |= {k:(selected[k] if k in selected else False) for k in self.sessions}
         self._update_shown_actions_for_config()
-        self._session_lister_set_extra_columns_to_show()    # only place we have to add this. Adding or deleting a session def from the study config triggers this function
+        self._session_lister_set_extra_columns_to_show()    # only place we have to add this. Adding or deleting a session def from the study config triggers the current function
 
     def _reload_planes(self):
         self.plane_configs.clear()
