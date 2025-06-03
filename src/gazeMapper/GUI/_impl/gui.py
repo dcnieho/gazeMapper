@@ -2006,10 +2006,8 @@ class GUI:
             if imgui.button("PyPI", size=(btn_tot_width/6, 0)):
                 webbrowser.open("https://pypi.org/project/gazeMapper/")
             imgui.same_line()
-            imgui.begin_disabled()
             if imgui.button("Paper", size=(btn_tot_width/6, 0)):
-                webbrowser.open("https://doi.org/10.3758/xxx")
-            imgui.end_disabled()
+                webbrowser.open("https://doi.org/10.3758/s13428-025-02704-4")
             imgui.same_line()
             if imgui.button("GitHub repo", size=(btn_tot_width/3, 0)):
                 webbrowser.open("https://github.com/dcnieho/gazeMapper")
@@ -2035,18 +2033,18 @@ class GUI:
             imgui.text("Reference")
             imgui.pop_font()
             imgui.spacing()
-            reference         = r"Niehorster, D.C., Hessels, R.S., Nyström, M., Benjamins, J.S. & Hooge, I.T.C. (submitted). gazeMapper: A tool for automated world-based analysis of gaze data from one or multiple wearable eye trackers. Manuscript submitted for publication, 2024"
+            reference         = r"Niehorster, D.C., Hessels, R.S., Nyström, M., Benjamins, J.S. & Hooge, I.T.C. (2025). gazeMapper: A tool for automated world-based analysis of gaze data from one or multiple wearable eye trackers. Behavior Research Methods. doi: 10.3758/s13428-025-02704-4"
             reference_bibtex  = r"""@article{niehorster2025gazeMapper,
     Author = {Niehorster, Diederick C. and
               Hessels, Roy S. and
               Nystr{\"o}m, Marcus and
               Benjamins, Jeroen S. and
               Hooge, Ignace T. C.},
-    Journal = {},
+    Journal = {Behavior Research Methods},
     Number = {},
     Title = {{gazeMapper}: A tool for automated world-based analysis of gaze data from one or multiple wearable eye trackers},
-    Year = {},
-    note = {Manuscript submitted for publication, 2024}
+    Year = {2025},
+    doi = {10.3758/s13428-025-02704-4}
 }
 """
             imgui.text(reference)

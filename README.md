@@ -1,6 +1,7 @@
 [![Downloads](https://static.pepy.tech/badge/gazeMapper)](https://pepy.tech/project/gazeMapper)
 [![PyPI Latest Release](https://img.shields.io/pypi/v/gazeMapper.svg)](https://pypi.org/project/gazeMapper/)
 [![image](https://img.shields.io/pypi/pyversions/gazeMapper.svg)](https://pypi.org/project/gazeMapper/)
+[![DOI](https://zenodo.org/badge/DOI/10.3758/s13428-025-02704-4.svg)](https://doi.org/10.3758/s13428-025-02704-4)
 
 # gazeMapper v1.8.3
 Tool for automated world-based analysis of wearable eye tracker data.
@@ -11,10 +12,9 @@ gazeMapper can:
 3) Determine data quality measures, e.g., accuracy and precision using [glassesValidator](https://github.com/dcnieho/glassesValidator) ([Niehorster et al., 2023](https://doi.org/10.3758/s13428-023-02105-5)).
 
 If you use this tool or any of the code in this repository, please cite:<br>
-Niehorster, D.C., Hessels, R.S., Nyström, M., Benjamins, J.S. and Hooge, I.T.C. (submitted). gazeMapper: A tool for automated world-based analysis of gaze data from one or multiple wearable eye trackers. Manuscript submitted for publication, 2025 ([BibTeX](#bibtex))<br>
+[Niehorster, D.C., Hessels, R.S., Nyström, M., Benjamins, J.S. and Hooge, I.T.C. (2025). gazeMapper: A tool for automated world-based analysis of gaze data from one or multiple wearable eye trackers. Behavior Research Methods. doi: 10.3758/s13428-025-02704-4](https://doi.org/10.3758/s13428-025-02704-4) ([BibTeX](#bibtex))<br>
 If you use the functionality for automatic determining the data quality (accuracy and precision) of wearable eye tracker recordings, please additionally cite:<br>
-[Niehorster, D.C., Hessels, R.S., Benjamins, J.S., Nyström, M. and Hooge, I.T.C. (2023). GlassesValidator:
-A data quality tool for eye tracking glasses. Behavior Research Methods. doi: 10.3758/s13428-023-02105-5](https://doi.org/10.3758/s13428-023-02105-5) ([BibTeX](#bibtex))
+[Niehorster, D.C., Hessels, R.S., Benjamins, J.S., Nyström, M. and Hooge, I.T.C. (2023). GlassesValidator: A data quality tool for eye tracking glasses. Behavior Research Methods. doi: 10.3758/s13428-023-02105-5](https://doi.org/10.3758/s13428-023-02105-5) ([BibTeX](#bibtex))
 
 ## Example
 ![application example](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/world_data.png?raw=true)
@@ -1031,24 +1031,23 @@ NB: For the below functions, a recording name should be a known recording set in
 
 # Citation
 If you use this tool or any of the code in this repository, please cite:<br>
-Niehorster, D.C., Hessels, R.S., Nyström, M., Benjamins, J.S. and Hooge, I.T.C. (in prep). gazeMapper: A tool for automated world-based analysis of wearable eye tracker data<br>
+[Niehorster, D.C., Hessels, R.S., Nyström, M., Benjamins, J.S. and Hooge, I.T.C. (2025). gazeMapper: A tool for automated world-based analysis of gaze data from one or multiple wearable eye trackers. Behavior Research Methods. doi: 10.3758/s13428-025-02704-4](https://doi.org/10.3758/s13428-025-02704-4)<br>
 If you use the functionality for automatic determining the data quality (accuracy and precision) of wearable eye tracker recordings, please additionally cite:<br>
-[Niehorster, D.C., Hessels, R.S., Benjamins, J.S., Nyström, M. and Hooge, I.T.C. (2023). GlassesValidator:
-A data quality tool for eye tracking glasses. Behavior Research Methods. doi: 10.3758/s13428-023-02105-5](https://doi.org/10.3758/s13428-023-02105-5)
+[Niehorster, D.C., Hessels, R.S., Benjamins, J.S., Nyström, M. and Hooge, I.T.C. (2023). GlassesValidator: A data quality tool for eye tracking glasses. Behavior Research Methods. doi: 10.3758/s13428-023-02105-5](https://doi.org/10.3758/s13428-023-02105-5)
 
 ## BibTeX
 ```latex
-@article{niehorstergazeMapper,
+@article{niehorster2025gazeMapper,
     Author = {Niehorster, Diederick C. and
               Hessels, R. S. and
               Nystr{\"o}m, Marcus and
               Benjamins, J. S. and
               Hooge, I. T. C.},
-    Journal = {},
+    Journal = {Behavior Research Methods},
     Number = {},
     Title = {{gazeMapper}: A tool for automated world-based analysis of gaze data from one or multiple wearable eye trackers},
-    Year = {},
-    note = {Manuscript submitted for publication, 2024}
+    Year = {2025},
+    doi = {10.3758/s13428-025-02704-4}
 }
 
 @article{niehorster2023glassesValidator,
