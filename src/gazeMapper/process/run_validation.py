@@ -33,6 +33,8 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path=None, progre
 
     # get interval(s) coded to be analyzed, if any
     episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / naming.coding_file))[annotation.Event.Validate]
+    if not episodes:
+        raise RuntimeError(f'There are no validation episodes coded for session "{working_dir.parent.name}", recording "{working_dir.name}", nothing to process')
 
     # prep progress indicator
     total = len(planes)*(2+len(episodes)*3)
