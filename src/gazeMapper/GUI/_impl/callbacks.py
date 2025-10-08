@@ -220,7 +220,7 @@ def set_cam_cal(cal_path: str|pathlib.Path, working_directory: str|pathlib.Path)
     shutil.copyfile(str(cal_path), str(working_directory / gt_naming.scene_camera_calibration_fname))
 
 def delete_cam_cal(working_directory: str|pathlib.Path):
-    pathlib.Path(working_directory / gt_naming.scene_camera_calibration_fname).unlink(missing_ok=True)
+    (pathlib.Path(working_directory) / gt_naming.scene_camera_calibration_fname).unlink(missing_ok=True)
 
 def make_plane(g, p_type: plane.Type, name: str, is_dynamic: bool, dynamic_config_file: str):
     from . import gui
@@ -236,8 +236,8 @@ def make_plane(g, p_type: plane.Type, name: str, is_dynamic: bool, dynamic_confi
         p_dir.mkdir(exist_ok=True)
         try:
             if dynamic_config_file:
-                dynamic_config_file = pathlib.Path(dynamic_config_file)
-                auto_coding_setup = val_dynamic.setup_to_plane_config(p_dir, dynamic_config_file.parent, dynamic_config_file.name)
+                dcf = pathlib.Path(dynamic_config_file)
+                auto_coding_setup = val_dynamic.setup_to_plane_config(p_dir, dcf.parent, dcf.name)
             else:
                 auto_coding_setup = val_dynamic.setup_to_plane_config(p_dir)
         except Exception as exc:
@@ -628,7 +628,7 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
     gt_gui.utils.push_popup(g, lambda: gt_gui.utils.popup(f"Set what to export", set_export_config_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, closable=True, outside=False))
 
 
-async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[recording.Recording|camera_recording.Recording]], dev_type: session.RecordingType, dev: eyetracker.EyeTracker|None, sessions: list[str], generic_device_name: str=None):
+async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[recording.Recording]|list[camera_recording.Recording]], dev_type: session.RecordingType, dev: eyetracker.EyeTracker|None, sessions: list[str], generic_device_name: str=None):
     from . import gui
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
 
@@ -666,8 +666,8 @@ async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[record
 
     # step 1, find what recordings of this type of eye tracker/camera files are in the path
     recs = rec_getter()
-    all_recs: list[recording.Recording] = []
-    dup_recs: list[recording.Recording] = []
+    all_recs: list[recording.Recording|camera_recording.Recording] = []
+    dup_recs: list[recording.Recording|camera_recording.Recording] = []
     known_rec_dirs = [g.sessions[s].recordings[r].info.get_source_directory() for s in g.sessions for r in g.sessions[s].recordings if g.sessions[s].recordings[r].definition.type==dev_type]
     known_rec_names= [g.sessions[s].recordings[r].info.name for s in g.sessions for r in g.sessions[s].recordings if g.sessions[s].recordings[r].definition.type==dev_type]
     for rec in recs:
@@ -701,7 +701,7 @@ async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[record
     recordings_to_add = {i:r for i,r in enumerate(all_recs)}
     recording_assignment: dict[str, dict[str, int]] = {}
     rec_names = [r.name for r in g.study_config.session_def.recordings]
-    selected_slot: tuple[str,str] = None
+    selected_slot: tuple[str,str]|None = None
 
     def _recording_context_menu(iid: int) -> bool:
         nonlocal selected_slot
@@ -750,7 +750,7 @@ async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[record
                     if rec_def.type!=dev_type:
                         continue
                     disable = False
-                    rec: recording.Recording = None
+                    rec: recording.Recording|camera_recording.Recording|None = None
                     if r in sess.recordings:
                         rec = sess.recordings[r].info
                         disable = True
@@ -833,7 +833,7 @@ async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[record
     }
     gt_gui.utils.push_popup(g, lambda: gt_gui.utils.popup("Assign and import recordings", list_recs_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, closable=True, outside=False))
 
-async def _import_recordings(g, recordings: list[recording.Recording|camera_recording.Recording], recording_assignment: dict[str, dict[str, int]], generic_device_name: str|None):
+async def _import_recordings(g, recordings: typing.Mapping[int,recording.Recording|camera_recording.Recording], recording_assignment: dict[str, dict[str, int]], generic_device_name: str|None):
     from . import gui
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
     for s in recording_assignment:
