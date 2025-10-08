@@ -2015,7 +2015,7 @@ class GUI:
                        "in whatever way you wish as long as you keep the same license.")
             imgui.spacing()
             imgui.spacing()
-            imgui.text("If you find bugs or have some feedback, please do let me know on GitHub (using issues or pull requests).")
+            imgui_md.render(f"If you find bugs or have some feedback, please do let me know on [GitHub](https://github.com/dcnieho/gazeMapper) (using issues or pull requests).")
             imgui.spacing()
             imgui.spacing()
             imgui.dummy((0, 10*hello_imgui.dpi_window_size_factor()))
@@ -2025,7 +2025,7 @@ class GUI:
             imgui.text("Reference")
             imgui.pop_font()
             imgui.spacing()
-            reference         = r"Niehorster, D.C., Hessels, R.S., Nyström, M., Benjamins, J.S. & Hooge, I.T.C. (2025). gazeMapper: A tool for automated world-based analysis of gaze data from one or multiple wearable eye trackers. Behavior Research Methods. doi: 10.3758/s13428-025-02704-4"
+            reference         = r"Niehorster, D.C., Hessels, R.S., Nyström, M., Benjamins, J.S. & Hooge, I.T.C. (2025). gazeMapper: A tool for automated world-based analysis of gaze data from one or multiple wearable eye trackers. Behavior Research Methods. doi: [10.3758/s13428-025-02704-4](https://doi.org/10.3758/s13428-025-02704-4)"
             reference_bibtex  = r"""@article{niehorster2025gazeMapper,
     Author = {Niehorster, Diederick C. and
               Hessels, Roy S. and
@@ -2039,7 +2039,7 @@ class GUI:
     doi = {10.3758/s13428-025-02704-4}
 }
 """
-            imgui.text(reference)
+            imgui_md.render(reference)
             if imgui.begin_popup_context_item(f"##reference_context_gazeMapper"):
                 if imgui.selectable("APA", False)[0]:
                     imgui.set_clipboard_text(reference)
@@ -2052,7 +2052,7 @@ class GUI:
             imgui.spacing()
             imgui_md.render(f"This tool makes use of [glassesValidator](https://github.com/dcnieho/glassesValidator) ([paper](https://doi.org/10.3758/s13428-023-02105-5)), please also reference:")
             imgui.spacing()
-            reference         = r"Niehorster, D.C., Hessels, R.S., Benjamins, J.S., Nyström, M. & Hooge, I.T.C. (2023). GlassesValidator: Data quality tool for eye tracking glasses. Behavior Research Methods. doi: 10.3758/s13428-023-02105-5"
+            reference         = r"Niehorster, D.C., Hessels, R.S., Benjamins, J.S., Nyström, M. & Hooge, I.T.C. (2023). GlassesValidator: Data quality tool for eye tracking glasses. Behavior Research Methods. doi: [10.3758/s13428-023-02105-5](https://doi.org/10.3758/s13428-023-02105-5)"
             reference_bibtex  = r"""@article{niehorster2023glassesValidator,
     Author = {Niehorster, Diederick C. and
               Hessels, Roy S. and
@@ -2066,7 +2066,7 @@ class GUI:
     doi = {10.3758/s13428-023-02105-5}
 }
 """
-            imgui.text(reference)
+            imgui_md.render(reference)
             if imgui.begin_popup_context_item(f"##reference_context_glassesValidator"):
                 if imgui.selectable("APA", False)[0]:
                     imgui.set_clipboard_text(reference)
