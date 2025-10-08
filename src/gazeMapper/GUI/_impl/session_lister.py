@@ -1,6 +1,7 @@
 import threading
 from imgui_bundle import imgui, icons_fontawesome_6 as ifa6
 import typing
+import natsort
 
 import glassesTools
 
@@ -278,7 +279,7 @@ class List:
             for sort_spec in reversed(sort_specs):
                 match sort_spec.column_index:
                     case 1:     # Name
-                        key = lambda iid: self.items[iid].name
+                        key = natsort.os_sort_keygen(key=lambda iid: self.items[iid].name)
                     case 2:     # Number of recordings
                         key = lambda iid: self.items[iid].num_present_recordings()
                     case _:     # status indicators

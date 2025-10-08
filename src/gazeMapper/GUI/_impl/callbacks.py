@@ -6,6 +6,7 @@ import asyncio
 import subprocess
 import pathvalidate
 import threading
+import natsort
 from imgui_bundle import imgui, imspinner, hello_imgui, icons_fontawesome_6 as ifa6
 
 from glassesTools import annotation, aruco, async_thread, camera_recording, eyetracker, gui as gt_gui, marker as gt_marker, naming as gt_naming, platform, process_pool, recording, video_utils
@@ -632,6 +633,7 @@ async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[record
     from . import gui
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
 
+    sessions = natsort.os_sorted(sessions)
     if dev_type==session.RecordingType.Camera:
         dev_rec_lbl = 'Camera recordings'
     else:
@@ -714,7 +716,9 @@ async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[record
         return False
 
     def _add_new_session(new_sess: str):
+        nonlocal sessions
         sessions.append(new_sess)
+        sessions = natsort.os_sorted(sessions)
 
     recording_lock = threading.Lock()
     recording_list = gt_gui.recording_table.RecordingTable(recordings_to_add, recording_lock, None, item_context_callback=_recording_context_menu)

@@ -12,6 +12,7 @@ import time
 import datetime
 import typing
 import pathvalidate
+import natsort
 
 import imgui_bundle
 from imgui_bundle import imgui, immapp, imgui_md, hello_imgui, glfw_utils, icons_fontawesome_6 as ifa6
@@ -848,26 +849,28 @@ class GUI:
                         imgui.text(rec.participant or "Unknown")
                     case "Duration":
                         imgui.text("Unknown" if (d:=rec.duration) is None else str(datetime.timedelta(seconds=d//1000)))
-            def _get_sort_value(which: str, iid: int):
-                rec = next(iter(self.sessions[iid].recordings.values())).info if self.sessions[iid].recordings else None
-                if rec is None:
-                    imgui.text('-')
-                    return 999 if which=="Duration" else 'zzzzz'
+            def _get_sort_key(which: str):
+                def _get_rec(iid: int, attr: str):
+                    rec = next(iter(self.sessions[iid].recordings.values())).info if self.sessions[iid].recordings else None
+                    if rec is None or not hasattr(rec,attr):
+                        return None
+                    return getattr(rec,attr)
+
                 match which:
                     case "Eye Tracker":
-                        return rec.eye_tracker.value.lower()
+                        return lambda iid: (e.value if (e:=_get_rec(iid,'eye_tracker')) is not None else 'zzzzz').lower()
                     case "Recording Name":
-                        return rec.name.lower()
+                        return natsort.os_sort_keygen(key=lambda iid: (n if (n:=_get_rec(iid,'name')) is not None else 'zzzzz').lower())
                     case "Participant":
-                        return rec.participant.lower()
+                        return natsort.os_sort_keygen(key=lambda iid: (p if (p:=_get_rec(iid,'participant')) is not None else 'zzzzz').lower())
                     case "Duration":
-                        return 0 if (d:=rec.duration) is None else d
+                        return lambda iid: d if (d:=_get_rec(iid,'duration')) is not None else 999
 
             self._session_lister.set_extra_columns([
                 session_lister.ColumnSpec(lbl,
                                           imgui.TableColumnFlags_.no_resize,
                                           lambda rec,w=lbl[2:]: _draw_status(w,rec),
-                                          lambda iid,w=lbl[2:]: _get_sort_value(w,iid),
+                                          _get_sort_key(lbl[2:]),
                                           lbl[2:])
                 for lbl in (ifa6.ICON_FA_EYE+" Eye Tracker", ifa6.ICON_FA_SIGNATURE+" Recording Name", ifa6.ICON_FA_USER_TIE+" Participant", ifa6.ICON_FA_STOPWATCH+" Duration")
             ])
