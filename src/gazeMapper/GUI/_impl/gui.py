@@ -87,8 +87,8 @@ class GUI:
         self._action_list_pane      : hello_imgui.DockableWindow    = None
         self._show_demo_window                                      = False
 
-        self._icon_font             : imgui.ImFont                  = None
-        self._big_font              : imgui.ImFont                  = None
+        self._big_font_size_multiplier                              = 1.75
+        self._icon_font_size_multiplier                             = 4.2
 
         self._marker_preview_cache  : dict[tuple[int,int,int], image_helper.ImageHelper]= {}
         self._plane_preview_cache   : dict[str               , image_helper.ImageHelper]= {}
@@ -109,24 +109,11 @@ class GUI:
         async_thread.done_callback = asyncexcepthook
 
     def _load_fonts(self):
-        def selected_glyphs_to_ranges(glyph_list: list[str]) -> list[tuple[int, int]]:
-            return [tuple([ord(x),ord(x)]) for x in glyph_list]
-
         # load the default font. Do it manually as we want to use Roboto as the default font
         normal_size = 16.
         hello_imgui.load_font("fonts/Roboto/Roboto-Regular.ttf", normal_size)
-        hello_imgui.load_font("fonts/Font_Awesome_6_Free-Solid-900.otf", normal_size, hello_imgui.FontLoadingParams(merge_to_last_font=True, glyph_ranges=[(ifa6.ICON_MIN_FA, ifa6.ICON_MAX_FA)]))
-
-        # big font
-        big_size = 28.
-        self._big_font = hello_imgui.load_font("fonts/Roboto/Roboto-Regular.ttf", big_size)
-
-        # load large icons for message box
-        msg_box_size = 69.
-        large_icons_params = hello_imgui.FontLoadingParams()
-        large_icons_params.glyph_ranges = selected_glyphs_to_ranges([ifa6.ICON_FA_CIRCLE_QUESTION, ifa6.ICON_FA_CIRCLE_INFO, ifa6.ICON_FA_TRIANGLE_EXCLAMATION])
-        self._icon_font = gt_gui.msg_box.icon_font = \
-            hello_imgui.load_font("fonts/Font_Awesome_6_Free-Solid-900.otf", msg_box_size, large_icons_params)
+        # add icons
+        hello_imgui.load_font("fonts/Font_Awesome_6_Free-Solid-900.otf", normal_size, hello_imgui.FontLoadingParams(merge_to_last_font=True))
 
     def _setup_glfw(self):
         win = glfw_utils.glfw_window_hello_imgui()
@@ -972,7 +959,7 @@ class GUI:
         but_x = (avail.x - 2*but_width - 10*imgui.get_style().item_spacing.x) / 2
         but_y = (avail.y - but_height) / 2
 
-        imgui.push_font(self._big_font)
+        imgui.push_font(None, imgui.get_style().font_size_base*self._big_font_size_multiplier)
         text = "Drag and drop a gazeMapper project folder or use the below buttons"
         size = imgui.calc_text_size(text)
         imgui.set_cursor_pos(((avail.x-size.x)/2, (but_y-size.y)/2))
@@ -1982,7 +1969,7 @@ class GUI:
             imgui.same_line()
             imgui.begin_group()
             imgui.push_text_wrap_pos(width - imgui.get_style().frame_padding.x)
-            imgui.push_font(self._big_font)
+            imgui.push_font(None, imgui.get_style().font_size_base*self._big_font_size_multiplier)
             imgui.text("gazeMapper")
             imgui.pop_font()
             imgui.text(f"Version {version.__version__}")
@@ -2032,7 +2019,7 @@ class GUI:
             imgui.spacing()
             imgui.spacing()
             imgui.dummy((0, 10*hello_imgui.dpi_window_size_factor()))
-            imgui.push_font(self._big_font)
+            imgui.push_font(None, imgui.get_style().font_size_base*self._big_font_size_multiplier)
             size = imgui.calc_text_size("Reference")
             imgui.set_cursor_pos_x((width - size.x + imgui.get_style().scrollbar_size) / 2)
             imgui.text("Reference")

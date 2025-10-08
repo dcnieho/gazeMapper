@@ -40,7 +40,7 @@ class ImageHelper:
         if width is None or height is None:
             raise ValueError()
         if imgui.is_rect_visible((width, height)):
-            imgui.image(self.texture_id, (width, height), *args, **kwargs)
+            imgui.image(imgui.ImTextureRef(self.texture_id), (width, height), *args, **kwargs)
             return True
         else:
             # Skip if outside view

@@ -430,7 +430,7 @@ def show_action_options(g, session_name: str, rec_name: str|None, action: proces
         nonlocal options
         spacing = 2 * imgui.get_style().item_spacing.x
         color = (0.45, 0.09, 1.00, 1.00)
-        imgui.push_font(g._icon_font)
+        imgui.push_font(None, imgui.get_style().font_size_base*g._icon_font_size_multiplier)
         imgui.text_colored(color, ifa6.ICON_FA_CIRCLE_INFO)
         imgui.pop_font()
         imgui.same_line(spacing=spacing)
@@ -518,7 +518,7 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
         nonlocal to_export, dq_set
         spacing = 2 * imgui.get_style().item_spacing.x
         color = (0.45, 0.09, 1.00, 1.00)
-        imgui.push_font(g._icon_font)
+        imgui.push_font(None, imgui.get_style().font_size_base*g._icon_font_size_multiplier)
         imgui.text_colored(color, ifa6.ICON_FA_CIRCLE_INFO)
         imgui.pop_font()
         imgui.same_line(spacing=spacing)
@@ -644,7 +644,7 @@ async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[record
     def prepping_recs_popup():
         spacing = 2 * imgui.get_style().item_spacing.x
         color = (0.45, 0.09, 1.00, 1.00)
-        imgui.push_font(g._icon_font)
+        imgui.push_font(None, imgui.get_style().font_size_base*g._icon_font_size_multiplier)
         imgui.text_colored(color, ifa6.ICON_FA_CIRCLE_INFO)
         imgui.pop_font()
         imgui.same_line(spacing=spacing)
@@ -880,7 +880,7 @@ def add_eyetracking_recordings(g, paths: list[pathlib.Path], sessions: list[str]
         nonlocal combo_value, eye_tracker, generic_et_idx, generic_et_name
         spacing = 2 * imgui.get_style().item_spacing.x
         color = (0.45, 0.09, 1.00, 1.00)
-        imgui.push_font(g._icon_font)
+        imgui.push_font(None, imgui.get_style().font_size_base*g._icon_font_size_multiplier)
         imgui.text_colored(color, ifa6.ICON_FA_CIRCLE_INFO)
         imgui.pop_font()
         imgui.same_line(spacing=spacing)
@@ -941,7 +941,7 @@ def camera_show_glob_filter_config(g, paths, sessions):
         nonlocal glob_filter
         spacing = 2 * imgui.get_style().item_spacing.x
         color = (0.45, 0.09, 1.00, 1.00)
-        imgui.push_font(g._icon_font)
+        imgui.push_font(None, imgui.get_style().font_size_base*g._icon_font_size_multiplier)
         imgui.text_colored(color, ifa6.ICON_FA_CIRCLE_INFO)
         imgui.pop_font()
         imgui.same_line(spacing=spacing)
@@ -1017,7 +1017,7 @@ def add_recordings(g, paths: list[pathlib.Path], sessions: list[str]):
         nonlocal combo_value, dev_type, glob_filter
         spacing = 2 * imgui.get_style().item_spacing.x
         color = (0.45, 0.09, 1.00, 1.00)
-        imgui.push_font(g._icon_font)
+        imgui.push_font(None, imgui.get_style().font_size_base*g._icon_font_size_multiplier)
         imgui.text_colored(color, ifa6.ICON_FA_CIRCLE_INFO)
         imgui.pop_font()
         imgui.same_line(spacing=spacing)
