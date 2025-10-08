@@ -227,6 +227,8 @@ class Session:
         elif rec_def.type==RecordingType.Camera:
             if not isinstance(rec_info,CameraRecording):
                 raise TypeError(f"The provided rec_info is not for a camera recording, but {which} is a camera recording")
+            if rec_info.type!=rec_def.camera_recording_type:
+                raise TypeError(f"The provided rec_info specifies a {rec_info.type.value} camera recording, not an expected {rec_def.camera_recording_type.value} camera recording")
 
     def update_recording_info(self, which: str, rec_info: EyeTrackerRecording|CameraRecording):
         if which not in self.recordings:
