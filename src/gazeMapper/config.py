@@ -45,7 +45,7 @@ class I2MCSettings(typed_dict_defaults.TypedDictDefault, total=False):
 class CamMovementForEtSyncFunction(typed_dict_defaults.TypedDictDefault, total=False):
     module_or_file  : str
     function        : str
-    parameters      : dict[str,Any]|None = None
+    parameters      : dict[str,Any] = typed_dict_defaults.Field(default_factory=lambda: {})
 
 class RgbColor(typing.NamedTuple):
     r: int = 0

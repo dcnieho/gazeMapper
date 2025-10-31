@@ -7,11 +7,18 @@ import sys
 # 2. adds a function obj.apply_defaults() that in-place modified the dict by adding the default
 #    parameters (optionally overwriting)
 
+class Field:
+    def __init__(self, default_factory):
+        self.default_factory = default_factory
+
 class DefaultsMixin:
-    def apply_defaults(obj, overwrite: bool = False):
-        for f in obj._field_defaults:
-            if f not in obj or overwrite:
-                obj[f] = obj._field_defaults[f]
+    def apply_defaults(self, overwrite: bool = False):
+        for f in self._field_defaults:
+            if f not in self or overwrite:
+                if isinstance(self._field_defaults[f], Field):
+                    self[f] = self._field_defaults[f].default_factory()
+                else:
+                    self[f] = self._field_defaults[f]
 
 class _TypedDictDefaultMeta(type):
     def __new__(cls, name, bases, ns, total=True):

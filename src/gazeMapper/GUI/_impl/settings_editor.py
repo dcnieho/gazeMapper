@@ -273,6 +273,9 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, actual_types: dic
     if defaults is None:
         if typed_dict_defaults.is_typeddictdefault(o_type):
             defaults = o_type._field_defaults.copy()
+            for k in defaults:
+                if isinstance(defaults[k], typed_dict_defaults.Field):
+                    defaults[k] = defaults[k].default_factory()
         elif type_utils.is_NamedTuple_type(o_type):
             defaults = o_type._field_defaults.copy()
         else:
