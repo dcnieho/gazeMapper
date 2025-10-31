@@ -44,7 +44,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
     # see where stretches of True (marker presence) start
     marker_starts = [s for m in markers for s in gt_marker.get_appearance_starts_ends(m, study_config.auto_code_sync_points['max_gap_duration'], study_config.auto_code_sync_points['min_duration'])[0]]
     # insert in episodes
-    [episodes[annotation.Event.Sync_Camera].append(i) for i in marker_starts if i not in episodes[annotation.Event.Sync_Camera]]
+    [episodes[annotation.EventType.Sync_Camera].append(i) for i in marker_starts if i not in episodes[annotation.EventType.Sync_Camera]]
 
     # early exit if nothing has changed
     if episodes==episodes_original:

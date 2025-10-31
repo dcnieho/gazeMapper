@@ -39,10 +39,10 @@ def run(working_dir: str|pathlib.Path, export_path: str|pathlib.Path, to_export:
 
 
 def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, study_config: config.Study, recs: list[str]):
-    if annotation.Event.Trial not in study_config.planes_per_episode:
+    if annotation.EventType.Trial not in study_config.planes_per_episode:
         raise ValueError('No planes are specified for mapping gaze to during trials, no gaze-on-plane data to export')
 
-    planes = list(study_config.planes_per_episode[annotation.Event.Trial])
+    planes = list(study_config.planes_per_episode[annotation.EventType.Trial])
 
     # per recording, read the relevant files and put them all together
     for r in recs:
@@ -61,10 +61,10 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
         else:
             episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / r / naming.coding_file), study_config.episodes_to_code)
             subset_var = 'frame_idx'
-        if annotation.Event.Trial not in episodes or not episodes[annotation.Event.Trial]:
-            print(f'Warning: no {annotation.tooltip_map[annotation.Event.Trial]}s found in the coding file for recording {r} in session {working_dir.name}. Skipping...')
+        if annotation.EventType.Trial not in episodes or not episodes[annotation.EventType.Trial]:
+            print(f'Warning: no {annotation.tooltip_map[annotation.EventType.Trial]}s found in the coding file for recording {r} in session {working_dir.name}. Skipping...')
             continue
-        episodes = episodes[annotation.Event.Trial]
+        episodes = episodes[annotation.EventType.Trial]
 
         # get all gaze data
         plane_gazes = {p:pd.read_csv(working_dir / r / f'{naming.world_gaze_prefix}{p}.tsv', sep='\t', dtype=defaultdict(lambda: float, **gaze_worldref.Gaze._non_float)) for p in planes}

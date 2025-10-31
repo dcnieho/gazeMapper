@@ -114,7 +114,7 @@ def is_action_possible_given_config(action: Action, study_config: 'config.Study'
         case Action.SYNC_TO_REFERENCE:
             return not not study_config.sync_ref_recording
         case Action.VALIDATE:
-            return annotation.Event.Validate in study_config.planes_per_episode
+            return annotation.EventType.Validate in study_config.planes_per_episode
         case Action.EXPORT_TRIALS:
             return True     # always possible (in terms of config), since gaze overlay videos are always possible
         case Action.MAKE_MAPPED_GAZE_VIDEO:
@@ -168,7 +168,7 @@ def _determine_to_invalidate(action: Action, study_config: 'config.Study') -> tu
             states_to_invalidate = {Action.CODE_EPISODES, Action.GAZE_TO_PLANE, Action.SYNC_TO_REFERENCE, Action.EXPORT_TRIALS, Action.MAKE_MAPPED_GAZE_VIDEO}
         case Action.AUTO_CODE_EPISODES:
             states_to_invalidate = {a for a in Action.CODE_EPISODES.next_values(inclusive=True) if a not in [Action.AUTO_CODE_EPISODES, Action.AUTO_CODE_SYNC, Action.SYNC_ET_TO_CAM, Action.SYNC_TO_REFERENCE, Action.VALIDATE]}
-            for_all_recs = not not study_config.sync_ref_recording and annotation.Event.Trial in study_config.auto_code_episodes
+            for_all_recs = not not study_config.sync_ref_recording and annotation.EventType.Trial in study_config.auto_code_episodes
         case Action.SYNC_ET_TO_CAM:
             states_to_invalidate = {a for a in Action.GAZE_TO_PLANE.next_values(inclusive=True) if a not in [Action.AUTO_CODE_EPISODES, Action.AUTO_CODE_SYNC, Action.SYNC_ET_TO_CAM]}
         case Action.SYNC_TO_REFERENCE:

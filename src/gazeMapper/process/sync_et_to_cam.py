@@ -43,9 +43,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     # check there is a sync setup
     if study_config.get_cam_movement_for_et_sync_method not in ['plane', 'function']:
         raise ValueError('There is no eye tracker data to scene camera synchronization defined, should not run this function')
-    if annotation.Event.Sync_ET_Data not in study_config.episodes_to_code:
+    if annotation.EventType.Sync_ET_Data not in study_config.episodes_to_code:
         raise ValueError('ET sync episodes are not set up to be coded, nothing to do here')
-    if study_config.get_cam_movement_for_et_sync_method=='plane' and annotation.Event.Sync_ET_Data not in study_config.planes_per_episode:
+    if study_config.get_cam_movement_for_et_sync_method=='plane' and annotation.EventType.Sync_ET_Data not in study_config.planes_per_episode:
         raise ValueError(f'No plane specified for syncing eye tracker data to the scene cam, cannot continue')
 
     # check this is an eye tracker recording
@@ -56,10 +56,10 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     # get interval coding
     coding_file = working_dir / naming.coding_file
     if not coding_file.is_file():
-        raise FileNotFoundError(f'A coding file must be available to run sync_et_to_cam, but it is not. Run code_episodes and code at least one {annotation.tooltip_map[annotation.Event.Sync_ET_Data]}. Not found: {coding_file}')
-    episodes = episode.list_to_marker_dict(episode.read_list_from_file(coding_file))[annotation.Event.Sync_ET_Data]
+        raise FileNotFoundError(f'A coding file must be available to run sync_et_to_cam, but it is not. Run code_episodes and code at least one {annotation.tooltip_map[annotation.EventType.Sync_ET_Data]}. Not found: {coding_file}')
+    episodes = episode.list_to_marker_dict(episode.read_list_from_file(coding_file))[annotation.EventType.Sync_ET_Data]
     if not episodes:
-        raise RuntimeError(f'No {annotation.tooltip_map[annotation.Event.Sync_ET_Data]}s found for this recording. Run code_episodes and code at least one {annotation.tooltip_map[annotation.Event.Sync_ET_Data]}.')
+        raise RuntimeError(f'No {annotation.tooltip_map[annotation.EventType.Sync_ET_Data]}s found for this recording. Run code_episodes and code at least one {annotation.tooltip_map[annotation.EventType.Sync_ET_Data]}.')
 
     # Read gaze data
     gazes = gaze_headref.read_dict_from_file(working_dir / gt_naming.gaze_data_fname, episodes)[0]
@@ -68,7 +68,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
 
     match study_config.get_cam_movement_for_et_sync_method:
         case 'plane':
-            planes = list(study_config.planes_per_episode[annotation.Event.Sync_ET_Data])
+            planes = list(study_config.planes_per_episode[annotation.EventType.Sync_ET_Data])
             if len(planes)!=1:
                 raise NotImplementedError("sync_et_to_cam only supports a single plane being used for synchronizing eye tracking data to the scene camera, contact developer if this is an issue")
             pln = planes[0]

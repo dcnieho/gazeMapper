@@ -605,8 +605,8 @@ class GUI:
             return sorted([gt_marker.MarkerID(m.id, m.aruco_dict_id) for m in self.study_config.individual_markers])
         def _get_known_planes() -> list[str]:
             return sorted([p.name for p in self.study_config.planes])
-        def _get_episodes_to_code_for_planes() -> list[annotation.Event]:
-            return sorted([e for e in self.study_config.episodes_to_code if e!=annotation.Event.Sync_Camera], key=lambda x: x.value)
+        def _get_episodes_to_code_for_planes() -> list[annotation.EventType]:
+            return sorted([e for e in self.study_config.episodes_to_code if e!=annotation.EventType.Sync_Camera], key=lambda x: x.value)
         self._possible_value_getters = {
             'mapped_video_make_which': _get_known_recordings,
             'mapped_video_recording_colors': _get_known_recordings_only_eye_tracker,

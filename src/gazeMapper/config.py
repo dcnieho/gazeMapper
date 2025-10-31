@@ -60,8 +60,8 @@ class Study:
     def __init__(self,
                  session_def                                    : session.SessionDefinition,
                  planes                                         : list[plane.Definition],
-                 planes_per_episode                             : dict[annotation.Event,set[str]],
-                 episodes_to_code                               : set[annotation.Event],
+                 planes_per_episode                             : dict[annotation.EventType,set[str]],
+                 episodes_to_code                               : set[annotation.EventType],
                  individual_markers                             : list[marker.Marker],
                  working_directory                              : str|pathlib.Path,
 
@@ -90,9 +90,9 @@ class Study:
 
                  auto_code_sync_points                          : AutoCodeSyncPoints|None           = None,
                  auto_code_episodes                             : dict[Literal[
-                                                                    annotation.Event.Sync_ET_Data,
-                                                                    annotation.Event.Trial,
-                                                                    annotation.Event.Validate],
+                                                                    annotation.EventType.Sync_ET_Data,
+                                                                    annotation.EventType.Trial,
+                                                                    annotation.EventType.Validate],
                                                                   AutoCodeEpisodes]|None            = None,
 
                  export_output3D                                : bool                              = False,
@@ -308,22 +308,22 @@ class Study:
 
             # check correct number of planes is defined for the episode
             match e:
-                case annotation.Event.Sync_Camera:
+                case annotation.EventType.Sync_Camera:
                     allow_one_plane = allow_more_than_one = False
-                case annotation.Event.Sync_ET_Data:
+                case annotation.EventType.Sync_ET_Data:
                     if self.get_cam_movement_for_et_sync_method=='plane':
                         allow_one_plane = True
                         allow_more_than_one = False
                     else:
                         allow_one_plane = allow_more_than_one = False
-                case annotation.Event.Validate:
+                case annotation.EventType.Validate:
                     allow_one_plane = True
                     allow_more_than_one = False
-                case annotation.Event.Trial:
+                case annotation.EventType.Trial:
                     allow_one_plane = allow_more_than_one = True
             if not allow_one_plane:
                 msg = f'No planes should be defined for a {annotation.tooltip_map[e]}. Remove entry, even if its empty.'
-                if e==annotation.Event.Sync_ET_Data:
+                if e==annotation.EventType.Sync_ET_Data:
                     msg += ' Alternatively, you may want to set the get_cam_movement_for_et_sync_method on the main options panel to "Plane".'
                 if strict_check:
                     raise ValueError(msg)
@@ -343,7 +343,7 @@ class Study:
                     type_utils.merge_problem_dicts(problems, {'planes_per_episode': {e: msg}})
 
         for e in self.episodes_to_code:
-            if e not in self.planes_per_episode and e!=annotation.Event.Sync_Camera and (e==annotation.Event.Sync_ET_Data and self.get_cam_movement_for_et_sync_method=='plane'):
+            if e not in self.planes_per_episode and e!=annotation.EventType.Sync_Camera and (e==annotation.EventType.Sync_ET_Data and self.get_cam_movement_for_et_sync_method=='plane'):
                 msg = f'{annotation.tooltip_map[e]}s are set up to be coded and require an associated plane, but no plane(s) are defined in planes_per_episode for {annotation.tooltip_map[e]}s'
                 if strict_check:
                     raise ValueError(msg)
@@ -355,8 +355,8 @@ class Study:
         problems: type_utils.ProblemDict = {}
         if not self.episodes_to_code:
             type_utils.merge_problem_dicts(problems, {'episodes_to_code': 'At minimum one episode should be selected to be coded'})
-        if annotation.Event.Sync_ET_Data in self.episodes_to_code and self.get_cam_movement_for_et_sync_method=='':
-            type_utils.merge_problem_dicts(problems, {'episodes_to_code': f'{annotation.tooltip_map[annotation.Event.Sync_ET_Data]} should not be listed in the episodes to be coded if there is no method for plane synchronization (get_cam_movement_for_et_sync_method) specified.'})
+        if annotation.EventType.Sync_ET_Data in self.episodes_to_code and self.get_cam_movement_for_et_sync_method=='':
+            type_utils.merge_problem_dicts(problems, {'episodes_to_code': f'{annotation.tooltip_map[annotation.EventType.Sync_ET_Data]} should not be listed in the episodes to be coded if there is no method for plane synchronization (get_cam_movement_for_et_sync_method) specified.'})
 
         for e in self.planes_per_episode:
             if e not in self.episodes_to_code:
@@ -371,12 +371,12 @@ class Study:
         problems = self._check_auto_markers(strict_check)
         this_problems: type_utils.ProblemDict = {}
         if self.auto_code_sync_points:
-            if annotation.Event.Sync_Camera not in self.episodes_to_code:
+            if annotation.EventType.Sync_Camera not in self.episodes_to_code:
                 if strict_check:
-                    raise ValueError(f'The auto_code_sync_points option is configured, but {annotation.tooltip_map[annotation.Event.Sync_Camera]}s are not set to be coded in episodes_to_code. Fix episodes_to_code.')
+                    raise ValueError(f'The auto_code_sync_points option is configured, but {annotation.tooltip_map[annotation.EventType.Sync_Camera]}s are not set to be coded in episodes_to_code. Fix episodes_to_code.')
                 else:
-                    this_problems['episodes_to_code'] = f'The auto_code_sync_points option is configured, but {annotation.tooltip_map[annotation.Event.Sync_Camera]}s are not set to be coded in episodes_to_code.'
-                    this_problems['auto_code_sync_points'] = f'The auto_code_sync_points option is configured, but {annotation.tooltip_map[annotation.Event.Sync_Camera]}s are not set to be coded in episodes_to_code. Fix episodes_to_code or remove auto_code_sync_points setup.'
+                    this_problems['episodes_to_code'] = f'The auto_code_sync_points option is configured, but {annotation.tooltip_map[annotation.EventType.Sync_Camera]}s are not set to be coded in episodes_to_code.'
+                    this_problems['auto_code_sync_points'] = f'The auto_code_sync_points option is configured, but {annotation.tooltip_map[annotation.EventType.Sync_Camera]}s are not set to be coded in episodes_to_code. Fix episodes_to_code or remove auto_code_sync_points setup.'
         if self.auto_code_episodes:
             for e in self.auto_code_episodes:
                 if e not in self.episodes_to_code:
@@ -389,7 +389,7 @@ class Study:
 
     def _check_auto_markers(self, strict_check) -> type_utils.ProblemDict:
         problems: type_utils.ProblemDict = {}
-        used_markers: dict[tuple[str,str]|tuple[str,annotation.Event,str],list[gt_marker.MarkerID]] = {}
+        used_markers: dict[tuple[str,str]|tuple[str,annotation.EventType,str],list[gt_marker.MarkerID]] = {}
         if self.auto_code_sync_points:
             if 'markers' not in self.auto_code_sync_points:
                 if strict_check:
@@ -434,10 +434,10 @@ class Study:
         # 1. marker used for auto_code_sync_points cannot appear anywhere else
         # 2. marker sequences used for auto_code_episodes must be unique (markers can be reused)
         # first transform marker IDs to family so we can properly detect clashes
-        used_markers      : dict[tuple[str,str]|tuple[str,annotation.Event,str],list[tuple[int,int]]] = {k:[(m.m_id, aruco.dict_id_to_family[m.aruco_dict_id]) for m in used_markers[k]] for k in used_markers}
+        used_markers      : dict[tuple[str,str]|tuple[str,annotation.EventType,str],list[tuple[int,int]]] = {k:[(m.m_id, aruco.dict_id_to_family[m.aruco_dict_id]) for m in used_markers[k]] for k in used_markers}
         seen_markers      : set[tuple[int,int]] = set()
         seen_markers_sets : set[tuple[tuple[int,int]]] = set()
-        def _format_key(key: tuple[str,str]|tuple[str,annotation.Event,str]):
+        def _format_key(key: tuple[str,str]|tuple[str,annotation.EventType,str]):
             return f'{key[0]}.{key[1]}' if len(key)==2 else f'{key[0]}[{key[1]}].{key[2]}'
         for s in used_markers:
             # first check if used markers are unique at the family level
@@ -559,12 +559,12 @@ class Study:
                 raise ValueError(f'Recording {self.sync_ref_recording} is the reference recording for sync, should not be specified in sync_average_recordings')
             else:
                 problems['sync_ref_average_recordings'] = f'Recording {self.sync_ref_recording} is the reference recording for sync, cannot be specified in sync_average_recordings'
-        if annotation.Event.Sync_Camera not in self.episodes_to_code:
+        if annotation.EventType.Sync_Camera not in self.episodes_to_code:
             if strict_check:
                 raise ValueError('when sync_ref_recording is set, coding of camera sync points should be set up in episodes_to_code')
             else:
-                problems['episodes_to_code'] = f'if sync_ref_recording is set, {annotation.tooltip_map[annotation.Event.Sync_Camera]}s should be set up to be coded'
-                type_utils.merge_problem_dicts(problems, {'sync_ref_recording': f'sync_ref_recording is set, but {annotation.tooltip_map[annotation.Event.Sync_Camera]}s are not set up to be coded in episodes_to_code'})
+                problems['episodes_to_code'] = f'if sync_ref_recording is set, {annotation.tooltip_map[annotation.EventType.Sync_Camera]}s should be set up to be coded'
+                type_utils.merge_problem_dicts(problems, {'sync_ref_recording': f'sync_ref_recording is set, but {annotation.tooltip_map[annotation.EventType.Sync_Camera]}s are not set up to be coded in episodes_to_code'})
         return problems
 
     def _check_et_sync_method(self, strict_check) -> type_utils.ProblemDict:
@@ -584,12 +584,12 @@ class Study:
         if self.get_cam_movement_for_et_sync_method not in ['plane', 'function']:
             # nothing to do
             return problems
-        if annotation.Event.Sync_ET_Data not in self.episodes_to_code:
+        if annotation.EventType.Sync_ET_Data not in self.episodes_to_code:
             if strict_check:
-                raise ValueError(f'if get_cam_movement_for_et_sync_method is set to "plane" or "function", {annotation.tooltip_map[annotation.Event.Sync_ET_Data]}s should be set up to be coded in episodes_to_code')
+                raise ValueError(f'if get_cam_movement_for_et_sync_method is set to "plane" or "function", {annotation.tooltip_map[annotation.EventType.Sync_ET_Data]}s should be set up to be coded in episodes_to_code')
             else:
-                problems['episodes_to_code'] = f'if get_cam_movement_for_et_sync_method is set to "plane" or "function", {annotation.tooltip_map[annotation.Event.Sync_ET_Data]}s should be set up to be coded'
-                problems['get_cam_movement_for_et_sync_method'] = f'get_cam_movement_for_et_sync_method is set to "{self.get_cam_movement_for_et_sync_method}", but {annotation.tooltip_map[annotation.Event.Sync_ET_Data]}s are not set up to be coded in episodes_to_code'
+                problems['episodes_to_code'] = f'if get_cam_movement_for_et_sync_method is set to "plane" or "function", {annotation.tooltip_map[annotation.EventType.Sync_ET_Data]}s should be set up to be coded'
+                problems['get_cam_movement_for_et_sync_method'] = f'get_cam_movement_for_et_sync_method is set to "{self.get_cam_movement_for_et_sync_method}", but {annotation.tooltip_map[annotation.EventType.Sync_ET_Data]}s are not set up to be coded in episodes_to_code'
         if self.get_cam_movement_for_et_sync_method=='function':
             if strict_check:
                 if not self.get_cam_movement_for_et_sync_function or not all([x in self.get_cam_movement_for_et_sync_function for x in ["module_or_file","function","parameters"]]):
@@ -601,12 +601,12 @@ class Study:
                 if this_problems:
                     problems['get_cam_movement_for_et_sync_function'] = this_problems
         elif self.get_cam_movement_for_et_sync_method=='plane':
-            if annotation.Event.Sync_ET_Data not in self.planes_per_episode:
+            if annotation.EventType.Sync_ET_Data not in self.planes_per_episode:
                 if strict_check:
-                    raise ValueError(f'if get_cam_movement_for_et_sync_method is set to "plane", a plane should be set up to be used for processing {annotation.tooltip_map[annotation.Event.Sync_ET_Data]}s in planes_per_episode')
+                    raise ValueError(f'if get_cam_movement_for_et_sync_method is set to "plane", a plane should be set up to be used for processing {annotation.tooltip_map[annotation.EventType.Sync_ET_Data]}s in planes_per_episode')
                 else:
-                    problems['planes_per_episode'] = f'if get_cam_movement_for_et_sync_method is set to "plane", a plane should be set up to be used for processing {annotation.tooltip_map[annotation.Event.Sync_ET_Data]}s'
-                    type_utils.merge_problem_dicts(problems, {'get_cam_movement_for_et_sync_method': f'get_cam_movement_for_et_sync_method is set to "plane", but no plane specified for syncing eye tracker data to the scene cam (i.e., for {annotation.tooltip_map[annotation.Event.Sync_ET_Data]}s) in planes_per_episode'})
+                    problems['planes_per_episode'] = f'if get_cam_movement_for_et_sync_method is set to "plane", a plane should be set up to be used for processing {annotation.tooltip_map[annotation.EventType.Sync_ET_Data]}s'
+                    type_utils.merge_problem_dicts(problems, {'get_cam_movement_for_et_sync_method': f'get_cam_movement_for_et_sync_method is set to "plane", but no plane specified for syncing eye tracker data to the scene cam (i.e., for {annotation.tooltip_map[annotation.EventType.Sync_ET_Data]}s) in planes_per_episode'})
         return problems
 
     def _check_make_video(self, strict_check) -> type_utils.ProblemDict:
@@ -707,11 +707,11 @@ class Study:
             if k.startswith('video_'):
                 kwds[f'mapped_{k}'] = kwds.pop(k)
         # stored as list of tuples (with enum values as keys), unpack
-        kwds['planes_per_episode'] = {annotation.Event(k):v for k,v in kwds['planes_per_episode']}
+        kwds['planes_per_episode'] = {annotation.EventType(k):v for k,v in kwds['planes_per_episode']}
         if 'auto_code_episodes' in kwds:
-            kwds['auto_code_episodes'] = {annotation.Event(k):v for k,v in kwds['auto_code_episodes']}
+            kwds['auto_code_episodes'] = {annotation.EventType(k):v for k,v in kwds['auto_code_episodes']}
         # help with enum roundtrip
-        kwds['episodes_to_code'] = {annotation.Event(e) for e in kwds['episodes_to_code']}
+        kwds['episodes_to_code'] = {annotation.EventType(e) for e in kwds['episodes_to_code']}
         if 'validate_dq_types' in kwds:
             kwds['validate_dq_types']= {DataQualityType(d) for d in kwds['validate_dq_types']}
         if 'mapped_video_which_gaze_type_on_plane' in kwds:
@@ -730,7 +730,7 @@ class Study:
             kwds['mapped_video_recording_colors'] = {k: RgbColor(*kwds['mapped_video_recording_colors'][k]) for k in kwds['mapped_video_recording_colors']}
         # backwards compatibility, rename 'auto_code_trial_episodes'
         if 'auto_code_trial_episodes' in kwds:
-            kwds['auto_code_episodes'] = {annotation.Event.Trial: kwds.pop('auto_code_trial_episodes')}
+            kwds['auto_code_episodes'] = {annotation.EventType.Trial: kwds.pop('auto_code_trial_episodes')}
         # backwards compatibility, upgrade markers to markerIDs if they're bare ints
         if 'auto_code_sync_points' in kwds and kwds['auto_code_sync_points'] is not None and 'markers' in kwds['auto_code_sync_points']:
             markers = kwds['auto_code_sync_points']['markers']
@@ -808,13 +808,13 @@ study_parameter_types = {k:_params[k].annotation for k in _params if k not in ['
 def _get_gv_data_quality_type_doc(dq: DataQualityType):
     t,doc = get_DataQualityType_explanation(dq)
     return (dq, type_utils.GUIDocInfo(t,doc))
-def _get_annotation_event_doc(a: annotation.Event, children: dict = None):
+def _get_annotation_event_doc(a: annotation.EventType, children: dict = None):
     t = annotation.tooltip_map[a]
     doc = {
-        annotation.Event.Trial: 'Denotes an episode for which to map gaze to plane(s). This determines for which segments there will be gaze data when running the Export Trials.',
-        annotation.Event.Validate: 'Denotes an episode during which a participant looked at a validation poster, to be used to run glassesValidator to compute data quality of the gaze data.',
-        annotation.Event.Sync_Camera: 'Time point (frame from video) when a synchronization event happened, used for synchronizing different recordings.',
-        annotation.Event.Sync_ET_Data: 'Episode to be used for synchronization of eye tracker data to scene camera (e.g. using VOR).'
+        annotation.EventType.Trial: 'Denotes an episode for which to map gaze to plane(s). This determines for which segments there will be gaze data when running the Export Trials.',
+        annotation.EventType.Validate: 'Denotes an episode during which a participant looked at a validation poster, to be used to run glassesValidator to compute data quality of the gaze data.',
+        annotation.EventType.Sync_Camera: 'Time point (frame from video) when a synchronization event happened, used for synchronizing different recordings.',
+        annotation.EventType.Sync_ET_Data: 'Episode to be used for synchronization of eye tracker data to scene camera (e.g. using VOR).'
     }.get(a)
     if children is None:
         children = {}
@@ -827,10 +827,10 @@ _gaze_type_doc = {
     gaze_worldref.Type.Average_Gaze_Vector  : type_utils.GUIDocInfo('Average of gaze vectors', 'Average of the projections of the left and right eyes\' gaze vectors to the plane.'),
 }
 study_parameter_doc = {
-    'planes_per_episode': type_utils.GUIDocInfo('Planes per episode', 'For each episode that is enabled to be coded in the project, sets which planes will be looked for and gaze mapped to during the episode.',dict([_get_annotation_event_doc(a) for a in annotation.Event])),
+    'planes_per_episode': type_utils.GUIDocInfo('Planes per episode', 'For each episode that is enabled to be coded in the project, sets which planes will be looked for and gaze mapped to during the episode.',dict([_get_annotation_event_doc(a) for a in annotation.EventType])),
     'episodes_to_code': type_utils.GUIDocInfo('Episodes to code', 'Sets which episodes can be coded for this project.',{
         None: # None indicates the doc specification applies to the contained values
-            dict([_get_annotation_event_doc(a) for a in annotation.Event])
+            dict([_get_annotation_event_doc(a) for a in annotation.EventType])
     }),
     'import_do_copy_video': type_utils.GUIDocInfo('Copy video during import?', 'If not enabled, the scene video of an eye tracker recording, or the video of an external camera is not copied to the gazeMapper recording directory during import. Instead, the video will be loaded from the recording\'s source directory (so do not move it). Ignored when the video must be transcoded to be processed with gazeMapper.'),
     'import_source_dir_as_relative_path': type_utils.GUIDocInfo('Store source directory as relative path?', 'Specifies whether the path to the source directory stored in the recording info file is an absolute path (this option is not enabled) or a relative path (enabled). If a relative path is used, the imported recording and the source directory can be moved to another location, and the source directory can still be found as long as the relative path (e.g., one folder up and in the directory "original recordings": "../original recordings") doesn\'t change.'),
@@ -878,7 +878,7 @@ study_parameter_doc = {
                 'max_intermarker_gap_duration': type_utils.GUIDocInfo('Maximum intermarker gap duration', 'Maximum gap (number of frames) that is allowed between the detection of two markers in a sequence.'),
                 'min_duration': type_utils.GUIDocInfo('Minimum duration', 'Minimum duration (number of frames) that a marker should be detected. Shorter runs are removed.')
                 }
-            ) for a in annotation.Event if a!=annotation.Event.Sync_Camera])
+            ) for a in annotation.EventType if a!=annotation.EventType.Sync_Camera])
     }),
     'export_output3D': type_utils.GUIDocInfo('Mapped data export: include 3D fields', 'Determines whether gaze positions on the plane in the scene camera reference frame are exported when invoking the Export Trials action.'),
     'export_output2D': type_utils.GUIDocInfo('Mapped data export: include 2D fields', 'Determines whether gaze positions on the plane in the plane\'s reference frame are exported when invoking the Export Trials action.'),
@@ -1074,7 +1074,7 @@ class StudyOverride:
             kwds['planes_per_episode'] = {k:v for k,v in kwds['planes_per_episode']}
         # help with enum roundtrip
         if 'episodes_to_code' in kwds:
-            kwds['episodes_to_code'] = {annotation.Event(e) for e in kwds['episodes_to_code']}
+            kwds['episodes_to_code'] = {annotation.EventType(e) for e in kwds['episodes_to_code']}
         if 'validate_dq_types' in kwds:
             kwds['validate_dq_types']= {DataQualityType(d) for d in kwds['validate_dq_types']}
         if 'mapped_video_which_gaze_type_on_plane' in kwds:

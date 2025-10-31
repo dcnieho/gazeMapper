@@ -28,10 +28,10 @@ from .. import config, episode, naming, plane, process, session, synchronization
 # will also be shown.
 
 _event_type_to_key_map = {
-    annotation.Event.Validate       : imgui.Key.v,
-    annotation.Event.Sync_Camera    : imgui.Key.c,
-    annotation.Event.Sync_ET_Data   : imgui.Key.e,
-    annotation.Event.Trial          : imgui.Key.t,
+    annotation.EventType.Validate       : imgui.Key.v,
+    annotation.EventType.Sync_Camera    : imgui.Key.c,
+    annotation.EventType.Sync_ET_Data   : imgui.Key.e,
+    annotation.EventType.Trial          : imgui.Key.t,
 }
 
 def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **study_settings):
@@ -63,22 +63,22 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     if rec_def.type==session.RecordingType.Camera:
         has_gaze, has_plane_gaze, has_plane_pose = False, False, False
         # no episode.Event.Sync_ET_Data for camera recordings, remove
-        if annotation.Event.Sync_ET_Data in study_config.episodes_to_code:
-            study_config.episodes_to_code.remove(annotation.Event.Sync_ET_Data)
+        if annotation.EventType.Sync_ET_Data in study_config.episodes_to_code:
+            study_config.episodes_to_code.remove(annotation.EventType.Sync_ET_Data)
         # no episode.Event.Validate for camera recordings, remove
-        if annotation.Event.Validate in study_config.episodes_to_code:
-            study_config.episodes_to_code.remove(annotation.Event.Validate)
+        if annotation.EventType.Validate in study_config.episodes_to_code:
+            study_config.episodes_to_code.remove(annotation.EventType.Validate)
     elif rec_def.type==session.RecordingType.Eye_Tracker:
         # Read gaze data
         has_gaze = True
         gazes = gaze_headref.read_dict_from_file(working_dir / gt_naming.gaze_data_fname, ts_column_suffixes=['VOR',''])[0]
 
         planes: set[str] = set()
-        for e in [annotation.Event.Validate, annotation.Event.Trial]:
+        for e in [annotation.EventType.Validate, annotation.EventType.Trial]:
             if e in study_config.planes_per_episode:
                 planes.update(study_config.planes_per_episode[e])
-        if study_config.get_cam_movement_for_et_sync_method=='plane' and annotation.Event.Sync_ET_Data in study_config.planes_per_episode:
-            planes.update(study_config.planes_per_episode[annotation.Event.Sync_ET_Data])
+        if study_config.get_cam_movement_for_et_sync_method=='plane' and annotation.EventType.Sync_ET_Data in study_config.planes_per_episode:
+            planes.update(study_config.planes_per_episode[annotation.EventType.Sync_ET_Data])
 
         # Read gaze on poster data, if available
         plane_files = [working_dir/f'{naming.world_gaze_prefix}{p}.tsv' for p in planes]
@@ -111,17 +111,17 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     # trial episodes are gotten from the reference recording if there is one and this is not the reference recording
     if study_config.sync_ref_recording and rec_def.name!=study_config.sync_ref_recording:
         # any trial coding there is should be discarded
-        episodes.pop(annotation.Event.Trial, None)
+        episodes.pop(annotation.EventType.Trial, None)
         # mark trial as not codable
-        if annotation.Event.Trial in episodes_to_code:
-            episodes_to_code.remove(annotation.Event.Trial)
+        if annotation.EventType.Trial in episodes_to_code:
+            episodes_to_code.remove(annotation.EventType.Trial)
         # if there is trial coding for the reference recording, get them and show them (read only)
-        if annotation.Event.Trial in study_config.episodes_to_code:
+        if annotation.EventType.Trial in study_config.episodes_to_code:
             all_recs = [r.name for r in study_config.session_def.recordings if r.name!=study_config.sync_ref_recording]
-            episodes[annotation.Event.Trial] = synchronization.get_episode_frame_indices_from_ref(working_dir, annotation.Event.Trial, rec_def.name, study_config.sync_ref_recording, all_recs, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings, study_config.sync_ref_stretch_which, missing_ref_coding_ok=True)
+            episodes[annotation.EventType.Trial] = synchronization.get_episode_frame_indices_from_ref(working_dir, annotation.EventType.Trial, rec_def.name, study_config.sync_ref_recording, all_recs, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings, study_config.sync_ref_stretch_which, missing_ref_coding_ok=True)
             # if nothing found, remove again so we don't have a useless empty track
-            if not episodes[annotation.Event.Trial]:
-                episodes.pop(annotation.Event.Trial, None)
+            if not episodes[annotation.EventType.Trial]:
+                episodes.pop(annotation.EventType.Trial, None)
     episodes = annotation.flatten_annotation_dict(episodes) # NB: also ensures ordering is consistent
     episodes_original = copy.deepcopy(episodes)
 
@@ -243,7 +243,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     # store coded intervals to file
     if study_config.sync_ref_recording and rec_def.name!=study_config.sync_ref_recording:
         # any (read only) trial coding there is should not be written to file
-        episodes.pop(annotation.Event.Trial, None)
+        episodes.pop(annotation.EventType.Trial, None)
     episode.write_list_to_file(episode.marker_dict_to_list(episodes), coding_file)
 
     # update state

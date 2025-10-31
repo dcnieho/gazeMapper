@@ -23,7 +23,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
 
     if study_config.sync_ref_recording and rec_def.name!=study_config.sync_ref_recording:
         # Trial events are only coded for the reference recording
-        study_config.auto_code_episodes.pop(annotation.Event.Trial, None)
+        study_config.auto_code_episodes.pop(annotation.EventType.Trial, None)
         if not study_config.auto_code_episodes:
             raise RuntimeError(f'Nothing to do, auto_code_episodes is defined only for trials and you have a sync_ref_recording ({study_config.sync_ref_recording}), but this recording ({rec_def.name}) is another one')
 

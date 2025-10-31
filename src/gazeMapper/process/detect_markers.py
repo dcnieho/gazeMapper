@@ -64,14 +64,14 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
 
     # trial episodes are gotten from the reference recording if there is one and this is not the reference recording
     if study_config.sync_ref_recording and rec_def.name!=study_config.sync_ref_recording:
-        if annotation.Event.Trial in episodes and episodes[annotation.Event.Trial]:
+        if annotation.EventType.Trial in episodes and episodes[annotation.EventType.Trial]:
             raise ValueError(f'Trial episodes are gotten from the reference recording ({study_config.sync_ref_recording}) and should not be coded for this recording ({rec_def.name})')
-        if annotation.Event.Trial in study_config.episodes_to_code:
+        if annotation.EventType.Trial in study_config.episodes_to_code:
             all_recs = [r.name for r in study_config.session_def.recordings]
             # NB: don't error if we don't need trial episodes for coding.
-            episodes[annotation.Event.Trial] = synchronization.get_episode_frame_indices_from_ref(working_dir, annotation.Event.Trial, rec_def.name, study_config.sync_ref_recording, all_recs, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings, study_config.sync_ref_stretch_which, missing_ref_coding_ok=has_auto_code)
+            episodes[annotation.EventType.Trial] = synchronization.get_episode_frame_indices_from_ref(working_dir, annotation.EventType.Trial, rec_def.name, study_config.sync_ref_recording, all_recs, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings, study_config.sync_ref_stretch_which, missing_ref_coding_ok=has_auto_code)
 
-    sync_target_function         = _get_sync_function(study_config, rec_def, None if annotation.Event.Sync_ET_Data not in episodes else episodes[annotation.Event.Sync_ET_Data])
+    sync_target_function         = _get_sync_function(study_config, rec_def, None if annotation.EventType.Sync_ET_Data not in episodes else episodes[annotation.EventType.Sync_ET_Data])
     planes_setup, analyze_frames = _get_plane_setup(study_config, config_dir, episodes)
 
     # set up pose estimator
@@ -137,8 +137,8 @@ def _get_sync_function(study_config: config.Study,
             case '':
                 pass # nothing to do
             case 'plane':
-                if annotation.Event.Sync_ET_Data not in study_config.planes_per_episode:
-                    raise ValueError(f'The method for synchronizing eye tracker data to the scene camera (get_cam_movement_for_et_sync_method) is set to "plane" but no plane is configured for {annotation.Event.Sync_ET_Data.name} in the planes_per_episode config')
+                if annotation.EventType.Sync_ET_Data not in study_config.planes_per_episode:
+                    raise ValueError(f'The method for synchronizing eye tracker data to the scene camera (get_cam_movement_for_et_sync_method) is set to "plane" but no plane is configured for {annotation.EventType.Sync_ET_Data.name} in the planes_per_episode config')
                 # NB: no extra_funcs to run
             case 'function':
                 import importlib
@@ -168,7 +168,7 @@ def _sync_function_output_drawer(proc_name: str, frame: np.ndarray, frame_idx: i
 
 def _get_plane_setup(study_config: config.Study,
                      config_dir: pathlib.Path,
-                     episodes: dict[annotation.Event,list[list[int]]] = None) -> tuple[dict[str, aruco.PlaneSetup], dict[str, list[list[int]]|None]]:
+                     episodes: dict[annotation.EventType,list[list[int]]] = None) -> tuple[dict[str, aruco.PlaneSetup], dict[str, list[list[int]]|None]]:
     # process the above into a dict of plane definitions and a dict with frame number intervals for which to use each
     planes = {v for k in study_config.planes_per_episode for v in study_config.planes_per_episode[k]}
     planes_setup: dict[str, aruco.PlaneSetup] = {}

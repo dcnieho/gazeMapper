@@ -146,16 +146,16 @@ def get_coding_file(working_dir: str|pathlib.Path, missing_ref_coding_ok=False):
     if not coding_file.is_file():
         if missing_ref_coding_ok:
             return None
-        raise FileNotFoundError(f'A coding file must be available for the recording ({working_dir.name}) to run sync_to_ref, but it is not. Run code_episodes and code at least one {annotation.tooltip_map[annotation.Event.Sync_Camera]}. Not found: {coding_file}')
-    episodes = episode.list_to_marker_dict(episode.read_list_from_file(coding_file))[annotation.Event.Sync_Camera]
+        raise FileNotFoundError(f'A coding file must be available for the recording ({working_dir.name}) to run sync_to_ref, but it is not. Run code_episodes and code at least one {annotation.tooltip_map[annotation.EventType.Sync_Camera]}. Not found: {coding_file}')
+    episodes = episode.list_to_marker_dict(episode.read_list_from_file(coding_file))[annotation.EventType.Sync_Camera]
     episodes = [x[0] for x in episodes] # remove inner wrapping list, there are only single values in it anyway
     if not episodes:
         if missing_ref_coding_ok:
             return None
-        raise ValueError(f'No {annotation.tooltip_map[annotation.Event.Sync_Camera]}s found for this recording ({working_dir.name}). Run code_episodes and code at least one {annotation.tooltip_map[annotation.Event.Sync_Camera]}.')
+        raise ValueError(f'No {annotation.tooltip_map[annotation.EventType.Sync_Camera]}s found for this recording ({working_dir.name}). Run code_episodes and code at least one {annotation.tooltip_map[annotation.EventType.Sync_Camera]}.')
     return episodes
 
-def get_episode_frame_indices_from_ref(working_dir: str|pathlib.Path, event: annotation.Event, rec: str, ref_rec:str, all_recs: list[str], do_time_stretch: bool, average_recordings: list[str], stretch_which: str, extra_fr=0, missing_ref_coding_ok=False) -> list[list[int]]:
+def get_episode_frame_indices_from_ref(working_dir: str|pathlib.Path, event: annotation.EventType, rec: str, ref_rec:str, all_recs: list[str], do_time_stretch: bool, average_recordings: list[str], stretch_which: str, extra_fr=0, missing_ref_coding_ok=False) -> list[list[int]]:
     working_dir  = pathlib.Path(working_dir)
     ref_coding_file = working_dir.parent / ref_rec / naming.coding_file
     if not ref_coding_file.is_file():

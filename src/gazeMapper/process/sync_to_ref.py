@@ -23,7 +23,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
     # check there is a sync setup
     if not study_config.sync_ref_recording:
         raise ValueError('Synchronization to a reference recording is not defined, should not run this function')
-    if annotation.Event.Sync_Camera not in study_config.episodes_to_code:
+    if annotation.EventType.Sync_Camera not in study_config.episodes_to_code:
         raise ValueError('Camera sync points are not set up to be coded, nothing to do here')
 
     # load any existing sync if its already available

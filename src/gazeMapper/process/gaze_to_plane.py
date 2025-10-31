@@ -53,16 +53,16 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, s
     episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / naming.coding_file), study_config.episodes_to_code)
     # trial episodes are gotten from the reference recording if there is one and this is not the reference recording
     if study_config.sync_ref_recording and rec_def.name!=study_config.sync_ref_recording:
-        if annotation.Event.Trial in episodes and episodes[annotation.Event.Trial]:
+        if annotation.EventType.Trial in episodes and episodes[annotation.EventType.Trial]:
             raise ValueError(f'Trial episodes are gotten from the reference recording ({study_config.sync_ref_recording}) and should not be coded for this recording ({rec_def.name})')
-        if annotation.Event.Trial in study_config.episodes_to_code:
+        if annotation.EventType.Trial in study_config.episodes_to_code:
             all_recs = [r.name for r in study_config.session_def.recordings]
-            episodes[annotation.Event.Trial] = synchronization.get_episode_frame_indices_from_ref(working_dir, annotation.Event.Trial, rec_def.name, study_config.sync_ref_recording, all_recs, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings, study_config.sync_ref_stretch_which)
+            episodes[annotation.EventType.Trial] = synchronization.get_episode_frame_indices_from_ref(working_dir, annotation.EventType.Trial, rec_def.name, study_config.sync_ref_recording, all_recs, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings, study_config.sync_ref_stretch_which)
 
     # we transform to map to plane for validate and trial episodes, set it up
-    episodes_to_proc = [annotation.Event.Validate, annotation.Event.Trial]
-    if annotation.Event.Sync_ET_Data in study_config.episodes_to_code and study_config.get_cam_movement_for_et_sync_method=='plane':
-        episodes_to_proc.append(annotation.Event.Sync_ET_Data)
+    episodes_to_proc = [annotation.EventType.Validate, annotation.EventType.Trial]
+    if annotation.EventType.Sync_ET_Data in study_config.episodes_to_code and study_config.get_cam_movement_for_et_sync_method=='plane':
+        episodes_to_proc.append(annotation.EventType.Sync_ET_Data)
     mapping_setup: dict[str, list[list[int]]] = {}
     for e in episodes_to_proc:
         if e in study_config.planes_per_episode:
