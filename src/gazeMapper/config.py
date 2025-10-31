@@ -209,6 +209,7 @@ class Study:
         self.gui_num_workers                            = gui_num_workers
 
         self.check_valid(strict_check=strict_check)
+        self._register_annotations()
 
     def check_valid(self, strict_check=True):
         # ensure typed dicts with defaults members are of the right class, and apply defaults
@@ -243,6 +244,17 @@ class Study:
             self._check_head_attached_recordings(strict_check)
             self._check_sync_ref(strict_check)
             self._check_make_video(strict_check)
+
+    def _register_annotations(self):
+        annotation.unregister_all_annotation_types()
+        for cs in self.coding_setup:
+            annotation.register_event(annotation.Event(
+                name        = cs['name'],
+                event_type  = cs['event_type'],
+                description = cs['description'],
+                hotkey      = cs['hotkey']
+            ))
+
 
     def _check_recordings(self, which: list[str]|None, field: str, strict_check) -> type_utils.ProblemDict:
         problems: type_utils.ProblemDict = {}
