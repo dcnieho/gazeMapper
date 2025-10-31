@@ -498,7 +498,7 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
         if s is None:
             continue
         if 'plane gaze' not in to_export:
-            if not not g.study_config.coding_setup and any(cs['event_type']==annotation.EventType.Trial for cs in g.study_config.coding_setup) and any((s.recordings[r].state[process.Action.GAZE_TO_PLANE]==process_pool.State.Completed for r in s.recordings)):
+            if any(cs['event_type']==annotation.EventType.Trial for cs in g.study_config.coding_setup) and any((s.recordings[r].state[process.Action.GAZE_TO_PLANE]==process_pool.State.Completed for r in s.recordings)):
                 to_export['plane gaze'] = True
         if recs:=[s.recordings[r].info.working_directory for r in s.recordings if s.recordings[r].state[process.Action.VALIDATE]==process_pool.State.Completed]:
             to_export['validation'] = True
