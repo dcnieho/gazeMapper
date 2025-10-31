@@ -3,6 +3,8 @@ import typing
 
 from glassesTools import annotation, json, process_pool, utils
 
+from gazeMapper import config
+
 class Action(enum.IntEnum):
     IMPORT = enum.auto()
     MAKE_GAZE_OVERLAY_VIDEO = enum.auto()
@@ -28,12 +30,12 @@ class Action(enum.IntEnum):
     @property
     def has_progress_indication(self):
         return self in [Action.MAKE_GAZE_OVERLAY_VIDEO, Action.DETECT_MARKERS, Action.GAZE_TO_PLANE, Action.VALIDATE, Action.MAKE_MAPPED_GAZE_VIDEO]
-    def succ(self):
+    def next(self):
         v = self.value+1
         if v > Action.MAKE_MAPPED_GAZE_VIDEO.value:
             raise StopIteration('Enumeration ended')
         return Action(v)
-    def pred(self):
+    def prev(self):
         v = self.value-1
         if v<Action.IMPORT.value:
             raise StopIteration('Enumeration ended')
@@ -45,7 +47,7 @@ class Action(enum.IntEnum):
             vals.add(a)
         try:
             while True:
-                a = a.succ()
+                a = a.next()
                 vals.add(a)
         except StopIteration:
             pass    # we're done
@@ -54,7 +56,7 @@ def action_str_to_enum_val(x: str) -> Action:
     return utils.enum_str_2_val(x, Action, {'MAKE_VIDEO':'MAKE_MAPPED_GAZE_VIDEO', 'RUN_VALIDATION':'VALIDATE', 'AUTO_CODE_TRIALS': 'AUTO_CODE_EPISODES'})
 json.register_type(json.TypeEntry(Action, '__enum.process.Action__', utils.enum_val_2_str, action_str_to_enum_val))
 
-def action_to_func(action: Action) -> typing.Callable[..., None]:
+def action_to_func(action: Action) -> typing.Callable[..., None]|None:
     # Returns function to perform the provided action. NB: not for Action.IMPORT,
     # needs its own special handling by caller instead
     from .make_gaze_overlay_video import run as make_gaze_overlay_video
@@ -100,21 +102,39 @@ def action_to_func(action: Action) -> typing.Callable[..., None]:
 def is_session_level_action(action: Action) -> bool:
     return action in [Action.SYNC_TO_REFERENCE, Action.EXPORT_TRIALS, Action.MAKE_MAPPED_GAZE_VIDEO]
 
+def _config_has_auto_coding(study_config: 'config.Study', specific_event_type: annotation.EventType|None=None, specific_episode_type: annotation.Type|None=None) -> bool:
+    if not study_config.coding_setup:
+        return False
+    for cs in study_config.coding_setup:
+        if cs['auto_code']:
+            if specific_event_type and cs['event_type']!=specific_event_type:
+                continue
+            elif specific_episode_type and annotation.type_map[cs['event_type']]!=specific_episode_type:
+                continue
+            return True
+    return False
+
+def _config_has_et_sync(study_config: 'config.Study') -> bool:
+    return not not study_config.coding_setup and any(not not cs['sync_setup'] for cs in study_config.coding_setup)
+
+def _config_has_specific_episode_type(study_config: 'config.Study', specific_event_type: annotation.EventType) -> bool:
+    return not not study_config.coding_setup and any(cs['event_type']==specific_event_type for cs in study_config.coding_setup)
+
 def is_action_possible_given_config(action: Action, study_config: 'config.Study') -> bool:
     match action:
         case Action.CODE_EPISODES | Action.DETECT_MARKERS | Action.GAZE_TO_PLANE:
             # if there is any form of config beyond a session definition, these will be possible (whether config is complete is handled by error messages so no need to worry about that here)
-            return not not study_config.planes or not not study_config.episodes_to_code or not not study_config.planes_per_episode or not not study_config.individual_markers
+            return not not study_config.planes or not not study_config.coding_setup or not not study_config.individual_markers
         case Action.AUTO_CODE_SYNC:
-            return not not study_config.auto_code_sync_points
+            return _config_has_auto_coding(study_config, specific_event_type=annotation.EventType.Sync_Camera)
         case Action.AUTO_CODE_EPISODES:
-            return not not study_config.auto_code_episodes
+            return _config_has_auto_coding(study_config, specific_episode_type=annotation.Type.Interval)
         case Action.SYNC_ET_TO_CAM:
-            return study_config.get_cam_movement_for_et_sync_method in ['plane', 'function']
+            return _config_has_et_sync(study_config)
         case Action.SYNC_TO_REFERENCE:
             return not not study_config.sync_ref_recording
         case Action.VALIDATE:
-            return annotation.EventType.Validate in study_config.planes_per_episode
+            return _config_has_specific_episode_type(study_config, annotation.EventType.Validate)
         case Action.EXPORT_TRIALS:
             return True     # always possible (in terms of config), since gaze overlay videos are always possible
         case Action.MAKE_MAPPED_GAZE_VIDEO:
@@ -168,7 +188,7 @@ def _determine_to_invalidate(action: Action, study_config: 'config.Study') -> tu
             states_to_invalidate = {Action.CODE_EPISODES, Action.GAZE_TO_PLANE, Action.SYNC_TO_REFERENCE, Action.EXPORT_TRIALS, Action.MAKE_MAPPED_GAZE_VIDEO}
         case Action.AUTO_CODE_EPISODES:
             states_to_invalidate = {a for a in Action.CODE_EPISODES.next_values(inclusive=True) if a not in [Action.AUTO_CODE_EPISODES, Action.AUTO_CODE_SYNC, Action.SYNC_ET_TO_CAM, Action.SYNC_TO_REFERENCE, Action.VALIDATE]}
-            for_all_recs = not not study_config.sync_ref_recording and annotation.EventType.Trial in study_config.auto_code_episodes
+            for_all_recs = not not study_config.sync_ref_recording and _config_has_auto_coding(study_config, specific_event_type=annotation.EventType.Trial)
         case Action.SYNC_ET_TO_CAM:
             states_to_invalidate = {a for a in Action.GAZE_TO_PLANE.next_values(inclusive=True) if a not in [Action.AUTO_CODE_EPISODES, Action.AUTO_CODE_SYNC, Action.SYNC_ET_TO_CAM]}
         case Action.SYNC_TO_REFERENCE:
@@ -196,7 +216,7 @@ def action_update_and_invalidate(action: Action, state: process_pool.State, stud
 
     return action_state_mutations, for_all_recs
 
-def _is_recording_action_possible(rec: str, action_states: dict[Action, process_pool.State], study_config: 'config.Study', rec_type: 'session.RecordingType', action: Action) -> tuple[bool,list[Action]]:
+def _is_recording_action_possible(rec: str, action_states: dict[Action, process_pool.State], study_config: 'config.Study', rec_type: 'session.RecordingType', action: Action) -> tuple[bool,list[Action]|None]:
     if not is_action_possible_given_config(action, study_config):
         return False, None
     elif not is_action_possible_for_recording(rec, rec_type, action, study_config):
@@ -211,13 +231,13 @@ def _is_recording_action_possible(rec: str, action_states: dict[Action, process_
         case Action.CODE_EPISODES:
             pass    # nothing besides import
         case Action.DETECT_MARKERS:
-            if not (study_config.auto_code_sync_points or study_config.auto_code_episodes):
+            if not _config_has_auto_coding(study_config):
                 preconditions.add(Action.CODE_EPISODES)
         case Action.GAZE_TO_PLANE:
             preconditions.update([Action.CODE_EPISODES, Action.DETECT_MARKERS])
             if study_config.sync_ref_recording:
                 preconditions.add(Action.SYNC_TO_REFERENCE)
-            if study_config.get_cam_movement_for_et_sync_method!='':
+            if _config_has_et_sync(study_config):
                 preconditions.add(Action.SYNC_ET_TO_CAM)
         case Action.AUTO_CODE_SYNC:
             preconditions.update([Action.DETECT_MARKERS])
@@ -244,19 +264,19 @@ def _is_session_action_possible(session_action_states: dict[Action, process_pool
     match action:
         case Action.SYNC_TO_REFERENCE:
             preconditions.update([Action.CODE_EPISODES])
-            # NB: even if study_config.auto_code_sync_points is defined, user may decide to code sync manually. So don't add Action.AUTO_CODE_SYNC to preconditions
-            if study_config.get_cam_movement_for_et_sync_method!='':
+            # NB: even if automatic coding of sync points is defined, user may decide to code sync manually. So don't add Action.AUTO_CODE_SYNC to preconditions
+            if _config_has_et_sync(study_config):
                 preconditions.add(Action.SYNC_ET_TO_CAM)
         case Action.EXPORT_TRIALS:
             preconditions.update([Action.MAKE_GAZE_OVERLAY_VIDEO, Action.GAZE_TO_PLANE, Action.VALIDATE, Action.MAKE_MAPPED_GAZE_VIDEO])
             preconditions_test = 'or'
         case Action.MAKE_MAPPED_GAZE_VIDEO:
             preconditions.update([Action.CODE_EPISODES])
-            # NB: even if study_config.auto_code_sync_points is defined, user may decide to code sync manually. So don't add Action.AUTO_CODE_SYNC to preconditions
-            # NB: even if study_config.auto_code_episodes is defined, user may decide to code episodes manually. So don't add Action.AUTO_CODE_EPISODES to preconditions
+            # NB: even if automatic coding of sync points is defined, user may decide to code sync manually. So don't add Action.AUTO_CODE_SYNC to preconditions
+            # NB: even if automatic coding of episodes is defined, user may decide to code episodes manually. So don't add Action.AUTO_CODE_EPISODES to preconditions
             if study_config.sync_ref_recording:
                 preconditions.add(Action.SYNC_TO_REFERENCE)
-            elif study_config.get_cam_movement_for_et_sync_method!='':
+            elif _config_has_et_sync(study_config):
                 preconditions.add(Action.SYNC_ET_TO_CAM)
         case _:
             raise NotImplementedError(f'Logic is not implemented for {action.displayable_name} ({action}), major developer oversight! Let him know.')

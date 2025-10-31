@@ -3,6 +3,8 @@ import typing
 import numpy as np
 import cv2
 
+from imgui_bundle import imgui
+
 from glassesTools import aruco
 
 from . import image_helper
@@ -43,6 +45,8 @@ def load_image_with_helper(path_or_image: pathlib.Path|np.ndarray):
     else:
         return image_helper.ImageHelper(path_or_image)
 
+def is_valid_imgui_key(key: str) -> bool:
+    return hasattr(imgui.Key, key)
 
 class JobInfo(typing.NamedTuple):
     action:     process.Action

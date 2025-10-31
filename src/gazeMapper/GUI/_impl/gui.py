@@ -61,7 +61,7 @@ class GUI:
 
         self.need_setup_recordings                                  = True
         self.need_setup_plane                                       = True
-        self.need_setup_episode                                     = True
+        self.need_setup_coding                                     = True
         self.need_setup_individual_markers                          = True
         self.can_accept_sessions                                    = False
         self._session_actions           : set[process.Action]       = set()
@@ -605,8 +605,6 @@ class GUI:
             return sorted([gt_marker.MarkerID(m.id, m.aruco_dict_id) for m in self.study_config.individual_markers])
         def _get_known_planes() -> list[str]:
             return sorted([p.name for p in self.study_config.planes])
-        def _get_episodes_to_code_for_planes() -> list[annotation.EventType]:
-            return sorted([e for e in self.study_config.episodes_to_code if e!=annotation.EventType.Sync_Camera], key=lambda x: x.value)
         self._possible_value_getters = {
             'mapped_video_make_which': _get_known_recordings,
             'mapped_video_recording_colors': _get_known_recordings_only_eye_tracker,
@@ -615,11 +613,10 @@ class GUI:
             'mapped_video_show_gaze_vec_in_which': _get_known_recordings,
             'sync_ref_recording': _get_known_recordings,
             'sync_ref_average_recordings': _get_known_recordings_no_ref,
-            'planes_per_episode': [_get_episodes_to_code_for_planes, _get_known_planes],
-            'auto_code_sync_points': {'markers': _get_known_individual_markers},
-            'auto_code_episodes': [_get_episodes_to_code_for_planes, {None: {'start_markers': _get_known_individual_markers, 'end_markers': _get_known_individual_markers}}],
             'head_attached_recordings_replace_et_scene': _get_known_recordings_only_camera_head_attached,
-            'session_def_et_recordings': _get_known_recordings_only_eye_tracker
+            'session_def_et_recordings': _get_known_recordings_only_eye_tracker,
+            'planes': _get_known_planes,
+            'auto_code': {'markers': _get_known_individual_markers, 'start_markers': _get_known_individual_markers, 'end_markers': _get_known_individual_markers},
         }
 
         self._need_set_window_title = True
@@ -699,25 +696,24 @@ class GUI:
         #   5. no individual marker problems
         self.need_setup_recordings = not self.study_config or not self.study_config.session_def.recordings or 'session_def' in self._problems_cache or any((r.name in self.cam_calibrations and isinstance(self.cam_calibrations[r.name],Exception) for r in self.study_config.session_def.recordings))
         has_any_plane_setup = not not self.study_config and not not self.study_config.planes
-        has_any_episode_setup = not not self.study_config and (not not self.study_config.episodes_to_code or not not self.study_config.planes_per_episode)
+        has_coding_setup = not not self.study_config and not not self.study_config.coding_setup
         has_any_indiv_marker_setup = not not self.study_config and not not self.study_config.individual_markers
-        if self.need_setup_recordings or has_any_plane_setup or has_any_episode_setup or has_any_indiv_marker_setup:
+        if self.need_setup_recordings or has_any_plane_setup or has_coding_setup or has_any_indiv_marker_setup:
             self.need_setup_plane = not self.study_config or not self.study_config.planes or 'planes' in self._problems_cache or any((not p.has_complete_setup() for p in self.study_config.planes)) or any((p.name not in self.plane_configs or isinstance(self.plane_configs[p.name],Exception) for p in self.study_config.planes))
-            self.need_setup_episode = not self.study_config or not self.study_config.episodes_to_code or not self.study_config.planes_per_episode or any((x in self._problems_cache for x in ['episodes_to_code', 'planes_per_episode']))
+            self.need_setup_coding = not self.study_config or not self.study_config.coding_setup or 'coding_setup' in self._problems_cache
             self.need_setup_individual_markers = not self.study_config or 'individual_markers' in self._problems_cache
         else:
-            self.need_setup_plane = self.need_setup_episode = self.need_setup_individual_markers = False
+            self.need_setup_plane = self.need_setup_coding = self.need_setup_individual_markers = False
             # remove all problems related to unused setup
             self._problems_cache.pop('planes',None)
-            self._problems_cache.pop('episodes_to_code',None)
-            self._problems_cache.pop('planes_per_episode',None)
+            self._problems_cache.pop('coding_setup',None)
             self._problems_cache.pop('individual_markers',None)
 
         self.can_accept_sessions = \
             not self._problems_cache and \
             not self.need_setup_recordings and \
             not self.need_setup_plane and \
-            not self.need_setup_episode and \
+            not self.need_setup_coding and \
             not self.need_setup_individual_markers
 
     def _get_markers(self, use_family=False):
@@ -999,19 +995,19 @@ class GUI:
             imgui.pop_style_color(3)
         imgui.same_line()
 
-        if self.need_setup_episode:
-            _indicate_needs_attention()
-        if imgui.button("Episode setup"):
-            new_win_params = ('Episode setup', self._episode_setup_pane_drawer)
-        if self.need_setup_episode:
-            imgui.pop_style_color(3)
-        imgui.same_line()
-
         if self.need_setup_individual_markers:
             _indicate_needs_attention()
         if imgui.button("Edit individual markers"):
             new_win_params = ('Individual marker editor', self._individual_marker_setup_pane_drawer)
         if self.need_setup_individual_markers:
+            imgui.pop_style_color(3)
+        imgui.same_line()
+
+        if self.need_setup_coding:
+            _indicate_needs_attention()
+        if imgui.button("Coding setup"):
+            new_win_params = ('Coding setup', self._coding_setup_pane_drawer)
+        if self.need_setup_coding:
             imgui.pop_style_color(3)
 
         if new_win_params is not None:
@@ -1024,7 +1020,7 @@ class GUI:
             self._to_focus = new_win_params[0]
 
         # rest of settings handled here in a settings tree
-        if any((k not in ['session_def', 'planes', 'episodes_to_code', 'planes_per_episode', 'individual_markers'] for k in self._problems_cache)):
+        if any((k not in ['session_def', 'planes', 'coding_setup', 'individual_markers'] for k in self._problems_cache)):
             imgui.text_colored(colors.error,'*There are problems in the below setup that need to be resolved.\nHover over red text to get information about the error')
 
         fields = [k for k in config.study_parameter_types.keys() if k in config.study_defaults]
@@ -1335,7 +1331,7 @@ class GUI:
                         elif not p.use_default and imgui.button(ifa6.ICON_FA_CLIPBOARD_LIST+f' deploy default config'):
                             callbacks.glasses_validator_deploy_config(self, p)
                 imgui.same_line()
-                if imgui.button(ifa6.ICON_FA_TRASH_CAN+' delete plane'):
+                if imgui.button(ifa6.ICON_FA_TRASH_CAN+f' delete plane###{lbl}'):
                     self._remove_plane(p)
                 imgui.tree_pop()
             else:
@@ -1423,38 +1419,99 @@ class GUI:
             }
             gt_gui.utils.push_popup(self, lambda: gt_gui.utils.popup("Add plane", _add_plane_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, outside=False))
 
-    def _episode_setup_pane_drawer(self):
-        if not self.study_config.planes:
-            imgui.align_text_to_frame_padding()
-            imgui.text_colored(colors.error,'*At minimum one plane should be defined. Go to')
-            imgui.same_line()
-            tab_lbl = 'Plane editor'
-            if imgui.button('Edit planes'):
-                if not any((w.label==tab_lbl for w in hello_imgui.get_runner_params().docking_params.dockable_windows)):
-                    new_win = self._make_main_space_window(tab_lbl, self._plane_editor_pane_drawer, can_be_closed=True)
-                    if not self._window_list:
-                        self._window_list = hello_imgui.get_runner_params().docking_params.dockable_windows
-                    self._window_list.append(new_win)
-                    self._to_dock.append(tab_lbl)
-                self._to_focus = tab_lbl
-            imgui.same_line()
-            imgui.text_colored(colors.error,'to set this up.')
-        if any((x in self._problems_cache for x in ['episodes_to_code', 'planes_per_episode'])):
+    def _coding_setup_pane_drawer(self):
+        if any((x in self._problems_cache for x in ['coding_setup'])):
             imgui.text_colored(colors.error,'*There are problems in the below setup that need to be resolved.\nHover over red text to get information about the error')
-
-        # episodes to be coded
-        changed, new_config, _ = settings_editor.draw(copy.deepcopy(self.study_config), ['episodes_to_code', 'planes_per_episode'], config.study_parameter_types, {}, self._possible_value_getters, None, None, self._problems_cache, config.study_parameter_doc)
-        if changed:
-            try:
-                new_config.check_valid(strict_check=False)
-            except Exception as exc:
-                # do not persist invalid config, inform user of problem
-                gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Settings error", f"You cannot make this change to the project's settings:\n{exc}", gt_gui.msg_box.MsgBox.error, more=gt_gui.utils.get_traceback(type(exc), exc, exc.__traceback__))
+        fields = [f for f in config.event_setup_display_order if f in config.EventSetup.__optional_keys__] + [f for f in config.EventSetup.__optional_keys__ if f not in config.event_setup_display_order]
+        fixed_fields = type_utils.NestedDict({k:None for k in ['name', 'event_type']})
+        marked_for_deletion = []
+        for i,cs in enumerate(self.study_config.coding_setup):
+            problem_fields = None
+            if 'coding_setup' in self._problems_cache and i in self._problems_cache['coding_setup']:
+                problem_fields = self._problems_cache['coding_setup'][i]
+            extra = ''
+            lbl = f'{cs['name']} ({annotation.tooltip_map[cs['event_type']]})'
+            if (has_error:=problem_fields):
+                extra = '*'
+                imgui.push_style_color(imgui.Col_.text, colors.error)
+            if imgui.tree_node_ex(f'{extra}{lbl}###{i}', imgui.TreeNodeFlags_.framed):
+                if has_error:
+                    imgui.pop_style_color()
+                changed, new_coding_config, _ = settings_editor.draw(
+                    copy.deepcopy(self.study_config.coding_setup[i]),
+                    fields,
+                    config.EventSetup.__annotations__ | {'auto_code': typing.Union[config.AutoCodeEpisodes if annotation.type_map[cs['event_type']]==annotation.Type.Interval else config.AutoCodeSyncPoints,None]},
+                    config.EventSetup._field_defaults,
+                    self._possible_value_getters, problems=problem_fields, fixed=fixed_fields, documentation=config.event_setup_doc)
+                if changed:
+                    try:
+                        new_config = copy.deepcopy(self.study_config)
+                        new_config.coding_setup[i] = new_coding_config
+                        new_config.check_valid(strict_check=False)
+                    except Exception as exc:
+                        # do not persist invalid config, inform user of problem
+                        gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Settings error", f"You cannot make this change to the project's settings:\n{exc}", gt_gui.msg_box.MsgBox.error, more=gt_gui.utils.get_traceback(type(exc), exc, exc.__traceback__))
+                    else:
+                        # persist changed config
+                        self.study_config = new_config
+                        self.study_config.store_as_json()
+                        self._update_shown_actions_for_config()
+                if imgui.button(ifa6.ICON_FA_TRASH_CAN+f' delete "{cs["name"]}" coding###{i}'):
+                    marked_for_deletion.append(i)
+                imgui.tree_pop()
             else:
-                # persist changed config
-                self.study_config = new_config
-                self.study_config.store_as_json()
-                self._update_shown_actions_for_config()
+                if has_error:
+                    imgui.pop_style_color()
+        if marked_for_deletion:
+            for idx in sorted(marked_for_deletion, reverse=True):
+                del self.study_config.coding_setup[idx]
+            self.study_config.store_as_json()
+            self._update_shown_actions_for_config()
+        if imgui.button('+ new coding'):
+            new_coding_name = ''
+            new_coding_type: annotation.EventType|None = None
+            def _valid_coding_name():
+                return new_coding_name and not any((cs['name']==new_coding_name for cs in self.study_config.coding_setup))
+            def _add_coding_popup():
+                nonlocal new_coding_name
+                nonlocal new_coding_type
+                imgui.dummy(((30+30*(new_coding_type==plane.Type.GlassesValidator))*imgui.calc_text_size('x').x,0))
+                if imgui.begin_table("##new_coding_info",2):
+                    imgui.table_setup_column("##new_coding_infos_left", imgui.TableColumnFlags_.width_fixed)
+                    imgui.table_setup_column("##new_coding_infos_right", imgui.TableColumnFlags_.width_stretch)
+                    imgui.table_next_row()
+                    imgui.table_next_column()
+                    imgui.align_text_to_frame_padding()
+                    invalid = not _valid_coding_name()
+                    if invalid:
+                        imgui.push_style_color(imgui.Col_.text, colors.error)
+                    imgui.text("Coding name")
+                    if invalid:
+                        imgui.pop_style_color()
+                    imgui.table_next_column()
+                    imgui.set_next_item_width(-1)
+                    _,new_coding_name = imgui.input_text("##new_coding_name",new_coding_name)
+                    imgui.table_next_row()
+                    imgui.table_next_column()
+                    imgui.align_text_to_frame_padding()
+                    invalid = new_coding_type is None
+                    if invalid:
+                        imgui.push_style_color(imgui.Col_.text, colors.error)
+                    imgui.text("Coding type")
+                    if invalid:
+                        imgui.pop_style_color()
+                    imgui.table_next_column()
+                    imgui.set_next_item_width(-1)
+                    c_idx = annotation.event_types.index(new_coding_type) if new_coding_type is not None else -1
+                    _,c_idx = imgui.combo("##coding_type_selector", c_idx, [c.name for c in annotation.event_types])
+                    new_coding_type = None if c_idx==-1 else annotation.event_types[c_idx]
+                    imgui.end_table()
+
+            buttons = {
+                ifa6.ICON_FA_CHECK+" Create plane": (lambda: callbacks.make_coding_setup(self, new_coding_name, new_coding_type), lambda: not _valid_coding_name() or new_coding_type is None),
+                ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
+            }
+            gt_gui.utils.push_popup(self, lambda: gt_gui.utils.popup("Add plane", _add_coding_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, outside=False))
 
     def _individual_marker_setup_pane_drawer(self):
         if any((x in self._problems_cache for x in ['individual_markers'])):

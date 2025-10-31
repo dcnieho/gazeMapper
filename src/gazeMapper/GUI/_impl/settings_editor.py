@@ -117,8 +117,11 @@ def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_get
             if n_type is not None:
                 for vt,nt in zip(v_type,n_type):
                     f_type = _replace_type_arg(f_type, base_type, vt, nt)
-        case typing.Union if f_type==typing.Union[str, pathlib.Path]:
-            is_dict = False
+        case typing.Union:
+            if f_type==typing.Union[str, pathlib.Path]:
+                is_dict = False
+            if all(typed_dict_defaults.is_typeddictdefault(t) for t in typing.get_args(f_type)):
+                is_dict = True
         case _ if issubclass(f_type, enum.Enum):
             is_dict = False
         case _:

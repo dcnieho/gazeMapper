@@ -10,6 +10,7 @@ from glassesTools import annotation, aruco, camera_recording, gaze_worldref, jso
 from glassesTools.validation import DataQualityType, get_DataQualityType_explanation
 
 from . import marker, plane, session, typed_dict_defaults, type_utils, utils
+from .GUI._impl import utils as gui_utils
 
 
 class AutoCodeSyncPoints(typed_dict_defaults.TypedDictDefault, total=False):
@@ -47,6 +48,42 @@ class CamMovementForEtSyncFunction(typed_dict_defaults.TypedDictDefault, total=F
     function        : str
     parameters      : dict[str,Any] = typed_dict_defaults.Field(default_factory=lambda: {})
 
+class EtSyncSetup(typed_dict_defaults.TypedDictDefault, total=False):
+    get_cam_movement_method     : Literal['plane','function']       = 'plane'
+    get_cam_movement_function   : CamMovementForEtSyncFunction|None = None
+    use_average                 : bool                              = True
+
+class ValidationSetup(typed_dict_defaults.TypedDictDefault, total=False):
+    do_global_shift             : bool                      = True
+    max_dist_fac                : float                     = .5
+    dq_types                    : set[DataQualityType]|None = None
+    allow_dq_fallback           : bool                      = False
+    include_data_loss           : bool                      = False
+    I2MC_settings               : I2MCSettings|None         = None
+    dynamic_skip_first_duration : float                     = .2
+    dynamic_max_gap_duration    : int                       = 4
+    dynamic_min_duration        : int                       = 6
+
+class EventSetup(typed_dict_defaults.TypedDictDefault, total=False):
+    event_type      : annotation.EventType
+    name            : str
+    description     : str = ''
+    hotkey          : str|None = None
+    planes          : set[str] = typed_dict_defaults.Field(default_factory=lambda: set())
+    auto_code       : AutoCodeSyncPoints|AutoCodeEpisodes|None = None
+    sync_setup      : EtSyncSetup|None = None
+    validation_setup: ValidationSetup|None = None
+event_setup_display_order = [
+    'event_type',
+    'name',
+    'description',
+    'hotkey',
+    'planes',
+    'auto_code',
+    'sync_setup',
+    'validation_setup',
+]
+
 class RgbColor(typing.NamedTuple):
     r: int = 0
     g: int = 0
@@ -58,56 +95,35 @@ class Study:
 
     @typeguard.typechecked(collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
     def __init__(self,
-                 session_def                                    : session.SessionDefinition,
-                 planes                                         : list[plane.Definition],
-                 planes_per_episode                             : dict[annotation.EventType,set[str]],
-                 episodes_to_code                               : set[annotation.EventType],
-                 individual_markers                             : list[marker.Marker],
-                 working_directory                              : str|pathlib.Path,
+                 session_def                                : session.SessionDefinition,
+                 planes                                     : list[plane.Definition],
+                 individual_markers                         : list[marker.Marker],
+                 coding_setup                               : list[EventSetup],
+                 working_directory                          : str|pathlib.Path,
 
                  # setup with defaults
-                 import_do_copy_video                           : bool                              = True,
-                 import_source_dir_as_relative_path             : bool                              = False,
-                 import_known_custom_eye_trackers               : list[str]|None                    = None,
 
-                 head_attached_recordings_replace_et_scene      : set[str]|None                     = None,
+                 import_do_copy_video                       : bool                          = True,
+                 import_source_dir_as_relative_path         : bool                          = False,
+                 import_known_custom_eye_trackers           : list[str]|None                = None,
 
-                 overlay_video_gaze_vid_pos_color               : RgbColor                          = RgbColor(  0,255,  0),
-                 overlay_video_gaze_world_pos_color             : RgbColor|None                     = RgbColor(255,  0,255),
-                 overlay_video_gaze_vid_pos_radius              : int                               = 8,
-                 overlay_video_gaze_world_pos_radius            : int                               = 5,
-                 overlay_video_gaze_vid_pos_thickness           : int                               = 2,
-                 overlay_video_gaze_world_pos_thickness         : int                               = -1,
+                 head_attached_recordings_replace_et_scene  : set[str]|None                 = None,
 
-                 sync_ref_recording                             : str|None                          = None,
-                 sync_ref_do_time_stretch                       : bool|None                         = None,
-                 sync_ref_stretch_which                         : Literal['ref','other']|None       = None,
-                 sync_ref_average_recordings                    : set[str]|None                     = None,
+                 overlay_video_gaze_vid_pos_color           : RgbColor                      = RgbColor(  0,255,  0),
+                 overlay_video_gaze_world_pos_color         : RgbColor|None                 = RgbColor(255,  0,255),
+                 overlay_video_gaze_vid_pos_radius          : int                           = 8,
+                 overlay_video_gaze_world_pos_radius        : int                           = 5,
+                 overlay_video_gaze_vid_pos_thickness       : int                           = 2,
+                 overlay_video_gaze_world_pos_thickness     : int                           = -1,
 
-                 get_cam_movement_for_et_sync_method            : Literal['','plane','function']    = '',
-                 get_cam_movement_for_et_sync_function          : CamMovementForEtSyncFunction|None = None,
-                 sync_et_to_cam_use_average                     : bool                              = True,
+                 sync_ref_recording                         : str|None                      = None,
+                 sync_ref_do_time_stretch                   : bool|None                     = None,
+                 sync_ref_stretch_which                     : Literal['ref','other']|None   = None,
+                 sync_ref_average_recordings                : set[str]|None                 = None,
 
-                 auto_code_sync_points                          : AutoCodeSyncPoints|None           = None,
-                 auto_code_episodes                             : dict[Literal[
-                                                                    annotation.EventType.Sync_ET_Data,
-                                                                    annotation.EventType.Trial,
-                                                                    annotation.EventType.Validate],
-                                                                  AutoCodeEpisodes]|None            = None,
-
-                 export_output3D                                : bool                              = False,
-                 export_output2D                                : bool                              = True,
-                 export_only_code_marker_presence               : bool                              = True,
-
-                 validate_do_global_shift                       : bool                              = True,
-                 validate_max_dist_fac                          : float                             = .5,
-                 validate_dq_types                              : set[DataQualityType]|None         = None,
-                 validate_allow_dq_fallback                     : bool                              = False,
-                 validate_include_data_loss                     : bool                              = False,
-                 validate_I2MC_settings                         : I2MCSettings|None                 = None,
-                 validate_dynamic_skip_first_duration           : float                             = .2,
-                 validate_dynamic_max_gap_duration              : int                               = 4,
-                 validate_dynamic_min_duration                  : int                               = 6,
+                 export_output3D                            : bool                          = False,
+                 export_output2D                            : bool                          = True,
+                 export_only_code_marker_presence           : bool                          = True,
 
                  mapped_video_make_which                               : set[str]|None                     = None,
                  mapped_video_recording_colors                         : dict[str,RgbColor]|None           = None,
@@ -133,56 +149,38 @@ class Study:
                  mapped_video_which_gaze_type_on_plane_allow_fallback  : bool                              = True,
                  mapped_video_gaze_to_plane_margin                     : float                             = 0.25,
 
-                 gui_num_workers                                : int                               = 2,
+                 gui_num_workers                            : int                           = 2,
 
                  # not a class member
-                 strict_check                                   : bool                              = True
-                 ):
-        self.session_def                                    = session_def
-        self.planes                                         = planes
-        self.planes_per_episode                             = planes_per_episode
-        self.episodes_to_code                               = episodes_to_code
-        self.individual_markers                             = individual_markers
-        self.working_directory                              = working_directory
+                 strict_check                               : bool                          = True
+        ):
+        self.session_def                                = session_def
+        self.planes                                     = planes
+        self.individual_markers                         = individual_markers
+        self.coding_setup                               = coding_setup
+        self.working_directory                          = working_directory
 
-        self.import_do_copy_video                           = import_do_copy_video
-        self.import_source_dir_as_relative_path             = import_source_dir_as_relative_path
-        self.import_known_custom_eye_trackers               = import_known_custom_eye_trackers
+        self.import_do_copy_video                       = import_do_copy_video
+        self.import_source_dir_as_relative_path         = import_source_dir_as_relative_path
+        self.import_known_custom_eye_trackers           = import_known_custom_eye_trackers
 
-        self.head_attached_recordings_replace_et_scene      = head_attached_recordings_replace_et_scene
+        self.head_attached_recordings_replace_et_scene  = head_attached_recordings_replace_et_scene
 
-        self.overlay_video_gaze_vid_pos_color               = overlay_video_gaze_vid_pos_color
-        self.overlay_video_gaze_world_pos_color             = overlay_video_gaze_world_pos_color
-        self.overlay_video_gaze_vid_pos_radius              = overlay_video_gaze_vid_pos_radius
-        self.overlay_video_gaze_world_pos_radius            = overlay_video_gaze_world_pos_radius
-        self.overlay_video_gaze_vid_pos_thickness           = overlay_video_gaze_vid_pos_thickness
-        self.overlay_video_gaze_world_pos_thickness         = overlay_video_gaze_world_pos_thickness
+        self.overlay_video_gaze_vid_pos_color           = overlay_video_gaze_vid_pos_color
+        self.overlay_video_gaze_world_pos_color         = overlay_video_gaze_world_pos_color
+        self.overlay_video_gaze_vid_pos_radius          = overlay_video_gaze_vid_pos_radius
+        self.overlay_video_gaze_world_pos_radius        = overlay_video_gaze_world_pos_radius
+        self.overlay_video_gaze_vid_pos_thickness       = overlay_video_gaze_vid_pos_thickness
+        self.overlay_video_gaze_world_pos_thickness     = overlay_video_gaze_world_pos_thickness
 
-        self.get_cam_movement_for_et_sync_method            = get_cam_movement_for_et_sync_method
-        self.get_cam_movement_for_et_sync_function          = get_cam_movement_for_et_sync_function
-        self.sync_et_to_cam_use_average                     = sync_et_to_cam_use_average
+        self.sync_ref_recording                         = sync_ref_recording
+        self.sync_ref_do_time_stretch                   = sync_ref_do_time_stretch
+        self.sync_ref_stretch_which                     = sync_ref_stretch_which
+        self.sync_ref_average_recordings                = sync_ref_average_recordings
 
-        self.sync_ref_recording                             = sync_ref_recording
-        self.sync_ref_do_time_stretch                       = sync_ref_do_time_stretch
-        self.sync_ref_stretch_which                         = sync_ref_stretch_which
-        self.sync_ref_average_recordings                    = sync_ref_average_recordings
-
-        self.auto_code_sync_points                          = auto_code_sync_points
-        self.auto_code_episodes                             = auto_code_episodes
-
-        self.export_output3D                                = export_output3D
-        self.export_output2D                                = export_output2D
-        self.export_only_code_marker_presence               = export_only_code_marker_presence
-
-        self.validate_do_global_shift                       = validate_do_global_shift
-        self.validate_max_dist_fac                          = validate_max_dist_fac
-        self.validate_dq_types                              = validate_dq_types
-        self.validate_allow_dq_fallback                     = validate_allow_dq_fallback
-        self.validate_include_data_loss                     = validate_include_data_loss
-        self.validate_I2MC_settings                         = validate_I2MC_settings
-        self.validate_dynamic_skip_first_duration           = validate_dynamic_skip_first_duration
-        self.validate_dynamic_max_gap_duration              = validate_dynamic_max_gap_duration
-        self.validate_dynamic_min_duration                  = validate_dynamic_min_duration
+        self.export_output3D                            = export_output3D
+        self.export_output2D                            = export_output2D
+        self.export_only_code_marker_presence           = export_only_code_marker_presence
 
         self.mapped_video_make_which                               = mapped_video_make_which
         self.mapped_video_recording_colors                         = mapped_video_recording_colors
@@ -208,32 +206,43 @@ class Study:
         self.mapped_video_which_gaze_type_on_plane_allow_fallback  = mapped_video_which_gaze_type_on_plane_allow_fallback
         self.mapped_video_gaze_to_plane_margin                     = mapped_video_gaze_to_plane_margin                      # fraction of plane size, added to each side of the plane
 
-        self.gui_num_workers                                = gui_num_workers
+        self.gui_num_workers                            = gui_num_workers
 
         self.check_valid(strict_check=strict_check)
 
     def check_valid(self, strict_check=True):
+        # ensure typed dicts with defaults members are of the right class, and apply defaults
+        cs_type = typing.get_args(gt_utils.unpack_none_union(study_parameter_types['coding_setup'])[0])[0]
+        for i in range(len(self.coding_setup)):
+            # ensure correct type and apply defaults for main container
+            self.coding_setup[i] = cs_type(self.coding_setup[i])
+            self.coding_setup[i].apply_defaults()
+            cs = self.coding_setup[i]
+            # ensure correct type and apply defaults for nested typed dicts
+            if cs.get('auto_code') is not None:
+                ac_type = AutoCodeSyncPoints if annotation.type_map[cs['event_type']]==annotation.Type.Point else AutoCodeEpisodes
+                cs['auto_code'] = ac_type(cs['auto_code'])
+                cs['auto_code'].apply_defaults()
+            if cs.get('sync_setup') is not None:
+                cs['sync_setup'] = EtSyncSetup(cs['sync_setup'])
+                cs['sync_setup'].apply_defaults()
+                if cs['sync_setup'].get('get_cam_movement_function') is not None:
+                    cs['sync_setup']['get_cam_movement_function'] = CamMovementForEtSyncFunction(cs['sync_setup']['get_cam_movement_function'])
+                    cs['sync_setup']['get_cam_movement_function'].apply_defaults()
+            if cs.get('validation_setup') is not None:
+                cs['validation_setup'] = ValidationSetup(cs['validation_setup'])
+                cs['validation_setup'].apply_defaults()
+                if cs['validation_setup'].get('I2MC_settings') is not None:
+                    cs['validation_setup']['I2MC_settings'] = I2MCSettings(cs['validation_setup']['I2MC_settings'])
+                    cs['validation_setup']['I2MC_settings'].apply_defaults()
+
         if strict_check:
             self._check_session_def(strict_check)
-            self._check_planes_per_episode(strict_check)
-            self._check_episodes_to_code(strict_check)
+            self._check_coding_setup(strict_check)
             self._check_individual_markers(strict_check)
             self._check_head_attached_recordings(strict_check)
             self._check_sync_ref(strict_check)
-            self._check_et_sync_method(strict_check)
-            self._check_auto_coding_setup(strict_check)
             self._check_make_video(strict_check)
-
-        # ensure typed dicts with defaults members are of the right class, and apply defaults
-        to_check = {k:t for k in study_parameter_types if typed_dict_defaults.is_typeddictdefault(t:=gt_utils.unpack_none_union(study_parameter_types[k])[0])}
-        for k in to_check:
-            if getattr(self,k) is not None:
-                setattr(self,k, to_check[k](getattr(self,k)))
-                getattr(self,k).apply_defaults()
-        if self.auto_code_episodes is not None:
-            self.auto_code_episodes = {e: AutoCodeEpisodes(self.auto_code_episodes[e]) for e in self.auto_code_episodes}
-            for e in self.auto_code_episodes:
-                self.auto_code_episodes[e].apply_defaults()
 
     def _check_recordings(self, which: list[str]|None, field: str, strict_check) -> type_utils.ProblemDict:
         problems: type_utils.ProblemDict = {}
@@ -290,13 +299,11 @@ class Study:
                         type_utils.merge_problem_dicts(problems, {'session_def': {r.name: msg}})
         return problems
 
-    def _check_planes_per_episode(self, strict_check) -> type_utils.ProblemDict:
+    def _check_coding_setup(self, strict_check) -> type_utils.ProblemDict:
         problems: type_utils.ProblemDict = {}
-        if not self.planes_per_episode:
-            type_utils.merge_problem_dicts(problems, {'planes_per_episode': 'At minimum one episode should have a corresponding plane defined'})
-        for e in self.planes_per_episode:
+        for i, cs in enumerate(self.coding_setup):
             missing_planes: list[str] = []
-            for p in self.planes_per_episode[e]:
+            for p in cs['planes']:
                 if not any([p==pl.name for pl in self.planes]):
                     if strict_check:
                         raise ValueError(f'Plane {p} not known')
@@ -304,14 +311,16 @@ class Study:
                         missing_planes.append(p)
             if missing_planes:
                 mp = '", "'.join(missing_planes)
-                type_utils.merge_problem_dicts(problems, {'planes_per_episode': {e: f'Plane(s) "{mp}" not known.'}})
+                type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'planes': f'Plane(s) "{mp}" not known.'}}})
 
             # check correct number of planes is defined for the episode
-            match e:
+            allow_one_plane = False
+            allow_more_than_one = False
+            match (e:=cs['event_type']):
                 case annotation.EventType.Sync_Camera:
                     allow_one_plane = allow_more_than_one = False
                 case annotation.EventType.Sync_ET_Data:
-                    if self.get_cam_movement_for_et_sync_method=='plane':
+                    if cs['sync_setup'] is not None and cs['sync_setup'].get('get_cam_movement_method','')=='plane':
                         allow_one_plane = True
                         allow_more_than_one = False
                     else:
@@ -321,166 +330,185 @@ class Study:
                     allow_more_than_one = False
                 case annotation.EventType.Trial:
                     allow_one_plane = allow_more_than_one = True
-            if not allow_one_plane:
-                msg = f'No planes should be defined for a {annotation.tooltip_map[e]}. Remove entry, even if its empty.'
+            if not allow_one_plane and cs['planes']:
+                msg = f'No planes should be defined for a {annotation.tooltip_map[e]} episode.'
                 if e==annotation.EventType.Sync_ET_Data:
-                    msg += ' Alternatively, you may want to set the get_cam_movement_for_et_sync_method on the main options panel to "Plane".'
+                    msg += ' Alternatively, you may want to set the sync_setup.get_cam_movement_method for this episode to "plane".'
                 if strict_check:
                     raise ValueError(msg)
                 else:
-                    type_utils.merge_problem_dicts(problems, {'planes_per_episode': {e: msg}})
-            elif not self.planes_per_episode[e]:
+                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'planes': msg}}})
+            elif allow_one_plane and not cs['planes']:
                 msg = ('At least one' if allow_more_than_one else 'One')+f' plane should be defined for a {annotation.tooltip_map[e]}'
                 if strict_check:
                     raise ValueError(msg)
                 else:
-                    type_utils.merge_problem_dicts(problems, {'planes_per_episode': {e: msg}})
-            if not allow_more_than_one and len(self.planes_per_episode[e])>1:
+                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'planes': msg}}})
+            if not allow_more_than_one and len(cs['planes'])>1:
                 msg = f'Only one plane should be defined for a {annotation.tooltip_map[e]}'
                 if strict_check:
                     raise ValueError(msg)
                 else:
-                    type_utils.merge_problem_dicts(problems, {'planes_per_episode': {e: msg}})
+                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'planes': msg}}})
 
-        for e in self.episodes_to_code:
-            if e not in self.planes_per_episode and e!=annotation.EventType.Sync_Camera and (e==annotation.EventType.Sync_ET_Data and self.get_cam_movement_for_et_sync_method=='plane'):
-                msg = f'{annotation.tooltip_map[e]}s are set up to be coded and require an associated plane, but no plane(s) are defined in planes_per_episode for {annotation.tooltip_map[e]}s'
+            # check hotkey
+            if cs.get('hotkey') is not None and not gui_utils.is_valid_imgui_key(cs['hotkey']):
+                msg = f'Hotkey "{cs["hotkey"]}" is not a valid ImGui key name'
                 if strict_check:
                     raise ValueError(msg)
                 else:
-                    type_utils.merge_problem_dicts(problems, {'planes_per_episode': msg})
-        return problems
+                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'hotkey': msg}}})
 
-    def _check_episodes_to_code(self, strict_check) -> type_utils.ProblemDict:
-        problems: type_utils.ProblemDict = {}
-        if not self.episodes_to_code:
-            type_utils.merge_problem_dicts(problems, {'episodes_to_code': 'At minimum one episode should be selected to be coded'})
-        if annotation.EventType.Sync_ET_Data in self.episodes_to_code and self.get_cam_movement_for_et_sync_method=='':
-            type_utils.merge_problem_dicts(problems, {'episodes_to_code': f'{annotation.tooltip_map[annotation.EventType.Sync_ET_Data]} should not be listed in the episodes to be coded if there is no method for plane synchronization (get_cam_movement_for_et_sync_method) specified.'})
-
-        for e in self.planes_per_episode:
-            if e not in self.episodes_to_code:
-                if strict_check:
-                    raise ValueError(f'Plane(s) are defined in planes_per_episode for {annotation.tooltip_map[e]}s, but {annotation.tooltip_map[e]}s are not set up to be coded in episodes_to_code. Fix episodes_to_code.')
-                else:
-                    type_utils.merge_problem_dicts(problems, {'episodes_to_code': f'Plane(s) are defined in planes_per_episode for {annotation.tooltip_map[e]}s, but {annotation.tooltip_map[e]}s are not set up to be coded'})
-                    type_utils.merge_problem_dicts(problems, {'planes_per_episode': {e: f'{annotation.tooltip_map[e]}s are not set up to be coded in episodes_to_code, so no plane(s) should be set up for {annotation.tooltip_map[e]}s.'}})
-        return problems
-
-    def _check_auto_coding_setup(self, strict_check) -> type_utils.ProblemDict:
-        problems = self._check_auto_markers(strict_check)
-        this_problems: type_utils.ProblemDict = {}
-        if self.auto_code_sync_points:
-            if annotation.EventType.Sync_Camera not in self.episodes_to_code:
-                if strict_check:
-                    raise ValueError(f'The auto_code_sync_points option is configured, but {annotation.tooltip_map[annotation.EventType.Sync_Camera]}s are not set to be coded in episodes_to_code. Fix episodes_to_code.')
-                else:
-                    this_problems['episodes_to_code'] = f'The auto_code_sync_points option is configured, but {annotation.tooltip_map[annotation.EventType.Sync_Camera]}s are not set to be coded in episodes_to_code.'
-                    this_problems['auto_code_sync_points'] = f'The auto_code_sync_points option is configured, but {annotation.tooltip_map[annotation.EventType.Sync_Camera]}s are not set to be coded in episodes_to_code. Fix episodes_to_code or remove auto_code_sync_points setup.'
-        if self.auto_code_episodes:
-            for e in self.auto_code_episodes:
-                if e not in self.episodes_to_code:
+            # check sync setup for ET sync episodes
+            if e==annotation.EventType.Sync_ET_Data:
+                if cs['sync_setup'] is None:
+                    msg = f'Sync setup should be defined for a {annotation.tooltip_map[e]} episode.'
                     if strict_check:
-                        raise ValueError(f'Coding of {annotation.tooltip_map[e]}s is configured in the auto_code_episodes option, but {annotation.tooltip_map[e]}s are not set to be coded in episodes_to_code. Fix episodes_to_code.')
+                        raise ValueError(msg)
                     else:
-                        this_problems['episodes_to_code'] = f'Coding of {annotation.tooltip_map[e]}s is configured in the auto_code_episodes option, but {annotation.tooltip_map[e]}s are not set to be coded in episodes_to_code.'
-                        this_problems['auto_code_episodes'] = f'Coding of {annotation.tooltip_map[e]}s is configured in the auto_code_episodes option, but {annotation.tooltip_map[e]}s are not set to be coded in episodes_to_code. Fix episodes_to_code or remove {annotation.tooltip_map[e]}s from the auto_code_episodes setup.'
-        return type_utils.merge_problem_dicts(problems,this_problems)
+                        type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'sync_setup': msg}}})
+                else:
+                    cam_mov_possible_values = typing.get_args(EtSyncSetup.__annotations__['get_cam_movement_method'])
+                    if cs['sync_setup'].get('get_cam_movement_method') not in cam_mov_possible_values:
+                        values = list(cam_mov_possible_values)
+                        values_str = '"' + '", "'.join(values) + '"'
+                        temp = values_str.partition(f'"{values[-1]}"')
+                        values_str = temp[0] + 'or ' + temp[1]
+                        msg = f'sync_setup.get_cam_movement_method parameter should be {values_str}'
+                        if strict_check:
+                            raise ValueError(msg)
+                        else:
+                            type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'sync_setup': {'get_cam_movement_method': msg}}}})
+                        # nothing further to check, return
+                        return problems
+
+                    msg = None
+                    if cs['sync_setup'].get('get_cam_movement_method')=='function':
+                        if cs['sync_setup'].get('get_cam_movement_function') is None:
+                            msg = f'Camera movement function should be defined for a {annotation.tooltip_map[e]} episode when the get_cam_movement_method is set to "function".'
+                            if strict_check:
+                                raise ValueError(msg)
+                            else:
+                                type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'sync_setup': msg}}})
+                        else:
+                            keys = CamMovementForEtSyncFunction.__required_keys__
+                            this_problems = {k:f'sync_setup.get_cam_movement_function.{k} should be set when sync_setup.get_cam_movement_method is set to "function"' for k in keys if k not in cs['sync_setup'].get('get_cam_movement_function') or not cs['sync_setup'].get('get_cam_movement_function')[k]}
+                            if this_problems:
+                                if strict_check:
+                                    raise ValueError('\n'.join(this_problems.values()))
+                                else:
+                                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'sync_setup': {'get_cam_movement_function': this_problems}}}})
+                        if cs['planes']:
+                            msg = f'No planes should be defined for a {annotation.tooltip_map[e]} episode unless the get_cam_movement_method is set to "plane".'
+                            if strict_check:
+                                raise ValueError(msg)
+                            else:
+                                type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'sync_setup': msg}}})
+                    elif cs['sync_setup'].get('get_cam_movement_method')=='plane':
+                        if not cs['planes']:
+                            msg = f'A plane should be defined for a {annotation.tooltip_map[e]} episode when the get_cam_movement_method is set to "plane".'
+                            if strict_check:
+                                raise ValueError(msg)
+                            else:
+                                type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'sync_setup': msg}}})
+
+            # check auto coding setup
+            if cs.get('auto_code') is not None:
+                if annotation.type_map[cs['event_type']]==annotation.Type.Point:
+                    keys = AutoCodeSyncPoints.__required_keys__
+                    fields = ['markers']
+                else:
+                    keys = AutoCodeEpisodes.__required_keys__
+                    fields = ['start_markers','end_markers']
+
+                this_problems = {k:f'auto_code.{k} should be set for a {annotation.tooltip_map[cs["event_type"]]} episode.' for k in keys if k not in cs['auto_code'] or not cs['auto_code'][k]}
+                if this_problems:
+                    if strict_check:
+                        raise ValueError('\n'.join(this_problems.values()))
+                    else:
+                        type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'auto_code': this_problems}}})
+                else:
+                    for f in fields:
+                        if f not in cs['auto_code'] or not cs['auto_code'][f]:
+                            msg = f'auto_code.{f} cannot be empty for a {annotation.tooltip_map[cs["event_type"]]} episode.'
+                            if strict_check:
+                                raise ValueError(msg)
+                            else:
+                                type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'auto_code': {f: msg}}}})
+                        else:
+                            missing_markers: list[gt_marker.MarkerID] = []
+                            for m in cs['auto_code'][f]:
+                                if not any([m.m_id==im.id and m.aruco_dict_id==im.aruco_dict_id for im in self.individual_markers]):
+                                    missing_markers.append(m)
+                            if missing_markers:
+                                msg = f'Markers "{", ".join([gt_marker.marker_ID_to_str(m) for m in missing_markers])}" specified in auto_code.{f}, but unknown because not present in individual_markers.'
+                                if strict_check:
+                                    raise ValueError(msg)
+                                else:
+                                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'auto_code': {f: msg}}}})
+        return problems
 
     def _check_auto_markers(self, strict_check) -> type_utils.ProblemDict:
         problems: type_utils.ProblemDict = {}
-        used_markers: dict[tuple[str,str]|tuple[str,annotation.EventType,str],list[gt_marker.MarkerID]] = {}
-        if self.auto_code_sync_points:
-            if 'markers' not in self.auto_code_sync_points:
-                if strict_check:
-                    raise ValueError('auto_code_sync_points.markers cannot be empty or unspecified')
-                else:
-                    problems['auto_code_sync_points'] = {}
-                    problems['auto_code_sync_points']['markers'] = 'auto_code_sync_points.markers cannot be empty or unspecified'
-            else:
-                missing_markers: list[gt_marker.MarkerID] = []
-                for i in self.auto_code_sync_points['markers']:
-                    if not any([m.id==i.m_id and m.aruco_dict_id==i.aruco_dict_id for m in self.individual_markers]):
-                        if strict_check:
-                            raise ValueError(f'Marker "{gt_marker.marker_ID_to_str(i)}" specified in auto_code_sync_points.markers, but unknown because not present in individual_markers')
-                        else:
-                            missing_markers.append(i)
-                if missing_markers:
-                    problems['auto_code_sync_points'] = {}
-                    missing_markers = ', '.join((gt_marker.marker_ID_to_str(m) for m in missing_markers))
-                    problems['auto_code_sync_points']['markers'] = f'The marker(s) {missing_markers} are not defined in individual_markers'
-                used_markers[('auto_code_sync_points','markers')] = self.auto_code_sync_points['markers']
-        if self.auto_code_episodes:
-            for e in self.auto_code_episodes:
-                for f in ['start_markers','end_markers']:
-                    if f not in self.auto_code_episodes[e] or not self.auto_code_episodes[e][f]:
-                        if strict_check:
-                            raise ValueError(f'auto_code_episodes[{e}].{f} cannot be empty or unspecified')
-                        else:
-                            type_utils.merge_problem_dicts(problems, {'auto_code_episodes': {e: {f: f'auto_code_episodes[{e}].{f} cannot be empty or unspecified'}}})
-                    else:
-                        missing_markers: list[gt_marker.MarkerID] = []
-                        for i in self.auto_code_episodes[e][f]:
-                            if not any([m.id==i.m_id and m.aruco_dict_id==i.aruco_dict_id for m in self.individual_markers]):
-                                if strict_check:
-                                    raise ValueError(f'Marker "{gt_marker.marker_ID_to_str(i)}" specified in auto_code_episodes.[{e}].{f}, but unknown because not present in individual_markers')
-                                else:
-                                    missing_markers.append(i)
-                        if missing_markers:
-                            missing_markers = ', '.join((gt_marker.marker_ID_to_str(m) for m in missing_markers))
-                            type_utils.merge_problem_dicts(problems, {'auto_code_episodes': {e: {f: f'The marker(s) {missing_markers} are not defined in individual_markers'}}})
-                        used_markers[('auto_code_episodes',e,f)] = self.auto_code_episodes[e][f]
+        used_markers: dict[tuple[str,int,annotation.EventType,str],list[gt_marker.MarkerID]] = {}
+        for i, cs in enumerate(self.coding_setup):
+            e = cs['event_type']
+            if annotation.type_map[cs['event_type']]==annotation.Type.Point:
+                used_markers[('point',i,e,'markers')] = list(cs['auto_code']['markers'])
+            elif annotation.type_map[cs['event_type']]==annotation.Type.Interval:
+                used_markers[('episode',i,e,'start_markers')] = list(cs['auto_code']['start_markers'])
+                used_markers[('episode',i,e,'end_markers')]   = list(cs['auto_code']['end_markers'])
         # check if markers or marker sequences are uniquely used:
         # 1. marker used for auto_code_sync_points cannot appear anywhere else
         # 2. marker sequences used for auto_code_episodes must be unique (markers can be reused)
-        # first transform marker IDs to family so we can properly detect clashes
-        used_markers      : dict[tuple[str,str]|tuple[str,annotation.EventType,str],list[tuple[int,int]]] = {k:[(m.m_id, aruco.dict_id_to_family[m.aruco_dict_id]) for m in used_markers[k]] for k in used_markers}
+        # first transform marker dict IDs to family so we can properly detect clashes
+        used_markers_fam  : dict[tuple[str,int,annotation.EventType,str],list[tuple[int,int]]] = {k:[(m.m_id, aruco.dict_id_to_family[m.aruco_dict_id]) for m in used_markers[k]] for k in used_markers}
         seen_markers      : set[tuple[int,int]] = set()
         seen_markers_sets : set[tuple[tuple[int,int]]] = set()
-        def _format_key(key: tuple[str,str]|tuple[str,annotation.EventType,str]):
-            return f'{key[0]}.{key[1]}' if len(key)==2 else f'{key[0]}[{key[1]}].{key[2]}'
-        for s in used_markers:
+        def _format_key(key: tuple[str,int,annotation.EventType,str]):
+            return f'coding_setup[{key[1]}].auto_code' if key[3]=='markers' else f'coding_setup[{key[1]}].auto_code.{key[3]}'
+        for s in used_markers_fam:
             # first check if used markers are unique at the family level
             seen: set[tuple[int,int]] = set()
-            if (duplicates := {x for x in used_markers[s] if x in seen or seen.add(x)}):
-                msg = f'The markers defined for {_format_key(s)} are not unique. Please resolves the following duplicates: {utils.format_duplicate_markers_msg(duplicates)}'
+            if (duplicates := {x for x in used_markers_fam[s] if x in seen or seen.add(x)}):
+                msg = f'The markers defined for {_format_key(s)} are not unique. Please resolve the following duplicates: {utils.format_duplicate_markers_msg(duplicates)}'
                 if strict_check:
                     raise ValueError(msg)
                 else:
-                    type_utils.merge_problem_dicts(problems, {s[0]: ({s[1]: msg} if len(s)==2 else {s[1]: {s[2]: msg}})})
+                    type_utils.merge_problem_dicts(problems, {'coding_setup': {s[1]: {'auto_code': {s[3]: msg}}}})
             # then check if already used in another setup
-            if seen_markers.intersection(used_markers[s]):
+            if seen_markers.intersection(used_markers_fam[s]):
                 # markers not unique, make error. Find exactly where the overlap is
                 # yes, this is bad algorithmic complexity, but it only runs in failure cases
-                for s2 in used_markers:
-                    if s==s2 or s[0]=='auto_code_episodes' and s[0]==s2[0]:
-                        # if both are different entries in 'auto_code_episodes', that is not an error
-                        # for 'auto_code_episodes' we need to check marker sequences are unique, not
+                for s2 in used_markers_fam:
+                    if s==s2 or s[0]=='episode' and s[0]==s2[0]:
+                        # if both are different entries in 'episode', that is not an error
+                        # for 'episode' we need to check marker sequences are unique, not
                         # individual entries. e.g. start is 80 81, and end is 81 80 is valid
                         continue
-                    if (overlap:=set(used_markers[s2]).intersection(used_markers[s])):
+                    if (overlap:=set(used_markers_fam[s2]).intersection(used_markers_fam[s])):
                         msg = f'The following markers are encountered in the setup for both {_format_key(s)} and {_format_key(s2)}: {utils.format_duplicate_markers_msg(overlap)}. Markers cannot be used more than once, fix this collision.'
                         # emit error message
                         if strict_check:
                             raise ValueError(msg)
                         else:
                             for sx in (s,s2):
-                                type_utils.merge_problem_dicts(problems, {sx[0]: ({sx[1]: msg} if len(sx)==2 else {sx[1]: {sx[2]: msg}})})
-            seen_markers.update(used_markers[s])
+                                type_utils.merge_problem_dicts(problems, {'coding_setup': {sx[1]: {'auto_code': {sx[3]: msg}}}})
+            seen_markers.update(used_markers_fam[s])
             # check if marker sequence is already used
-            if seen_markers_sets.intersection((tuple(used_markers[s]),)):
-                for s2 in used_markers:
+            if seen_markers_sets.intersection((tuple(used_markers_fam[s]),)):
+                for s2 in used_markers_fam:
                     if s==s2:
                         continue
-                    if set((tuple(used_markers[s2]),)).intersection((tuple(used_markers[s]),)):
-                        msg = f'The marker sequence {utils.format_marker_sequence_msg(used_markers[s])} specified for {_format_key(s)} has already been used for {_format_key(s2)}. Markers sequences must be unique, please fix this collision.'
+                    if set((tuple(used_markers_fam[s2]),)).intersection((tuple(used_markers_fam[s]),)):
+                        msg = f'The marker sequence {utils.format_marker_sequence_msg(used_markers_fam[s])} specified for {_format_key(s)} has already been used for {_format_key(s2)}. Markers sequences must be unique, please fix this collision.'
                         # emit error message
                         if strict_check:
                             raise ValueError(msg)
                         else:
                             for sx in (s,s2):
-                                type_utils.merge_problem_dicts(problems, {sx[0]: {sx[1]: {sx[2]: msg}}})
-            seen_markers_sets.add(tuple(used_markers[s]))
+                                type_utils.merge_problem_dicts(problems, {'coding_setup': {sx[1]: {'auto_code': {sx[3]: msg}}}})
+            seen_markers_sets.add(tuple(used_markers_fam[s]))
         return problems
 
     def _check_individual_markers(self, strict_check):
@@ -559,54 +587,12 @@ class Study:
                 raise ValueError(f'Recording {self.sync_ref_recording} is the reference recording for sync, should not be specified in sync_average_recordings')
             else:
                 problems['sync_ref_average_recordings'] = f'Recording {self.sync_ref_recording} is the reference recording for sync, cannot be specified in sync_average_recordings'
-        if annotation.EventType.Sync_Camera not in self.episodes_to_code:
+        if not any(cs['event_type']==annotation.EventType.Sync_Camera for cs in self.coding_setup):
             if strict_check:
-                raise ValueError('when sync_ref_recording is set, coding of camera sync points should be set up in episodes_to_code')
+                raise ValueError('When sync_ref_recording is set, coding of camera sync points should be set up in coding_setup')
             else:
-                problems['episodes_to_code'] = f'if sync_ref_recording is set, {annotation.tooltip_map[annotation.EventType.Sync_Camera]}s should be set up to be coded'
-                type_utils.merge_problem_dicts(problems, {'sync_ref_recording': f'sync_ref_recording is set, but {annotation.tooltip_map[annotation.EventType.Sync_Camera]}s are not set up to be coded in episodes_to_code'})
-        return problems
-
-    def _check_et_sync_method(self, strict_check) -> type_utils.ProblemDict:
-        problems: type_utils.ProblemDict = {}
-        cam_mov_possible_values = typing.get_args(study_parameter_types['get_cam_movement_for_et_sync_method'])
-        if self.get_cam_movement_for_et_sync_method not in cam_mov_possible_values:
-            values = list(cam_mov_possible_values)
-            values.remove('')
-            values_str = '"' + '", "'.join(values) + '"'
-            temp = values_str.partition(f'"{values[-1]}"')
-            values_str = ('' if len(values)==1 else ', ') + temp[0] + 'or ' + temp[1]
-            if strict_check:
-                raise ValueError(f'get_cam_movement_for_et_sync_method parameter should be an empty string{values_str}')
-            else:
-                problems['get_cam_movement_for_et_sync_method'] = f'get_cam_movement_for_et_sync_method parameter should be an empty string{values_str}'
-
-        if self.get_cam_movement_for_et_sync_method not in ['plane', 'function']:
-            # nothing to do
-            return problems
-        if annotation.EventType.Sync_ET_Data not in self.episodes_to_code:
-            if strict_check:
-                raise ValueError(f'if get_cam_movement_for_et_sync_method is set to "plane" or "function", {annotation.tooltip_map[annotation.EventType.Sync_ET_Data]}s should be set up to be coded in episodes_to_code')
-            else:
-                problems['episodes_to_code'] = f'if get_cam_movement_for_et_sync_method is set to "plane" or "function", {annotation.tooltip_map[annotation.EventType.Sync_ET_Data]}s should be set up to be coded'
-                problems['get_cam_movement_for_et_sync_method'] = f'get_cam_movement_for_et_sync_method is set to "{self.get_cam_movement_for_et_sync_method}", but {annotation.tooltip_map[annotation.EventType.Sync_ET_Data]}s are not set up to be coded in episodes_to_code'
-        if self.get_cam_movement_for_et_sync_method=='function':
-            if strict_check:
-                if not self.get_cam_movement_for_et_sync_function or not all([x in self.get_cam_movement_for_et_sync_function for x in ["module_or_file","function","parameters"]]):
-                    raise ValueError('if get_cam_movement_for_et_sync_method is set to "function", get_cam_movement_for_et_sync_function should be a dict specifying "module_or_file", "function", and "parameters"')
-            else:
-                t = gt_utils.unpack_none_union(study_parameter_types['get_cam_movement_for_et_sync_function'])[0]
-                keys = t.__required_keys__|t.__optional_keys__
-                this_problems = {k:f'{k} should be set when get_cam_movement_for_et_sync_function is set to "function"' for k in keys if not self.get_cam_movement_for_et_sync_function or (k not in t._field_defaults and (k not in self.get_cam_movement_for_et_sync_function or not self.get_cam_movement_for_et_sync_function[k]))}
-                if this_problems:
-                    problems['get_cam_movement_for_et_sync_function'] = this_problems
-        elif self.get_cam_movement_for_et_sync_method=='plane':
-            if annotation.EventType.Sync_ET_Data not in self.planes_per_episode:
-                if strict_check:
-                    raise ValueError(f'if get_cam_movement_for_et_sync_method is set to "plane", a plane should be set up to be used for processing {annotation.tooltip_map[annotation.EventType.Sync_ET_Data]}s in planes_per_episode')
-                else:
-                    problems['planes_per_episode'] = f'if get_cam_movement_for_et_sync_method is set to "plane", a plane should be set up to be used for processing {annotation.tooltip_map[annotation.EventType.Sync_ET_Data]}s'
-                    type_utils.merge_problem_dicts(problems, {'get_cam_movement_for_et_sync_method': f'get_cam_movement_for_et_sync_method is set to "plane", but no plane specified for syncing eye tracker data to the scene cam (i.e., for {annotation.tooltip_map[annotation.EventType.Sync_ET_Data]}s) in planes_per_episode'})
+                problems['coding_setup'] = f'if sync_ref_recording is set, a {annotation.tooltip_map[annotation.EventType.Sync_Camera]}s should be set up to be coded'
+                type_utils.merge_problem_dicts(problems, {'sync_ref_recording': f'sync_ref_recording is set, but no {annotation.tooltip_map[annotation.EventType.Sync_Camera]}s are not set up to be coded in coding_setup'})
         return problems
 
     def _check_make_video(self, strict_check) -> type_utils.ProblemDict:
@@ -637,13 +623,10 @@ class Study:
     def field_problems(self) -> type_utils.ProblemDict:
         problems: type_utils.ProblemDict = {}
         type_utils.merge_problem_dicts(problems, self._check_session_def(False))
-        type_utils.merge_problem_dicts(problems, self._check_planes_per_episode(False))
-        type_utils.merge_problem_dicts(problems, self._check_episodes_to_code(False))
-        type_utils.merge_problem_dicts(problems, self._check_auto_coding_setup(False))
+        type_utils.merge_problem_dicts(problems, self._check_coding_setup(False))
         type_utils.merge_problem_dicts(problems, self._check_individual_markers(False))
         type_utils.merge_problem_dicts(problems, self._check_head_attached_recordings(False))
         type_utils.merge_problem_dicts(problems, self._check_sync_ref(False))
-        type_utils.merge_problem_dicts(problems, self._check_et_sync_method(False))
         type_utils.merge_problem_dicts(problems, self._check_make_video(False))
         return problems
 
@@ -651,8 +634,6 @@ class Study:
         if not path:
             path = guess_config_dir(self.working_directory)
         path = pathlib.Path(path)
-        # this stores only the planes_per_episode variable to json, rest is read from other files
-        # instead to remain flexible and make it easy for users to rename, etc
         f_path = path
         if f_path.is_dir():
             f_path /= self.default_json_file_name
@@ -660,20 +641,41 @@ class Study:
             path = f_path.parent
             # prep for dump to file
         to_dump = {k:copy.deepcopy(getattr(self,k)) for k in vars(self) if not k.startswith('_') and k not in ['session_def','planes','working_directory']}    # session_def and planes will be populated from contents in the provided folder, and working_directory as the provided path
-        to_dump['planes_per_episode'] = [(k, to_dump['planes_per_episode'][k]) for k in to_dump['planes_per_episode']]   # pack as list of tuples for storage
         # filter out defaulted
         to_dump = {k:to_dump[k] for k in to_dump if k not in study_defaults or study_defaults[k]!=to_dump[k]}
-        # also filter out defaults in some subfields
-        typed_dict_default_fields = [k for k in to_dump if typed_dict_defaults.is_typeddictdefault(gt_utils.unpack_none_union(study_parameter_types[k])[0])]
-        for k in typed_dict_default_fields:
-            to_dump[k] = {kk:to_dump[k][kk] for kk in to_dump[k] if kk not in to_dump[k]._field_defaults or to_dump[k]._field_defaults[kk]!=to_dump[k][kk]}
-            if not to_dump[k] and k in study_defaults and study_defaults[k] is not None:
-                to_dump.pop(k)
-        if 'auto_code_episodes' in to_dump:
-            for e in to_dump['auto_code_episodes']:
-                to_dump['auto_code_episodes'][e] = {kk:to_dump['auto_code_episodes'][e][kk] for kk in to_dump['auto_code_episodes'][e] if kk not in to_dump['auto_code_episodes'][e]._field_defaults or to_dump['auto_code_episodes'][e]._field_defaults[kk]!=to_dump['auto_code_episodes'][e][kk]}
-            # pack as list of tuples for storage
-            to_dump['auto_code_episodes'] = [(e, to_dump['auto_code_episodes'][e]) for e in to_dump['auto_code_episodes']]   # pack as list of tuples for storage
+        # also filter out defaults in some subfields, and ensure they are not typeddicts (json encoder balks over that)
+        def _remove_defaults_recursive(d: dict, defaults: dict, types: dict[str, typing.Type]) -> dict:
+            # check defaults
+            for k in defaults:
+                if isinstance(defaults[k], typed_dict_defaults.Field):
+                    defaults[k] = defaults[k].default_factory()
+
+            # NB: this also converts to plain dict, so json encoder can handle it
+            out = {}
+            for k in d:
+                if k in defaults and isinstance(d[k], dict):
+                    # recurse
+                    t_defaults = t_types = {}
+                    if typed_dict_defaults.is_typeddictdefault(it:=gt_utils.unpack_none_union(types[k])[0]):
+                        t_defaults = it._field_defaults
+                        t_types    = it.__annotations__
+                    elif typing.get_origin(it)==typing.Union and any((typed_dict_defaults.is_typeddictdefault(tt) for tt in typing.get_args(it))):
+                        # the only case where this happens is the AutoCodeSyncPoints|AutoCodeEpisodes case, so special case to select the right one
+                        if annotation.type_map[d['event_type']]==annotation.Type.Point:
+                            tt = AutoCodeSyncPoints
+                        else:
+                            tt = AutoCodeEpisodes
+                        t_defaults = tt._field_defaults
+                        t_types    = tt.__annotations__
+                    d[k] = _remove_defaults_recursive(d[k], t_defaults, t_types)
+
+                # now check if not equal to default. If not equal, store
+                if k not in defaults or d[k]!=defaults[k]:
+                    out[k] = d[k]
+            return out
+
+        to_dump['coding_setup'] = [_remove_defaults_recursive(cs, EventSetup._field_defaults, EventSetup.__annotations__) for cs in to_dump['coding_setup']]
+
         # dump to file
         json.dump(to_dump, f_path)
         # this doesn't store any files itself, but triggers the contained info to be stored
@@ -689,7 +691,7 @@ class Study:
         # returns a minimally set up config, with every required argument set empty, and the rest default-initialized
         return Study(
             session.SessionDefinition(),
-            [],{},set(),[],path,
+            [],[],[],path,
             strict_check=False
         )
 
@@ -702,86 +704,143 @@ class Study:
             d_path = path
         # get kwds
         kwds = json.load(d_path)
-        # fix up 'video_' parameters for backwards compatibility
-        for k in list(kwds.keys()):
-            if k.startswith('video_'):
-                kwds[f'mapped_{k}'] = kwds.pop(k)
-        # stored as list of tuples (with enum values as keys), unpack
-        kwds['planes_per_episode'] = {annotation.EventType(k):v for k,v in kwds['planes_per_episode']}
-        if 'auto_code_episodes' in kwds:
-            kwds['auto_code_episodes'] = {annotation.EventType(k):v for k,v in kwds['auto_code_episodes']}
-        # help with enum roundtrip
-        kwds['episodes_to_code'] = {annotation.EventType(e) for e in kwds['episodes_to_code']}
-        if 'validate_dq_types' in kwds:
-            kwds['validate_dq_types']= {DataQualityType(d) for d in kwds['validate_dq_types']}
-        if 'mapped_video_which_gaze_type_on_plane' in kwds:
-            kwds['mapped_video_which_gaze_type_on_plane'] = gaze_worldref.Type(kwds['mapped_video_which_gaze_type_on_plane'])
-        # backward compatibility: ensure value are stored in sets, not lists
-        kwds['planes_per_episode'] = {k:set(v) for k,v in kwds['planes_per_episode'].items()}
-        if 'sync_ref_average_recordings' in kwds:
-            kwds['sync_ref_average_recordings'] = set(kwds['sync_ref_average_recordings'])
-        if 'mapped_video_make_which' in kwds:
-            kwds['mapped_video_make_which'] = set(kwds['mapped_video_make_which'])
-        # backwards compatibility, help with named tuple roundtrip
-        for k in ('overlay_video_gaze_vid_pos_color','overlay_video_gaze_world_pos_color','mapped_video_projected_vidPos_color','mapped_video_projected_world_pos_color','mapped_video_projected_left_ray_color','mapped_video_projected_right_ray_color','mapped_video_projected_average_ray_color'):
-            if k in kwds and kwds[k] is not None and not isinstance(kwds[k],RgbColor):
-                kwds[k] = RgbColor(*kwds[k])
-        if 'mapped_video_recording_colors' in kwds and any((not isinstance(kwds['mapped_video_recording_colors'][k],RgbColor) for k in kwds['mapped_video_recording_colors'])):
-            kwds['mapped_video_recording_colors'] = {k: RgbColor(*kwds['mapped_video_recording_colors'][k]) for k in kwds['mapped_video_recording_colors']}
-        # backwards compatibility, rename 'auto_code_trial_episodes'
-        if 'auto_code_trial_episodes' in kwds:
-            kwds['auto_code_episodes'] = {annotation.EventType.Trial: kwds.pop('auto_code_trial_episodes')}
-        # backwards compatibility, upgrade markers to markerIDs if they're bare ints
-        if 'auto_code_sync_points' in kwds and kwds['auto_code_sync_points'] is not None and 'markers' in kwds['auto_code_sync_points']:
-            markers = kwds['auto_code_sync_points']['markers']
-            kwds['auto_code_sync_points']['markers'] = set()
-            for m in markers:
-                if not isinstance(m,int):
-                    kwds['auto_code_sync_points']['markers'].add(m)
-                    continue
-                # find corresponding marker in individual_markers
-                im = [im for im in kwds['individual_markers'] if im.id==m]
-                if not im:
-                    # incorrect setup, referring to a non-existing individual marker. ignore
-                    continue
-                else:
-                    kwds['auto_code_sync_points']['markers'].add(gt_marker.MarkerID(im[0].id, im[0].aruco_dict_id))
-        if 'auto_code_episodes' in kwds:
-            for e in kwds['auto_code_episodes']:
-                for f in ('start_markers','end_markers'):
-                    if not f in kwds['auto_code_episodes'][e]:
+
+        # backwards compatibility for version 1 project setups
+        if 'coding_setup' not in kwds:
+            # fix up 'video_' parameters for backwards compatibility
+            for k in list(kwds.keys()):
+                if k.startswith('video_'):
+                    kwds[f'mapped_{k}'] = kwds.pop(k)
+            # stored as list of tuples (with enum values as keys), unpack
+            if 'planes_per_episode' in kwds:
+                kwds['planes_per_episode'] = {annotation.EventType(k):v for k,v in kwds['planes_per_episode']}
+                if 'auto_code_episodes' in kwds:
+                    kwds['auto_code_episodes'] = {annotation.EventType(k):v for k,v in kwds['auto_code_episodes']}
+            # help with enum roundtrip
+            if 'episodes_to_code' in kwds:
+                kwds['episodes_to_code'] = {annotation.EventType(e) for e in kwds['episodes_to_code']}
+            if 'validate_dq_types' in kwds:
+                kwds['validate_dq_types']= {DataQualityType(d) for d in kwds['validate_dq_types']}
+            if 'mapped_video_which_gaze_type_on_plane' in kwds:
+                kwds['mapped_video_which_gaze_type_on_plane'] = gaze_worldref.Type(kwds['mapped_video_which_gaze_type_on_plane'])
+            # backward compatibility: ensure value are stored in sets, not lists
+            if 'planes_per_episode' in kwds:
+                kwds['planes_per_episode'] = {k:set(v) for k,v in kwds['planes_per_episode'].items()}
+            if 'sync_ref_average_recordings' in kwds:
+                kwds['sync_ref_average_recordings'] = set(kwds['sync_ref_average_recordings'])
+            if 'mapped_video_make_which' in kwds:
+                kwds['mapped_video_make_which'] = set(kwds['mapped_video_make_which'])
+            # backwards compatibility, help with named tuple roundtrip
+            for k in ('overlay_video_gaze_vid_pos_color','overlay_video_gaze_world_pos_color','mapped_video_projected_vidPos_color','mapped_video_projected_world_pos_color','mapped_video_projected_left_ray_color','mapped_video_projected_right_ray_color','mapped_video_projected_average_ray_color'):
+                if k in kwds and kwds[k] is not None and not isinstance(kwds[k],RgbColor):
+                    kwds[k] = RgbColor(*kwds[k])
+            if 'mapped_video_recording_colors' in kwds and any((not isinstance(kwds['mapped_video_recording_colors'][k],RgbColor) for k in kwds['mapped_video_recording_colors'])):
+                kwds['mapped_video_recording_colors'] = {k: RgbColor(*kwds['mapped_video_recording_colors'][k]) for k in kwds['mapped_video_recording_colors']}
+            # backwards compatibility, rename 'auto_code_trial_episodes'
+            if 'auto_code_trial_episodes' in kwds:
+                kwds['auto_code_episodes'] = {annotation.EventType.Trial: kwds.pop('auto_code_trial_episodes')}
+            # backwards compatibility, upgrade markers to markerIDs if they're bare ints
+            if 'auto_code_sync_points' in kwds and kwds['auto_code_sync_points'] is not None and 'markers' in kwds['auto_code_sync_points']:
+                markers = kwds['auto_code_sync_points']['markers']
+                kwds['auto_code_sync_points']['markers'] = set()
+                for m in markers:
+                    if not isinstance(m,int):
+                        kwds['auto_code_sync_points']['markers'].add(m)
                         continue
-                    markers = kwds['auto_code_episodes'][e][f]
-                    kwds['auto_code_episodes'][e][f] = []
-                    for m in markers:
-                        if not isinstance(m,int):
-                            kwds['auto_code_episodes'][e][f].append(m)
+                    # find corresponding marker in individual_markers
+                    im = [im for im in kwds['individual_markers'] if im.id==m]
+                    if not im:
+                        # incorrect setup, referring to a non-existing individual marker. ignore
+                        continue
+                    else:
+                        kwds['auto_code_sync_points']['markers'].add(gt_marker.MarkerID(im[0].id, im[0].aruco_dict_id))
+            if 'auto_code_episodes' in kwds:
+                for e in kwds['auto_code_episodes']:
+                    for f in ('start_markers','end_markers'):
+                        if not f in kwds['auto_code_episodes'][e]:
                             continue
-                        # find corresponding marker in individual_markers
-                        im = [im for im in kwds['individual_markers'] if im.id==m]
-                        if not im:
-                            # incorrect setup, referring to a non-existing individual marker. ignore
-                            continue
-                        else:
-                            kwds['auto_code_episodes'][e][f].append(gt_marker.MarkerID(im[0].id, im[0].aruco_dict_id))
-        # backwards compatibility for mapped video marker and axes settings
-        kwds.pop('mapped_video_process_individual_markers_for_all_frames',None) # setting doesn't exist anymore
-        if 'mapped_video_show_detected_markers' in kwds:
-            mapped_video_show_detected_markers = kwds.pop('mapped_video_show_detected_markers')
-            kwds['mapped_video_plane_marker_color'] = study_defaults['mapped_video_plane_marker_color'] if mapped_video_show_detected_markers else None
-            kwds['mapped_video_recovered_plane_marker_color'] = study_defaults['mapped_video_recovered_plane_marker_color'] if mapped_video_show_detected_markers else None
-        if 'mapped_video_show_plane_axes' in kwds or 'mapped_video_show_board_axes' in kwds:
-            mapped_video_show_plane_axes = kwds.pop('mapped_video_show_plane_axes') if 'mapped_video_show_plane_axes' in kwds else kwds.pop('mapped_video_show_board_axes')
-            kwds['mapped_video_plane_axis_arm_length'] = study_defaults['mapped_video_plane_axis_arm_length'] if mapped_video_show_plane_axes else None
-        if 'mapped_video_show_individual_marker_axes' in kwds:
-            mapped_video_show_individual_marker_axes = kwds.pop('mapped_video_show_individual_marker_axes')
-            kwds['mapped_video_individual_marker_axis_arm_length'] = study_defaults['mapped_video_individual_marker_axis_arm_length'] if mapped_video_show_individual_marker_axes else None
-        if 'mapped_video_show_unexpected_markers' in kwds:
-            mapped_video_show_unexpected_markers = kwds.pop('mapped_video_show_unexpected_markers')
-            kwds['mapped_video_unexpected_marker_color'] = study_defaults['mapped_video_unexpected_marker_color'] if mapped_video_show_unexpected_markers else None
-        if 'mapped_video_show_rejected_markers' in kwds:
-            mapped_video_show_rejected_markers = kwds.pop('mapped_video_show_rejected_markers')
-            kwds['mapped_video_rejected_marker_color'] = study_defaults['mapped_video_rejected_marker_color'] if mapped_video_show_rejected_markers else None
+                        markers = kwds['auto_code_episodes'][e][f]
+                        kwds['auto_code_episodes'][e][f] = []
+                        for m in markers:
+                            if not isinstance(m,int):
+                                kwds['auto_code_episodes'][e][f].append(m)
+                                continue
+                            # find corresponding marker in individual_markers
+                            im = [im for im in kwds['individual_markers'] if im.id==m]
+                            if not im:
+                                # incorrect setup, referring to a non-existing individual marker. ignore
+                                continue
+                            else:
+                                kwds['auto_code_episodes'][e][f].append(gt_marker.MarkerID(im[0].id, im[0].aruco_dict_id))
+            # backwards compatibility for mapped video marker and axes settings
+            kwds.pop('mapped_video_process_individual_markers_for_all_frames',None) # setting doesn't exist anymore
+            if 'mapped_video_show_detected_markers' in kwds:
+                mapped_video_show_detected_markers = kwds.pop('mapped_video_show_detected_markers')
+                kwds['mapped_video_plane_marker_color'] = study_defaults['mapped_video_plane_marker_color'] if mapped_video_show_detected_markers else None
+                kwds['mapped_video_recovered_plane_marker_color'] = study_defaults['mapped_video_recovered_plane_marker_color'] if mapped_video_show_detected_markers else None
+            if 'mapped_video_show_plane_axes' in kwds or 'mapped_video_show_board_axes' in kwds:
+                mapped_video_show_plane_axes = kwds.pop('mapped_video_show_plane_axes') if 'mapped_video_show_plane_axes' in kwds else kwds.pop('mapped_video_show_board_axes')
+                kwds['mapped_video_plane_axis_arm_length'] = study_defaults['mapped_video_plane_axis_arm_length'] if mapped_video_show_plane_axes else None
+            if 'mapped_video_show_individual_marker_axes' in kwds:
+                mapped_video_show_individual_marker_axes = kwds.pop('mapped_video_show_individual_marker_axes')
+                kwds['mapped_video_individual_marker_axis_arm_length'] = study_defaults['mapped_video_individual_marker_axis_arm_length'] if mapped_video_show_individual_marker_axes else None
+            if 'mapped_video_show_unexpected_markers' in kwds:
+                mapped_video_show_unexpected_markers = kwds.pop('mapped_video_show_unexpected_markers')
+                kwds['mapped_video_unexpected_marker_color'] = study_defaults['mapped_video_unexpected_marker_color'] if mapped_video_show_unexpected_markers else None
+            if 'mapped_video_show_rejected_markers' in kwds:
+                mapped_video_show_rejected_markers = kwds.pop('mapped_video_show_rejected_markers')
+                kwds['mapped_video_rejected_marker_color'] = study_defaults['mapped_video_rejected_marker_color'] if mapped_video_show_rejected_markers else None
+
+            # now build coding setup (port to v2 settings)
+            kwds['coding_setup'] = []
+            legacy_default_hotkeys = {
+                annotation.EventType.Validate       : 'v',
+                annotation.EventType.Sync_Camera    : 'c',
+                annotation.EventType.Sync_ET_Data   : 'e',
+                annotation.EventType.Trial          : 't',
+            }
+            # now process episodes to code
+            for e in kwds['episodes_to_code']:
+                kwds['coding_setup'].append(EventSetup(
+                    event_type  = e,
+                    name        = e.name,
+                    description = annotation.tooltip_map.get(e, ''),
+                    hotkey      = legacy_default_hotkeys.get(e, None),
+                    planes      = set(kwds['planes_per_episode'].get(e, set())),
+                ))
+                # check auto coding setup
+                if annotation.type_map[e]==annotation.Type.Point:
+                    if kwds.get('auto_code_sync_points', None) is not None:
+                        kwds['coding_setup'][-1]['auto_code'] = kwds.pop('auto_code_sync_points')
+                else:
+                    if kwds.get('auto_code_episodes', None) is not None and e in kwds['auto_code_episodes']:
+                        kwds['coding_setup'][-1]['auto_code'] = kwds['auto_code_episodes'].pop(e)
+                # check ET sync setup
+                if e==annotation.EventType.Sync_ET_Data and kwds.get('get_cam_movement_for_et_sync_method','') in ['plane','function']:
+                    kwds['coding_setup'][-1]['sync_setup'] = EtSyncSetup(
+                        get_cam_movement_method     = kwds.pop('get_cam_movement_for_et_sync_method', ''),
+                        get_cam_movement_function   = kwds.pop('get_cam_movement_for_et_sync_function', None),
+                    )
+                    if 'sync_et_to_cam_use_average' in kwds:
+                        kwds['coding_setup'][-1]['sync_setup'].use_average = kwds.pop('sync_et_to_cam_use_average')
+                # check validation setup
+                if e==annotation.EventType.Validate and any((k.startswith('validate_') for k in kwds)):
+                    kwds['coding_setup'][-1]['validation_setup'] = ValidationSetup()
+                    for k in ValidationSetup.__annotations__:
+                        if k in kwds:
+                            kwds['coding_setup'][-1]['validation_setup'][k] = kwds.pop(k)
+            # dump some now unused keys
+            kwds.pop('episodes_to_code', None)
+            kwds.pop('planes_per_episode', None)
+            kwds.pop('auto_code_episodes', None)
+        else:
+            # for v2 setups:
+            # ensure coding setup entries and its sub-entries are proper EventSetup and EtSyncSetup / ValidationSetup objects
+            for i in range(len(kwds['coding_setup'])):
+                # ensure enums are properly set
+                kwds['coding_setup'][i]['event_type'] = annotation.EventType(kwds['coding_setup'][i]['event_type'])
+                if 'planes' in kwds['coding_setup'][i] and kwds['coding_setup'][i]['planes'] is not None and not isinstance(kwds['coding_setup'][i]['planes'], set):
+                    kwds['coding_setup'][i]['planes'] = set(kwds['coding_setup'][i]['planes'])
 
         # get session def
         s_path = path / 'session_def.json'
@@ -827,11 +886,6 @@ _gaze_type_doc = {
     gaze_worldref.Type.Average_Gaze_Vector  : type_utils.GUIDocInfo('Average of gaze vectors', 'Average of the projections of the left and right eyes\' gaze vectors to the plane.'),
 }
 study_parameter_doc = {
-    'planes_per_episode': type_utils.GUIDocInfo('Planes per episode', 'For each episode that is enabled to be coded in the project, sets which planes will be looked for and gaze mapped to during the episode.',dict([_get_annotation_event_doc(a) for a in annotation.EventType])),
-    'episodes_to_code': type_utils.GUIDocInfo('Episodes to code', 'Sets which episodes can be coded for this project.',{
-        None: # None indicates the doc specification applies to the contained values
-            dict([_get_annotation_event_doc(a) for a in annotation.EventType])
-    }),
     'import_do_copy_video': type_utils.GUIDocInfo('Copy video during import?', 'If not enabled, the scene video of an eye tracker recording, or the video of an external camera is not copied to the gazeMapper recording directory during import. Instead, the video will be loaded from the recording\'s source directory (so do not move it). Ignored when the video must be transcoded to be processed with gazeMapper.'),
     'import_source_dir_as_relative_path': type_utils.GUIDocInfo('Store source directory as relative path?', 'Specifies whether the path to the source directory stored in the recording info file is an absolute path (this option is not enabled) or a relative path (enabled). If a relative path is used, the imported recording and the source directory can be moved to another location, and the source directory can still be found as long as the relative path (e.g., one folder up and in the directory "original recordings": "../original recordings") doesn\'t change.'),
     'import_known_custom_eye_trackers': type_utils.GUIDocInfo('Registered custom eye trackers', 'gazeMapper allows importing generic eye trackers for which no specific support is implemented, if their recording data is preprocessed to conform to glassesTools\' generic data format. Here you can define specific known generic eye tracker names that you may import.'),
@@ -851,66 +905,9 @@ study_parameter_doc = {
         }
     }),
     'sync_ref_average_recordings': type_utils.GUIDocInfo('Synchronization: Average recordings?', 'Whether to average the clock drifts for multiple recordings if "Synchronization: Do time stretch?" is enabled.'),
-    'get_cam_movement_for_et_sync_method': type_utils.GUIDocInfo('Gaze data synchronization: Method to get camera movement', 'Method used to derive the head motion for synchronizing eye tracker data and scene camera.',{
-        None: {     # indicates the doc specification applies to the contained values
-            '': type_utils.GUIDocInfo('None', 'No gaze data synchronization'),
-            'plane': type_utils.GUIDocInfo('Plane', 'Head movement is represented by the position of the origin of the plane in the scene camera video (the plane that is set up to be used for "Sync ET Data" episodes), as extracted through pose estimation or homography using a gazeMapper plane.'),
-            'function': type_utils.GUIDocInfo('Function', 'A user-specified function (configured using the "Gaze data synchronization: Function for camera movement" setting) will be called for each frame of the scene video in a "Sync ET Data" episode and is expected to return the location of the target the participant was looking at.')
-        }
-    }),
-    'get_cam_movement_for_et_sync_function': type_utils.GUIDocInfo('Gaze data synchronization: Function for camera movement', 'Setup for function to use for deriving the head motion when synchronizing eye tracker data and scene camera if "Gaze data synchronization: Method to get camera movement" is set to "function".',{
-        'module_or_file': type_utils.GUIDocInfo('Module or file', 'Importable module or file (can be a full path) that contains the function to run.'),
-        'function': type_utils.GUIDocInfo('Function', 'Name of the function to run.'),
-        'parameters': type_utils.GUIDocInfo('Parameters', 'Set of parameters and values to pass to the function. The frame to process (np.ndarray) is the first (positional) input passed to the function, and should not be specified in this set.'),
-    }),
-    'sync_et_to_cam_use_average': type_utils.GUIDocInfo('Gaze data synchronization: Use average?', 'Whether to use the average offset of multiple sync episodes. If not enabled, the offset for the first sync episode is used, the rest are ignored.'),
-    'auto_code_sync_points': type_utils.GUIDocInfo('Automated coding of synchronization points','Setup for automatic coding of synchronization timepoints.',{
-        'markers': type_utils.GUIDocInfo('Marker(s)', 'Set of marker IDs whose appearance indicates a synchronization timepoint.'),
-        'max_gap_duration': type_utils.GUIDocInfo('Maximum gap duration', 'Maximum gap (number of frames) in marker detections that will be filled in (ignored).'),
-        'min_duration': type_utils.GUIDocInfo('Minimum duration', 'Minimum duration (number of frames) that a marker should be detected. Shorter runs are removed.')
-    }),
-    'auto_code_episodes': type_utils.GUIDocInfo('Automated coding of episodes','Setup for automatic coding of episodes.',{
-        None: # None indicates the doc specification applies to the contained values
-            dict([_get_annotation_event_doc(a,{
-                'start_markers': type_utils.GUIDocInfo('Start marker(s)', 'A single marker ID or a sequence of marker IDs that indicate the start of an episode.'),
-                'end_markers': type_utils.GUIDocInfo('End marker(s)', 'A single marker ID or a sequence of marker IDs that indicate the end of an episode.'),
-                'max_gap_duration': type_utils.GUIDocInfo('Maximum gap duration', 'Maximum gap (number of frames) in marker detections that will be filled in (ignored).'),
-                'max_intermarker_gap_duration': type_utils.GUIDocInfo('Maximum intermarker gap duration', 'Maximum gap (number of frames) that is allowed between the detection of two markers in a sequence.'),
-                'min_duration': type_utils.GUIDocInfo('Minimum duration', 'Minimum duration (number of frames) that a marker should be detected. Shorter runs are removed.')
-                }
-            ) for a in annotation.EventType if a!=annotation.EventType.Sync_Camera])
-    }),
     'export_output3D': type_utils.GUIDocInfo('Mapped data export: include 3D fields', 'Determines whether gaze positions on the plane in the scene camera reference frame are exported when invoking the Export Trials action.'),
     'export_output2D': type_utils.GUIDocInfo('Mapped data export: include 2D fields', 'Determines whether gaze positions on the plane in the plane\'s reference frame are exported when invoking the Export Trials action.'),
     'export_only_code_marker_presence': type_utils.GUIDocInfo('Mapped data export: only include marker presence?', 'If enabled, for each marker only a single column is added to the export created by the Export Trials action, indicating whether the given marker was detected or not on a given frame. If not enabled, marker pose information is included in the export.'),
-    'validate_do_global_shift': type_utils.GUIDocInfo('glassesValidator: Apply global shift?', 'If enabled, for each validation interval the median position will be removed from the gaze data and the mean from the targets, removing any overall shift of the data. This improves the matching of fixations to targets when there is a significant overall offset in the data. It may fail (backfire) if there are data samples far outside the range of the validation targets, or if there is no data for some targets.'),
-    'validate_max_dist_fac': type_utils.GUIDocInfo('glassesValidator: Maximum distance factor', 'Factor for determining distance limit when assigning fixation points to validation targets. If for a given target the closest fixation point is further away than <factor>*[minimum intertarget distance], then no fixation point will be assigned to this target, i.e., it will not be matched to any fixation point. Set to a large value to essentially disable.'),
-    'validate_dq_types': type_utils.GUIDocInfo('glassesValidator: Data quality types', 'Selects the types of data quality you would like to calculate for each of the recordings. When none are selected, a good default is used for each recording. When none of the selected types is available, depending on the `validate_allow_dq_fallback` setting, either an error is thrown or that same default is used instead. Whether a data quality type is available depends on what type of gaze information is available for a recording, as well as whether the camera is calibrated.',{
-        None: # None indicates the doc specification applies to the contained values
-            dict([_get_gv_data_quality_type_doc(dq) for dq in DataQualityType])
-    }),
-    'validate_allow_dq_fallback': type_utils.GUIDocInfo('glassesValidator: Allow fallback data quality type?', 'If not enabled, an error is raised when the data quality type(s) indicated in "glassesValidator: Data quality types" are not available. If enabled, a sensible default other data type will be used instead. Does not apply if the "glassesValidator: Data quality types" is not set.'),
-    'validate_include_data_loss': type_utils.GUIDocInfo('glassesValidator: Include data loss?', 'If enabled, the data quality report will include data loss during the episode selected for each target on the validation poster. This is NOT the data loss of the whole recording and thus not what you want to report in your paper.'),
-    'validate_I2MC_settings': type_utils.GUIDocInfo('glassesValidator: I2MC settings','Settings for the I2MC fixation classifier used as part of determining the fixation that are assigned to validation targets. Settings that are "<not set>" will be determined based on the provided eye tracking data.',{
-        'freq': type_utils.GUIDocInfo('Sampling frequency', 'Sampling frequency of the eye tracking data.'),
-        'windowtimeInterp': type_utils.GUIDocInfo('Maximum gap duration for interpolation', 'Maximum duration (s) of gap in the data that is interpolated.'),
-        'edgeSampInterp': type_utils.GUIDocInfo('# Edge samples','Amount of data (number of samples) at edges needed for interpolation.'),
-        'maxdisp': type_utils.GUIDocInfo('Maximum dispersion', 'Maximum distance (mm) between the two edges of a gap below which the missing data is interpolated.'),
-        'windowtime': type_utils.GUIDocInfo('Moving window duration','Length of the moving window (s) used by I2MC to calculate 2-means clustering when processing the data.'),
-        'steptime': type_utils.GUIDocInfo('Moving window step', 'Step size (s) by which the moving window is moved.'),
-        'downsamples': type_utils.GUIDocInfo('Downsample factors', 'Set of integer decimation factors used to downsample the gaze data as part of I2MC processing.'),
-        'downsampFilter': type_utils.GUIDocInfo('Apply Chebyshev filter?', 'If enabled, a Chebyshev low-pass filter is applied when downsampling.'),
-        'chebyOrder': type_utils.GUIDocInfo('Chebyshev filter order','Order of the Chebyshev low-pass filter.'),
-        'maxerrors': type_utils.GUIDocInfo('Maximum # errors', 'Maximum number of errors before processing of a trial is aborted.'),
-        'cutoffstd': type_utils.GUIDocInfo('Fixation cutoff factor', 'Number of standard deviations above mean k-means weights that will be used as fixation cutoff.'),
-        'onoffsetThresh': type_utils.GUIDocInfo('Onset/offset Threshold', 'Number of MAD away from median fixation duration. Will be used to walk forward at fixation starts and backward at fixation ends to refine their placement and stop algorithm from eating into saccades.'),
-        'maxMergeDist': type_utils.GUIDocInfo('Maximum merging distance', 'Maximum Euclidean distance (mm) between fixations for merging to be possible.'),
-        'maxMergeTime': type_utils.GUIDocInfo('Maximum gap duration for merging', 'Maximum time (ms) between fixations for merging to be possible.'),
-        'minFixDur': type_utils.GUIDocInfo('Minimum fixation duration', 'Minimum fixation duration (ms) after merging, fixations with shorter duration are removed from output.'),
-    }),
-    'validate_dynamic_skip_first_duration': type_utils.GUIDocInfo('glassesValidator: Dynamic skip first duration', 'For a glassesValidator plane that is marked as dynamic (i.e. for a validation procedure using the PsychoPy script), how many seconds of data to not use from the beginning of each target interval.'),
-    'validate_dynamic_max_gap_duration': type_utils.GUIDocInfo('glassesValidator: Dynamic, maximum gap duration', 'For a glassesValidator plane that is marked as dynamic (i.e. for a validation procedure using the PsychoPy script), maximum gap (number of frames) in marker detections that will be filled in (ignored).'),
-    'validate_dynamic_min_duration': type_utils.GUIDocInfo('glassesValidator: Dynamic, minimum duration', 'Minimum duration (number of frames) that a marker should be detected. Shorter runs are removed.'),
     'mapped_video_make_which': type_utils.GUIDocInfo('Mapped video: Which recordings', 'Indicates one or multiple recordings for which to make videos of the eye tracker scene camera or external camera (synchronized to one of the recordings if there are multiple) showing detected plane origins, detected individual markers and gaze from any other recordings eye tracker recordings. Also shown for eye tracker recordings are gaze on the scene video from the eye tracker, gaze projected to the detected planes. Each only if available, and enabled in the below video generation settings.'),
     'mapped_video_recording_colors': type_utils.GUIDocInfo('Mapped video: Recording colors', 'Colors used for drawing each recording\'s gaze point, scene camera and gaze vector (depending on settings).'),
     'mapped_video_projected_vidPos_color': type_utils.GUIDocInfo('Mapped video: Color for gaze position on plane', 'Color used for drawing the recorded gaze position on the scene video transformed to the plane. Not drawn if value is not set.'),
@@ -936,7 +933,69 @@ study_parameter_doc = {
     'mapped_video_gaze_to_plane_margin': type_utils.GUIDocInfo('Mapped video: Gaze position margin','Gaze position more than this factor outside a defined plane will not be drawn.'),
     'gui_num_workers': type_utils.GUIDocInfo('Number of workers','Each action is processed by a worker and each worker can handle one action at a time. Having more workers means more actions are processed simultaneously, but having too many will not provide any gain and might freeze the program and your whole computer. Since much of the processing utilizes more than one processor thread, set this value to significantly less than the number of threads available in your system. NB: If you currently have running or enqueued jobs, the number of workers will only be changed once all have completed or are cancelled.'),
 }
-if _missing_params:=[k for k in _params if k not in study_parameter_doc and k not in ['self','session_def','planes','individual_markers','working_directory','strict_check']]:
+event_setup_doc = {
+    'event_type': type_utils.GUIDocInfo('Coded event type', 'Type of the event to be coded.',{
+        None: # None indicates the doc specification applies to the contained values
+            dict([_get_annotation_event_doc(a) for a in annotation.EventType])
+    }),
+    'name': type_utils.GUIDocInfo('Event name', 'Name of the event to be shown in the coding GUI.'),
+    'description': type_utils.GUIDocInfo('Event description', 'Description of the event to be shown in the coding GUI as tooltip.'),
+    'hotkey': type_utils.GUIDocInfo('Event hotkey', 'Hotkey to be used for coding this event in the coding GUI.'),
+    'planes': type_utils.GUIDocInfo('Planes for event', 'Set of planes which will be looked for and gaze mapped to during the episode.'),
+    'auto_code': type_utils.GUIDocInfo('Auto-coding setup', 'Setup for automatically coding this event based on individual marker detections.',{
+        'markers': type_utils.GUIDocInfo('Marker(s)', 'Set of marker IDs whose appearance indicates a synchronization timepoint.'),
+        'start_markers': type_utils.GUIDocInfo('Start marker(s)', 'A single marker ID or a sequence of marker IDs that indicate the start of an episode.'),
+        'end_markers': type_utils.GUIDocInfo('End marker(s)', 'A single marker ID or a sequence of marker IDs that indicate the end of an episode.'),
+        'max_gap_duration': type_utils.GUIDocInfo('Maximum gap duration', 'Maximum gap (number of frames) in marker detections that will be filled in (ignored).'),
+        'max_intermarker_gap_duration': type_utils.GUIDocInfo('Maximum intermarker gap duration', 'Maximum gap (number of frames) that is allowed between the detection of two markers in a sequence.'),
+        'min_duration': type_utils.GUIDocInfo('Minimum duration', 'Minimum duration (number of frames) that a marker should be detected. Shorter runs are removed.')
+    }),
+    'sync_setup': type_utils.GUIDocInfo('Eye tracker synchronization setup', 'Setup for synchronizing eye tracker data to the scene camera based on plane tracking data.',{
+        'get_cam_movement_method': type_utils.GUIDocInfo('Gaze data synchronization: Method to get camera movement', 'Method used to derive the head motion for synchronizing eye tracker data and scene camera.',{
+        None: {     # indicates the doc specification applies to the contained values
+            'plane': type_utils.GUIDocInfo('Plane', 'Head movement is represented by the position of the origin of the plane in the scene camera video (the plane that is set up to be used for "Sync ET Data" episodes), as extracted through pose estimation or homography using a gazeMapper plane.'),
+            'function': type_utils.GUIDocInfo('Function', 'A user-specified function (configured using the "Gaze data synchronization: Function for camera movement" setting) will be called for each frame of the scene video in a "Sync ET Data" episode and is expected to return the location of the target the participant was looking at.')
+        }
+        }),
+        'get_cam_movement_function': type_utils.GUIDocInfo('Gaze data synchronization: Function for camera movement', 'Setup for function to use for deriving the head motion when synchronizing eye tracker data and scene camera if "Gaze data synchronization: Method to get camera movement" is set to "function".',{
+            'module_or_file': type_utils.GUIDocInfo('Module or file', 'Importable module or file (can be a full path) that contains the function to run.'),
+            'function': type_utils.GUIDocInfo('Function', 'Name of the function to run.'),
+            'parameters': type_utils.GUIDocInfo('Parameters', 'Set of parameters and values to pass to the function. The frame to process (np.ndarray) is the first (positional) input passed to the function, and should not be specified in this set.'),
+        }),
+        'use_average': type_utils.GUIDocInfo('Gaze data synchronization: Use average?', 'Whether to use the average offset of multiple sync episodes. If not enabled, the offset for the first sync episode is used, the rest are ignored.'),
+    }),
+    'validation_setup': type_utils.GUIDocInfo('glassesValidator setup', 'Setup for determining the data quality of gaze data based on looking at a validation poster during this event (using glassesValidator).',{
+        'do_global_shift': type_utils.GUIDocInfo('Apply global shift?', 'If enabled, for each validation interval the median position will be removed from the gaze data and the mean from the targets, removing any overall shift of the data. This improves the matching of fixations to targets when there is a significant overall offset in the data. It may fail (backfire) if there are data samples far outside the range of the validation targets, or if there is no data for some targets.'),
+        'max_dist_fac': type_utils.GUIDocInfo('Maximum distance factor', 'Factor for determining distance limit when assigning fixation points to validation targets. If for a given target the closest fixation point is further away than <factor>*[minimum intertarget distance], then no fixation point will be assigned to this target, i.e., it will not be matched to any fixation point. Set to a large value to essentially disable.'),
+        'dq_types': type_utils.GUIDocInfo('Data quality types', 'Selects the types of data quality you would like to calculate for each of the recordings. When none are selected, a good default is used for each recording. When none of the selected types is available, depending on the `allow_dq_fallback` setting, either an error is thrown or that same default is used instead. Whether a data quality type is available depends on what type of gaze information is available for a recording, as well as whether the camera is calibrated.',{
+            None: # None indicates the doc specification applies to the contained values
+                dict([_get_gv_data_quality_type_doc(dq) for dq in DataQualityType])
+        }),
+        'allow_dq_fallback': type_utils.GUIDocInfo('Allow fallback data quality type?', 'If not enabled, an error is raised when the data quality type(s) indicated in "Data quality types" are not available. If enabled, a sensible default other data type will be used instead. Does not apply if the "glassesValidator: Data quality types" is not set.'),
+        'include_data_loss': type_utils.GUIDocInfo('Include data loss?', 'If enabled, the data quality report will include data loss during the episode selected for each target on the validation poster. This is NOT the data loss of the whole recording and thus not what you want to report in your paper.'),
+        'I2MC_settings': type_utils.GUIDocInfo('I2MC settings','Settings for the I2MC fixation classifier used as part of determining the fixation that are assigned to validation targets. Settings that are "<not set>" will be determined based on the provided eye tracking data.',{
+            'freq': type_utils.GUIDocInfo('Sampling frequency', 'Sampling frequency of the eye tracking data.'),
+            'windowtimeInterp': type_utils.GUIDocInfo('Maximum gap duration for interpolation', 'Maximum duration (s) of gap in the data that is interpolated.'),
+            'edgeSampInterp': type_utils.GUIDocInfo('# Edge samples','Amount of data (number of samples) at edges needed for interpolation.'),
+            'maxdisp': type_utils.GUIDocInfo('Maximum dispersion', 'Maximum distance (mm) between the two edges of a gap below which the missing data is interpolated.'),
+            'windowtime': type_utils.GUIDocInfo('Moving window duration','Length of the moving window (s) used by I2MC to calculate 2-means clustering when processing the data.'),
+            'steptime': type_utils.GUIDocInfo('Moving window step', 'Step size (s) by which the moving window is moved.'),
+            'downsamples': type_utils.GUIDocInfo('Downsample factors', 'Set of integer decimation factors used to downsample the gaze data as part of I2MC processing.'),
+            'downsampFilter': type_utils.GUIDocInfo('Apply Chebyshev filter?', 'If enabled, a Chebyshev low-pass filter is applied when downsampling.'),
+            'chebyOrder': type_utils.GUIDocInfo('Chebyshev filter order','Order of the Chebyshev low-pass filter.'),
+            'maxerrors': type_utils.GUIDocInfo('Maximum # errors', 'Maximum number of errors before processing of a trial is aborted.'),
+            'cutoffstd': type_utils.GUIDocInfo('Fixation cutoff factor', 'Number of standard deviations above mean k-means weights that will be used as fixation cutoff.'),
+            'onoffsetThresh': type_utils.GUIDocInfo('Onset/offset Threshold', 'Number of MAD away from median fixation duration. Will be used to walk forward at fixation starts and backward at fixation ends to refine their placement and stop algorithm from eating into saccades.'),
+            'maxMergeDist': type_utils.GUIDocInfo('Maximum merging distance', 'Maximum Euclidean distance (mm) between fixations for merging to be possible.'),
+            'maxMergeTime': type_utils.GUIDocInfo('Maximum gap duration for merging', 'Maximum time (ms) between fixations for merging to be possible.'),
+            'minFixDur': type_utils.GUIDocInfo('Minimum fixation duration', 'Minimum fixation duration (ms) after merging, fixations with shorter duration are removed from output.'),
+        }),
+        'dynamic_skip_first_duration': type_utils.GUIDocInfo('Dynamic skip first duration', 'For a glassesValidator plane that is marked as dynamic (i.e. for a validation procedure using the PsychoPy script), how many seconds of data to not use from the beginning of each target interval.'),
+        'dynamic_max_gap_duration': type_utils.GUIDocInfo('Dynamic, maximum gap duration', 'For a glassesValidator plane that is marked as dynamic (i.e. for a validation procedure using the PsychoPy script), maximum gap (number of frames) in marker detections that will be filled in (ignored).'),
+        'dynamic_min_duration': type_utils.GUIDocInfo('Dynamic, minimum duration', 'Minimum duration (number of frames) that a marker should be detected. Shorter runs are removed.'),
+    }),
+}
+if _missing_params:=[k for k in _params if k not in study_parameter_doc and k not in ['self','session_def','planes','individual_markers','working_directory','coding_setup','strict_check']]:
     raise NotImplementedError('Documentation missing for parameters:\n- '+'\n- '.join(_missing_params))
 del _params
 del _missing_params
@@ -947,6 +1006,7 @@ def guess_config_dir(working_dir: str|pathlib.Path, config_dir_name: str = "conf
     # 2. a session's working directory; or
     # 3. a recording's directory in a session's working directory.
     # So try three levels
+    working_dir = pathlib.Path(working_dir).resolve()
     for i in range(3):
         if i>0:
             # try again in parent directory
@@ -1059,8 +1119,6 @@ class StudyOverride:
         if path.is_dir():
             path = path / self.default_json_file_name
         to_dump = {p:getattr(self,p) for p in self._overridden_params}
-        if 'planes_per_episode' in to_dump:
-            to_dump['planes_per_episode'] = [(k, to_dump['planes_per_episode'][k]) for k in to_dump['planes_per_episode']]   # pack as list of tuples for storage
         json.dump(to_dump, path)
 
     @staticmethod
@@ -1069,12 +1127,7 @@ class StudyOverride:
         if path.is_dir():
             path = path / StudyOverride.default_json_file_name
         kwds = json.load(path)
-        if 'planes_per_episode' in kwds:
-            # stored as list of tuples, unpack
-            kwds['planes_per_episode'] = {k:v for k,v in kwds['planes_per_episode']}
         # help with enum roundtrip
-        if 'episodes_to_code' in kwds:
-            kwds['episodes_to_code'] = {annotation.EventType(e) for e in kwds['episodes_to_code']}
         if 'validate_dq_types' in kwds:
             kwds['validate_dq_types']= {DataQualityType(d) for d in kwds['validate_dq_types']}
         if 'mapped_video_which_gaze_type_on_plane' in kwds:
@@ -1089,14 +1142,6 @@ class StudyOverride:
 
     @staticmethod
     def _fix_typing(kwds: dict[str,Any]) -> dict[str,Any]:
-        if 'get_cam_movement_for_et_sync_function' in kwds and kwds['get_cam_movement_for_et_sync_function'] is not None:
-            kwds['get_cam_movement_for_et_sync_function'] = CamMovementForEtSyncFunction(**kwds['get_cam_movement_for_et_sync_function'])
-        if 'auto_code_sync_points' in kwds and kwds['auto_code_sync_points'] is not None:
-            kwds['auto_code_sync_points'] = AutoCodeSyncPoints(**kwds['auto_code_sync_points'])
-        if 'auto_code_episodes' in kwds and kwds['auto_code_episodes'] is not None:
-            kwds['auto_code_episodes'] = {e: AutoCodeEpisodes(**kwds['auto_code_episodes'][e]) for e in kwds['auto_code_episodes']}
-        if 'validate_I2MC_settings' in kwds and kwds['validate_I2MC_settings'] is not None:
-            kwds['validate_I2MC_settings'] = I2MCSettings(**kwds['validate_I2MC_settings'])
         if 'mapped_video_recording_colors' in kwds and kwds['mapped_video_recording_colors'] is not None:
             kwds['mapped_video_recording_colors'] = {k: None if kwds['mapped_video_recording_colors'][k] is None else RgbColor(*kwds['mapped_video_recording_colors'][k]) for k in kwds['mapped_video_recording_colors']}
         for k in ['mapped_video_projected_vidPos_ray_color','mapped_video_projected_world_pos_color','mapped_video_projected_left_ray_color','mapped_video_projected_right_ray_color','mapped_video_projected_average_ray_color']:

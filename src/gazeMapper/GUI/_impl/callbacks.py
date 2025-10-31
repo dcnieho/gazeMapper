@@ -164,8 +164,8 @@ def set_dynamic_validation_plane_config(g, config_file_path: pathlib.Path, p_def
 
 def set_auto_coding_for_dynamic_validation_plane(g, p_def: plane.Definition_GlassesValidator, auto_coding_setup: dict[str,list[gt_marker.MarkerID]]):
     def _apply_individual_markers_if_needed():
-        all_markers = set(g.study_config.auto_code_episodes[annotation.EventType.Validate]['start_markers'])
-        all_markers.update(g.study_config.auto_code_episodes[annotation.EventType.Validate]['end_markers'])
+        all_markers = set(auto_coding_setup['start_markers'])
+        all_markers.update(auto_coding_setup['end_markers'])
         applied = False
         for m in all_markers:
             if not any((im.id==m.m_id and im.aruco_dict_id==m.aruco_dict_id for im in g.study_config.individual_markers)):
@@ -173,21 +173,36 @@ def set_auto_coding_for_dynamic_validation_plane(g, p_def: plane.Definition_Glas
                 applied = True
         return applied
     def _apply_automatic_val_coding():
-        if not g.study_config.auto_code_episodes:
-            g.study_config.auto_code_episodes = {}
-        g.study_config.auto_code_episodes[annotation.EventType.Validate] = config.AutoCodeEpisodes(start_markers=auto_coding_setup['start_markers'], end_markers=auto_coding_setup['end_markers'])
-        g.study_config.auto_code_episodes[annotation.EventType.Validate].apply_defaults()
+        cs = [cs for cs in g.study_config.coding_setup if cs['event_type']==annotation.EventType.Validate and p_def.name in cs['planes']]
+        if not cs:
+            g.study_config.coding_setup.append(config.EventSetup(
+                event_type = annotation.EventType.Validate,
+                name = f'Dynamic validation ({p_def.name})',
+                description = f'Dynamic validation setup for {p_def.name}',
+                planes     = [p_def.name],
+                auto_code  = config.AutoCodeEpisodes(
+                    start_markers = auto_coding_setup['start_markers'],
+                    end_markers   = auto_coding_setup['end_markers'],
+                )
+            ))
+            g.study_config.coding_setup[-1]['auto_code'].apply_defaults()
+        else:
+            cs[0]['auto_code']['start_markers'] = auto_coding_setup['start_markers']
+            cs[0]['auto_code']['end_markers']   = auto_coding_setup['end_markers']
         _apply_individual_markers_if_needed()
         # persist changed config
         g.study_config.store_as_json()
 
     from . import gui
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
-    exists = g.study_config.auto_code_episodes and annotation.EventType.Validate in g.study_config.auto_code_episodes
+    cs = [cs for cs in g.study_config.coding_setup if cs['event_type']==annotation.EventType.Validate and p_def.name in cs['planes']]
+    exists = not not cs
     if exists:
-        matches = all((g.study_config.auto_code_episodes[annotation.EventType.Validate][f]==auto_coding_setup[f] for f in ('start_markers','end_markers')))
+        if len(cs)>1:
+            raise RuntimeError(f'Multiple coding setups found for {annotation.tooltip_map[annotation.EventType.Validate]}s for plane {p_def.name}, cannot proceed')
+        matches = all((cs[0]['auto_code'][f]==auto_coding_setup[f] for f in ('start_markers','end_markers')))
         if matches:
-            # nothing to do, do check all individual markers are there
+            # nothing to do, do check all individual markers are also defined
             if _apply_individual_markers_if_needed():
                 # persist changed config
                 g.study_config.store_as_json()
@@ -201,9 +216,9 @@ def set_auto_coding_for_dynamic_validation_plane(g, p_def: plane.Definition_Glas
     for f in ('start_markers','end_markers'):
         msg += f'{f}: ['+(', '.join((gt_marker.marker_ID_to_str(m) for m in auto_coding_setup[f])))+']\n'
     if exists:
-        msg += f'\nThe following setup for automatic coding of {annotation.tooltip_map[annotation.EventType.Validate]}s is already set:\n'
+        msg += f'\nThe following setup for automatic coding of {annotation.tooltip_map[annotation.EventType.Validate]}s using the {p_def.name} plane is already set:\n'
         for f in ('start_markers','end_markers'):
-            msg += f'{f}: ['+(', '.join((gt_marker.marker_ID_to_str(m) for m in g.study_config.auto_code_episodes[annotation.EventType.Validate][f])))+']\n'
+            msg += f'{f}: ['+(', '.join((gt_marker.marker_ID_to_str(m) for m in cs[0]['auto_code'][f])))+']\n'
         msg += '\nDo you want to overwrite this configuration with the above?'
     else:
         msg += '\nDo you want to apply this configuration?'
@@ -256,6 +271,14 @@ def make_plane(g, p_type: plane.Type, name: str, is_dynamic: bool, dynamic_confi
     # deal with further setup for dynamic plane
     if is_dynamic:
         set_auto_coding_for_dynamic_validation_plane(g, p_def, auto_coding_setup)
+
+def make_coding_setup(g, coding_name: str, coding_type: annotation.EventType):
+    from . import gui
+    g = typing.cast(gui.GUI,g)  # indicate type to typechecker
+    # append to known coding setups
+    g.study_config.coding_setup.append(config.EventSetup(name=coding_name, event_type=coding_type))
+    # store config
+    g.study_config.store_as_json()
 
 def delete_plane(study_config: config.Study, plane: plane.Definition):
     # remove config directory for the plane
@@ -475,7 +498,7 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
         if s is None:
             continue
         if 'plane gaze' not in to_export:
-            if annotation.EventType.Trial in g.study_config.planes_per_episode and any((s.recordings[r].state[process.Action.GAZE_TO_PLANE]==process_pool.State.Completed for r in s.recordings)):
+            if not not g.study_config.coding_setup and any(cs['event_type']==annotation.EventType.Trial for cs in g.study_config.coding_setup) and any((s.recordings[r].state[process.Action.GAZE_TO_PLANE]==process_pool.State.Completed for r in s.recordings)):
                 to_export['plane gaze'] = True
         if recs:=[s.recordings[r].info.working_directory for r in s.recordings if s.recordings[r].state[process.Action.VALIDATE]==process_pool.State.Completed]:
             to_export['validation'] = True
@@ -492,7 +515,8 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
 
     dq_df, dq_set = None, None
     if rec_dirs_val:
-        dq_df, default_dq_type, dq_targets = export.collect_data_quality(rec_dirs_val, {p:f'{naming.validation_prefix}{p}_data_quality.tsv' for p in g.study_config.planes_per_episode[annotation.EventType.Validate]}, col_for_parent='session')
+        val_planes = set([p for cs in g.study_config.coding_setup if cs['event_type']==annotation.EventType.Validate for p in cs['planes']])
+        dq_df, default_dq_type, dq_targets = export.collect_data_quality(rec_dirs_val, {p:f'{naming.validation_prefix}{p}_data_quality.tsv' for p in val_planes}, col_for_parent='session')
         if dq_df is None:
             to_export.pop('validation', None)
         else:
