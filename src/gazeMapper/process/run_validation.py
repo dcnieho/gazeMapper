@@ -112,7 +112,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path=None, progre
                                 working_dir/f'{naming.validation_prefix}{p}_fixation_assignment.tsv',
                                 episodes,
                                 targets,
-                                validation_plane.config['distance']*10.,
+                                validation_plane.config['distance']*10.,    # cm -> mm
                                 working_dir,
                                 filename=f'{naming.validation_prefix}{p}_data_quality.tsv',
                                 dq_types=study_config.validate_dq_types,
