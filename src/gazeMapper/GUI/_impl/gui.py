@@ -1276,8 +1276,15 @@ class GUI:
             gt_gui.utils.push_popup(self, lambda: gt_gui.utils.popup("Add recording", _add_rec_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, outside=False))
 
     def _plane_editor_pane_drawer(self):
-        if not self.study_config.planes:
-            imgui.text_colored(colors.error,'*At minimum one plane should be defined')
+        if self.need_setup_plane:
+            has_coding_setup_needing_plane = not not self.study_config.coding_setup and any((cs['event_type'] in (annotation.EventType.Trial, annotation.EventType.Validate) or (cs['event_type']==annotation.EventType.Sync_ET_Data and cs['sync_setup'] and cs['sync_setup']['get_cam_movement_method']=='plane') for cs in self.study_config.coding_setup))
+            has_individual_markers = not not self.study_config.individual_markers
+            if has_coding_setup_needing_plane and has_individual_markers:
+                imgui.text_colored(colors.error,'*At minimum one plane should be defined when a coding setup needing a plane and individual markers are defined')
+            elif has_coding_setup_needing_plane:
+                imgui.text_colored(colors.error,'*At minimum one plane should be defined when a coding setup needing a plane is defined')
+            elif has_individual_markers:
+                imgui.text_colored(colors.error,'*At minimum one plane should be defined when individual markers are defined')
         if any((x in self._problems_cache for x in ['planes'])):
             imgui.text_colored(colors.error,'*There are problems in the below setup that need to be resolved.\nHover over red text to get information about the error')
         def _hover_img_error_popup(p_def: plane.Definition, load_error: Exception):
@@ -1422,6 +1429,15 @@ class GUI:
     def _coding_setup_pane_drawer(self):
         if any((x in self._problems_cache for x in ['coding_setup'])):
             imgui.text_colored(colors.error,'*There are problems in the below setup that need to be resolved.\nHover over red text to get information about the error')
+        if self.need_setup_coding and not self.study_config.coding_setup:
+            has_plane = not not self.study_config.planes
+            has_individual_markers = not not self.study_config.individual_markers
+            if has_plane and has_individual_markers:
+                imgui.text_colored(colors.error,'*At minimum one coding setup should be defined when planes and individual markers are defined')
+            elif has_plane:
+                imgui.text_colored(colors.error,'*At minimum one coding setup should be defined when a plane is defined')
+            elif has_individual_markers:
+                imgui.text_colored(colors.error,'*At minimum one coding setup should be defined when individual markers are defined')
         fields = [f for f in config.event_setup_display_order if f in config.EventSetup.__optional_keys__] + [f for f in config.EventSetup.__optional_keys__ if f not in config.event_setup_display_order]
         fixed_fields = type_utils.NestedDict({k:None for k in ['name', 'event_type']})
         marked_for_deletion = []
