@@ -793,19 +793,13 @@ class Study:
 
             # now build coding setup (port to v2 settings)
             kwds['coding_setup'] = []
-            legacy_default_hotkeys = {
-                annotation.EventType.Validate       : 'v',
-                annotation.EventType.Sync_Camera    : 'c',
-                annotation.EventType.Sync_ET_Data   : 'e',
-                annotation.EventType.Trial          : 't',
-            }
             # now process episodes to code
             for e in kwds['episodes_to_code']:
                 kwds['coding_setup'].append(EventSetup(
                     event_type  = e,
                     name        = e.name,
                     description = annotation.tooltip_map.get(e, ''),
-                    hotkey      = legacy_default_hotkeys.get(e, None),
+                    hotkey      = annotation.default_hotkeys.get(e, None),
                     planes      = set(kwds['planes_per_episode'].get(e, set())),
                 ))
                 # check auto coding setup

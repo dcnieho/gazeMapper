@@ -277,6 +277,10 @@ def make_coding_setup(g, coding_name: str, coding_type: annotation.EventType):
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
     # append to known coding setups
     g.study_config.coding_setup.append(config.EventSetup(name=coding_name, event_type=coding_type))
+    # set default hotkey if first event of this type
+    cs_of_type = [cs for cs in g.study_config.coding_setup if cs['event_type']==coding_type]
+    if len(cs_of_type)==1 and coding_type in annotation.default_hotkeys:
+        cs_of_type[0]['hotkey'] = annotation.default_hotkeys[coding_type]
     # store config
     g.study_config.store_as_json()
 
