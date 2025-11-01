@@ -366,6 +366,15 @@ class Study:
                     raise ValueError(msg)
                 else:
                     type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'planes': (type_utils.ProblemLevel.Error, msg)}}})
+            if e==annotation.EventType.Validate:
+                pl_name = list(cs['planes'])[0]
+                pl_def = [pl for pl in self.planes if pl.name==pl_name][0]
+                if pl_def.type!=plane.Type.GlassesValidator:
+                    msg = f'Plane {pl_name} is not a glassesValidator plane, cannot be used for validation.'
+                    if strict_check:
+                        raise ValueError(msg)
+                    else:
+                        type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'planes': (type_utils.ProblemLevel.Error, msg)}}})
 
             # check hotkey
             if cs.get('hotkey') is not None and not gui_utils.is_valid_imgui_key(cs['hotkey']):
