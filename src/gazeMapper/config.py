@@ -687,6 +687,9 @@ class Study:
                         t_defaults = tt._field_defaults
                         t_types    = tt.__annotations__
                     d[k] = _remove_defaults_recursive(d[k], t_defaults, t_types)
+                    if not d[k]:
+                        # all defaulted, skip
+                        continue
 
                 # now check if not equal to default. If not equal, store
                 if k not in defaults or d[k]!=defaults[k]:
