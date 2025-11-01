@@ -8,7 +8,7 @@ from .. import config, episode, naming, plane, process, session
 
 
 stopAllProcessing = False
-def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path=None, progress_indicator: process_pool.JobProgress=None, **study_settings):
+def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None=None, progress_indicator: process_pool.JobProgress|None=None, **study_settings):
     working_dir = pathlib.Path(working_dir)
     if config_dir is None:
         config_dir = config.guess_config_dir(working_dir)
@@ -22,9 +22,9 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path=None, progre
 
     # get settings for the study
     study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent, config.OverrideLevel.Recording: working_dir}, **study_settings)
-    if annotation.Event.Validate not in study_config.planes_per_episode:
-        raise ValueError('No planes to use for validation are specified for the study, nothing to process')
-    planes = list(study_config.planes_per_episode[annotation.Event.Validate])
+    val_events = process.get_specific_event_types(study_config, annotation.EventType.Validate)
+    if not val_events:
+        raise ValueError('No validation events are configured for the study, nothing to process')
 
     # get info about recording
     rec_def = study_config.session_def.get_recording_def(working_dir.name)
@@ -32,18 +32,23 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path=None, progre
         raise ValueError(f'You can only run run_validation on eye tracker recordings, not on a {str(rec_def.type).split(".")[1]} recording')
 
     # get interval(s) coded to be analyzed, if any
-    episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / naming.coding_file))[annotation.Event.Validate]
-    if not episodes:
+    episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / naming.coding_file), [cs['name'] for cs in val_events])
+    if not any(episodes[e] for e in episodes):
         raise RuntimeError(f'There are no validation episodes coded for session "{working_dir.parent.name}", recording "{working_dir.name}", nothing to process')
 
     # prep progress indicator
-    total = len(planes)*(2+len(episodes)*3)
+    total = 2+sum(len(episodes[e]) for e in episodes)*3
     progress_indicator.set_total(total)
     progress_indicator.set_intervals(int(total/200), int(total/200))
     progress_indicator.update(n=0)  # ensure a complete hover text appears before first processing step is finished
 
     # per plane, run the glassesValidator steps
-    for p in planes:
+    for e in episodes:
+        # find corresponding coding config
+        cs = [cs for cs in val_events if cs['name']==e][0]
+        if len(cs['planes'])!=1:
+            raise ValueError(f'Validation event "{e}" should be coded for exactly one glassesValidator plane, found {len(cs["planes"])}')
+        p = list(cs['planes'])[0]
         plane_def = [pl for pl in study_config.planes if pl.name==p][0]
         if plane_def.type!=plane.Type.GlassesValidator:
             raise ValueError(f'Plane {p} is not a glassesValidator plane, cannot be used for validation')
@@ -60,10 +65,10 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path=None, progre
             marker_observations_per_target, markers_per_target = validation.dynamic.get_marker_observations(validation_plane, working_dir)
         else:
             fixation_classification.from_plane_gaze(working_dir/f'{naming.world_gaze_prefix}{p}.tsv',
-                                                    episodes,
+                                                    episodes[e],
                                                     working_dir,
-                                                    I2MC_settings_override=study_config.validate_I2MC_settings,
-                                                    filename_stem=f'{naming.validation_prefix}{p}_fixations',
+                                                    I2MC_settings_override=cs['validation_setup']['I2MC_settings'],
+                                                    filename_stem=f'{naming.validation_prefix}{e}_fixations',
                                                     plot_limits=plot_limits)
         progress_indicator.update()
 
@@ -75,16 +80,16 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path=None, progre
                                                      markers_per_target,
                                                      working_dir/gt_naming.frame_timestamps_fname,
                                                      episodes[idx],
-                                                     study_config.validate_dynamic_skip_first_duration,
-                                                     study_config.validate_dynamic_max_gap_duration,
-                                                     study_config.validate_dynamic_min_duration)
+                                                     cs['validation_setup']['dynamic_skip_first_duration'],
+                                                     cs['validation_setup']['dynamic_max_gap_duration'],
+                                                     cs['validation_setup']['dynamic_min_duration'])
             else:
-                fix_file = working_dir / f'{naming.validation_prefix}{p}_fixations_interval_{idx+1:02d}.tsv'
+                fix_file = working_dir / f'{naming.validation_prefix}{e}_fixations_interval_{idx+1:02d}.tsv'
                 selected_intervals, other_intervals = \
                     assign_intervals.distance(targets,
                                               fix_file,
-                                              do_global_shift=study_config.validate_do_global_shift,
-                                              max_dist_fac=study_config.validate_max_dist_fac)
+                                              do_global_shift=cs['validation_setup']['do_global_shift'],
+                                              max_dist_fac=cs['validation_setup']['max_dist_fac'])
             progress_indicator.update()
 
             # plot output
@@ -92,9 +97,9 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path=None, progre
                                   other_intervals,
                                   targets,
                                   working_dir/f'{naming.world_gaze_prefix}{p}.tsv',
-                                  episodes[idx],
+                                  episodes[e][idx],
                                   working_dir,
-                                  filename_stem=f'{naming.validation_prefix}{p}_fixation_assignment',
+                                  filename_stem=f'{naming.validation_prefix}{e}_fixation_assignment',
                                   iteration=idx,
                                   background_image=background_image,
                                   plot_limits=plot_limits)
@@ -103,21 +108,21 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path=None, progre
             # store output to file
             assign_intervals.to_tsv(selected_intervals,
                                     working_dir,
-                                    filename_stem=f'{naming.validation_prefix}{p}_fixation_assignment',
+                                    filename_stem=f'{naming.validation_prefix}{e}_fixation_assignment',
                                     iteration=idx)
             progress_indicator.update()
 
         compute_offsets.compute(working_dir/f'{naming.world_gaze_prefix}{p}.tsv',
                                 working_dir/f'{naming.plane_pose_prefix}{p}.tsv',
-                                working_dir/f'{naming.validation_prefix}{p}_fixation_assignment.tsv',
-                                episodes,
+                                working_dir/f'{naming.validation_prefix}{e}_fixation_assignment.tsv',
+                                episodes[e],
                                 targets,
                                 validation_plane.config['distance']*10.,    # cm -> mm
                                 working_dir,
-                                filename=f'{naming.validation_prefix}{p}_data_quality.tsv',
-                                dq_types=study_config.validate_dq_types,
-                                allow_dq_fallback=study_config.validate_allow_dq_fallback,
-                                include_data_loss=study_config.validate_include_data_loss)
+                                filename=f'{naming.validation_prefix}{e}_data_quality.tsv',
+                                dq_types=cs['validation_setup']['dq_types'],
+                                allow_dq_fallback=cs['validation_setup']['allow_dq_fallback'],
+                                include_data_loss=cs['validation_setup']['include_data_loss'])
         progress_indicator.update()
 
     # update state
