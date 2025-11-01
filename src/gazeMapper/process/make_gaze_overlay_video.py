@@ -6,7 +6,7 @@ from glassesTools.gui import video_player
 from .. import config, process, session
 
 
-def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show_visualization=False, progress_indicator: process_pool.JobProgress=None, **study_settings):
+def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None=None, show_visualization=False, progress_indicator: process_pool.JobProgress|None=None, **study_settings):
     # if show_visualization, each frame is shown in a viewer as video is generated
     working_dir = pathlib.Path(working_dir)
     if config_dir is None:
@@ -33,7 +33,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show
         do_the_work(working_dir, config_dir, None, progress_indicator, **study_settings)
 
 
-def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_player.GUI, progress_indicator: process_pool.JobProgress, **study_settings):
+def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_player.GUI|None, progress_indicator: process_pool.JobProgress|None, **study_settings):
     # progress indicator
     if progress_indicator is None:
         progress_indicator = process_pool.JobProgress(printer=lambda x: print(x))
