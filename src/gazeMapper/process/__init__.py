@@ -117,10 +117,10 @@ def config_has_auto_coding(study_config: 'config.Study', specific_event_type: an
 def config_has_specific_event_type(study_config: 'config.Study', specific_event_type: annotation.EventType, check_specific_fields: typing.Sequence[str]|None=None) -> bool:
     return not not get_specific_event_types(study_config, specific_event_type, check_specific_fields)
 
-def get_specific_event_types(study_config: 'config.Study', specific_event_type: annotation.EventType, check_specific_fields: typing.Sequence[str]|None=None) -> list['config.EventSetup']:
+def get_specific_event_types(study_config: 'config.Study', specific_event_type: annotation.EventType|None=None, check_specific_fields: typing.Sequence[str]|None=None) -> list['config.EventSetup']:
     if not study_config.coding_setup:
         return []
-    return [cs for cs in study_config.coding_setup if cs['event_type']==specific_event_type and (all(f in cs and cs[f] is not None for f in check_specific_fields) if check_specific_fields else True)]
+    return [cs for cs in study_config.coding_setup if (specific_event_type is None or cs['event_type']==specific_event_type) and (all(f in cs and cs[f] is not None for f in check_specific_fields) if check_specific_fields else True)]
 
 def _config_has_et_sync(study_config: 'config.Study') -> bool:
     return not not get_specific_event_types(study_config, annotation.EventType.Sync_ET_Data, ['sync_setup'])
