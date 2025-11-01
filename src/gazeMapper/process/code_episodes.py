@@ -2,7 +2,7 @@ import pathlib
 import numpy as np
 import cv2
 import copy
-from imgui_bundle import imgui
+import typing
 
 from ffpyplayer.player import MediaPlayer
 
@@ -12,7 +12,7 @@ isMacOS = sys.platform.startswith("darwin")
 if isMacOS:
     import AppKit
 
-from glassesTools import annotation, drawing, gaze_headref, gaze_worldref, naming as gt_naming, ocv, pose as gt_pose, process_pool, propagating_thread, timestamps
+from glassesTools import annotation, drawing, gaze_headref, gaze_worldref, naming as gt_naming, ocv, plane as gt_plane, pose as gt_pose, process_pool, propagating_thread, timestamps
 from glassesTools.gui.video_player import GUI
 
 
@@ -27,14 +27,7 @@ from .. import config, episode, naming, plane, process, session, synchronization
 # but output from the detectMarkers and gazeToPoster actions (if available)
 # will also be shown.
 
-_event_type_to_key_map = {
-    annotation.EventType.Validate       : imgui.Key.v,
-    annotation.EventType.Sync_Camera    : imgui.Key.c,
-    annotation.EventType.Sync_ET_Data   : imgui.Key.e,
-    annotation.EventType.Trial          : imgui.Key.t,
-}
-
-def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **study_settings):
+def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None, **study_settings):
     # if show_poster, also draw poster with gaze overlaid on it (if available)
     working_dir = pathlib.Path(working_dir)
     if config_dir is None:
@@ -62,31 +55,21 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     in_video = session.read_recording_info(working_dir, rec_def.type)[1]
     if rec_def.type==session.RecordingType.Camera:
         has_gaze, has_plane_gaze, has_plane_pose = False, False, False
-        # no episode.Event.Sync_ET_Data for camera recordings, remove
-        if annotation.EventType.Sync_ET_Data in study_config.episodes_to_code:
-            study_config.episodes_to_code.remove(annotation.EventType.Sync_ET_Data)
-        # no episode.Event.Validate for camera recordings, remove
-        if annotation.EventType.Validate in study_config.episodes_to_code:
-            study_config.episodes_to_code.remove(annotation.EventType.Validate)
+        # no Sync_ET_Data or Validate events for camera recordings, remove
+        study_config.coding_setup = [cs for cs in study_config.coding_setup if cs['event_type'] not in (annotation.EventType.Sync_ET_Data, annotation.EventType.Validate)]
     elif rec_def.type==session.RecordingType.Eye_Tracker:
         # Read gaze data
         has_gaze = True
         gazes = gaze_headref.read_dict_from_file(working_dir / gt_naming.gaze_data_fname, ts_column_suffixes=['VOR',''])[0]
 
-        planes: set[str] = set()
-        for e in [annotation.EventType.Validate, annotation.EventType.Trial]:
-            if e in study_config.planes_per_episode:
-                planes.update(study_config.planes_per_episode[e])
-        if study_config.get_cam_movement_for_et_sync_method=='plane' and annotation.EventType.Sync_ET_Data in study_config.planes_per_episode:
-            planes.update(study_config.planes_per_episode[annotation.EventType.Sync_ET_Data])
-
         # Read gaze on poster data, if available
+        planes = {v for cs in study_config.coding_setup for v in cs['planes']}
         plane_files = [working_dir/f'{naming.world_gaze_prefix}{p}.tsv' for p in planes]
         plane_gazes = {p:gaze_worldref.read_dict_from_file(f) for p,f in zip(planes,plane_files) if f.is_file()}
         has_plane_gaze = not not plane_gazes
 
         if has_plane_gaze:
-            planes_setup: dict[str, dict[str]] = {}
+            planes_setup: dict[str, gt_plane.Plane] = {}
             for p in planes:
                 p_def = [pl for pl in study_config.planes if pl.name==p][0]
                 planes_setup[p] = plane.get_plane_from_definition(p_def, config_dir/p)
@@ -102,27 +85,28 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     cam_params = ocv.CameraParams.read_from_file(working_dir / gt_naming.scene_camera_calibration_fname)
 
     # get previous interval coding, if available
+    to_code = [cs['name'] for cs in study_config.coding_setup]
     coding_file = working_dir / naming.coding_file
     if coding_file.is_file():
-        episodes = episode.list_to_marker_dict(episode.read_list_from_file(coding_file), study_config.episodes_to_code)
+        episodes = episode.list_to_marker_dict(episode.read_list_from_file(coding_file), to_code)
     else:
-        episodes = episode.get_empty_marker_dict(study_config.episodes_to_code)
+        episodes = episode.get_empty_marker_dict(to_code)
     episodes_to_code = {e for e in episodes}
     # trial episodes are gotten from the reference recording if there is one and this is not the reference recording
     if study_config.sync_ref_recording and rec_def.name!=study_config.sync_ref_recording:
         # any trial coding there is should be discarded
-        episodes.pop(annotation.EventType.Trial, None)
-        # mark trial as not codable
-        if annotation.EventType.Trial in episodes_to_code:
-            episodes_to_code.remove(annotation.EventType.Trial)
+        trial_events = process.get_specific_event_types(study_config, annotation.EventType.Trial)
+        for e in trial_events:
+            episodes.pop(e['name'], None)
+            # also mark as not codable
+            episodes_to_code.remove(e['name'])
         # if there is trial coding for the reference recording, get them and show them (read only)
-        if annotation.EventType.Trial in study_config.episodes_to_code:
+        if trial_events:
             all_recs = [r.name for r in study_config.session_def.recordings if r.name!=study_config.sync_ref_recording]
-            episodes[annotation.EventType.Trial] = synchronization.get_episode_frame_indices_from_ref(working_dir, annotation.EventType.Trial, rec_def.name, study_config.sync_ref_recording, all_recs, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings, study_config.sync_ref_stretch_which, missing_ref_coding_ok=True)
-            # if nothing found, remove again so we don't have a useless empty track
-            if not episodes[annotation.EventType.Trial]:
-                episodes.pop(annotation.EventType.Trial, None)
-    episodes = annotation.flatten_annotation_dict(episodes) # NB: also ensures ordering is consistent
+            for e in trial_events:
+                # NB: don't error if we don't need trial episodes for coding.
+                episodes[e['name']] = synchronization.get_episode_frame_indices_from_ref(working_dir, e['name'], rec_def.name, study_config.sync_ref_recording, all_recs, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings, study_config.sync_ref_stretch_which, missing_ref_coding_ok=True)
+    episodes = annotation.flatten_annotation_dict(episodes)
     episodes_original = copy.deepcopy(episodes)
 
     # set up video playback
@@ -138,7 +122,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     gui.set_allow_seek(True)
     gui.set_allow_timeline_zoom(True)
     gui.set_show_controls(True, gui.main_window_id)
-    gui.set_allow_annotate(episodes_to_code, {e:_event_type_to_key_map[e] for e in episodes})
+    gui.set_allow_annotate(episodes_to_code, {cs['name']:cs['hotkey'] for cs in study_config.coding_setup}, {cs['name']:cs['description'] for cs in study_config.coding_setup})
     gui.set_show_timeline(True, video_ts, episodes, gui.main_window_id)
     gui.set_show_annotation_label(True, gui.main_window_id)
     gui.set_show_action_tooltip(True, gui.main_window_id)
@@ -243,7 +227,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     # store coded intervals to file
     if study_config.sync_ref_recording and rec_def.name!=study_config.sync_ref_recording:
         # any (read only) trial coding there is should not be written to file
-        episodes.pop(annotation.EventType.Trial, None)
+        for e in trial_events:
+            episodes.pop(e['name'], None)
     episode.write_list_to_file(episode.marker_dict_to_list(episodes), coding_file)
 
     # update state
