@@ -17,7 +17,7 @@ from . import _utils
 from .. import config, episode, naming, process, session
 
 
-def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **study_settings):
+def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None, **study_settings):
     # apply_average: if True: the average offset for all VOR sync episodes will be applied to the timestamps
     # if False, the VOR offset for the first episode will be applied, the rest are taken as checks
     working_dir = pathlib.Path(working_dir)
@@ -41,12 +41,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent, config.OverrideLevel.Recording: working_dir}, **study_settings)
 
     # check there is a sync setup
-    if study_config.get_cam_movement_for_et_sync_method not in ['plane', 'function']:
-        raise ValueError('There is no eye tracker data to scene camera synchronization defined, should not run this function')
-    if annotation.EventType.Sync_ET_Data not in study_config.episodes_to_code:
-        raise ValueError('ET sync episodes are not set up to be coded, nothing to do here')
-    if study_config.get_cam_movement_for_et_sync_method=='plane' and annotation.EventType.Sync_ET_Data not in study_config.planes_per_episode:
-        raise ValueError(f'No plane specified for syncing eye tracker data to the scene cam, cannot continue')
+    sync_events = process.get_specific_event_types(study_config, annotation.EventType.Sync_ET_Data)
+    if not sync_events:
+        raise ValueError('No ET sync events are configured for the study, nothing to process')
 
     # check this is an eye tracker recording
     rec_def = study_config.session_def.get_recording_def(working_dir.name)
@@ -57,41 +54,47 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     coding_file = working_dir / naming.coding_file
     if not coding_file.is_file():
         raise FileNotFoundError(f'A coding file must be available to run sync_et_to_cam, but it is not. Run code_episodes and code at least one {annotation.tooltip_map[annotation.EventType.Sync_ET_Data]}. Not found: {coding_file}')
-    episodes = episode.list_to_marker_dict(episode.read_list_from_file(coding_file))[annotation.EventType.Sync_ET_Data]
+    episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / naming.coding_file), [cs['name'] for cs in sync_events])
     if not episodes:
         raise RuntimeError(f'No {annotation.tooltip_map[annotation.EventType.Sync_ET_Data]}s found for this recording. Run code_episodes and code at least one {annotation.tooltip_map[annotation.EventType.Sync_ET_Data]}.')
 
     # Read gaze data
-    gazes = gaze_headref.read_dict_from_file(working_dir / gt_naming.gaze_data_fname, episodes)[0]
+    gazes = gaze_headref.read_dict_from_file(working_dir / gt_naming.gaze_data_fname, [v for e in episodes for v in episodes[e]])[0]
     # time info
     video_ts = timestamps.VideoTimestamps(working_dir / gt_naming.frame_timestamps_fname)
 
-    match study_config.get_cam_movement_for_et_sync_method:
-        case 'plane':
-            planes = list(study_config.planes_per_episode[annotation.EventType.Sync_ET_Data])
-            if len(planes)!=1:
-                raise NotImplementedError("sync_et_to_cam only supports a single plane being used for synchronizing eye tracking data to the scene camera, contact developer if this is an issue")
-            pln = planes[0]
+    # Read target positions
+    target_positions: dict[str, dict[int, TargetPos]] = {}
+    for cs in sync_events:
+        nm = cs['name']
+        match cs['sync_setup']['get_cam_movement_method']:
+            case 'plane':
+                if len(cs['planes'])!=1:
+                    raise ValueError(f'ET Sync event "{nm}" should be coded for exactly one plane, found {len(cs["planes"])}')
+                pln = list(cs['planes'])[0]
 
-            # Read pose w.r.t plane
-            pln_file = working_dir/f'{naming.plane_pose_prefix}{pln}.tsv'
-            if not pln_file.is_file():
-                raise FileNotFoundError(f'A planePose file for the {pln} plane is not found, but is needed. Run detect_markers to create this file.')
-            poses = pose.read_dict_from_file(pln_file, episodes)
+                # Read pose w.r.t plane
+                pln_file = working_dir/f'{naming.plane_pose_prefix}{pln}.tsv'
+                if not pln_file.is_file():
+                    raise FileNotFoundError(f'A planePose file for the {pln} plane is not found, but is needed. Run detect_markers to create this file.')
+                poses = pose.read_dict_from_file(pln_file, episodes[nm])
 
-            # get camera calibration info
-            camera_params= ocv.CameraParams.read_from_file(working_dir / gt_naming.scene_camera_calibration_fname)
+                # get camera calibration info
+                camera_params = ocv.CameraParams.read_from_file(working_dir / gt_naming.scene_camera_calibration_fname)
 
-            # compute target positions
-            target_positions: dict[int, TargetPos] = {}
-            for frame_idx in poses:
-                t_pos = poses[frame_idx].get_origin_on_image(camera_params)
-                if not np.isnan(t_pos[0]):
-                    target_positions[frame_idx] = TargetPos(video_ts.get_timestamp(frame_idx), frame_idx, t_pos)
-        case 'function':
-            df = pd.read_csv(working_dir/naming.target_sync_file, delimiter='\t', index_col=False, dtype=defaultdict(lambda: float, frame_idx=int))
-            df['cam_pos'] = [x for x in df[['target_x','target_y']].values]
-            target_positions = {idx:TargetPos(video_ts.get_timestamp(idx), **kwargs) for idx,kwargs in zip(df['frame_idx'].values,df[['frame_idx','cam_pos']].to_dict(orient='records'))}
+                # compute target positions on camera frame
+                target_positions[nm] = {}
+                for frame_idx in poses:
+                    t_pos = poses[frame_idx].get_origin_on_image(camera_params)
+                    if not np.isnan(t_pos[0]):
+                        target_positions[nm][frame_idx] = TargetPos(video_ts.get_timestamp(frame_idx), frame_idx, t_pos)
+            case 'function':
+                df = pd.read_csv(working_dir/naming.target_sync_prefix + nm + '.tsv', delimiter='\t', index_col=False, dtype=defaultdict(lambda: float, frame_idx=int))
+                df['cam_pos'] = [x for x in df[['target_x','target_y']].values]
+                target_positions[nm] = {idx:TargetPos(video_ts.get_timestamp(idx), **kwargs) for idx,kwargs in zip(df['frame_idx'].values,df[['frame_idx','cam_pos']].to_dict(orient='records'))}
+
+    # flatten into list of tuples for easier processing
+    episodes = [(e, v) for e in episodes for v in episodes[e]]
 
     # get previous sync settings, if any
     VOR_sync_file = working_dir / naming.VOR_sync_file
@@ -116,13 +119,13 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
 
         if gui.is_running() and need_to_load:
             # select data
-            start, end = episodes[ival]
-            plot_gaze  = {fr:gazes           [fr] for fr in      gazes       if fr>=start and fr<=end}
-            plot_t_pos = {fr:target_positions[fr] for fr in target_positions if fr>=start and fr<=end}
+            e,(start, end) = episodes[ival]
+            plot_gaze  = {fr:gazes              [fr] for fr in      gazes          if fr>=start and fr<=end}
+            plot_t_pos = {fr:target_positions[e][fr] for fr in target_positions[e] if fr>=start and fr<=end}
             if not plot_gaze:
                 raise RuntimeError(f'No gaze data found between frames {start} and {end}')
             if not plot_t_pos:
-                raise RuntimeError(f'No target/scene camera data found between frames {start} and {end}')
+                raise RuntimeError(f'No target/scene camera data found between frames {start} and {end} for episode "{e}"')
             # determine initial offset
             toff = VOR_sync.loc[ival, 'offset_t']
             if np.isnan(toff):
@@ -162,7 +165,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     VOR_sync.to_csv(VOR_sync_file, sep='\t', float_format="%.4f") # .1 ms resolution
 
     # apply offset to gaze
-    if study_config.sync_et_to_cam_use_average:
+    if len(set(cs['sync_setup']['use_average'] for cs in sync_events))!=1:
+        raise ValueError('The setting "use_average" for ET sync events is not consistent across configured events. Please set all to True or all to False.')
+    if sync_events[0]['sync_setup']['use_average']:
         toff = VOR_sync['offset_t'].mean()
     else:
         toff = VOR_sync.iloc[0,'offset_t']
