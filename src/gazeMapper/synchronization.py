@@ -41,8 +41,11 @@ def get_sync_for_recs(working_dir: str|pathlib.Path, recs: str|list[str], ref_re
     for r in recs:
         # get interval coding for this recording
         episodes = get_coding_file(working_dir / r, missing_ref_coding_ok)
-        if episodes is None and missing_ref_coding_ok:
-            return None
+        if episodes is None:
+            if missing_ref_coding_ok:
+                return None
+            else:
+                raise FileNotFoundError(f'A coding file must be available for the recording ({r}) to run sync_to_ref, but it is not. Run code_episodes and code at least one {annotation.tooltip_map[annotation.EventType.Sync_Camera]}. Not found: {working_dir / r / naming.coding_file}')
 
         # check intervals
         if len(episodes)!=len(ref_episodes):
@@ -147,15 +150,18 @@ def get_coding_file(working_dir: str|pathlib.Path, missing_ref_coding_ok=False):
         if missing_ref_coding_ok:
             return None
         raise FileNotFoundError(f'A coding file must be available for the recording ({working_dir.name}) to run sync_to_ref, but it is not. Run code_episodes and code at least one {annotation.tooltip_map[annotation.EventType.Sync_Camera]}. Not found: {coding_file}')
-    episodes = episode.list_to_marker_dict(episode.read_list_from_file(coding_file))[annotation.EventType.Sync_Camera]
-    episodes = [x[0] for x in episodes] # remove inner wrapping list, there are only single values in it anyway
+    all_sync_events = annotation.get_events_by_type(annotation.EventType.Sync_Camera)
+    if not all_sync_events:
+        raise ValueError('No camera sync events have been set up to be coded. Cannot continue.')
+    episodes = episode.list_to_marker_dict(episode.read_list_from_file(coding_file), [e.name for e in all_sync_events])
+    episodes = [x[0] for e in episodes for x in episodes[e]] # merge all sync codes and remove inner wrapping list, there are only single values in it anyway
     if not episodes:
         if missing_ref_coding_ok:
             return None
-        raise ValueError(f'No {annotation.tooltip_map[annotation.EventType.Sync_Camera]}s found for this recording ({working_dir.name}). Run code_episodes and code at least one {annotation.tooltip_map[annotation.EventType.Sync_Camera]}.')
+        raise ValueError(f'No {annotation.tooltip_map[annotation.EventType.Sync_Camera]} codes found for this recording ({working_dir.name}). Run code_episodes and code at least one of the configured {annotation.tooltip_map[annotation.EventType.Sync_Camera]} events.')
     return episodes
 
-def get_episode_frame_indices_from_ref(working_dir: str|pathlib.Path, event: annotation.EventType, rec: str, ref_rec:str, all_recs: list[str], do_time_stretch: bool, average_recordings: list[str], stretch_which: str, extra_fr=0, missing_ref_coding_ok=False) -> list[list[int]]:
+def get_episode_frame_indices_from_ref(working_dir: str|pathlib.Path, event: str, rec: str, ref_rec:str, all_recs: list[str], do_time_stretch: bool, average_recordings: list[str], stretch_which: str, extra_fr=0, missing_ref_coding_ok=False) -> list[list[int]]:
     working_dir  = pathlib.Path(working_dir)
     ref_coding_file = working_dir.parent / ref_rec / naming.coding_file
     if not ref_coding_file.is_file():
@@ -166,7 +172,10 @@ def get_episode_frame_indices_from_ref(working_dir: str|pathlib.Path, event: ann
     if event not in ref_episodes:
         if missing_ref_coding_ok:
             return [[]]
-        raise KeyError(f'Trying to get {annotation.tooltip_map[event]}s from the reference recording ({ref_rec}), but the coding file for this reference recording doesn\'t contain any {annotation.tooltip_map[event]}s')
+        evt_info = annotation.get_event_by_name(event)
+        if evt_info is None:
+            raise KeyError(f'Requested event "{event}" is unknown. Cannot get codes from the reference recording ({ref_rec}).')
+        raise KeyError(f'Trying to get {event} codes (a {annotation.tooltip_map[evt_info.event_type]}) from the reference recording ({ref_rec}), but the coding file for this reference recording doesn\'t contain any {event} codes')
     # get sync and timestamp info we need to transform reference frames indices to frame indices of this recording
     sync = get_sync_for_recs(working_dir.parent, all_recs, ref_rec, do_time_stretch, average_recordings, missing_ref_coding_ok)
     if sync is None:
