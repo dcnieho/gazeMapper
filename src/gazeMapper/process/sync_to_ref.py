@@ -10,7 +10,7 @@ from . import _utils
 from .. import config, process, session, synchronization
 
 
-def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **study_settings):
+def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None, **study_settings):
     working_dir = pathlib.Path(working_dir) # working directory of a session, not of a recording
     if config_dir is None:
         config_dir = config.guess_config_dir(working_dir)
@@ -24,7 +24,8 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, **st
     # check there is a sync setup
     if not study_config.sync_ref_recording:
         raise ValueError('Synchronization to a reference recording is not defined, should not run this function')
-    if annotation.EventType.Sync_Camera not in study_config.episodes_to_code:
+    sync_events = process.get_specific_event_types(study_config, annotation.EventType.Sync_Camera)
+    if not sync_events:
         raise ValueError('Camera sync points are not set up to be coded, nothing to do here')
 
     # load any existing sync if its already available
