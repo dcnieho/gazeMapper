@@ -226,19 +226,23 @@ class Study:
             if cs.get('auto_code') is not None:
                 ac_type = AutoCodeSyncPoints if annotation.type_map[cs['event_type']]==annotation.Type.Point else AutoCodeEpisodes
                 cs['auto_code'] = ac_type(cs['auto_code'])
-                cs['auto_code'].apply_defaults()
             if cs.get('sync_setup') is not None:
                 cs['sync_setup'] = EtSyncSetup(cs['sync_setup'])
-                cs['sync_setup'].apply_defaults()
                 if cs['sync_setup'].get('get_cam_movement_function') is not None:
                     cs['sync_setup']['get_cam_movement_function'] = CamMovementForEtSyncFunction(cs['sync_setup']['get_cam_movement_function'])
-                    cs['sync_setup']['get_cam_movement_function'].apply_defaults()
+                elif cs['sync_setup']['get_cam_movement_function']=='function':
+                    # for ET sync events using function, ensure there is a get_cam_movement_function
+                    cs['sync_setup']['get_cam_movement_function'] = CamMovementForEtSyncFunction()
+            elif cs['event_type']==annotation.EventType.Sync_ET_Data:
+                # for ET sync events, ensure there is a sync setup
+                cs['sync_setup'] = EtSyncSetup()
             if cs.get('validation_setup') is not None:
                 cs['validation_setup'] = ValidationSetup(cs['validation_setup'])
-                cs['validation_setup'].apply_defaults()
                 if cs['validation_setup'].get('I2MC_settings') is not None:
                     cs['validation_setup']['I2MC_settings'] = I2MCSettings(cs['validation_setup']['I2MC_settings'])
-                    cs['validation_setup']['I2MC_settings'].apply_defaults()
+            elif cs['event_type']==annotation.EventType.Validate:
+                # for validation events, ensure there is a validation setup
+                cs['validation_setup'] = ValidationSetup()
 
         if strict_check:
             self._check_session_def(strict_check)
