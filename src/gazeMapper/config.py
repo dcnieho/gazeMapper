@@ -3,6 +3,7 @@ import inspect
 import copy
 import enum
 import typeguard
+import pathvalidate
 import typing
 from typing import Any, Literal
 
@@ -322,6 +323,12 @@ class Study:
     def _check_coding_setup(self, strict_check) -> type_utils.ProblemDict:
         problems: type_utils.ProblemDict = {}
         for i, cs in enumerate(self.coding_setup):
+            if not pathvalidate.is_valid_filename(cs['name'], "auto"):
+                msg = f'Coding setup name "{cs["name"]}" is not valid. It should be a valid filename'
+                if strict_check:
+                    raise ValueError(msg)
+                else:
+                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'name': (type_utils.ProblemLevel.Error, msg)}}})
             missing_planes: list[str] = []
             for p in cs['planes']:
                 if not any([p==pl.name for pl in self.planes]):

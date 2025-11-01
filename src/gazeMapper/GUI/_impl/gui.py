@@ -1365,7 +1365,7 @@ class GUI:
             new_plane_is_dyn = False
             new_plane_dyn_config_file: str = ''
             def _valid_plane_name():
-                return new_plane_name and not any((p.name==new_plane_name for p in self.study_config.planes))
+                return new_plane_name and pathvalidate.is_valid_filename(new_plane_name, "auto") and not any((p.name==new_plane_name for p in self.study_config.planes))
             def _valid_config_file():
                 return new_plane_dyn_config_file=='' or ((p:=pathlib.Path(new_plane_dyn_config_file)).suffix=='.json' and p.is_file())
             def _add_plane_popup():
@@ -1504,7 +1504,7 @@ class GUI:
             new_coding_name = ''
             new_coding_type: annotation.EventType|None = None
             def _valid_coding_name():
-                return new_coding_name and not any((cs['name']==new_coding_name for cs in self.study_config.coding_setup))
+                return new_coding_name and pathvalidate.is_valid_filename(new_coding_name, "auto") and not any((cs['name']==new_coding_name for cs in self.study_config.coding_setup))
             def _add_coding_popup():
                 nonlocal new_coding_name
                 nonlocal new_coding_type
