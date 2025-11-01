@@ -122,7 +122,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     gui.set_allow_seek(True)
     gui.set_allow_timeline_zoom(True)
     gui.set_show_controls(True, gui.main_window_id)
-    gui.set_allow_annotate(episodes_to_code, {cs['name']:cs['hotkey'] for cs in study_config.coding_setup}, {cs['name']:cs['description'] for cs in study_config.coding_setup})
+    gui.set_allow_annotate(episodes_to_code,
+                           {cs['name']:cs['hotkey'] for cs in study_config.coding_setup if cs['hotkey'] is not None},
+                           {cs['name']:cs['description'] for cs in study_config.coding_setup if cs['description'] is not None})
     gui.set_show_timeline(True, video_ts, episodes, gui.main_window_id)
     gui.set_show_annotation_label(True, gui.main_window_id)
     gui.set_show_action_tooltip(True, gui.main_window_id)
