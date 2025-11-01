@@ -1,5 +1,6 @@
 import pathlib
 import pandas as pd
+import typing
 from collections import defaultdict
 
 from glassesTools import annotation
@@ -75,7 +76,7 @@ def list_to_marker_dict(episodes: list[Episode], expected_types: list[str]|None=
             e_dict[e.event].append([e.start_frame])
     return e_dict
 
-def marker_dict_to_list(episodes: dict[str,list[int]|list[list[int]]]) -> list[Episode]:
+def marker_dict_to_list(episodes: typing.Mapping[str,list[int]|list[list[int]]]) -> list[Episode]:
     e_list: list[Episode] = []
     for e in episodes:
         if not episodes[e]:
