@@ -12,10 +12,17 @@ class ProblemLevel(enum.Enum):
     Warning     = enum.auto()
     Error       = enum.auto()
 
-ProblemDict = dict[str,tuple[ProblemLevel,typing.Union[None,str,'ProblemDict']]]
+ProblemKey      = str | int
+# A leaf message: level + optional text
+ProblemMessage  = tuple[ProblemLevel, str | None]
+# A node is either a nested dict (branch) or a leaf tuple
+ProblemEntry    = typing.Union['ProblemDict', ProblemMessage]
+# Recursive problem tree
+ProblemDict     = dict[ProblemKey, ProblemEntry]
+
 NestedDict = dict[str,typing.Union[None,'NestedDict']]
 
-def get_error_level(problem: ProblemDict|tuple[ProblemLevel,str]) -> ProblemLevel:
+def get_error_level(problem: ProblemDict|ProblemMessage) -> ProblemLevel:
     problem_level = None
     # check if any error, then return error immediately. Recurse if needed
     if isinstance(problem, tuple):
@@ -41,7 +48,7 @@ class GUIDocInfo:
 ArucoDictType = typing.Literal[tuple(aruco.dict_id_to_str.keys())]
 
 
-def merge_problem_dicts(a: ProblemDict, b: ProblemDict):
+def merge_problem_dicts(a: ProblemDict, b: ProblemDict) -> ProblemDict:
     for key in b:
         if key in a:
             if isinstance(a[key], dict) and isinstance(b[key], dict):
