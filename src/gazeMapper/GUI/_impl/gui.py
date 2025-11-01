@@ -59,13 +59,13 @@ class GUI:
 
         self._possible_value_getters    : dict[str]                                         = {}
 
-        self.need_setup_recordings                                  = True
-        self.need_setup_plane                                       = True
-        self.need_setup_coding                                     = True
-        self.need_setup_individual_markers                          = True
-        self.can_accept_sessions                                    = False
-        self._session_actions           : set[process.Action]       = set()
-        self._problems_cache            : type_utils.ProblemDict    = {}
+        self.setup_recordings_error_level           : type_utils.ProblemLevel|None  = None
+        self.setup_plane_error_level                : type_utils.ProblemLevel|None  = None
+        self.setup_coding_error_level               : type_utils.ProblemLevel|None  = None
+        self.setup_individual_markers_error_level   : type_utils.ProblemLevel|None  = None
+        self.can_accept_sessions                                                    = False
+        self._session_actions                       : set[process.Action]           = set()
+        self._problems_cache                        : type_utils.ProblemDict        = {}
 
         self._session_watcher           : concurrent.futures.Future = None
         self._session_watcher_stop_event: asyncio.Event             = None
@@ -694,27 +694,33 @@ class GUI:
         #   3. one episode to code
         #   4. one plane linked to one episode
         #   5. no individual marker problems
-        self.need_setup_recordings = not self.study_config or not self.study_config.session_def.recordings or 'session_def' in self._problems_cache or any((r.name in self.cam_calibrations and isinstance(self.cam_calibrations[r.name],Exception) for r in self.study_config.session_def.recordings))
+        self.setup_recordings_error_level = type_utils.ProblemLevel.Error if not self.study_config or not self.study_config.session_def.recordings or 'session_def' in self._problems_cache or any((r.name in self.cam_calibrations and isinstance(self.cam_calibrations[r.name],Exception) for r in self.study_config.session_def.recordings)) else None
         has_any_plane_setup = not not self.study_config and not not self.study_config.planes
         has_coding_setup = not not self.study_config and not not self.study_config.coding_setup
         has_any_indiv_marker_setup = not not self.study_config and not not self.study_config.individual_markers
-        if self.need_setup_recordings or has_any_plane_setup or has_coding_setup or has_any_indiv_marker_setup:
-            self.need_setup_plane = not self.study_config or not self.study_config.planes or 'planes' in self._problems_cache or any((not p.has_complete_setup() for p in self.study_config.planes)) or any((p.name not in self.plane_configs or isinstance(self.plane_configs[p.name],Exception) for p in self.study_config.planes))
-            self.need_setup_coding = not self.study_config or not self.study_config.coding_setup or 'coding_setup' in self._problems_cache
-            self.need_setup_individual_markers = not self.study_config or 'individual_markers' in self._problems_cache
+        if self.setup_recordings_error_level or has_any_plane_setup or has_coding_setup or has_any_indiv_marker_setup:
+            self.setup_plane_error_level = type_utils.ProblemLevel.Error if not self.study_config or not self.study_config.planes or any((not p.has_complete_setup() for p in self.study_config.planes)) or any((p.name not in self.plane_configs or isinstance(self.plane_configs[p.name],Exception) for p in self.study_config.planes)) else None
+            if self.setup_plane_error_level is None and 'planes' in self._problems_cache:
+                self.setup_plane_error_level = type_utils.get_error_level(self._problems_cache['planes'])
+            self.setup_coding_error_level = type_utils.ProblemLevel.Error if not self.study_config or not self.study_config.coding_setup else None
+            if self.setup_coding_error_level is None and 'coding_setup' in self._problems_cache:
+                self.setup_coding_error_level = type_utils.get_error_level(self._problems_cache['coding_setup'])
+            self.setup_individual_markers_error_level = type_utils.ProblemLevel.Error if not self.study_config or 'individual_markers' in self._problems_cache else None
+            if self.setup_individual_markers_error_level is None and 'individual_markers' in self._problems_cache:
+                self.setup_individual_markers_error_level = type_utils.get_error_level(self._problems_cache['individual_markers'])
         else:
-            self.need_setup_plane = self.need_setup_coding = self.need_setup_individual_markers = False
+            self.setup_plane_error_level = self.setup_coding_error_level = self.setup_individual_markers_error_level = None
             # remove all problems related to unused setup
             self._problems_cache.pop('planes',None)
             self._problems_cache.pop('coding_setup',None)
             self._problems_cache.pop('individual_markers',None)
 
         self.can_accept_sessions = \
-            not self._problems_cache and \
-            not self.need_setup_recordings and \
-            not self.need_setup_plane and \
-            not self.need_setup_coding and \
-            not self.need_setup_individual_markers
+            (not self._problems_cache or type_utils.get_error_level(self._problems_cache)!=type_utils.ProblemLevel.Error) and \
+            self.setup_recordings_error_level!=type_utils.ProblemLevel.Error and \
+            self.setup_plane_error_level!=type_utils.ProblemLevel.Error and \
+            self.setup_coding_error_level!=type_utils.ProblemLevel.Error and \
+            self.setup_individual_markers_error_level!=type_utils.ProblemLevel.Error
 
     def _get_markers(self, use_family=False):
         markers: dict[str,dict[str,list[tuple[int,int]]]] = {}
@@ -739,11 +745,11 @@ class GUI:
                         msg = f'The individual markers contain'
                     else:
                         msg = f'The set of {m} markers of the {s} "plane" contains'
-                    msg = f'{msg} duplicates: {gm_utils.format_duplicate_markers_msg(duplicates)}. Markers should be unique, fix this duplication.'
+                    msg += (f'{msg} duplicates: {gm_utils.format_duplicate_markers_msg(duplicates)}.' + (' Markers must be unique, fix this duplication.' if not self.study_config.allow_duplicated_markers else ''))
                     if s=='xx_individual_markers_xx':
-                        type_utils.merge_problem_dicts(self._problems_cache, {'individual_markers': {d: msg for d in duplicates}})
+                        type_utils.merge_problem_dicts(self._problems_cache, {'individual_markers': {d: (type_utils.ProblemLevel.Warning if self.study_config.allow_duplicated_markers else type_utils.ProblemLevel.Error, msg) for d in duplicates}})
                     else:
-                        type_utils.merge_problem_dicts(self._problems_cache, {'planes': {s: {'marker_file' if m=='plane' else 'target_file': msg}}})
+                        type_utils.merge_problem_dicts(self._problems_cache, {'planes': {s: {'marker_file' if m=='plane' else 'target_file': (type_utils.ProblemLevel.Warning if self.study_config.allow_duplicated_markers else type_utils.ProblemLevel.Error, msg)}}})
                 # check no collisions
                 if seen_markers.intersection(used_markers[s][m]):
                     # markers not unique, make error. Find exactly where the overlap is
@@ -761,13 +767,13 @@ class GUI:
                                     else:
                                         lbl = f'{mx} markers' if isinstance(mx,str) else f'dynamic validation target markers (column {mx})'
                                         mark_msgs.append(f'{lbl} of the "{sx}" plane')
-                                msg = f'The following markers are encountered in the setup both as {mark_msgs[0]} and as {mark_msgs[1]}: {gm_utils.format_duplicate_markers_msg(overlap)}. Markers must be unique, fix this collision.'
+                                msg = f'The following markers are encountered in the setup both as {mark_msgs[0]} and as {mark_msgs[1]}: {gm_utils.format_duplicate_markers_msg(overlap)}.' + (' Markers must be unique, fix this duplication.' if not self.study_config.allow_duplicated_markers else '')
                                 # add error message to problem dict
                                 if 'xx_individual_markers_xx' in (s,s2):
-                                    type_utils.merge_problem_dicts(self._problems_cache, {'individual_markers': {d: msg for d in overlap if d in used_markers['xx_individual_markers_xx']['markers']}})
+                                    type_utils.merge_problem_dicts(self._problems_cache, {'individual_markers': {d: (type_utils.ProblemLevel.Warning if self.study_config.allow_duplicated_markers else type_utils.ProblemLevel.Error, msg) for d in overlap if d in used_markers['xx_individual_markers_xx']['markers']}})
                                 for sx,mx in zip((s,s2),(m,m2)):
                                     if sx!='xx_individual_markers_xx':
-                                        type_utils.merge_problem_dicts(self._problems_cache, {'planes': {sx: {'marker_file' if mx=='plane' else 'target_file': msg}}})
+                                        type_utils.merge_problem_dicts(self._problems_cache, {'planes': {sx: {'marker_file' if mx=='plane' else 'target_file': (type_utils.ProblemLevel.Warning if self.study_config.allow_duplicated_markers else type_utils.ProblemLevel.Error, msg)}}})
                 seen_markers.update(used_markers[s][m])
 
     def _check_camera_calibrations(self):
@@ -973,41 +979,46 @@ class GUI:
             gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='loading'))
 
     def _project_settings_pane_drawer(self):
-        def _indicate_needs_attention():
-            imgui.push_style_color(imgui.Col_.button,         colors.error_dark)
-            imgui.push_style_color(imgui.Col_.button_hovered, colors.error)
-            imgui.push_style_color(imgui.Col_.button_active,  colors.error_bright)
+        def _indicate_needs_attention(problem_level: type_utils.ProblemLevel):
+            if problem_level==type_utils.ProblemLevel.Warning:
+                imgui.push_style_color(imgui.Col_.button,         colors.warning_dark)
+                imgui.push_style_color(imgui.Col_.button_hovered, colors.warning)
+                imgui.push_style_color(imgui.Col_.button_active,  colors.warning_bright)
+            else:
+                imgui.push_style_color(imgui.Col_.button,         colors.error_dark)
+                imgui.push_style_color(imgui.Col_.button_hovered, colors.error)
+                imgui.push_style_color(imgui.Col_.button_active,  colors.error_bright)
         # options handled in separate panes
         new_win_params: tuple[str,Callable[[],None]] = None
-        if self.need_setup_recordings:
-            _indicate_needs_attention()
+        if self.setup_recordings_error_level is not None:
+            _indicate_needs_attention(self.setup_recordings_error_level)
         if imgui.button("Edit session definition"):
             new_win_params = ('Session definition', self._session_definition_pane_drawer)
-        if self.need_setup_recordings:
+        if self.setup_recordings_error_level is not None:
             imgui.pop_style_color(3)
         imgui.same_line()
 
-        if self.need_setup_plane:
-            _indicate_needs_attention()
+        if self.setup_plane_error_level is not None:
+            _indicate_needs_attention(self.setup_plane_error_level)
         if imgui.button("Edit planes"):
             new_win_params = ('Plane editor', self._plane_editor_pane_drawer)
-        if self.need_setup_plane:
+        if self.setup_plane_error_level is not None:
             imgui.pop_style_color(3)
         imgui.same_line()
 
-        if self.need_setup_individual_markers:
-            _indicate_needs_attention()
+        if self.setup_individual_markers_error_level is not None:
+            _indicate_needs_attention(self.setup_individual_markers_error_level)
         if imgui.button("Edit individual markers"):
             new_win_params = ('Individual marker editor', self._individual_marker_setup_pane_drawer)
-        if self.need_setup_individual_markers:
+        if self.setup_individual_markers_error_level is not None:
             imgui.pop_style_color(3)
         imgui.same_line()
 
-        if self.need_setup_coding:
-            _indicate_needs_attention()
+        if self.setup_coding_error_level is not None:
+            _indicate_needs_attention(self.setup_coding_error_level)
         if imgui.button("Coding setup"):
             new_win_params = ('Coding setup', self._coding_setup_pane_drawer)
-        if self.need_setup_coding:
+        if self.setup_coding_error_level is not None:
             imgui.pop_style_color(3)
 
         if new_win_params is not None:
@@ -1145,7 +1156,7 @@ class GUI:
             imgui.text_colored(colors.error,'*At minimum one recording should be defined')
         if 'session_def' in self._problems_cache and (not isinstance(self._problems_cache['session_def'],dict) or 'problem_with_this_key' in self._problems_cache['session_def']):
             problem = self._problems_cache['session_def']['problem_with_this_key'] if isinstance(self._problems_cache['session_def'],dict) else self._problems_cache['session_def']
-            imgui.text_colored(colors.error,f"*{problem}")
+            imgui.text_colored(colors.error if problem[0]==type_utils.ProblemLevel.Error else colors.warning, f"*{problem[1]}")
         have_camera_recordings = any((r.type==session.RecordingType.Camera for r in self.study_config.session_def.recordings))
         table_is_started = imgui.begin_table(f"##session_def_list", 3+2*have_camera_recordings)
         if not table_is_started:
@@ -1164,9 +1175,9 @@ class GUI:
             if has_cal_error := r.name in self.cam_calibrations and isinstance(self.cam_calibrations[r.name],Exception):
                 msg = 'There is a problem with the configured calibration'
                 if not problem:
-                    problem = msg
+                    problem = (type_utils.ProblemLevel.Error, msg)
                 else:
-                    problem += '\n'+msg
+                    problem[1] += '\n'+msg
             imgui.table_next_row()
             imgui.table_next_column()
             if imgui.button(ifa6.ICON_FA_TRASH_CAN+f'##{r.name}'):
@@ -1174,10 +1185,10 @@ class GUI:
                 self._reload_sessions()
             imgui.same_line()
             if problem is not None:
-                imgui.push_style_color(imgui.Col_.text, colors.error)
+                imgui.push_style_color(imgui.Col_.text, colors.error if problem[0]==type_utils.ProblemLevel.Error else colors.warning)
             imgui.text(r.name)
             if problem is not None:
-                gt_gui.utils.draw_hover_text(problem, '')
+                gt_gui.utils.draw_hover_text(problem[1], '')
                 imgui.pop_style_color()
             imgui.table_next_column()
             imgui.align_text_to_frame_padding()
@@ -1276,7 +1287,12 @@ class GUI:
             gt_gui.utils.push_popup(self, lambda: gt_gui.utils.popup("Add recording", _add_rec_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, outside=False))
 
     def _plane_editor_pane_drawer(self):
-        if self.need_setup_plane:
+        if self.setup_plane_error_level is not None:
+            if self.setup_plane_error_level==type_utils.ProblemLevel.Error:
+                imgui.text_colored(colors.error,'*There are problems in the below setup that need to be resolved.\nHover over red text to get information about the error.')
+            else:
+                imgui.text_colored(colors.warning,'*There are potential problems in the below setup.\nHover over yellow text to get information about the warning.')
+        if self.setup_plane_error_level is not None and (not self.study_config or not self.study_config.planes):
             has_coding_setup_needing_plane = not not self.study_config.coding_setup and any((cs['event_type'] in (annotation.EventType.Trial, annotation.EventType.Validate) or (cs['event_type']==annotation.EventType.Sync_ET_Data and cs['sync_setup'] and cs['sync_setup']['get_cam_movement_method']=='plane') for cs in self.study_config.coding_setup))
             has_individual_markers = not not self.study_config.individual_markers
             if has_coding_setup_needing_plane and has_individual_markers:
@@ -1285,8 +1301,6 @@ class GUI:
                 imgui.text_colored(colors.error,'*At minimum one plane should be defined when a coding setup needing a plane is defined')
             elif has_individual_markers:
                 imgui.text_colored(colors.error,'*At minimum one plane should be defined when individual markers are defined')
-        if any((x in self._problems_cache for x in ['planes'])):
-            imgui.text_colored(colors.error,'*There are problems in the below setup that need to be resolved.\nHover over red text to get information about the error')
         def _hover_img_error_popup(p_def: plane.Definition, load_error: Exception):
             if imgui.is_item_hovered(imgui.HoveredFlags_.for_tooltip|imgui.HoveredFlags_.delay_normal):
                 imgui.begin_tooltip()
@@ -1307,7 +1321,7 @@ class GUI:
             lbl = f'{p.name} ({p.type.value})'
             if (has_error:=problem_fields or load_error):
                 extra = '*'
-                imgui.push_style_color(imgui.Col_.text, colors.error)
+                imgui.push_style_color(imgui.Col_.text, colors.error if type_utils.get_error_level(problem_fields)==type_utils.ProblemLevel.Error or (load_error is not None) else colors.warning)
             if imgui.tree_node_ex(f'{extra}{lbl}###{lbl}', imgui.TreeNodeFlags_.framed):
                 if has_error:
                     imgui.pop_style_color()
@@ -1427,9 +1441,12 @@ class GUI:
             gt_gui.utils.push_popup(self, lambda: gt_gui.utils.popup("Add plane", _add_plane_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, outside=False))
 
     def _coding_setup_pane_drawer(self):
-        if any((x in self._problems_cache for x in ['coding_setup'])):
-            imgui.text_colored(colors.error,'*There are problems in the below setup that need to be resolved.\nHover over red text to get information about the error')
-        if self.need_setup_coding and not self.study_config.coding_setup:
+        if self.setup_coding_error_level is not None:
+            if self.setup_coding_error_level==type_utils.ProblemLevel.Error:
+                imgui.text_colored(colors.error,'*There are problems in the below setup that need to be resolved.\nHover over red text to get information about the error.')
+            else:
+                imgui.text_colored(colors.warning,'*There are potential problems in the below setup.\nHover over yellow text to get information about the warning.')
+        if self.setup_coding_error_level is not None and (not self.study_config or not self.study_config.coding_setup):
             has_plane = not not self.study_config.planes
             has_individual_markers = not not self.study_config.individual_markers
             if has_plane and has_individual_markers:
@@ -1449,7 +1466,7 @@ class GUI:
             lbl = f'{cs['name']} ({annotation.tooltip_map[cs['event_type']]})'
             if (has_error:=problem_fields):
                 extra = '*'
-                imgui.push_style_color(imgui.Col_.text, colors.error)
+                imgui.push_style_color(imgui.Col_.text, colors.error if type_utils.get_error_level(problem_fields)==type_utils.ProblemLevel.Error else colors.warning)
             if imgui.tree_node_ex(f'{extra}{lbl}###{i}', imgui.TreeNodeFlags_.framed):
                 if has_error:
                     imgui.pop_style_color()
@@ -1530,8 +1547,11 @@ class GUI:
             gt_gui.utils.push_popup(self, lambda: gt_gui.utils.popup("Add plane", _add_coding_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, outside=False))
 
     def _individual_marker_setup_pane_drawer(self):
-        if any((x in self._problems_cache for x in ['individual_markers'])):
-            imgui.text_colored(colors.error,'*There are problems in the below setup that need to be resolved.\nHover over red text to get information about the error')
+        if self.setup_individual_markers_error_level is not None:
+            if self.setup_individual_markers_error_level==type_utils.ProblemLevel.Error:
+                imgui.text_colored(colors.error,'*There are problems in the below setup that need to be resolved.\nHover over red text to get information about the error')
+            else:
+                imgui.text_colored(colors.warning,'*There are potential problems in the below setup.\nHover over yellow text to get information about the warning.')
         table_is_started = imgui.begin_table(f"##markers_def_list", 5)
         if not table_is_started:
             return
@@ -1549,7 +1569,7 @@ class GUI:
             imgui.table_next_column()
             imgui.align_text_to_frame_padding()
             if problem:
-                imgui.push_style_color(imgui.Col_.text, gt_gui.colors.error)
+                imgui.push_style_color(imgui.Col_.text, colors.error if type_utils.get_error_level(problem)==type_utils.ProblemLevel.Error else colors.warning)
             imgui.set_next_item_width(-1)
             new_val = imgui.input_int(f'##id_input_{i}', m.id, 0, 0)[1]
             if (this_changed:=m.id!=new_val):

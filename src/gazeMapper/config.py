@@ -102,6 +102,7 @@ class Study:
                  working_directory                          : str|pathlib.Path,
 
                  # setup with defaults
+                 allow_duplicated_markers                   : bool                          = False,
 
                  import_do_copy_video                       : bool                          = True,
                  import_source_dir_as_relative_path         : bool                          = False,
@@ -159,6 +160,8 @@ class Study:
         self.individual_markers                         = individual_markers
         self.coding_setup                               = coding_setup
         self.working_directory                          = working_directory
+
+        self.allow_duplicated_markers                   = allow_duplicated_markers
 
         self.import_do_copy_video                       = import_do_copy_video
         self.import_source_dir_as_relative_path         = import_source_dir_as_relative_path
@@ -269,9 +272,9 @@ class Study:
                 else:
                     missing_recs.append(w)
         if missing_recs:
-            problems[field] = f'Recording(s) {missing_recs[0] if len(missing_recs)==1 else missing_recs} not known'
+            problems[field] = (type_utils.ProblemLevel.Error, f'Recording(s) {missing_recs[0] if len(missing_recs)==1 else missing_recs} not known')
             if isinstance(getattr(self,field),dict):
-                type_utils.merge_problem_dicts(problems,{field: {r:f'Recording {r} not known' for r in missing_recs}})
+                type_utils.merge_problem_dicts(problems,{field: {r:(type_utils.ProblemLevel.Error, f'Recording {r} not known') for r in missing_recs}})
         return problems
 
     def _check_recording(self, rec: str) -> bool:
@@ -284,7 +287,7 @@ class Study:
             if strict_check:
                 raise ValueError('At least one recording should be an eye tracker recording')
             else:
-                problems['session_def'] = 'At least one recording should be an eye tracker recording'
+                problems['session_def'] = (type_utils.ProblemLevel.Error, 'At least one recording should be an eye tracker recording')
         # additional checks for camera recordings
         for r in self.session_def.recordings:
             if r.type==session.RecordingType.Camera:
@@ -309,7 +312,7 @@ class Study:
                     if strict_check:
                         raise ValueError(f'problem with set up of "{r.name}" recording in session_def: {msg}')
                     else:
-                        type_utils.merge_problem_dicts(problems, {'session_def': {r.name: msg}})
+                        type_utils.merge_problem_dicts(problems, {'session_def': {r.name: (type_utils.ProblemLevel.Error, msg)}})
         return problems
 
     def _check_coding_setup(self, strict_check) -> type_utils.ProblemDict:
@@ -324,7 +327,7 @@ class Study:
                         missing_planes.append(p)
             if missing_planes:
                 mp = '", "'.join(missing_planes)
-                type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'planes': f'Plane(s) "{mp}" not known.'}}})
+                type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'planes': (type_utils.ProblemLevel.Error, f'Plane(s) "{mp}" not known.')}}})
 
             # check correct number of planes is defined for the episode
             allow_one_plane = False
@@ -350,19 +353,19 @@ class Study:
                 if strict_check:
                     raise ValueError(msg)
                 else:
-                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'planes': msg}}})
+                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'planes': (type_utils.ProblemLevel.Error, msg)}}})
             elif allow_one_plane and not cs['planes']:
                 msg = ('At least one' if allow_more_than_one else 'One')+f' plane should be defined for a {annotation.tooltip_map[e]}'
                 if strict_check:
                     raise ValueError(msg)
                 else:
-                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'planes': msg}}})
+                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'planes': (type_utils.ProblemLevel.Error, msg)}}})
             if not allow_more_than_one and len(cs['planes'])>1:
                 msg = f'Only one plane should be defined for a {annotation.tooltip_map[e]}'
                 if strict_check:
                     raise ValueError(msg)
                 else:
-                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'planes': msg}}})
+                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'planes': (type_utils.ProblemLevel.Error, msg)}}})
 
             # check hotkey
             if cs.get('hotkey') is not None and not gui_utils.is_valid_imgui_key(cs['hotkey']):
@@ -370,7 +373,7 @@ class Study:
                 if strict_check:
                     raise ValueError(msg)
                 else:
-                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'hotkey': msg}}})
+                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'hotkey': (type_utils.ProblemLevel.Error, msg)}}})
 
             # check sync setup for ET sync episodes
             if e==annotation.EventType.Sync_ET_Data:
@@ -379,7 +382,7 @@ class Study:
                     if strict_check:
                         raise ValueError(msg)
                     else:
-                        type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'sync_setup': msg}}})
+                        type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'sync_setup': (type_utils.ProblemLevel.Error, msg)}}})
                 else:
                     cam_mov_possible_values = typing.get_args(EtSyncSetup.__annotations__['get_cam_movement_method'])
                     if cs['sync_setup'].get('get_cam_movement_method') not in cam_mov_possible_values:
@@ -391,7 +394,7 @@ class Study:
                         if strict_check:
                             raise ValueError(msg)
                         else:
-                            type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'sync_setup': {'get_cam_movement_method': msg}}}})
+                            type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'sync_setup': {'get_cam_movement_method': (type_utils.ProblemLevel.Error, msg)}}}})
                         # nothing further to check, return
                         return problems
 
@@ -402,7 +405,7 @@ class Study:
                             if strict_check:
                                 raise ValueError(msg)
                             else:
-                                type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'sync_setup': msg}}})
+                                type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'sync_setup': (type_utils.ProblemLevel.Error, msg)}}})
                         else:
                             keys = CamMovementForEtSyncFunction.__required_keys__
                             this_problems = {k:f'sync_setup.get_cam_movement_function.{k} should be set when sync_setup.get_cam_movement_method is set to "function"' for k in keys if k not in cs['sync_setup'].get('get_cam_movement_function') or not cs['sync_setup'].get('get_cam_movement_function')[k]}
@@ -410,20 +413,20 @@ class Study:
                                 if strict_check:
                                     raise ValueError('\n'.join(this_problems.values()))
                                 else:
-                                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'sync_setup': {'get_cam_movement_function': this_problems}}}})
+                                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'sync_setup': {'get_cam_movement_function': (type_utils.ProblemLevel.Error, this_problems)}}}})
                         if cs['planes']:
                             msg = f'No planes should be defined for a {annotation.tooltip_map[e]} episode unless the get_cam_movement_method is set to "plane".'
                             if strict_check:
                                 raise ValueError(msg)
                             else:
-                                type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'sync_setup': msg}}})
+                                type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'sync_setup': (type_utils.ProblemLevel.Error, msg)}}})
                     elif cs['sync_setup'].get('get_cam_movement_method')=='plane':
                         if not cs['planes']:
                             msg = f'A plane should be defined for a {annotation.tooltip_map[e]} episode when the get_cam_movement_method is set to "plane".'
                             if strict_check:
                                 raise ValueError(msg)
                             else:
-                                type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'sync_setup': msg}}})
+                                type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'sync_setup': (type_utils.ProblemLevel.Error, msg)}}})
 
             # check auto coding setup
             if cs.get('auto_code') is not None:
@@ -439,7 +442,7 @@ class Study:
                     if strict_check:
                         raise ValueError('\n'.join(this_problems.values()))
                     else:
-                        type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'auto_code': this_problems}}})
+                        type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'auto_code': (type_utils.ProblemLevel.Error, this_problems)}}})
                 else:
                     for f in fields:
                         if f not in cs['auto_code'] or not cs['auto_code'][f]:
@@ -447,7 +450,7 @@ class Study:
                             if strict_check:
                                 raise ValueError(msg)
                             else:
-                                type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'auto_code': {f: msg}}}})
+                                type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'auto_code': {f: (type_utils.ProblemLevel.Error, msg)}}}})
                         else:
                             missing_markers: list[gt_marker.MarkerID] = []
                             for m in cs['auto_code'][f]:
@@ -458,7 +461,7 @@ class Study:
                                 if strict_check:
                                     raise ValueError(msg)
                                 else:
-                                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'auto_code': {f: msg}}}})
+                                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'auto_code': {f: (type_utils.ProblemLevel.Error, msg)}}}})
         return problems
 
     def _check_auto_markers(self, strict_check) -> type_utils.ProblemDict:
@@ -486,11 +489,11 @@ class Study:
             # first check if used markers are unique at the family level
             seen: set[tuple[int,int]] = set()
             if (duplicates := {x for x in used_markers_fam[s] if x in seen or seen.add(x)}):
-                msg = f'The markers defined for {_format_key(s)} are not unique. Please resolve the following duplicates: {utils.format_duplicate_markers_msg(duplicates)}'
+                msg = f'The markers defined for {_format_key(s)} are not unique. ' +('Please resolve' if not self.allow_duplicated_markers else 'There are') + f' the following duplicates: {utils.format_duplicate_markers_msg(duplicates)}'
                 if strict_check:
                     raise ValueError(msg)
                 else:
-                    type_utils.merge_problem_dicts(problems, {'coding_setup': {s[1]: {'auto_code': {s[3]: msg}}}})
+                    type_utils.merge_problem_dicts(problems, {'coding_setup': {s[1]: {'auto_code': {s[3]: (type_utils.ProblemLevel.Warning if self.allow_duplicated_markers else type_utils.ProblemLevel.Error, msg)}}}})
             # then check if already used in another setup
             if seen_markers.intersection(used_markers_fam[s]):
                 # markers not unique, make error. Find exactly where the overlap is
@@ -502,13 +505,13 @@ class Study:
                         # individual entries. e.g. start is 80 81, and end is 81 80 is valid
                         continue
                     if (overlap:=set(used_markers_fam[s2]).intersection(used_markers_fam[s])):
-                        msg = f'The following markers are encountered in the setup for both {_format_key(s)} and {_format_key(s2)}: {utils.format_duplicate_markers_msg(overlap)}. Markers cannot be used more than once, fix this collision.'
+                        msg = f'The following markers are encountered in the setup for both {_format_key(s)} and {_format_key(s2)}: {utils.format_duplicate_markers_msg(overlap)}.' +(' Markers cannot be used more than once, fix this collision.' if not self.allow_duplicated_markers else '')
                         # emit error message
                         if strict_check:
                             raise ValueError(msg)
                         else:
                             for sx in (s,s2):
-                                type_utils.merge_problem_dicts(problems, {'coding_setup': {sx[1]: {'auto_code': {sx[3]: msg}}}})
+                                type_utils.merge_problem_dicts(problems, {'coding_setup': {sx[1]: {'auto_code': {sx[3]: (type_utils.ProblemLevel.Warning if self.allow_duplicated_markers else type_utils.ProblemLevel.Error, msg)}}}})
             seen_markers.update(used_markers_fam[s])
             # check if marker sequence is already used
             if seen_markers_sets.intersection((tuple(used_markers_fam[s]),)):
@@ -516,13 +519,13 @@ class Study:
                     if s==s2:
                         continue
                     if set((tuple(used_markers_fam[s2]),)).intersection((tuple(used_markers_fam[s]),)):
-                        msg = f'The marker sequence {utils.format_marker_sequence_msg(used_markers_fam[s])} specified for {_format_key(s)} has already been used for {_format_key(s2)}. Markers sequences must be unique, please fix this collision.'
+                        msg = f'The marker sequence {utils.format_marker_sequence_msg(used_markers_fam[s])} specified for {_format_key(s)} has already been used for {_format_key(s2)}.' +(' Markers sequences must be unique, please fix this collision.' if not self.allow_duplicated_markers else '')
                         # emit error message
                         if strict_check:
                             raise ValueError(msg)
                         else:
                             for sx in (s,s2):
-                                type_utils.merge_problem_dicts(problems, {'coding_setup': {sx[1]: {'auto_code': {sx[3]: msg}}}})
+                                type_utils.merge_problem_dicts(problems, {'coding_setup': {sx[1]: {'auto_code': {sx[3]: (type_utils.ProblemLevel.Warning if self.allow_duplicated_markers else type_utils.ProblemLevel.Error, msg)}}}})
             seen_markers_sets.add(tuple(used_markers_fam[s]))
         return problems
 
@@ -542,7 +545,7 @@ class Study:
                 if strict_check:
                     raise ValueError(f'individual_markers marker {m.id} ({aruco.dict_id_to_str[m.aruco_dict_id]}): {problem}')
                 else:
-                    problems = type_utils.merge_problem_dicts(problems, {'individual_markers': {(m.id, aruco.dict_id_to_family[m.aruco_dict_id]): problem}})
+                    problems = type_utils.merge_problem_dicts(problems, {'individual_markers': {(m.id, aruco.dict_id_to_family[m.aruco_dict_id]): (type_utils.ProblemLevel.Error, problem)}})
         return problems
 
     def _check_head_attached_recordings(self, strict_check):
@@ -557,7 +560,7 @@ class Study:
                 if strict_check:
                     raise ValueError(msg)
                 else:
-                    problems = type_utils.merge_problem_dicts(problems, {'head_attached_recordings_replace_et_scene': msg})
+                    problems = type_utils.merge_problem_dicts(problems, {'head_attached_recordings_replace_et_scene': (type_utils.ProblemLevel.Error, msg)})
             # check that there is not more than one head-attached recording overriding a given ET recording
             overridden = [(r, r2.associated_recording) for r in self.head_attached_recordings_replace_et_scene for r2 in self.session_def.recordings if r2.name==r]
             # get duplicates
@@ -569,7 +572,7 @@ class Study:
                     if strict_check:
                         raise ValueError(msg)
                     else:
-                        problems = type_utils.merge_problem_dicts(problems, {'head_attached_recordings_replace_et_scene': msg})
+                        problems = type_utils.merge_problem_dicts(problems, {'head_attached_recordings_replace_et_scene': (type_utils.ProblemLevel.Error, msg)})
 
         return problems
 
@@ -577,11 +580,11 @@ class Study:
         problems: type_utils.ProblemDict = {}
         if self.sync_ref_recording is None:
             if len(self.session_def.recordings)>1:
-                problems['sync_ref_recording'] = f'sync_ref_recording must be set when sessions consist of more than one recording'
+                problems['sync_ref_recording'] = (type_utils.ProblemLevel.Error, f'sync_ref_recording must be set when sessions consist of more than one recording')
             # nothing to do
             return problems
         elif len(self.session_def.recordings)==1:
-            return {'sync_ref_recording': f'sync_ref_recording must not be set when sessions consist of only one recording'}
+            return {'sync_ref_recording': (type_utils.ProblemLevel.Error, f'sync_ref_recording must not be set when sessions consist of only one recording')}
 
         type_utils.merge_problem_dicts(problems, self._check_recordings([self.sync_ref_recording], 'sync_ref_recording', strict_check))
         type_utils.merge_problem_dicts(problems, self._check_recordings(self.sync_ref_average_recordings, 'sync_average_recordings', strict_check))
@@ -589,25 +592,25 @@ class Study:
             if strict_check:
                 raise ValueError(f'sync_ref_do_time_stretch should be set in the study setup when sync_ref_recording is set')
             else:
-                problems['sync_ref_do_time_stretch'] = f'sync_ref_do_time_stretch should be set when sync_ref_recording is set'
+                problems['sync_ref_do_time_stretch'] = (type_utils.ProblemLevel.Error, f'sync_ref_do_time_stretch should be set when sync_ref_recording is set')
         if self.sync_ref_do_time_stretch:
             for a in ['sync_ref_stretch_which', 'sync_ref_average_recordings']:
                 if getattr(self,a) is None:
                     if strict_check:
                         raise ValueError(f'{a} should be set in the study setup when sync_ref_recording is set and sync_ref_do_time_stretch is enabled')
                     else:
-                        problems[a] = f'{a} should be set when sync_ref_recording is set and sync_ref_do_time_stretch is enabled'
+                        problems[a] = (type_utils.ProblemLevel.Error, f'{a} should be set when sync_ref_recording is set and sync_ref_do_time_stretch is enabled')
         if self.sync_ref_average_recordings and self.sync_ref_recording in self.sync_ref_average_recordings:
             if strict_check:
                 raise ValueError(f'Recording {self.sync_ref_recording} is the reference recording for sync, should not be specified in sync_average_recordings')
             else:
-                problems['sync_ref_average_recordings'] = f'Recording {self.sync_ref_recording} is the reference recording for sync, cannot be specified in sync_average_recordings'
+                problems['sync_ref_average_recordings'] = (type_utils.ProblemLevel.Error, f'Recording {self.sync_ref_recording} is the reference recording for sync, cannot be specified in sync_average_recordings')
         if not any(cs['event_type']==annotation.EventType.Sync_Camera for cs in self.coding_setup):
             if strict_check:
                 raise ValueError('When sync_ref_recording is set, coding of camera sync points should be set up in coding_setup')
             else:
-                problems['coding_setup'] = f'if sync_ref_recording is set, a {annotation.tooltip_map[annotation.EventType.Sync_Camera]}s should be set up to be coded'
-                type_utils.merge_problem_dicts(problems, {'sync_ref_recording': f'sync_ref_recording is set, but no {annotation.tooltip_map[annotation.EventType.Sync_Camera]}s are not set up to be coded in coding_setup'})
+                problems['coding_setup'] = (type_utils.ProblemLevel.Error, f'if sync_ref_recording is set, a {annotation.tooltip_map[annotation.EventType.Sync_Camera]}s should be set up to be coded')
+                type_utils.merge_problem_dicts(problems, {'sync_ref_recording': (type_utils.ProblemLevel.Error, f'sync_ref_recording is set, but no {annotation.tooltip_map[annotation.EventType.Sync_Camera]}s are not set up to be coded in coding_setup')})
         return problems
 
     def _check_make_video(self, strict_check) -> type_utils.ProblemDict:
@@ -632,7 +635,7 @@ class Study:
                 if strict_check:
                     raise ValueError(msg)
                 else:
-                    type_utils.merge_problem_dicts(problems,{'mapped_video_recording_colors': msg})
+                    type_utils.merge_problem_dicts(problems,{'mapped_video_recording_colors': (type_utils.ProblemLevel.Error, msg)})
         return problems
 
     def field_problems(self) -> type_utils.ProblemDict:
@@ -896,6 +899,7 @@ _gaze_type_doc = {
     gaze_worldref.Type.Average_Gaze_Vector  : type_utils.GUIDocInfo('Average of gaze vectors', 'Average of the projections of the left and right eyes\' gaze vectors to the plane.'),
 }
 study_parameter_doc = {
+    'allow_duplicated_markers': type_utils.GUIDocInfo('Allow duplicated markers?', 'If enabled, the same marker can be used in multiple places in the coding setup (e.g. for auto coding and/or in planes). If disabled, each marker can only be used once. Enabling this may be ok, if the duplicate markers never occur at the same time. Still, use at your own risk.'),
     'import_do_copy_video': type_utils.GUIDocInfo('Copy video during import?', 'If not enabled, the scene video of an eye tracker recording, or the video of an external camera is not copied to the gazeMapper recording directory during import. Instead, the video will be loaded from the recording\'s source directory (so do not move it). Ignored when the video must be transcoded to be processed with gazeMapper.'),
     'import_source_dir_as_relative_path': type_utils.GUIDocInfo('Store source directory as relative path?', 'Specifies whether the path to the source directory stored in the recording info file is an absolute path (this option is not enabled) or a relative path (enabled). If a relative path is used, the imported recording and the source directory can be moved to another location, and the source directory can still be found as long as the relative path (e.g., one folder up and in the directory "original recordings": "../original recordings") doesn\'t change.'),
     'import_known_custom_eye_trackers': type_utils.GUIDocInfo('Registered custom eye trackers', 'gazeMapper allows importing generic eye trackers for which no specific support is implemented, if their recording data is preprocessed to conform to glassesTools\' generic data format. Here you can define specific known generic eye tracker names that you may import.'),

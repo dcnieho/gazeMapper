@@ -162,11 +162,15 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
                 imgui.end_table()
                 table_is_started = False
             if (has_problem:=problems and f in problems):
-                imgui.push_style_color(imgui.Col_.text, glassesTools.gui.colors.error)
+                error_level = type_utils.get_error_level(problems[f])
+                imgui.push_style_color(imgui.Col_.text, glassesTools.gui.colors.error if error_level==type_utils.ProblemLevel.Error else glassesTools.gui.colors.warning)
                 def _hover_draw_fun():
-                    if isinstance(problems[f],str) or (isinstance(problems[f],dict) and 'problem_with_this_key' in problems[f]):
-                        msg = problems[f] if isinstance(problems[f],str) else problems[f]['problem_with_this_key']
-                        glassesTools.gui.utils.draw_hover_text(msg, text='')
+                    if (isinstance(problems[f],tuple) and isinstance(problems[f][1],str)) or (isinstance(problems[f],dict) and 'problem_with_this_key' in problems[f]):
+                        msg = problems[f] if isinstance(problems[f],tuple) else problems[f]['problem_with_this_key']
+                        error_level = type_utils.get_error_level(msg)
+                        imgui.push_style_color(imgui.Col_.text, glassesTools.gui.colors.error if error_level==type_utils.ProblemLevel.Error else glassesTools.gui.colors.warning)
+                        glassesTools.gui.utils.draw_hover_text(msg[1], text='')
+                        imgui.pop_style_color()
             if imgui.tree_node_ex(this_lbl,imgui.TreeNodeFlags_.framed):
                 if has_problem:
                     _hover_draw_fun()
@@ -421,7 +425,7 @@ def _start_table(level, first_column_width):
     imgui.table_setup_column("value", imgui.TableColumnFlags_.width_stretch)
     return table_is_started
 
-def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type, o_type_args: tuple[typing.Type], nullable: bool, default: typing.Any|None, parent_obj: _T2|None, problem: bool|str, documentation: type_utils.GUIDocInfo|None, fixed: bool, has_remove: bool) -> bool:
+def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type, o_type_args: tuple[typing.Type], nullable: bool, default: typing.Any|None, parent_obj: _T2|None, problem: tuple[type_utils.ProblemLevel,str], documentation: type_utils.GUIDocInfo|None, fixed: bool, has_remove: bool) -> bool:
     imgui.table_next_row()
     imgui.table_next_column()
     special_val = '**special_val_when_not_found'
@@ -453,10 +457,10 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
         imgui.begin_disabled()
     if problem:
         imgui.align_text_to_frame_padding()
-        imgui.text_colored(glassesTools.gui.colors.error, field_lbl)
-        if isinstance(problem,str):
-            imgui.push_style_color(imgui.Col_.text, glassesTools.gui.colors.error)
-            glassesTools.gui.utils.draw_hover_text(problem,text='')
+        imgui.text_colored(glassesTools.gui.colors.error if problem[0]==type_utils.ProblemLevel.Error else glassesTools.gui.colors.warning, field_lbl)
+        if isinstance(problem[1],str):
+            imgui.push_style_color(imgui.Col_.text, glassesTools.gui.colors.error if problem[0]==type_utils.ProblemLevel.Error else glassesTools.gui.colors.warning)
+            glassesTools.gui.utils.draw_hover_text(problem[1],text='')
             imgui.pop_style_color()
     elif is_default or is_parent or is_none or fixed:
         imgui.align_text_to_frame_padding()
