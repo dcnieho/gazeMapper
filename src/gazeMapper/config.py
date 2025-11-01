@@ -360,7 +360,7 @@ class Study:
                     raise ValueError(msg)
                 else:
                     type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'planes': (type_utils.ProblemLevel.Error, msg)}}})
-            if not allow_more_than_one and len(cs['planes'])>1:
+            elif not allow_more_than_one and len(cs['planes'])>1:
                 msg = f'Only one plane should be defined for a {annotation.tooltip_map[e]}'
                 if strict_check:
                     raise ValueError(msg)
