@@ -482,6 +482,15 @@ class Study:
                                     raise ValueError(msg)
                                 else:
                                     type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'auto_code': {f: (type_utils.ProblemLevel.Error, msg)}}}})
+
+        sync_events = [(i, cs) for i, cs in enumerate(self.coding_setup) if cs['event_type'] == annotation.EventType.Sync_ET_Data]
+        if len(set(cs['sync_setup']['use_average'] for _, cs in sync_events if cs['sync_setup'] is not None))!=1:
+            msg = 'The setting "use_average" events is not consistent across configured ET sync events. Please set all to True or all to False.'
+            if strict_check:
+                raise ValueError(msg)
+            else:
+                for i, _ in sync_events:
+                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'sync_setup': {'use_average': (type_utils.ProblemLevel.Error, msg)}}}})
         return problems
 
     def _check_auto_markers(self, strict_check) -> type_utils.ProblemDict:
