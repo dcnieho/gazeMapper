@@ -59,7 +59,7 @@ class ValidationSetup(typed_dict_defaults.TypedDictDefault, total=False):
     dq_types                    : set[DataQualityType]|None = None
     allow_dq_fallback           : bool                      = False
     include_data_loss           : bool                      = False
-    I2MC_settings               : I2MCSettings|None         = None
+    I2MC_settings               : I2MCSettings              = typed_dict_defaults.Field(default_factory=lambda: I2MCSettings())
     dynamic_skip_first_duration : float                     = .2
     dynamic_max_gap_duration    : int                       = 4
     dynamic_min_duration        : int                       = 6
