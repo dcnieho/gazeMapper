@@ -1,13 +1,13 @@
 import pathlib
 
-from glassesTools import annotation, gaze_headref, gaze_worldref, naming as gt_naming, ocv, pose as gt_pose, process_pool, propagating_thread
+from glassesTools import annotation, gaze_headref, gaze_worldref, naming as gt_naming, ocv, plane as gt_plane, pose as gt_pose, process_pool, propagating_thread
 from glassesTools.gui import worldgaze as worldgaze_gui
 from glassesTools.gui.video_player import GUI
 
 from .. import config, episode, naming, plane, process, session, synchronization
 
 
-def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show_visualization=False, show_planes=True, show_only_intervals=True, progress_indicator: process_pool.JobProgress=None, **study_settings):
+def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None, show_visualization=False, show_planes=True, show_only_intervals=True, progress_indicator: process_pool.JobProgress|None=None, **study_settings):
     # if show_visualization, each frame is shown in a viewer, overlaid with info about detected planes and projected gaze
     # if show_poster, gaze in space of each plane is also drawn in a separate windows
     # if show_only_intervals, only the coded mapping episodes (if available) are shown in the viewer while the rest of the scene video is skipped past
@@ -34,7 +34,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show
         do_the_work(working_dir, config_dir, None, False, False, progress_indicator, **study_settings)
 
 
-def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, show_planes: bool, show_only_intervals: bool, progress_indicator: process_pool.JobProgress, **study_settings):
+def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|None, show_planes: bool, show_only_intervals: bool, progress_indicator: process_pool.JobProgress|None, **study_settings):
     # progress indicator
     if progress_indicator is None:
         progress_indicator = process_pool.JobProgress(printer=lambda x: print(x))
@@ -50,29 +50,27 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, s
         raise ValueError(f'You can only run gaze_to_plane on eye tracker recordings, not on a {str(rec_def.type).split(".")[1]} recording')
 
     # get episodes for which to transform gaze
-    episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / naming.coding_file), study_config.episodes_to_code)
+    episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / naming.coding_file), [cs['name'] for cs in study_config.coding_setup])
     # trial episodes are gotten from the reference recording if there is one and this is not the reference recording
     if study_config.sync_ref_recording and rec_def.name!=study_config.sync_ref_recording:
-        if annotation.EventType.Trial in episodes and episodes[annotation.EventType.Trial]:
+        trial_events = process.get_specific_event_types(study_config, annotation.EventType.Trial)
+        if trial_events and any(episodes[cs['name']] for cs in trial_events):
             raise ValueError(f'Trial episodes are gotten from the reference recording ({study_config.sync_ref_recording}) and should not be coded for this recording ({rec_def.name})')
-        if annotation.EventType.Trial in study_config.episodes_to_code:
-            all_recs = [r.name for r in study_config.session_def.recordings]
-            episodes[annotation.EventType.Trial] = synchronization.get_episode_frame_indices_from_ref(working_dir, annotation.EventType.Trial, rec_def.name, study_config.sync_ref_recording, all_recs, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings, study_config.sync_ref_stretch_which)
+        all_recs = [r.name for r in study_config.session_def.recordings]
+        for cs in trial_events:
+            episodes[cs['name']] = synchronization.get_episode_frame_indices_from_ref(working_dir, cs['name'], rec_def.name, study_config.sync_ref_recording, all_recs, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings, study_config.sync_ref_stretch_which)
 
     # we transform to map to plane for validate and trial episodes, set it up
-    episodes_to_proc = [annotation.EventType.Validate, annotation.EventType.Trial]
-    if annotation.EventType.Sync_ET_Data in study_config.episodes_to_code and study_config.get_cam_movement_for_et_sync_method=='plane':
-        episodes_to_proc.append(annotation.EventType.Sync_ET_Data)
+    episodes_to_proc = process.get_specific_event_types(study_config, check_specific_fields=['planes'])
     mapping_setup: dict[str, list[list[int]]] = {}
-    for e in episodes_to_proc:
-        if e in study_config.planes_per_episode:
-            for p in study_config.planes_per_episode[e]:
-                if p not in mapping_setup:
-                    mapping_setup[p] = []
-                mapping_setup[p].extend(episodes[e])
+    for cs in episodes_to_proc:
+        for p in cs['planes']:
+            if p not in mapping_setup:
+                mapping_setup[p] = []
+            mapping_setup[p].extend(episodes[cs['name']])
     mapping_setup = {p:sorted(mapping_setup[p], key = lambda x: x[0]) for p in mapping_setup}
 
-    planes: dict[str,plane.Plane] = {}
+    planes: dict[str,gt_plane.Plane] = {}
     for p in mapping_setup:
         p_def = [pl for pl in study_config.planes if pl.name==p][0]
         planes[p] = plane.get_plane_from_definition(p_def, config_dir/p)
@@ -107,6 +105,6 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, s
     worldgaze_gui.show_visualization(
         in_video, working_dir / gt_naming.frame_timestamps_fname, working_dir / gt_naming.scene_camera_calibration_fname,
         planes, poses, head_gazes, plane_gazes,
-        {e:episodes[e] for e in episodes_to_proc if e in episodes},
+        {n:episodes[n] for cs in episodes_to_proc if (n:=cs['name']) in episodes},
         gui, show_planes, show_only_intervals, 8
     )
