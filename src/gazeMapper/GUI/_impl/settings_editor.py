@@ -227,12 +227,12 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, actual_types: dic
         types = o_type.__annotations__.copy()
         fields = list(types.keys())
         if not problems and not made_or_replaced_obj:   # don't mark as problem if the obj was unset (None)
-            problems = {k:f'{k} is required' for k in o_type.__required_keys__ if k not in obj}
+            problems = {k: (type_utils.ProblemLevel.Error, f'{k} is required') for k in o_type.__required_keys__ if k not in obj}
     elif typed_dict_defaults.is_typeddictdefault(o_type):
         types = o_type.__annotations__.copy()
         fields = list(types.keys())
         if not problems and not made_or_replaced_obj:   # don't mark as problem if the obj was unset (None)
-            problems = {k:f'{k} is required' for k in o_type.__required_keys__ if k not in obj}
+            problems = {k: (type_utils.ProblemLevel.Error, f'{k} is required') for k in o_type.__required_keys__ if k not in obj}
     elif type_utils.is_NamedTuple_type(o_type):
         types = o_type.__annotations__.copy()
         fields= list(o_type._fields)
