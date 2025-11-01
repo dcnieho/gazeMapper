@@ -10,7 +10,7 @@ from glassesTools import annotation, gaze_worldref, marker as gt_marker, naming 
 from .. import config, episode, naming, process, session
 
 
-def run(working_dir: str|pathlib.Path, export_path: str|pathlib.Path, to_export: list[str], config_dir: str|pathlib.Path = None, **study_settings):
+def run(working_dir: str|pathlib.Path, export_path: str|pathlib.Path, to_export: list[str], config_dir: str|pathlib.Path|None = None, **study_settings):
     working_dir = pathlib.Path(working_dir) # working directory of a session, not of a recording
     export_path = pathlib.Path(export_path)
     if config_dir is None:

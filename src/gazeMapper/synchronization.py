@@ -14,7 +14,7 @@ def get_cols(do_time_stretch: bool):
     else:
         cols += ['mean_off']
 
-def get_sync_for_recs(working_dir: str|pathlib.Path, recs: str|list[str], ref_rec: str, do_time_stretch: bool, average_recordings: list[str], missing_ref_coding_ok=False):
+def get_sync_for_recs(working_dir: str|pathlib.Path, recs: str|list[str], ref_rec: str, do_time_stretch: bool, average_recordings: list[str], missing_ref_coding_ok=False) -> pd.DataFrame|None:
     working_dir  = pathlib.Path(working_dir)
     if isinstance(recs,str):
         recs = [recs]
