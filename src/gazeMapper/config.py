@@ -816,7 +816,7 @@ class Study:
             for e in kwds['episodes_to_code']:
                 kwds['coding_setup'].append(EventSetup(
                     event_type  = e,
-                    name        = e.name,
+                    name        = e.value,
                     description = annotation.tooltip_map.get(e, ''),
                     hotkey      = annotation.default_hotkeys.get(e, None),
                     planes      = set(kwds['planes_per_episode'].get(e, set())),
