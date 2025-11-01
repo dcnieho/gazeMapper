@@ -4,7 +4,7 @@ import inspect
 
 from glassesTools import aruco, json, marker as gt_marker
 
-from . import naming, type_utils
+from . import type_utils
 
 
 class Marker:
@@ -58,7 +58,7 @@ def get_marker_setup(marker: Marker) -> aruco.MarkerSetup:
                                     'markerBorderBits': marker.marker_border_bits
                                 },
                                 detect_only = marker.detect_only,
-                                size= marker.size
+                                size = marker.size
                             )
 
 def get_setup_for_markers(markers: list[Marker]) -> dict[gt_marker.MarkerID,aruco.MarkerSetup]:
