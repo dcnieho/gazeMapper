@@ -67,7 +67,7 @@ class ValidationSetup(typed_dict_defaults.TypedDictDefault, total=False):
 class EventSetup(typed_dict_defaults.TypedDictDefault, total=False):
     event_type      : annotation.EventType
     name            : str
-    description     : str = ''
+    description     : str|None = None
     hotkey          : str|None = None
     planes          : set[str] = typed_dict_defaults.Field(default_factory=lambda: set())
     auto_code       : AutoCodeSyncPoints|AutoCodeEpisodes|None = None
