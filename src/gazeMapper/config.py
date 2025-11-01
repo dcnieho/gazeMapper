@@ -240,6 +240,7 @@ class Study:
         if strict_check:
             self._check_session_def(strict_check)
             self._check_coding_setup(strict_check)
+            self._check_auto_markers(strict_check)
             self._check_individual_markers(strict_check)
             self._check_head_attached_recordings(strict_check)
             self._check_sync_ref(strict_check)
@@ -464,10 +465,12 @@ class Study:
         problems: type_utils.ProblemDict = {}
         used_markers: dict[tuple[str,int,annotation.EventType,str],list[gt_marker.MarkerID]] = {}
         for i, cs in enumerate(self.coding_setup):
+            if cs['auto_code'] is None:
+                continue
             e = cs['event_type']
-            if annotation.type_map[cs['event_type']]==annotation.Type.Point:
+            if annotation.type_map[cs['event_type']]==annotation.Type.Point and 'markers' in cs['auto_code']:
                 used_markers[('point',i,e,'markers')] = list(cs['auto_code']['markers'])
-            elif annotation.type_map[cs['event_type']]==annotation.Type.Interval:
+            elif annotation.type_map[cs['event_type']]==annotation.Type.Interval and 'start_markers' in cs['auto_code'] and 'end_markers' in cs['auto_code']:
                 used_markers[('episode',i,e,'start_markers')] = list(cs['auto_code']['start_markers'])
                 used_markers[('episode',i,e,'end_markers')]   = list(cs['auto_code']['end_markers'])
         # check if markers or marker sequences are uniquely used:
@@ -636,6 +639,7 @@ class Study:
         problems: type_utils.ProblemDict = {}
         type_utils.merge_problem_dicts(problems, self._check_session_def(False))
         type_utils.merge_problem_dicts(problems, self._check_coding_setup(False))
+        type_utils.merge_problem_dicts(problems, self._check_auto_markers(False))
         type_utils.merge_problem_dicts(problems, self._check_individual_markers(False))
         type_utils.merge_problem_dicts(problems, self._check_head_attached_recordings(False))
         type_utils.merge_problem_dicts(problems, self._check_sync_ref(False))
