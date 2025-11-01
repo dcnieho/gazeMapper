@@ -6,9 +6,15 @@ from glassesTools import annotation
 
 
 class Episode:
-    def __init__(self, event:str, start_frame:int, end_frame:int|None=None):
+    def __init__(self, event:str, start_frame:int, end_frame:int|None=None, event_type:annotation.EventType|None=None):
+        # check event is known
+        if (evt:=annotation.get_event_by_name(event)) is None:
+            raise ValueError(f'Event "{event}" is not registered. Cannot create Episode instance.')
         self.event          = event
-        self.event_type     = annotation.get_event_by_name(event).event_type
+        if event_type is not None:
+            if event_type != evt.event_type:
+                raise ValueError(f'Event type mismatch for event "{event}". Provided: {event_type}, expected from registry: {evt.event_type}')
+        self.event_type     = evt.event_type
         self.start_frame    = start_frame
 
         if annotation.type_map[self.event_type]==annotation.Type.Interval:
@@ -23,12 +29,19 @@ class Episode:
 # for dealing with lists of events
 def read_list_from_file(fileName: str|pathlib.Path) -> list[Episode]:
     df = pd.read_csv(str(fileName), delimiter='\t', index_col=False, dtype=defaultdict(lambda: int, event=str, event_type=str, end_frame=pd.Int64Dtype()))
-    # backward compatibility
     if 'event_type' in df.columns:
+        # v2 file
         df['event_type'] = [annotation.EventType(x) for x in df['event_type'].values]
     else:
+        # backward compatibility for v1 files
         df['event_type'] = [annotation.EventType(x) for x in df['event'].values]
-        df['event'] = [e.name for e in df['event_type'].values]
+        for e in df['event_type'].unique():
+            evts = annotation.get_events_by_type(e)
+            if len(evts)==0:
+                raise ValueError(f'No event found for event type {e}. Please update the coding file to include an explicit event_type column.')
+            elif len(evts)>1:
+                raise ValueError(f'Event type {e} is ambiguous, cannot determine event names from event types alone. Please update the coding file to include an explicit event_type column.')
+            df.loc[df['event_type']==e, 'event'] = evts[0].name
     df['end_frame'] = df['end_frame'].astype('object')
     df.loc[pd.isnull(df['end_frame']),'end_frame'] = None   # set missing to None
     return [Episode(**kwargs) for kwargs in df.to_dict(orient='records')]
