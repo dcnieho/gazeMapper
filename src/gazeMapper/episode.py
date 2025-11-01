@@ -41,7 +41,7 @@ def read_list_from_file(fileName: str|pathlib.Path) -> list[Episode]:
             if len(evts)==0:
                 raise ValueError(f'No event found for event type {e}. Please update the coding file to include an explicit event_type column.')
             elif len(evts)>1:
-                raise ValueError(f'Event type {e} is ambiguous, cannot determine event names from event types alone. Please update the coding file to include an explicit event_type column.')
+                raise ValueError(f'Event type {e} is ambiguous, there are multiple events with the same type. I thus cannot determine the correct event names from the event types alone, and thereby cannot update the loaded coding file. Please manually update the coding file to include an explicit event column containing the event names matching those existing in the coding setup.')
             df.loc[df['event_type']==e, 'event'] = evts[0].name
     df['end_frame'] = df['end_frame'].astype('object')
     df.loc[pd.isnull(df['end_frame']),'end_frame'] = None   # set missing to None
