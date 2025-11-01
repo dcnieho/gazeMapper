@@ -96,16 +96,16 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     if study_config.sync_ref_recording and rec_def.name!=study_config.sync_ref_recording:
         # any trial coding there is should be discarded
         trial_events = process.get_specific_event_types(study_config, annotation.EventType.Trial)
-        for e in trial_events:
-            episodes.pop(e['name'], None)
+        for cs in trial_events:
+            episodes.pop(cs['name'], None)
             # also mark as not codable
-            episodes_to_code.remove(e['name'])
+            episodes_to_code.remove(cs['name'])
         # if there is trial coding for the reference recording, get them and show them (read only)
         if trial_events:
             all_recs = [r.name for r in study_config.session_def.recordings if r.name!=study_config.sync_ref_recording]
-            for e in trial_events:
+            for cs in trial_events:
                 # NB: don't error if we don't need trial episodes for coding.
-                episodes[e['name']] = synchronization.get_episode_frame_indices_from_ref(working_dir, e['name'], rec_def.name, study_config.sync_ref_recording, all_recs, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings, study_config.sync_ref_stretch_which, missing_ref_coding_ok=True)
+                episodes[cs['name']] = synchronization.get_episode_frame_indices_from_ref(working_dir, cs['name'], rec_def.name, study_config.sync_ref_recording, all_recs, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings, study_config.sync_ref_stretch_which, missing_ref_coding_ok=True)
     episodes = annotation.flatten_annotation_dict(episodes)
     episodes_original = copy.deepcopy(episodes)
 
@@ -229,8 +229,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     # store coded intervals to file
     if study_config.sync_ref_recording and rec_def.name!=study_config.sync_ref_recording:
         # any (read only) trial coding there is should not be written to file
-        for e in trial_events:
-            episodes.pop(e['name'], None)
+        for cs in trial_events:
+            episodes.pop(cs['name'], None)
     episode.write_list_to_file(episode.marker_dict_to_list(episodes), coding_file)
 
     # update state

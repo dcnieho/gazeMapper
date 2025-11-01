@@ -56,7 +56,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
     has_auto_code = process.config_has_auto_coding(study_config)
     episode_file = working_dir / naming.coding_file
     if episode_file.is_file():
-        episodes = episode.list_to_marker_dict(episode.read_list_from_file(episode_file), annotation.get_all_event_names())
+        episodes = episode.list_to_marker_dict(episode.read_list_from_file(episode_file), [cs['name'] for cs in study_config.coding_setup])
     else:
         if not has_auto_code:   # missing coding is ok when auto coding is set up, as then we process all frames anyway
             raise RuntimeError(f'Coding is missing, cannot run Detect Markers\n{episode_file}')
@@ -65,12 +65,12 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
     # trial episodes are gotten from the reference recording if there is one and this is not the reference recording
     if study_config.sync_ref_recording and rec_def.name!=study_config.sync_ref_recording:
         trial_events = process.get_specific_event_types(study_config, annotation.EventType.Trial)
-        if trial_events and any(episodes[e['name']] for e in trial_events):
+        if trial_events and any(episodes[cs['name']] for cs in trial_events):
             raise ValueError(f'Trial episodes are gotten from the reference recording ({study_config.sync_ref_recording}) and should not be coded for this recording ({rec_def.name})')
         all_recs = [r.name for r in study_config.session_def.recordings]
-        for e in trial_events:
+        for cs in trial_events:
             # NB: don't error if we don't need trial episodes for coding.
-            episodes[e['name']] = synchronization.get_episode_frame_indices_from_ref(working_dir, e['name'], rec_def.name, study_config.sync_ref_recording, all_recs, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings, study_config.sync_ref_stretch_which, missing_ref_coding_ok=has_auto_code)
+            episodes[cs['name']] = synchronization.get_episode_frame_indices_from_ref(working_dir, cs['name'], rec_def.name, study_config.sync_ref_recording, all_recs, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings, study_config.sync_ref_stretch_which, missing_ref_coding_ok=has_auto_code)
 
     sync_target_functions, function_frames  = _get_sync_function(study_config, rec_def, episodes)
     planes_setup, plane_frames              = _get_plane_setup(study_config, config_dir, episodes)
@@ -136,15 +136,15 @@ def _get_sync_function(study_config: config.Study,
     # NB: only for eye tracker recordings, others don't have eye tracking data and thus nothing to sync
     if rec_def.type==session.RecordingType.Eye_Tracker:
         et_sync_events = process.get_specific_event_types(study_config, annotation.EventType.Sync_ET_Data, ['sync_setup'])
-        for e in et_sync_events:
-            match e['sync_setup']['get_cam_movement_method']:
+        for cs in et_sync_events:
+            match cs['sync_setup']['get_cam_movement_method']:
                 case 'plane':
-                    if not e['planes']:
-                        raise ValueError(f'The method for synchronizing eye tracker data to the scene camera (get_cam_movement_method) is set to "plane" for the "{e["name"]}" event but no plane is configured for this event. Cannot continue.')
+                    if not cs['planes']:
+                        raise ValueError(f'The method for synchronizing eye tracker data to the scene camera (get_cam_movement_method) is set to "plane" for the "{cs["name"]}" event but no plane is configured for this event. Cannot continue.')
                     # NB: no extra_funcs to run
                 case 'function':
                     import importlib
-                    to_load = e['sync_setup']['get_cam_movement_function']['module_or_file']
+                    to_load = cs['sync_setup']['get_cam_movement_function']['module_or_file']
                     if (to_load_path:=pathlib.Path(to_load)).is_file():
                         import sys
                         module_name = to_load_path.stem
@@ -153,15 +153,15 @@ def _get_sync_function(study_config: config.Study,
                         sys.modules[module_name] = module
                         spec.loader.exec_module(module)
                     else:
-                        module = importlib.import_module(e['sync_setup']['get_cam_movement_function']['module_or_file'])
-                    func = getattr(module, e['sync_setup']['get_cam_movement_function']['function'])
-                    sync_target_function[e["name"]] = (func, e['sync_setup']['get_cam_movement_function']['parameters'], _sync_function_output_drawer)
-                    if episodes and e['name'] in episodes:
-                        analyze_frames[e['name']] = episodes[e['name']]
+                        module = importlib.import_module(cs['sync_setup']['get_cam_movement_function']['module_or_file'])
+                    func = getattr(module, cs['sync_setup']['get_cam_movement_function']['function'])
+                    sync_target_function[cs["name"]] = (func, cs['sync_setup']['get_cam_movement_function']['parameters'], _sync_function_output_drawer)
+                    if episodes and cs['name'] in episodes:
+                        analyze_frames[cs['name']] = episodes[cs['name']]
                     else:
-                        analyze_frames[e['name']] = None
+                        analyze_frames[cs['name']] = None
                 case _:
-                    raise ValueError(f'sync_setup.get_cam_movement_method={e["sync_setup"]["get_cam_movement_method"]} for the "{e["name"]}" event not understood')
+                    raise ValueError(f'sync_setup.get_cam_movement_method={cs["sync_setup"]["get_cam_movement_method"]} for the "{cs["name"]}" event not understood')
 
     return sync_target_function, analyze_frames
 
