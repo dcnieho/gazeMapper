@@ -851,10 +851,10 @@ class Study:
             kwds.pop('auto_code_episodes', None)
         else:
             # for v2 setups:
-            # ensure coding setup entries and its sub-entries are proper EventSetup and EtSyncSetup / ValidationSetup objects
             for i in range(len(kwds['coding_setup'])):
                 # ensure enums are properly set
                 kwds['coding_setup'][i]['event_type'] = annotation.EventType(kwds['coding_setup'][i]['event_type'])
+                # ensure that planes are stored in sets
                 if 'planes' in kwds['coding_setup'][i] and kwds['coding_setup'][i]['planes'] is not None and not isinstance(kwds['coding_setup'][i]['planes'], set):
                     kwds['coding_setup'][i]['planes'] = set(kwds['coding_setup'][i]['planes'])
 
