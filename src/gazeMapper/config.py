@@ -880,12 +880,13 @@ class Study:
             kwds.pop('auto_code_episodes', None)
         else:
             # for v2 setups:
+            # ensure enum round trip
             for i in range(len(kwds['coding_setup'])):
-                # ensure enums are properly set
                 kwds['coding_setup'][i]['event_type'] = annotation.EventType(kwds['coding_setup'][i]['event_type'])
-                # ensure that planes are stored in sets
-                if 'planes' in kwds['coding_setup'][i] and kwds['coding_setup'][i]['planes'] is not None and not isinstance(kwds['coding_setup'][i]['planes'], set):
-                    kwds['coding_setup'][i]['planes'] = set(kwds['coding_setup'][i]['planes'])
+                if 'validation_setup' in kwds['coding_setup'][i] and kwds['coding_setup'][i]['validation_setup'] is not None and 'dq_types' in kwds['coding_setup'][i]['validation_setup']:
+                    kwds['coding_setup'][i]['validation_setup']['dq_types'] = {DataQualityType(d) for d in kwds['coding_setup'][i]['validation_setup']['dq_types']}
+            if 'mapped_video_which_gaze_type_on_plane' in kwds:
+                kwds['mapped_video_which_gaze_type_on_plane'] = gaze_worldref.Type(kwds['mapped_video_which_gaze_type_on_plane'])
 
         # get session def
         s_path = path / 'session_def.json'
