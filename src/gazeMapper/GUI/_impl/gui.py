@@ -38,26 +38,26 @@ class GUI:
         self.running     = False
         settings_editor.set_gui_instance(self)
 
-        self.project_dir      : pathlib.Path                            = None
-        self.study_config     : config.Study                            = None
+        self.project_dir      : pathlib.Path|None                       = None
+        self.study_config     : config.Study|None                       = None
         self.plane_configs    : dict[str,gt_plane.Plane|Exception|None] = {}
         self.cam_calibrations : dict[str,ocv.CameraParams|Exception]    = {}
         self._dict_type_rec   : dict[str, typing.Type]|None             = None
 
         self.sessions                   : dict[str, session.Session]        = {}
-        self.session_config_overrides   : dict[str, config.StudyOverride]   = {}
-        self._session_dict_type_rec     : dict[str, dict[str, typing.Type]] = {}
+        self.session_config_overrides   : dict[str, tuple[config.StudyOverride, dict[str,config.StudyOverride]]] = {}
+        self._session_dict_type_rec     : dict[str, dict[int|str, dict[str, typing.Type]]] = {}
         self._sessions_lock             : threading.Lock                    = threading.Lock()
         self._selected_sessions         : dict[str, bool]                   = {}
         self._session_lister                                                = session_lister.List(self.sessions, self._sessions_lock, self._selected_sessions, info_callback=self._open_session_detail, draw_action_status_callback=self._session_action_status, item_context_callback=self._session_context_menu)
         self._et_widget_drawer                                              = gt_gui.recording_table.EyeTrackerName()
 
-        self.recording_config_overrides : dict[str, dict[str, config.StudyOverride]]        = {}
-        self._recording_dict_type_rec   : dict[str, dict[str, dict[str, typing.Type]]]      = {}
+        self.recording_config_overrides : dict[str, dict[str, tuple[config.StudyOverride, dict[str,config.StudyOverride]]]] = {}
+        self._recording_dict_type_rec   : dict[str, dict[str, dict[int|str, dict[str, typing.Type]]]] = {}
         self._recording_listers         : dict[str, gt_gui.recording_table.RecordingTable]  = {}
         self._selected_recordings       : dict[str, dict[str, bool]]                        = {}
 
-        self._possible_value_getters    : dict[str]                                         = {}
+        self._possible_value_getters    : dict[str, typing.Callable]                        = {}
 
         self.setup_recordings_error_level           : type_utils.ProblemLevel|None  = None
         self.setup_plane_error_level                : type_utils.ProblemLevel|None  = None
@@ -67,29 +67,29 @@ class GUI:
         self._session_actions                       : set[process.Action]           = set()
         self._problems_cache                        : type_utils.ProblemDict        = {}
 
-        self._session_watcher           : concurrent.futures.Future = None
-        self._session_watcher_stop_event: asyncio.Event             = None
-        self._config_watcher            : concurrent.futures.Future = None
-        self._config_watcher_stop_event : asyncio.Event             = None
+        self._session_watcher           : concurrent.futures.Future|None = None
+        self._session_watcher_stop_event: asyncio.Event|None             = None
+        self._config_watcher            : concurrent.futures.Future|None = None
+        self._config_watcher_stop_event : asyncio.Event|None             = None
 
-        self.process_pool                                           = process_pool.ProcessPool()
-        self.job_scheduler                                          = process_pool.JobScheduler[utils.JobInfo](self.process_pool, self._check_job_valid)
-        self._active_jobs_cache         : dict[utils.JobInfo, int]  = {}
+        self.process_pool                                                = process_pool.ProcessPool()
+        self.job_scheduler                                               = process_pool.JobScheduler[utils.JobInfo](self.process_pool, self._check_job_valid)
+        self._active_jobs_cache         : dict[utils.JobInfo, int]       = {}
 
         self._window_list                   : list[hello_imgui.DockableWindow]  = []
         self._to_dock                                                           = []
         self._to_focus                                                          = None
-        self._after_window_update_callback  : Callable[[],None]                 = None
+        self._after_window_update_callback  : Callable[[],None]|None            = None
         self._need_set_window_title                                             = False
         self._main_dock_node_id                                                 = None
 
-        self._sessions_pane         : hello_imgui.DockableWindow    = None
-        self._project_settings_pane : hello_imgui.DockableWindow    = None
-        self._action_list_pane      : hello_imgui.DockableWindow    = None
-        self._show_demo_window                                      = False
+        self._sessions_pane         : hello_imgui.DockableWindow|None   = None
+        self._project_settings_pane : hello_imgui.DockableWindow|None   = None
+        self._action_list_pane      : hello_imgui.DockableWindow|None   = None
+        self._show_demo_window                                          = False
 
-        self._big_font_size_multiplier                              = 1.75
-        self._icon_font_size_multiplier                             = 4.2
+        self._big_font_size_multiplier                                  = 1.75
+        self._icon_font_size_multiplier                                 = 4.2
 
         self._marker_preview_cache  : dict[tuple[int,int,int], image_helper.ImageHelper]= {}
         self._plane_preview_cache   : dict[str               , image_helper.ImageHelper]= {}
@@ -794,7 +794,7 @@ class GUI:
         lister.set_actions_to_show(self._session_actions)
 
     def _recording_lister_set_actions_to_show(self, lister: gt_gui.recording_table.RecordingTable, sess: str):
-        cfg = self.session_config_overrides[sess].apply(self.study_config, strict_check=False)
+        cfg = config.apply_all_overrides(self.study_config, self.session_config_overrides[sess], strict_check=False)
         actions = process.get_actions_for_config(cfg, exclude_session_level=True)
         def _draw_status(action: process.Action, item: session.Recording):
             if process.is_action_possible_for_recording(item.definition.name, item.definition.type, action, cfg):
@@ -1455,7 +1455,7 @@ class GUI:
                 imgui.text_colored(colors.error,'*At minimum one coding setup should be defined when a plane is defined')
             elif has_individual_markers:
                 imgui.text_colored(colors.error,'*At minimum one coding setup should be defined when individual markers are defined')
-        fields = [f for f in config.event_setup_display_order if f in config.EventSetup.__optional_keys__] + [f for f in config.EventSetup.__optional_keys__ if f not in config.event_setup_display_order]
+        fields = [f for f in config.event_setup_field_order if f in config.EventSetup.__optional_keys__] + [f for f in config.EventSetup.__optional_keys__ if f not in config.event_setup_field_order]
         fixed_fields = type_utils.NestedDict({k:None for k in ['name', 'event_type']})
         marked_for_deletion = []
         for i,cs in enumerate(self.study_config.coding_setup):
@@ -1541,10 +1541,10 @@ class GUI:
                     imgui.end_table()
 
             buttons = {
-                ifa6.ICON_FA_CHECK+" Create plane": (lambda: callbacks.make_coding_setup(self, new_coding_name, new_coding_type), lambda: not _valid_coding_name() or new_coding_type is None),
+                ifa6.ICON_FA_CHECK+" Create coding": (lambda: callbacks.make_coding_setup(self, new_coding_name, new_coding_type), lambda: not _valid_coding_name() or new_coding_type is None),
                 ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
             }
-            gt_gui.utils.push_popup(self, lambda: gt_gui.utils.popup("Add plane", _add_coding_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, outside=False))
+            gt_gui.utils.push_popup(self, lambda: gt_gui.utils.popup("Add coding", _add_coding_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, outside=False))
 
     def _individual_marker_setup_pane_drawer(self):
         if self.setup_individual_markers_error_level is not None:
@@ -1697,7 +1697,7 @@ class GUI:
                     progress = job_desc.progress.get_progress() if job_desc.progress is not None else None
                 gt_gui.utils.draw_process_state(item.state[action], progress=progress)
             else:
-                cfg = self.session_config_overrides[item.name].apply(self.study_config, strict_check=False) if item.name in self.session_config_overrides else self.study_config
+                cfg = config.apply_all_overrides(self.study_config, self.session_config_overrides[item.name], strict_check=False) if item.name in self.session_config_overrides else self.study_config
                 states = {r:item.recordings[r].state[action] for r in item.recordings if process.is_action_possible_for_recording(r, item.definition.get_recording_def(r).type, action, cfg)}
                 not_completed = [r for r in states if states[r]!=process_pool.State.Completed]
                 progress: dict[str,tuple[float,str]] = {}
@@ -1726,7 +1726,7 @@ class GUI:
         actions: dict[str, dict[process.Action,tuple[bool|list[str],dict[process.Action,list[str]]]]] = {}
         actions_running: dict[str, dict[process.Action, bool|list[str]]] = {}
         for s in sess:
-            cfg = self.session_config_overrides[s.name].apply(self.study_config, strict_check=False) if s.name in self.session_config_overrides else self.study_config
+            cfg = config.apply_all_overrides(self.study_config, self.session_config_overrides[s.name], strict_check=False) if s.name in self.session_config_overrides else self.study_config
             actions[s.name] = process.get_possible_actions(s.state, {r:s.recordings[r].state for r in s.recordings}, {a for a in process.Action if a!=process.Action.IMPORT}, cfg)
             actions[s.name], actions_running[s.name] = self._filter_session_context_menu_actions(s.name, None, actions[s.name])
         # draw actions that can be run
@@ -1811,7 +1811,7 @@ class GUI:
         actions: dict[str, dict[process.Action, bool|list[str]]] = {}
         actions_running: dict[str, dict[process.Action, bool|list[str]]] = {}
         for r in recs:
-            cfg = self.session_config_overrides[session_name].apply(self.study_config, strict_check=False) if session_name in self.session_config_overrides else self.study_config
+            cfg = config.apply_all_overrides(self.study_config, self.session_config_overrides[session_name], strict_check=False) if session_name in self.session_config_overrides else self.study_config
             actions[r] = process.get_possible_actions(sess.state, {r:sess.recordings[r].state}, {a for a in process.Action if a!=process.Action.IMPORT and not process.is_session_level_action(a)}, cfg)
             actions[r], actions_running[r] = self._filter_session_context_menu_actions(sess.name, r, actions[r])
         # draw actions that can be run
@@ -1944,12 +1944,17 @@ class GUI:
             self._recording_listers[sess.name] = gt_gui.recording_table.RecordingTable(sess.recordings, self._sessions_lock, self._selected_recordings[sess.name], None, lambda r: r.info, item_context_callback=lambda rec_name: self._recording_context_menu(sess.name, rec_name))
             self._recording_listers[sess.name].dont_show_empty = True
             self.session_config_overrides[sess.name] = config.load_or_create_override(config.OverrideLevel.Session, sess.working_directory)
-            self._session_dict_type_rec[sess.name] = {}
+            allowed_parameters = config.StudyOverride.get_allowed_parameters(config.OverrideLevel.Session, for_event_setup=True)[0]
+            self.session_config_overrides[sess.name][1].update({cs['name']: config.StudyOverride(config.OverrideLevel.Session, for_event_setup=True, name=cs['name']) for cs in self.study_config.coding_setup if cs['name'] not in self.session_config_overrides[sess.name][1] and any(cs[attr] is not None for attr in allowed_parameters)})  # add empty dicts for relevant coding setup (those that have potentially overridable fields)
+            self._session_dict_type_rec[sess.name] = {-1: {}} | {c_name:{} for c_name in self.session_config_overrides[sess.name][1]}
             self.recording_config_overrides[sess.name] = {}
             self._recording_dict_type_rec[sess.name] = {}
             for r in sess.recordings:
                 self.recording_config_overrides[sess.name][r] = config.load_or_create_override(config.OverrideLevel.Recording, sess.recordings[r].info.working_directory, sess.recordings[r].definition.type)
-                self._recording_dict_type_rec[sess.name][r] = {}
+                rt = sess.recordings[r].definition.type
+                allowed_parameters = config.StudyOverride.get_allowed_parameters(config.OverrideLevel.Recording, rt, for_event_setup=True)[0]
+                self.recording_config_overrides[sess.name][r][1].update({cs['name']: config.StudyOverride(config.OverrideLevel.Recording, rt, for_event_setup=True, name=cs['name']) for cs in self.study_config.coding_setup if cs['name'] not in self.recording_config_overrides[sess.name][r][1] and any(cs[attr] is not None for attr in allowed_parameters)})  # add empty dicts for relevant coding setup (those that have potentially overridable fields)
+                self._recording_dict_type_rec[sess.name][r] = {-1: {}} | {c_name:{} for c_name in self.recording_config_overrides[sess.name][r][1]}
             self._recording_lister_set_actions_to_show(self._recording_listers[sess.name], sess.name)
 
     def _session_detail_GUI(self, sess: session.Session):
@@ -1970,7 +1975,7 @@ class GUI:
             if imgui.button(ifa6.ICON_FA_FILE_IMPORT+' import camera recordings'):
                 gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='add_cam_recordings', sessions=[sess.name]))
         session_level_actions = [a for a in self._session_actions if process.is_session_level_action(a)]
-        effective_config = self.session_config_overrides[sess.name].apply(self.study_config, strict_check=False)
+        effective_config = config.apply_all_overrides(self.study_config, self.session_config_overrides[sess.name], strict_check=False)
         possible_actions = process.get_possible_actions(sess.state, {r:sess.recordings[r].state for r in sess.recordings}, set(session_level_actions), effective_config)
         menu_actions,menu_actions_running = self._filter_session_context_menu_actions(sess.name, None, possible_actions)
         if session_level_actions and imgui.begin_table(f'##{sess.name}_session_level', 2, imgui.TableFlags_.sizing_fixed_fit):
@@ -2019,38 +2024,98 @@ class GUI:
         self._recording_listers[sess.name].draw(limit_outer_size=True)
         sess_changed = False
         if imgui.tree_node_ex('Setting overrides for this session',imgui.TreeNodeFlags_.framed):
+            field_problems = effective_config.field_problems()
+            new_config = copy.deepcopy(effective_config)
+            sess_changed = False
+            fixed_fields = type_utils.NestedDict({k:None for k in ['name', 'event_type']})
+            for c_name in self.session_config_overrides[sess.name][1]:
+                i = [cs['name'] for cs in self.study_config.coding_setup].index(c_name)
+                cs = self.study_config.coding_setup[i]
+                fields = [f for f in config.StudyOverride.get_allowed_parameters(config.OverrideLevel.Session, for_event_setup=True)[0] if cs[f] is not None]
+                problem_fields = None
+                if 'coding_setup' in field_problems and i in field_problems['coding_setup']:
+                    problem_fields = field_problems['coding_setup'][i]
+                extra = ''
+                lbl = f'{cs['name']} ({annotation.tooltip_map[cs['event_type']]})'
+                if (has_error:=problem_fields):
+                    extra = '*'
+                    imgui.push_style_color(imgui.Col_.text, colors.error if type_utils.get_error_level(problem_fields)==type_utils.ProblemLevel.Error else colors.warning)
+                if imgui.tree_node_ex(f'{extra}{lbl}###{i}', imgui.TreeNodeFlags_.framed):
+                    if has_error:
+                        imgui.pop_style_color()
+                    this_changed, new_coding_config, self._session_dict_type_rec[sess.name][c_name] = settings_editor.draw(
+                        new_config.coding_setup[i],
+                        fields,
+                        config.EventSetup.__annotations__ | {'auto_code': typing.Union[config.AutoCodeEpisodes if annotation.type_map[cs['event_type']]==annotation.Type.Interval else config.AutoCodeSyncPoints,None]},
+                        config.EventSetup._field_defaults,
+                        self._possible_value_getters, self.study_config.coding_setup[i], self._session_dict_type_rec[sess.name][c_name], problem_fields, fixed=fixed_fields, documentation=config.event_setup_doc)
+                    if this_changed:
+                        new_config.coding_setup[i] = new_coding_config
+                        sess_changed |= this_changed
+                    imgui.tree_pop()
             fields = config.StudyOverride.get_allowed_parameters(config.OverrideLevel.Session)[0]
-            sess_changed, new_config, self._session_dict_type_rec[sess.name] = settings_editor.draw(effective_config, fields, config.study_parameter_types, config.study_defaults, self._possible_value_getters, self.study_config, self._session_dict_type_rec[sess.name], effective_config.field_problems(), config.study_parameter_doc)
-            if sess_changed:
+            this_changed, new_config, self._session_dict_type_rec[sess.name][-1] = settings_editor.draw(new_config, fields, config.study_parameter_types, config.study_defaults, self._possible_value_getters, self.study_config, self._session_dict_type_rec[sess.name][-1], field_problems, config.study_parameter_doc)
+            if sess_changed or this_changed:
                 try:
                     new_config.check_valid(strict_check=False)
-                    self.session_config_overrides[sess.name] = config.StudyOverride.from_study_diff(new_config, self.study_config, config.OverrideLevel.Session)
+                    self.session_config_overrides[sess.name] = config.StudyOverride.from_study_diff(new_config, self.study_config, config.OverrideLevel.Session, which_coding_setups=list(self.session_config_overrides[sess.name][1].keys()))
                 except Exception as exc:
                     # do not persist invalid config, inform user of problem
                     gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Settings error", f"You cannot make this change to the settings for session {sess.name}:\n{exc}", gt_gui.msg_box.MsgBox.error, more=gt_gui.utils.get_traceback(type(exc), exc, exc.__traceback__))
                 else:
                     # persist changed config
-                    self.session_config_overrides[sess.name].store_as_json(sess.working_directory)
+                    config.store_overrides_to_json(self.session_config_overrides[sess.name], sess.working_directory)
             imgui.tree_pop()
+
         if len(self.study_config.session_def.recordings)>1:
             # if more than one recording per session, show recording-level settings overrides
             # don't show if only one recording per session, would be redundant
+            effective_config_for_session = config.apply_all_overrides(self.study_config, self.session_config_overrides[sess.name], strict_check=False)
             for r in sess.recordings:
                 if imgui.tree_node_ex(f'Setting overrides for {r} recording',imgui.TreeNodeFlags_.framed):
+                    effective_config = config.apply_all_overrides(effective_config_for_session, self.recording_config_overrides[sess.name][r], strict_check=False)
+                    field_problems = effective_config.field_problems()
+                    new_config = copy.deepcopy(effective_config)
+                    rec_changed = False
+                    fixed_fields = type_utils.NestedDict({k:None for k in ['name', 'event_type']})
+                    for c_name in self.recording_config_overrides[sess.name][r][1]:
+                        i = [cs['name'] for cs in self.study_config.coding_setup].index(c_name)
+                        cs = self.study_config.coding_setup[i]
+                        fields = [f for f in config.StudyOverride.get_allowed_parameters(config.OverrideLevel.Recording, sess.recordings[r].definition.type, for_event_setup=True)[0] if cs[f] is not None]
+                        problem_fields = None
+                        if 'coding_setup' in field_problems and i in field_problems['coding_setup']:
+                            problem_fields = field_problems['coding_setup'][i]
+                        extra = ''
+                        lbl = f'{cs['name']} ({annotation.tooltip_map[cs['event_type']]})'
+                        if (has_error:=problem_fields):
+                            extra = '*'
+                            imgui.push_style_color(imgui.Col_.text, colors.error if type_utils.get_error_level(problem_fields)==type_utils.ProblemLevel.Error else colors.warning)
+                        if imgui.tree_node_ex(f'{extra}{lbl}###{i}', imgui.TreeNodeFlags_.framed):
+                            if has_error:
+                                imgui.pop_style_color()
+                            this_changed, new_coding_config, self._recording_dict_type_rec[sess.name][r][c_name] = settings_editor.draw(
+                                new_config.coding_setup[i],
+                                fields,
+                                config.EventSetup.__annotations__ | {'auto_code': typing.Union[config.AutoCodeEpisodes if annotation.type_map[cs['event_type']]==annotation.Type.Interval else config.AutoCodeSyncPoints,None]},
+                                config.EventSetup._field_defaults,
+                                self._possible_value_getters, effective_config_for_session.coding_setup[i], self._recording_dict_type_rec[sess.name][r][c_name], problem_fields, fixed=fixed_fields, documentation=config.event_setup_doc)
+                            if this_changed:
+                                new_config.coding_setup[i] = new_coding_config
+                                rec_changed |= this_changed
+                            imgui.tree_pop()
                     fields = config.StudyOverride.get_allowed_parameters(config.OverrideLevel.Recording, sess.recordings[r].definition.type)[0]
-                    effective_config_for_session = self.session_config_overrides[sess.name].apply(self.study_config, strict_check=False)
-                    effective_config = self.recording_config_overrides[sess.name][r].apply(effective_config_for_session, strict_check=False)
-                    changed, new_config, self._recording_dict_type_rec[sess.name][r] = settings_editor.draw(effective_config, fields, config.study_parameter_types, config.study_defaults, self._possible_value_getters, effective_config_for_session, self._recording_dict_type_rec[sess.name][r], effective_config.field_problems(), config.study_parameter_doc)
-                    if changed or sess_changed: # NB: also need to update file when parent has changed
+                    if fields:
+                        this_changed, new_config, self._recording_dict_type_rec[sess.name][r][-1] = settings_editor.draw(new_config, fields, config.study_parameter_types, config.study_defaults, self._possible_value_getters, effective_config_for_session, self._recording_dict_type_rec[sess.name][r][-1], effective_config.field_problems(), config.study_parameter_doc)
+                    if rec_changed or (fields and this_changed): # NB: also need to update file when parent has changed
                         try:
                             new_config.check_valid(strict_check=False)
-                            self.recording_config_overrides[sess.name][r] = config.StudyOverride.from_study_diff(new_config, effective_config_for_session, config.OverrideLevel.Recording, sess.recordings[r].definition.type)
+                            self.recording_config_overrides[sess.name][r] = config.StudyOverride.from_study_diff(new_config, effective_config_for_session, config.OverrideLevel.Recording, sess.recordings[r].definition.type, which_coding_setups=list(self.recording_config_overrides[sess.name][r][1].keys()))
                         except Exception as exc:
                             # do not persist invalid config, inform user of problem
                             gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Settings error", f"You cannot make this change to the settings for recording {r} in session {sess.name}:\n{exc}", gt_gui.msg_box.MsgBox.error, more=gt_gui.utils.get_traceback(type(exc), exc, exc.__traceback__))
                         else:
                             # persist changed config
-                            self.recording_config_overrides[sess.name][r].store_as_json(sess.recordings[r].info.working_directory)
+                            config.store_overrides_to_json(self.recording_config_overrides[sess.name][r], sess.recordings[r].info.working_directory)
                     imgui.tree_pop()
 
     def _about_popup_drawer(self):

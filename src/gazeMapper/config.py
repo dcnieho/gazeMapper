@@ -74,7 +74,7 @@ class EventSetup(typed_dict_defaults.TypedDictDefault, total=False):
     auto_code       : AutoCodeSyncPoints|AutoCodeEpisodes|None = None
     sync_setup      : EtSyncSetup|None = None
     validation_setup: ValidationSetup|None = None
-event_setup_display_order = [
+event_setup_field_order = [
     'event_type',
     'name',
     'description',
@@ -1077,32 +1077,37 @@ class StudyOverride:
     default_json_file_name = 'study_def_override.json'
 
     @staticmethod
-    def get_allowed_parameters(level: OverrideLevel, recording_type: session.RecordingType|None = None) -> tuple[list[str],set[str]]:
+    def get_allowed_parameters(level: OverrideLevel, recording_type: session.RecordingType|None = None, for_event_setup: bool = False) -> tuple[list[str],set[str]]:
         # NB: list instead of set as want to keep ordering
-        all_params = list(study_parameter_types.keys())
-        exclude = {'self', 'session_def', 'planes', 'individual_markers', 'working_directory', 'import_known_custom_eye_trackers'}
-        # above is Session-level disallowed parameters. Depending on level, disallow more
-        if level in [OverrideLevel.Recording, OverrideLevel.FunctionArgs]:
-            # these make no sense on a recording level as they are settings for
-            # processing functions that run on a whole session at once. As function
-            # arguments they may make sense depending on the processing function that
-            # is being called, but we cannot differentiate, so reject to be conservative
-            # use whitelist
-            if recording_type==session.RecordingType.Camera:
+        if for_event_setup:
+            all_params = event_setup_field_order
+            if level==OverrideLevel.Recording and recording_type==session.RecordingType.Camera:
                 # if for a camera recording, almost no parameters make sense to set
-                include = {'auto_code_sync_points', 'auto_code_episodes'}
+                allowed_params = ['auto_code']
             else:
-                include = {'get_cam_movement_for_et_sync_method','get_cam_movement_for_et_sync_function',
-                           'auto_code_sync_points', 'auto_code_episodes',
-                           'validate_do_global_shift', 'validate_max_dist_fac', 'validate_dq_types', 'validate_allow_dq_fallback', 'validate_include_data_loss', 'validate_I2MC_settings', 'validate_dynamic_skip_first_duration', 'validate_dynamic_max_gap_duration', 'validate_dynamic_min_duration'}
-            exclude = set(all_params)-include
-        allowed_params = [a for a in all_params if a not in exclude]
+                # same allowed parameters for a session- or eye-tracker recording-level override
+                allowed_params = ['auto_code', 'sync_setup', 'validation_setup']
+            exclude = set(all_params)-set(allowed_params)
+        else:
+            all_params = list(study_parameter_types.keys())
+            if level in [OverrideLevel.Recording, OverrideLevel.FunctionArgs]:
+                # these make no sense on a recording level as they are settings for
+                # processing functions that run on a whole session at once. As function
+                # arguments they may make sense depending on the processing function that
+                # is being called, but we cannot differentiate, so reject to be conservative
+                # use whitelist
+                exclude = set(all_params)
+            else:
+                # Session-level disallowed parameters
+                exclude = {'self', 'session_def', 'planes', 'individual_markers', 'coding_setup', 'working_directory', 'import_known_custom_eye_trackers'}
+            allowed_params = [a for a in all_params if a not in exclude]
         return allowed_params, exclude
 
-    def __init__(self, level: OverrideLevel, recording_type: session.RecordingType|None = None, **kwargs):
+    def __init__(self, level: OverrideLevel, recording_type: session.RecordingType|None = None, for_event_setup: bool = False, **kwargs):
         self.override_level = level
         self.recording_type = recording_type
-        self._allowed_params, self._excluded_parameters = self.get_allowed_parameters(level, recording_type)
+        self.for_event_setup = for_event_setup
+        self._allowed_params, self._excluded_parameters = self.get_allowed_parameters(level, recording_type, self.for_event_setup)
         self._overridden_params: list[str] = []
         for p in self._allowed_params:
             self.clear_override(p)
@@ -1111,36 +1116,39 @@ class StudyOverride:
             e.append_path_element(f'argument "{key}" {self._get_err_msg()} ({exc._path[0]})')
             raise e from None
         kwargs = StudyOverride._fix_typing(kwargs)
+        self._allow_name = self.for_event_setup
+        types = EventSetup.__annotations__ if self.for_event_setup else study_parameter_types
         for p in kwargs:
             self._check_parameter(p, f"{StudyOverride.__name__}.__init__(): ")
             # special case: for dict-like object we can unset specific fields, so allow those by skipping check for them
             check_val = kwargs[p]
             if isinstance(check_val,dict) or typing.is_typeddict(check_val) or typed_dict_defaults.is_typeddictdefault(check_val) or type_utils.is_NamedTuple_type(check_val):
                 check_val = {k:check_val[k] for k in check_val if check_val[k] is not None}
-            typeguard.check_type(check_val, study_parameter_types[p], typecheck_fail_callback=lambda x,_: typecheck_exception_handler(x,p), collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
+            typeguard.check_type(check_val, types[p], typecheck_fail_callback=lambda x,_: typecheck_exception_handler(x,p), collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
             setattr(self,p,kwargs[p])
+        self._allow_name = False
 
     def __setattr__(self, name, value):
-        if name.startswith('_') or name in {'override_level', 'recording_type'}:
+        if name.startswith('_') or name in {'override_level', 'recording_type', 'for_event_setup'}:
             super(StudyOverride, self).__setattr__(name, value)
             return
 
         self._check_parameter(name)
         super(StudyOverride, self).__setattr__(name, value)
-        if name not in self._overridden_params:
+        if name not in self._overridden_params and (name!='name' or not self.for_event_setup):
             self._overridden_params.append(name)
 
-    def clear_override(self, name):
+    def clear_override(self, name: str):
         self._check_parameter(name)
         setattr(self,name,None)
         if name in self._overridden_params:
             self._overridden_params.remove(name)
 
     def _check_parameter(self, name: str, error_prefix=''):
-        if name in self._excluded_parameters:
-            raise ValueError(f"{error_prefix}You are not allowed to override the '{name}' parameter of a {Study.__name__} class {self._get_err_msg()}")
-        if name not in self._allowed_params:
-            raise ValueError(f"{error_prefix}Got an unknown parameter '{name}'")
+        if name not in self._allowed_params and (name!='name' or not self._allow_name):
+            if name in (event_setup_field_order if self.for_event_setup else study_parameter_types.keys()):
+                raise ValueError(f"{error_prefix}You are not allowed to override the '{name}' parameter of a {EventSetup.__name__ if self.for_event_setup else Study.__name__} class {self._get_err_msg()}")
+            raise ValueError(f"{error_prefix}Got an unknown parameter '{name}' to override for a {EventSetup.__name__ if self.for_event_setup else Study.__name__} class {self._get_err_msg()}")
 
     def _get_err_msg(self):
         if self.override_level==OverrideLevel.FunctionArgs:
@@ -1151,25 +1159,32 @@ class StudyOverride:
             err_text += f' for a {self.recording_type.value} recording'
         return err_text
 
-    def apply(self, study: Study, strict_check=True) -> Study:
-        study = copy.deepcopy(study)
-        study = _apply_impl(study, {p: getattr(self,p) for p in self._overridden_params}, study_parameter_types)
+    def apply(self, obj: Study, strict_check=True) -> Study:
+        obj = copy.deepcopy(obj)
+        if self.for_event_setup:
+            the_obj = [(i,cs) for i, cs in enumerate(obj.coding_setup) if cs['name']==getattr(self,'name')]
+            if not the_obj:
+                raise ValueError(f'Could not find event setup with name "{getattr(self,"name")}" to apply overrides to {self._get_err_msg()}')
+            idx,the_obj = the_obj[0]
+            the_obj = _apply_impl(the_obj, {p: getattr(self,p) for p in self._overridden_params}, EventSetup.__annotations__)
+            obj.coding_setup[idx] = the_obj
+        else:
+            obj = _apply_impl(obj, {p: getattr(self,p) for p in self._overridden_params}, study_parameter_types)
         # check resulting study is valid
         try:
-            study.check_valid(strict_check)
+            obj.check_valid(strict_check)
         except Exception as oe:
             raise ValueError(f'Study setup became invalid {self._get_err_msg()}: {str(oe)}').with_traceback(oe.__traceback__) from None
-        return study
+        return obj
 
-    def store_as_json(self, path: str | pathlib.Path):
-        path = pathlib.Path(path)
-        if path.is_dir():
-            path = path / self.default_json_file_name
-        to_dump = {p:getattr(self,p) for p in self._overridden_params}
-        json.dump(to_dump, path)
+    def get_dump(self) -> dict[str,Any]:
+        kwds = {p:getattr(self,p) for p in self._overridden_params}
+        if self.for_event_setup and not not kwds:
+            kwds['name'] = getattr(self,'name')
+        return kwds
 
     @staticmethod
-    def load_from_json(level: OverrideLevel, path: str | pathlib.Path, recording_type: session.RecordingType|None = None) -> 'StudyOverride':
+    def load_from_json(level: OverrideLevel, path: str|pathlib.Path, recording_type: session.RecordingType|None = None) -> tuple['StudyOverride', dict[str,'StudyOverride']]:
         path = pathlib.Path(path)
         if path.is_dir():
             path = path / StudyOverride.default_json_file_name
@@ -1179,13 +1194,76 @@ class StudyOverride:
             kwds['validate_dq_types']= {DataQualityType(d) for d in kwds['validate_dq_types']}
         if 'mapped_video_which_gaze_type_on_plane' in kwds:
             kwds['mapped_video_which_gaze_type_on_plane'] = gaze_worldref.Type(kwds['mapped_video_which_gaze_type_on_plane'])
-        return StudyOverride(level, recording_type, **kwds)
+        # backwards compatibility
+        compat_fields = ['auto_code_sync_points', 'auto_code_episodes', 'get_cam_movement_for_et_sync_method', 'get_cam_movement_for_et_sync_function', 'sync_et_to_cam_use_average']
+        if any((k in kwds for k in compat_fields)) or any((k.startswith('validate_') for k in kwds)):
+            kwds['coding_setup'] = []
+            if 'auto_code_sync_points' in kwds:
+                kwds['coding_setup'].append(dict(
+                    name        = annotation.EventType.Sync_Camera.value,
+                    auto_code   = kwds.pop('auto_code_sync_points'),
+                ))
+            if 'auto_code_episodes' in kwds:
+                for e in kwds['auto_code_episodes']:
+                    kwds['coding_setup'].append(dict(
+                        name        = e.value,
+                        auto_code   = kwds['auto_code_episodes'][e],
+                    ))
+                kwds.pop('auto_code_episodes')
+            if 'get_cam_movement_for_et_sync_method' in kwds or 'get_cam_movement_for_et_sync_function' in kwds or 'sync_et_to_cam_use_average' in kwds:
+                et_sync_setup = EtSyncSetup(
+                    get_cam_movement_method     = kwds.pop('get_cam_movement_for_et_sync_method', ''),
+                    get_cam_movement_function   = kwds.pop('get_cam_movement_for_et_sync_function', None),
+                    use_average                 = kwds.pop('sync_et_to_cam_use_average', False)
+                )
+                found = False
+                for e in kwds['coding_setup']:
+                    if e['event_type']==annotation.EventType.Sync_ET_Data:
+                        e['sync_setup'] = et_sync_setup
+                        found = True
+                        break
+                if not found:
+                    kwds['coding_setup'].append(dict(
+                        name        = annotation.EventType.Sync_ET_Data.value,
+                        sync_setup  = et_sync_setup,
+                ))
+            if any((k.startswith('validate_') for k in kwds)):
+                # collect all validation settings into a single validation setup
+                val_keys = {k:kwds[k] for k in kwds if k.startswith('validate_')}
+                validation_setup = ValidationSetup(**{k.removeprefix('validate_'): v for k, v in val_keys.items()})
+                for k in val_keys:
+                    kwds.pop(k)
+                found = False
+                for e in kwds['coding_setup']:
+                    if e['event_type']==annotation.EventType.Validate:
+                        e['validation_setup'] = validation_setup
+                        found = True
+                        break
+                if not found:
+                    kwds['coding_setup'].append(dict(
+                        name            = annotation.EventType.Validate.value,
+                        validation_setup= validation_setup,
+                ))
+
+        # split off coding setup overrides if present
+        coding_setup_overrides: dict[str, StudyOverride] = {}
+        if 'coding_setup' in kwds:
+            for cs in kwds.pop('coding_setup'):
+                name = cs.get('name')
+                coding_setup_overrides[name] = StudyOverride(level, recording_type, for_event_setup=True, **cs)
+        return StudyOverride(level, recording_type, **kwds), coding_setup_overrides
 
     @staticmethod
-    def from_study_diff(config: Study, parent_config: Study, level: OverrideLevel, recording_type: session.RecordingType|None = None) -> 'StudyOverride':
-        fields = StudyOverride.get_allowed_parameters(level, recording_type)[0]
+    def from_study_diff(config: Study|EventSetup, parent_config: Study|EventSetup, level: OverrideLevel, recording_type: session.RecordingType|None = None, which_coding_setups: list[str]|None = None) -> tuple['StudyOverride', dict[str, 'StudyOverride']]:
+        fields = (StudyOverride.get_allowed_parameters(level, recording_type, False)[0]+['coding_setup'], (which_coding_setups,StudyOverride.get_allowed_parameters(level, recording_type, True)[0]))
         kwds = _study_diff_impl(config, parent_config, fields)
-        return StudyOverride(level, recording_type, **kwds)
+        # split off coding setup overrides if present
+        coding_setup_overrides: dict[str, StudyOverride] = {}
+        if 'coding_setup' in kwds:
+            for cs in kwds.pop('coding_setup'):
+                name = cs.get('name')
+                coding_setup_overrides[name] = StudyOverride(level, recording_type, for_event_setup=True, **cs)
+        return StudyOverride(level, recording_type, **kwds), coding_setup_overrides
 
     @staticmethod
     def _fix_typing(kwds: dict[str,Any]) -> dict[str,Any]:
@@ -1224,15 +1302,34 @@ def _apply_impl(obj, overrides: dict[str,Any], annotations: dict[str,typing.Type
                 setattr(obj,p,val)
     return obj
 
-def _study_diff_impl(config: Study, parent_config: Study, fields: list[str]) -> dict[str,Any]:
+def _study_diff_impl(config: Study, parent_config: Study, fields: tuple[list[str],tuple[list[str]|None,list[str]]|None]) -> dict[str,Any]:
     kwds: dict[str,Any] = {}
-    for f in fields:
+    for f in fields[0]:
+        if f=='coding_setup' and fields[1] and fields[1][0] is not None:
+            # special case: coding setup is a list of dict-like objects, need to diff per event setup
+            val = getattr(config,f)
+            parent_val = getattr(parent_config,f)
+            kwds[f] = []
+            for ve,pve in zip(val,parent_val):
+                if ve['name'] not in fields[1][0]:
+                    continue
+                diff = _study_diff_impl(ve, pve, (fields[1][1],None))
+                diff['name'] = ve['name']
+                kwds[f].append(diff)
+            continue
         val        =        config.get(f) if isinstance(       config,dict) else getattr(       config,f)
         parent_val = parent_config.get(f) if isinstance(parent_config,dict) else getattr(parent_config,f)
         if val!=parent_val:
             if parent_val is not None and (isinstance(val,dict) or typing.is_typeddict(val) or typed_dict_defaults.is_typeddictdefault(val) or type_utils.is_NamedTuple_type(val)):
                 # need to recurse into object
-                val = _study_diff_impl(val, parent_val, list(set(type_utils.get_fields(val))|set(type_utils.get_fields(parent_val))))
+                if isinstance(val,list):
+                    # lists: per item check for differences
+                    kwds[f] = []
+                    for v,pv in zip(val,parent_val):
+                        kwds[f].append(_study_diff_impl(v, pv, (list(set(type_utils.get_fields(v))|set(type_utils.get_fields(pv))),None)))
+                else:
+                    # dict-like object: only include fields that differ
+                    val = _study_diff_impl(val, parent_val, (list(set(type_utils.get_fields(val))|set(type_utils.get_fields(parent_val))),None))
             kwds[f] = val
     return kwds
 
@@ -1243,16 +1340,35 @@ def load_override_and_apply(study: Study, level: OverrideLevel, override_path: s
     if not override_path.is_file():
         return study
 
-    study_override = StudyOverride.load_from_json(level, override_path, recording_type)
-    return study_override.apply(study, strict_check)
+    overrides = StudyOverride.load_from_json(level, override_path, recording_type)
+    return apply_all_overrides(study, overrides, strict_check)
 
-def load_or_create_override(level: OverrideLevel, override_path: str|pathlib.Path, recording_type: session.RecordingType|None = None) -> StudyOverride:
+def apply_all_overrides(study: Study, overrides: tuple[StudyOverride, dict[str, StudyOverride]], strict_check=True) -> Study:
+    so, eos = overrides
+    study = so.apply(study, strict_check)
+    for eo in eos.values():
+        study = eo.apply(study, strict_check)
+    return study
+
+def store_overrides_to_json(overrides: tuple[StudyOverride, dict[str, StudyOverride]], path: str|pathlib.Path):
+    path = pathlib.Path(path)
+    if path.is_dir():
+        path = path / StudyOverride.default_json_file_name
+    so, eos = overrides
+    to_dump = so.get_dump()
+    if eos:
+        to_dump['coding_setup'] = [dump for eo in eos.values() if (dump:=eo.get_dump())]
+        if not to_dump['coding_setup']:
+            del to_dump['coding_setup']
+    json.dump(to_dump, path)
+
+def load_or_create_override(level: OverrideLevel, override_path: str|pathlib.Path, recording_type: session.RecordingType|None = None) -> tuple[StudyOverride, dict[str,StudyOverride]]:
     override_path = pathlib.Path(override_path)
     if override_path.is_dir():
         override_path = override_path / StudyOverride.default_json_file_name
 
     if not override_path.is_file():
-        return StudyOverride(level, recording_type)
+        return StudyOverride(level, recording_type), {}
     else:
         return StudyOverride.load_from_json(level, override_path, recording_type)
 
@@ -1262,7 +1378,7 @@ def apply_kwarg_overrides(study: Study, strict_check=True, **kwargs) -> Study:
     overrides = StudyOverride(OverrideLevel.FunctionArgs, **kwargs)
     return overrides.apply(study, strict_check)
 
-def read_study_config_with_overrides(config_path: str|pathlib.Path, overrides: dict[OverrideLevel, str|pathlib.Path]=None, recording_type: session.RecordingType|None = None, strict_check=True, **kwargs) -> Study:
+def read_study_config_with_overrides(config_path: str|pathlib.Path, overrides: dict[OverrideLevel, str|pathlib.Path]|None=None, recording_type: session.RecordingType|None = None, strict_check=True, **kwargs) -> Study:
     study = Study.load_from_json(config_path)
     if overrides:
         for l in [OverrideLevel.Session, OverrideLevel.Recording]:
