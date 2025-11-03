@@ -89,7 +89,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
                     if not np.isnan(t_pos[0]):
                         target_positions[nm][frame_idx] = TargetPos(video_ts.get_timestamp(frame_idx), frame_idx, t_pos)
             case 'function':
-                df = pd.read_csv(working_dir/naming.target_sync_prefix + nm + '.tsv', delimiter='\t', index_col=False, dtype=defaultdict(lambda: float, frame_idx=int))
+                df = pd.read_csv(working_dir / f'{naming.target_sync_prefix}{nm}.tsv', delimiter='\t', index_col=False, dtype=defaultdict(lambda: float, frame_idx=int))
                 df['cam_pos'] = [x for x in df[['target_x','target_y']].values]
                 target_positions[nm] = {idx:TargetPos(video_ts.get_timestamp(idx), **kwargs) for idx,kwargs in zip(df['frame_idx'].values,df[['frame_idx','cam_pos']].to_dict(orient='records'))}
 
