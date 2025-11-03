@@ -130,7 +130,7 @@ class SessionDefinition:
         json.dump(to_dump, path)
 
     @staticmethod
-    def load_from_json(path: str | pathlib.Path) -> 'Session':
+    def load_from_json(path: str | pathlib.Path) -> 'SessionDefinition':
         path = pathlib.Path(path)
         if path.is_dir():
             path /= SessionDefinition.default_json_file_name
