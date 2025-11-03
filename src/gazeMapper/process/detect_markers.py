@@ -114,13 +114,13 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
     progress_indicator.set_intervals(step:=min(20,int(total/200)), step)
     estimator.set_progress_updater(progress_indicator.update)
 
-    poses, individual_markers, sync_target_signal = estimator.process_video()
+    poses, individual_markers, sync_target_signals = estimator.process_video()
 
     for p in poses:
         pose.write_list_to_file(poses[p], working_dir/f'{naming.plane_pose_prefix}{p}.tsv', skip_failed=True)
     for m in individual_markers:
         gt_marker.write_list_to_file(individual_markers[m], gt_marker.get_file_name(m.m_id, m.aruco_dict_id, working_dir), skip_failed=False)
-    for s in sync_target_signal:
+    for s in sync_target_signals:
         df = pd.DataFrame(sync_target_signals[s],columns=['frame_idx','target_x','target_y'])
         nm = s.removeprefix('sync_')
         df.to_csv(working_dir/naming.target_sync_prefix + nm + '.tsv', sep='\t', index=False, na_rep='nan', float_format="%.8f")
