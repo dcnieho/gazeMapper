@@ -73,36 +73,36 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None=None, p
         progress_indicator.update()
 
         # assign intervals
-        for idx,_ in enumerate(episodes):
+        for idx,_ in enumerate(episodes[e]):
             if validation_plane.is_dynamic():
                 selected_intervals, other_intervals = \
                     assign_intervals.dynamic_markers(marker_observations_per_target,
-                                                     markers_per_target,
-                                                     working_dir/gt_naming.frame_timestamps_fname,
-                                                     episodes[idx],
-                                                     cs['validation_setup']['dynamic_skip_first_duration'],
-                                                     cs['validation_setup']['dynamic_max_gap_duration'],
-                                                     cs['validation_setup']['dynamic_min_duration'])
+                                                    markers_per_target,
+                                                    working_dir/gt_naming.frame_timestamps_fname,
+                                                    episodes[e][idx],
+                                                    cs['validation_setup']['dynamic_skip_first_duration'],
+                                                    cs['validation_setup']['dynamic_max_gap_duration'],
+                                                    cs['validation_setup']['dynamic_min_duration'])
             else:
                 fix_file = working_dir / f'{naming.validation_prefix}{e}_fixations_interval_{idx+1:02d}.tsv'
                 selected_intervals, other_intervals = \
                     assign_intervals.distance(targets,
-                                              fix_file,
-                                              do_global_shift=cs['validation_setup']['do_global_shift'],
-                                              max_dist_fac=cs['validation_setup']['max_dist_fac'])
+                                            fix_file,
+                                            do_global_shift=cs['validation_setup']['do_global_shift'],
+                                            max_dist_fac=cs['validation_setup']['max_dist_fac'])
             progress_indicator.update()
 
             # plot output
             assign_intervals.plot(selected_intervals,
-                                  other_intervals,
-                                  targets,
-                                  working_dir/f'{naming.world_gaze_prefix}{p}.tsv',
-                                  episodes[e][idx],
-                                  working_dir,
-                                  filename_stem=f'{naming.validation_prefix}{e}_fixation_assignment',
-                                  iteration=idx,
-                                  background_image=background_image,
-                                  plot_limits=plot_limits)
+                                other_intervals,
+                                targets,
+                                working_dir/f'{naming.world_gaze_prefix}{p}.tsv',
+                                episodes[e][idx],
+                                working_dir,
+                                filename_stem=f'{naming.validation_prefix}{e}_fixation_assignment',
+                                iteration=idx,
+                                background_image=background_image,
+                                plot_limits=plot_limits)
             progress_indicator.update()
 
             # store output to file
