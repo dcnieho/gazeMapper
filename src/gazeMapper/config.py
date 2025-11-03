@@ -377,7 +377,7 @@ class Study:
                     raise ValueError(msg)
                 else:
                     type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'planes': (type_utils.ProblemLevel.Error, msg)}}})
-            if e==annotation.EventType.Validate:
+            if e==annotation.EventType.Validate and cs['planes']:
                 pl_name = list(cs['planes'])[0]
                 pl_def = [pl for pl in self.planes if pl.name==pl_name][0]
                 if pl_def.type!=plane.Type.GlassesValidator:
@@ -716,7 +716,7 @@ class Study:
                         t_defaults = tt._field_defaults
                         t_types    = tt.__annotations__
                     d[k] = _remove_defaults_recursive(d[k], t_defaults, t_types)
-                    if not d[k]:
+                    if not d[k] and not defaults[k] is None:
                         # all defaulted, skip
                         continue
 
