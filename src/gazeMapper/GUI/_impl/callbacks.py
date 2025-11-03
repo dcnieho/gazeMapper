@@ -529,6 +529,9 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
                 if dq_df is None:
                     dq_df = {nm: t_dq_df}
                     dq_set = {nm: {}}
+                else:
+                    dq_df[nm] = t_dq_df
+                    dq_set[nm] = {}
 
                 # prep config for validation export
                 # data quality type
