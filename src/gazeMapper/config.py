@@ -379,8 +379,8 @@ class Study:
                     type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'planes': (type_utils.ProblemLevel.Error, msg)}}})
             if e==annotation.EventType.Validate and cs['planes']:
                 pl_name = list(cs['planes'])[0]
-                pl_def = [pl for pl in self.planes if pl.name==pl_name][0]
-                if pl_def.type!=plane.Type.GlassesValidator:
+                pl_def = [pl for pl in self.planes if pl.name==pl_name]
+                if pl_def and pl_def[0].type!=plane.Type.GlassesValidator:
                     msg = f'Plane {pl_name} is not a glassesValidator plane, cannot be used for validation.'
                     if strict_check:
                         raise ValueError(msg)
