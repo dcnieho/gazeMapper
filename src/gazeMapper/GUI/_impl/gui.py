@@ -24,7 +24,7 @@ import glassesTools
 from glassesTools import annotation, aruco, camera_recording, gui as gt_gui, naming as gt_naming, marker as gt_marker, ocv, plane as gt_plane, platform as gt_platform, process_pool, utils as gt_utils
 from glassesTools.gui import colors
 
-from ... import config, marker, plane, process, project_watcher, session, type_utils, utils as gm_utils, version
+from ... import config, marker, plane, process, project_watcher, session, type_utils, version
 from .. import async_thread
 from . import callbacks, image_helper, session_lister, settings_editor, utils
 
@@ -745,7 +745,7 @@ class GUI:
                         msg = f'The individual markers contain'
                     else:
                         msg = f'The set of {m} markers of the {s} "plane" contains'
-                    msg += (f'{msg} duplicates: {gm_utils.format_duplicate_markers_msg(duplicates)}.' + (' Markers must be unique, fix this duplication.' if not self.study_config.allow_duplicated_markers else ''))
+                    msg += (f'{msg} duplicates: {gt_marker.format_duplicate_markers_msg(duplicates)}.' + (' Markers must be unique, fix this duplication.' if not self.study_config.allow_duplicated_markers else ''))
                     if s=='xx_individual_markers_xx':
                         type_utils.merge_problem_dicts(self._problems_cache, {'individual_markers': {d: (type_utils.ProblemLevel.Warning if self.study_config.allow_duplicated_markers else type_utils.ProblemLevel.Error, msg) for d in duplicates}})
                     else:
@@ -767,7 +767,7 @@ class GUI:
                                     else:
                                         lbl = f'{mx} markers' if isinstance(mx,str) else f'dynamic validation target markers (column {mx})'
                                         mark_msgs.append(f'{lbl} of the "{sx}" plane')
-                                msg = f'The following markers are encountered in the setup both as {mark_msgs[0]} and as {mark_msgs[1]}: {gm_utils.format_duplicate_markers_msg(overlap)}.' + (' Markers must be unique, fix this duplication.' if not self.study_config.allow_duplicated_markers else '')
+                                msg = f'The following markers are encountered in the setup both as {mark_msgs[0]} and as {mark_msgs[1]}: {gt_marker.format_duplicate_markers_msg(overlap)}.' + (' Markers must be unique, fix this duplication.' if not self.study_config.allow_duplicated_markers else '')
                                 # add error message to problem dict
                                 if 'xx_individual_markers_xx' in (s,s2):
                                     type_utils.merge_problem_dicts(self._problems_cache, {'individual_markers': {d: (type_utils.ProblemLevel.Warning if self.study_config.allow_duplicated_markers else type_utils.ProblemLevel.Error, msg) for d in overlap if d in used_markers['xx_individual_markers_xx']['markers']}})

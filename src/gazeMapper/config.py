@@ -10,7 +10,7 @@ from typing import Any, Literal
 from glassesTools import annotation, aruco, camera_recording, gaze_worldref, json, marker as gt_marker, utils as gt_utils
 from glassesTools.validation import DataQualityType, get_DataQualityType_explanation
 
-from . import marker, plane, session, typed_dict_defaults, type_utils, utils
+from . import marker, plane, session, typed_dict_defaults, type_utils
 from .GUI._impl import utils as gui_utils
 
 
@@ -518,7 +518,7 @@ class Study:
             # first check if used markers are unique at the family level
             seen: set[tuple[int,int]] = set()
             if (duplicates := {x for x in used_markers_fam[s] if x in seen or seen.add(x)}):
-                msg = f'The markers defined for {_format_key(s)} are not unique. ' +('Please resolve' if not self.allow_duplicated_markers else 'There are') + f' the following duplicates: {utils.format_duplicate_markers_msg(duplicates)}'
+                msg = f'The markers defined for {_format_key(s)} are not unique. ' +('Please resolve' if not self.allow_duplicated_markers else 'There are') + f' the following duplicates: {gt_marker.format_duplicate_markers_msg(duplicates)}'
                 if strict_check:
                     raise ValueError(msg)
                 else:
@@ -534,7 +534,7 @@ class Study:
                         # individual entries. e.g. start is 80 81, and end is 81 80 is valid
                         continue
                     if (overlap:=set(used_markers_fam[s2]).intersection(used_markers_fam[s])):
-                        msg = f'The following markers are encountered in the setup for both {_format_key(s)} and {_format_key(s2)}: {utils.format_duplicate_markers_msg(overlap)}.' +(' Markers cannot be used more than once, fix this collision.' if not self.allow_duplicated_markers else '')
+                        msg = f'The following markers are encountered in the setup for both {_format_key(s)} and {_format_key(s2)}: {gt_marker.format_duplicate_markers_msg(overlap)}.' +(' Markers cannot be used more than once, fix this collision.' if not self.allow_duplicated_markers else '')
                         # emit error message
                         if strict_check:
                             raise ValueError(msg)
@@ -548,7 +548,7 @@ class Study:
                     if s==s2:
                         continue
                     if set((tuple(used_markers_fam[s2]),)).intersection((tuple(used_markers_fam[s]),)):
-                        msg = f'The marker sequence {utils.format_marker_sequence_msg(used_markers_fam[s])} specified for {_format_key(s)} has already been used for {_format_key(s2)}.' +(' Markers sequences must be unique, please fix this collision.' if not self.allow_duplicated_markers else '')
+                        msg = f'The marker sequence {gt_marker.format_marker_sequence_msg(used_markers_fam[s])} specified for {_format_key(s)} has already been used for {_format_key(s2)}.' +(' Markers sequences must be unique, please fix this collision.' if not self.allow_duplicated_markers else '')
                         # emit error message
                         if strict_check:
                             raise ValueError(msg)
