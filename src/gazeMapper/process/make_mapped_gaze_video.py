@@ -19,7 +19,7 @@ from .. import config, episode, marker, naming, process, session, synchronizatio
 from .detect_markers import _get_plane_setup, _get_sync_function
 
 
-def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show_visualization=False, progress_indicator: process_pool.JobProgress=None, **study_settings):
+def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None, show_visualization=False, progress_indicator: process_pool.JobProgress|None = None, **study_settings):
     # if show_visualization, the generated video(s) are shown as they are created in a viewer
     working_dir  = pathlib.Path(working_dir) # working directory of a session, not of a recording
     if config_dir is None:
@@ -39,7 +39,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path = None, show
     else:
         do_the_work(working_dir, config_dir, None, progress_indicator, **study_settings)
 
-def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_player.GUI, progress_indicator: process_pool.JobProgress, **study_settings):
+def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_player.GUI|None, progress_indicator: process_pool.JobProgress|None, **study_settings):
     has_gui = gui is not None
     sub_pixel_fac = 8   # for anti-aliased drawing
 
@@ -58,26 +58,26 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
     session_info = session.Session.from_definition(study_config.session_def, working_dir)
 
     # load info for all recordings in the recording session and setup wanted output videos
-    episodes        : dict[str, dict[annotation.EventType, list[list[int]]]]            = {}
-    episodes_as_ref : dict[str, dict[annotation.EventType, list[list[int]]]]            = {}
-    episodes_seq_nrs: dict[str, dict[annotation.EventType, list[str]]]                  = {}
-    episode_colors  : dict[str, dict[annotation.EventType, tuple[float, float, float]]] = {}
-    gazes_head      : dict[str, dict[int, list[gaze_headref.Gaze]]]                 = {}
-    in_videos       : dict[str, pathlib.Path]                                       = {}
-    camera_params   : dict[str, ocv.CameraParams]                                   = {}
-    videos_ts       : dict[str, timestamps.VideoTimestamps]                         = {}
-    pose_estimators : dict[str, pose.Estimator]                                     = {}
-    vid_info        : dict[str, tuple[int, int, float]]                             = {}
-    plane_names     = {p for k in study_config.planes_per_episode for p in study_config.planes_per_episode[k]}
-    planes          : dict[str, plane.Plane]                                        = {}
-    all_poses       : dict[str, dict[str, dict[int, pose.Pose]]]                    = {}
+    episodes        : dict[str, dict[str, list[list[int]]]]             = {}
+    episodes_as_ref : dict[str, dict[str, list[list[int]]]]             = {}
+    episodes_seq_nrs: dict[str, dict[str, list[str]]]                   = {}
+    episode_colors  : dict[str, dict[str, tuple[int, int, int]]]        = {}
+    gazes_head      : dict[str, dict[int, list[gaze_headref.Gaze]]]     = {}
+    in_videos       : dict[str, pathlib.Path]                           = {}
+    camera_params   : dict[str, ocv.CameraParams]                       = {}
+    videos_ts       : dict[str, timestamps.VideoTimestamps]             = {}
+    pose_estimators : dict[str, pose.Estimator]                         = {}
+    vid_info        : dict[str, tuple[int, int, float]]                 = {}
+    plane_names     = {p for cs in study_config.coding_setup for p in cs['planes']}
+    planes          : dict[str, plane.Plane]                            = {}
+    all_poses       : dict[str, dict[str, dict[int, pose.Pose]]]        = {}
     recs = {r for r in session_info.recordings}
     for rec in recs:
         rec_def = session_info.recordings[rec].definition
         rec_working_dir = working_dir / rec
 
         # get interval(s) coded to be analyzed, if any
-        episodes[rec] = episode.list_to_marker_dict(episode.read_list_from_file(rec_working_dir / naming.coding_file), study_config.episodes_to_code)
+        episodes[rec] = episode.list_to_marker_dict(episode.read_list_from_file(rec_working_dir / naming.coding_file), [cs['name'] for cs in study_config.coding_setup])
         colors = [tuple(round(cc*255) for cc in c) for c in utils.get_colors(len(episodes[rec]), 0.45, 0.65)]
         episode_colors[rec] = {k:c for k,c in zip(episodes[rec], colors)}
         episodes_seq_nrs[rec] = {e: [str(x) for x in range(1,len(episodes[rec][e])+1)] for e in episodes[rec]}
@@ -109,10 +109,13 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
                                                                               study_config.sync_ref_do_time_stretch, study_config.sync_ref_stretch_which)
             ref_frame_idxs[r] = synchronization.smooth_video_frames_indices(ref_frame_idxs[r])
             # make sure episodes has a trial annotation, which comes from the reference recording
-            episodes[r][annotation.EventType.Trial] = synchronization.reference_frames_to_video(r, sync, episodes[study_config.sync_ref_recording][annotation.EventType.Trial],
-                                                                                            videos_ts[r].timestamps, videos_ts[study_config.sync_ref_recording].timestamps,
-                                                                                            study_config.sync_ref_do_time_stretch, study_config.sync_ref_stretch_which)
-            episodes_seq_nrs[r][annotation.EventType.Trial] = episodes_seq_nrs[study_config.sync_ref_recording][annotation.EventType.Trial]
+            trial_events = process.get_specific_event_types(study_config, annotation.EventType.Trial)
+            for cs in trial_events:
+                nm = cs['name']
+                episodes[r][nm] = synchronization.reference_frames_to_video(r, sync, episodes[study_config.sync_ref_recording][nm],
+                                                                                                videos_ts[r].timestamps, videos_ts[study_config.sync_ref_recording].timestamps,
+                                                                                                study_config.sync_ref_do_time_stretch, study_config.sync_ref_stretch_which)
+                episodes_seq_nrs[r][nm] = episodes_seq_nrs[study_config.sync_ref_recording][nm]
             episode_colors[r] = {k:c for k,c in zip(episodes[r], colors)}
             # also get this recording's coded events in the reference's frames idxs
             episodes_as_ref[r] = {e: synchronization.video_frames_to_reference(r, sync, episodes[r][e],
@@ -186,12 +189,15 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
 
     if study_config.sync_ref_recording:
         # check that all camera sync point frames of a recording are in the reference recordings sync frames (a recording may miss some, but the ones it has must be equal)
+        sync_events = process.get_specific_event_types(study_config, annotation.EventType.Sync_Camera, check_specific_fields=['auto_code'])
         for r in sync.index.get_level_values('recording').unique():
-            ref_sync_points = episodes_as_ref_flat[study_config.sync_ref_recording][annotation.EventType.Sync_Camera]
-            rec_sync_points = episodes_as_ref_flat[r][annotation.EventType.Sync_Camera]
-            # NB: allow one frame leeway to allow for small offsets due to conversion, or cameras not running completely in sync
-            if not all([abs(i_ref-i_rec)<=1 for i_ref,i_rec in zip(ref_sync_points,rec_sync_points)]):
-                raise RuntimeError(f'Camera sync points found for recording {r} ({episodes_as_ref_flat[r][annotation.EventType.Sync_Camera]}) that do not occur among the reference recordings sync points ({study_config.sync_ref_recording}, {episodes_as_ref_flat[study_config.sync_ref_recording][annotation.EventType.Sync_Camera]}). That means the sync logic must have failed')
+            for cs in sync_events:
+                nm = cs['name']
+                ref_sync_points = episodes_as_ref_flat[study_config.sync_ref_recording][nm]
+                rec_sync_points = episodes_as_ref_flat[r][nm]
+                # NB: allow one frame leeway to allow for small offsets due to conversion, or cameras not running completely in sync
+                if not all([abs(i_ref-i_rec)<=1 for i_ref,i_rec in zip(ref_sync_points,rec_sync_points)]):
+                    raise RuntimeError(f'Camera sync points found for recording {r} ({episodes_as_ref_flat[r][nm]}) that do not occur among the reference recordings sync points ({study_config.sync_ref_recording}, {episodes_as_ref_flat[study_config.sync_ref_recording][nm]}). That means the sync logic must have failed')
         # load plane poses
         if not (study_config.mapped_video_process_planes_for_all_frames or
                 study_config.mapped_video_plane_marker_color is not None or # NB: no need to check mapped_video_recovered_plane_marker_color as it only overrides colors for some plane markers
@@ -231,9 +237,10 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
         aruco_manager.consolidate_setup()
         aruco_manager.register_with_estimator(pose_estimators[rec])
         # other setup of estimator
-        sync_target_function = _get_sync_function(study_config, session_info.recordings[rec].definition, None if annotation.EventType.Sync_ET_Data not in episodes[rec] else episodes[rec][annotation.EventType.Sync_ET_Data])
-        if sync_target_function is not None:
-            pose_estimators[rec].register_extra_processing_fun('sync', *sync_target_function)
+        sync_target_functions, function_frames  = _get_sync_function(study_config, session_info.recordings[rec].definition, episodes[rec])
+        if sync_target_functions:
+            for sfe in sync_target_functions:
+                pose_estimators[rec].register_extra_processing_fun(f'sync_{sfe}', function_frames[sfe], *sync_target_functions[sfe])
             pose_estimators[rec].show_extra_processing_output = study_config.mapped_video_show_sync_func_output
 
         if rec in study_config.mapped_video_make_which:
@@ -430,7 +437,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
                 event, ivals = intervals.which_interval(frame_idx[lead_vid], episodes_as_ref[v])
                 for e,iv in zip(event,ivals):
                     idx = episodes_as_ref[v][e].index(iv)
-                    texts.append(f'{e.value} {episodes_seq_nrs[v][e][idx]}')
+                    texts.append(f'{e} {episodes_seq_nrs[v][e][idx]}')
                     frame_colors.append(episode_colors[v][e][::-1])
                 # now print them all
                 text_sizes: list[tuple[int,int]]= []
