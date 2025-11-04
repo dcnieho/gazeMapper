@@ -1508,7 +1508,7 @@ class GUI:
             def _add_coding_popup():
                 nonlocal new_coding_name
                 nonlocal new_coding_type
-                imgui.dummy(((30+30*(new_coding_type==plane.Type.GlassesValidator))*imgui.calc_text_size('x').x,0))
+                imgui.dummy((30*imgui.calc_text_size('x').x,0))
                 if imgui.begin_table("##new_coding_info",2):
                     imgui.table_setup_column("##new_coding_infos_left", imgui.TableColumnFlags_.width_fixed)
                     imgui.table_setup_column("##new_coding_infos_right", imgui.TableColumnFlags_.width_stretch)
