@@ -179,7 +179,7 @@ def set_auto_coding_for_dynamic_validation_plane(g, p_def: plane.Definition_Glas
                 event_type = annotation.EventType.Validate,
                 name = f'Dynamic validation ({p_def.name})',
                 description = f'Dynamic validation setup for {p_def.name}',
-                planes     = [p_def.name],
+                planes     = set([p_def.name]),
                 auto_code  = config.AutoCodeEpisodes(
                     start_markers = auto_coding_setup['start_markers'],
                     end_markers   = auto_coding_setup['end_markers'],
