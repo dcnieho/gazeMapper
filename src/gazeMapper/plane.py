@@ -12,6 +12,7 @@ from . import type_utils
 class Type(utils.AutoName):
     GlassesValidator= auto()
     Plane_2D        = auto()
+    Target_Plane_2D = auto()
 json.register_type(json.TypeEntry(Type,'__enum.plane.Type__', utils.enum_val_2_str, lambda x: getattr(Type, x.split('.')[1])))
 types = [p for p in Type]
 
@@ -119,9 +120,10 @@ class Definition_Plane_2D(Definition):
                  origin             : plane.Coordinate          = plane.Coordinate(0., 0.),
                  unit               : str                       = '',
                  aruco_dict_id      : type_utils.ArucoDictType  = aruco.default_dict,
-                 ref_image_size     : int                       = 1920
+                 ref_image_size     : int                       = 1920,
+                 **kwargs
                  ):
-        super().__init__(Type.Plane_2D, name)
+        super().__init__(Type.Plane_2D if 'type' not in kwargs else kwargs['type'], name)
         self.marker_file        = marker_file           # if str or Path: file from which to read markers. Else direction N_markerx4 array. Should contain centers of markers
         self.marker_size        = marker_size           # in "unit" units
         self.plane_size         = plane_size            # in "unit" units
@@ -133,7 +135,7 @@ class Definition_Plane_2D(Definition):
         self.ref_image_size     = ref_image_size        # largest dimension
 
     def field_problems(self) -> type_utils.ProblemDict:
-        problem: dict[str,None|dict[str,None]] = {}
+        problem: type_utils.ProblemDict = {}
         for a in ['marker_file','marker_size','plane_size']:
             if not getattr(self,a):
                 problem[a] = (type_utils.ProblemLevel.Error, None)
@@ -149,8 +151,48 @@ class Definition_Plane_2D(Definition):
     def has_complete_setup(self) -> bool:
         return not self.field_problems()
 
-def make_definition(p_type: Type, name: str, path: pathlib.Path|None, **kwargs) -> Definition_GlassesValidator|Definition_Plane_2D:
-    cls = Definition_GlassesValidator if p_type==Type.GlassesValidator else Definition_Plane_2D
+
+class Definition_Target_Plane_2D(Definition_Plane_2D):
+    @typeguard.typechecked(collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
+    def __init__(self,
+                 name               : str,
+                 marker_file        : str|pathlib.Path|None     = None, # should be set, no suitable default
+                 target_file        : str|pathlib.Path|None     = None, # should be set, no suitable default
+                 marker_size        : float|None                = None, # should be set, no suitable default
+                 marker_border_bits : int                       = 1,
+                 min_num_markers    : int                       = 3,
+                 plane_size         : plane.Coordinate          = plane.Coordinate(0., 0.), # should be set to something non-zero
+                 origin             : plane.Coordinate          = plane.Coordinate(0., 0.),
+                 unit               : str                       = '',
+                 aruco_dict_id      : type_utils.ArucoDictType  = aruco.default_dict,
+                 ref_image_size     : int                       = 1920
+                 ):
+        super().__init__(name, marker_file, marker_size, marker_border_bits, min_num_markers, plane_size, origin, unit, aruco_dict_id, ref_image_size, type=Type.Target_Plane_2D)
+        self.target_file        = target_file           # if str or Path: file from which to read targets. Else direction N_targetx2 array. Should contain centers of targets
+
+    def field_problems(self) -> type_utils.ProblemDict:
+        problem = super().field_problems()
+        for a in ['target_file','marker_size','plane_size']:
+            if not getattr(self,a):
+                problem[a] = (type_utils.ProblemLevel.Error, None)
+            elif a=='plane_size' and any(missing:=[c==0 for c in self.plane_size]):
+                problem[a] = {k:(type_utils.ProblemLevel.Error, None) for k,m in zip(self.plane_size._fields,missing) if m}
+        return problem
+
+    def fixed_fields(self) -> type_utils.NestedDict:
+        return {k:None for k in ['name']}
+
+    def has_complete_setup(self) -> bool:
+        return not self.field_problems()
+
+def make_definition(p_type: Type, name: str, path: pathlib.Path|None, **kwargs) -> Definition_GlassesValidator|Definition_Plane_2D|Definition_Target_Plane_2D:
+    match p_type:
+        case Type.GlassesValidator:
+            cls = Definition_GlassesValidator
+        case Type.Plane_2D:
+            cls = Definition_Plane_2D
+        case Type.Target_Plane_2D:
+            cls = Definition_Target_Plane_2D
     if p_type==Type.GlassesValidator:
         validator_config_dir = None # use glassesValidator built-in/default static poster
         if ('use_default' in kwargs and not kwargs['use_default']) or ('is_dynamic' in kwargs and kwargs['is_dynamic']):
@@ -167,7 +209,7 @@ def make_definition(p_type: Type, name: str, path: pathlib.Path|None, **kwargs) 
 
 definition_defaults: dict[Type, dict['str', typing.Any]] = {}
 definition_parameter_types: dict[Type, dict['str', typing.Type]] = {}
-for _t,_cls in zip([Type.GlassesValidator, Type.Plane_2D],[Definition_GlassesValidator, Definition_Plane_2D]):
+for _t,_cls in zip([Type.GlassesValidator, Type.Plane_2D, Type.Target_Plane_2D],[Definition_GlassesValidator, Definition_Plane_2D, Definition_Target_Plane_2D]):
     _params = inspect.signature(_cls.__init__).parameters
     definition_defaults[_t]        = {k:d for k in _params if (d:=_params[k].default)!=inspect._empty}
     definition_parameter_types[_t] = {k:_params[k].annotation for k in _params if k!='self'}
@@ -181,8 +223,8 @@ definition_parameter_doc = {
     'use_default': type_utils.GUIDocInfo('Use default setup','If enabled, the default glassesValidator plane is used. When not enabled, a custom configuration can be used by editing the files containing the plane setup in the plane configuration folder.'),
     'is_dynamic': type_utils.GUIDocInfo('Dynamic validation procedure?','If enabled, this indicates that a dynamic validation procedure run with the PsychoPy script was used.'),
     'marker_file': type_utils.GUIDocInfo('Marker file','Name of the file specifying the marker layout on the plane (e.g., markerPositions.csv).'),
-    'marker_size': type_utils.GUIDocInfo('Marker size','Length of the edge of a marker (mm, excluding the white edge, only the black part).'),
     'target_file': type_utils.GUIDocInfo('Target file','Name of the file specifying the targets positions on the plane (e.g., targetPositions.csv).'),
+    'marker_size': type_utils.GUIDocInfo('Marker size','Length of the edge of a marker (mm, excluding the white edge, only the black part).'),
     'plane_size': type_utils.GUIDocInfo('Plane size','Total size of the plane (mm). Can be larger than the area spanned by the fiducial markers.',{
         'x': type_utils.GUIDocInfo('X', 'Horizontal size of the plane (mm).'),
         'y': type_utils.GUIDocInfo('Y', 'Vertical size of the plane (mm).'),
@@ -210,17 +252,31 @@ def get_plane_from_definition(plane_def: Definition, path: str|pathlib.Path) -> 
         validation_config = validation.config.get_validation_setup(validator_config_dir)
         return validation.Plane(validator_config_dir, validation_config, is_dynamic=plane_def.is_dynamic, ref_image_store_path=path/plane.Plane.default_ref_image_name)
     else:
-        pl = plane.Plane(
-            markers             = path/plane_def.marker_file,
-            marker_size         = plane_def.marker_size,
-            plane_size          = plane_def.plane_size,
-            aruco_dict_id       = plane_def.aruco_dict_id,
-            marker_border_bits  = plane_def.marker_border_bits,
-            min_num_markers     = plane_def.min_num_markers,
-            unit                = plane_def.unit,
-            ref_image_store_path= path/plane.Plane.default_ref_image_name,
-            ref_image_size      = plane_def.ref_image_size
-        )
+        if plane_def.type==Type.Plane_2D:
+            pl = plane.Plane(
+                markers             = path/plane_def.marker_file,
+                marker_size         = plane_def.marker_size,
+                plane_size          = plane_def.plane_size,
+                aruco_dict_id       = plane_def.aruco_dict_id,
+                marker_border_bits  = plane_def.marker_border_bits,
+                min_num_markers     = plane_def.min_num_markers,
+                unit                = plane_def.unit,
+                ref_image_store_path= path/plane.Plane.default_ref_image_name,
+                ref_image_size      = plane_def.ref_image_size
+            )
+        elif plane_def.type==Type.Target_Plane_2D:
+            pl = plane.TargetPlane(
+                markers             = path/plane_def.marker_file,
+                targets             = path/plane_def.target_file,
+                marker_size         = plane_def.marker_size,
+                plane_size          = plane_def.plane_size,
+                aruco_dict_id       = plane_def.aruco_dict_id,
+                marker_border_bits  = plane_def.marker_border_bits,
+                min_num_markers     = plane_def.min_num_markers,
+                unit                = plane_def.unit,
+                ref_image_store_path= path/plane.Plane.default_ref_image_name,
+                ref_image_size      = plane_def.ref_image_size
+            )
         if plane_def.origin is not None:
             pl.set_origin(plane_def.origin)
         return pl
