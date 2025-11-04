@@ -92,7 +92,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
                     aruco_manager.add_individual_marker(m, marker_setup, plane_frames[p])
     for m in (markers:=marker.get_setup_for_markers(study_config.individual_markers)):
         aruco_manager.add_individual_marker(m, markers[m])
-    aruco_manager.consolidate_setup()
+    aruco_manager.consolidate_setup(study_config.allow_duplicated_markers)
     aruco_manager.register_with_estimator(estimator)
     # other setup of estimator
     for sfe in sync_target_functions:
