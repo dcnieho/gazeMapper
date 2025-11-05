@@ -9,8 +9,8 @@ import threading
 import natsort
 from imgui_bundle import imgui, imspinner, hello_imgui, icons_fontawesome_6 as ifa6
 
-from glassesTools import annotation, aruco, async_thread, camera_recording, eyetracker, gui as gt_gui, marker as gt_marker, naming as gt_naming, platform, process_pool, recording, video_utils
-from glassesTools.validation import config as val_config, default_poster, DataQualityType, dynamic as val_dynamic, export, get_DataQualityType_explanation
+from glassesTools import annotation, aruco, async_thread, camera_recording, data_types, eyetracker, gui as gt_gui, marker as gt_marker, naming as gt_naming, platform, process_pool, recording, video_utils
+from glassesTools.validation import config as val_config, default_poster, dynamic as val_dynamic, export
 from glassesTools.gui import colors
 
 from . import utils
@@ -537,7 +537,7 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
                 # data quality type
                 type_idx = t_dq_df.index.names.index('type')
                 dq_set[nm]['dq_types'] = {k:False for k in sorted(list(t_dq_df.index.levels[type_idx]), key=lambda dq: dq.value)}
-                for dq in DataQualityType:
+                for dq in data_types.DataType:
                     if cs['validation_setup']['dq_types'] is not None and dq in cs['validation_setup']['dq_types'] and dq in dq_set[nm]['dq_types']:
                         dq_set[nm]['dq_types'][dq] = True
                 if not any(dq_set[nm]['dq_types'].values()):
@@ -591,7 +591,7 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
                                 imgui.table_next_row()
                                 imgui.table_next_column()
                                 imgui.align_text_to_frame_padding()
-                                t,ht = get_DataQualityType_explanation(dq)
+                                t,ht = data_types.get_explanation(dq)
                                 imgui.text(t)
                                 gt_gui.utils.draw_hover_text(ht, text="")
                                 imgui.table_next_column()

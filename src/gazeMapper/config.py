@@ -7,8 +7,7 @@ import pathvalidate
 import typing
 from typing import Any, Literal
 
-from glassesTools import annotation, aruco, camera_recording, gaze_worldref, json, marker as gt_marker, utils as gt_utils
-from glassesTools.validation import DataQualityType, get_DataQualityType_explanation
+from glassesTools import annotation, aruco, camera_recording, data_types as _data_types, gaze_worldref, json, marker as gt_marker, utils as gt_utils
 
 from . import marker, plane, session, typed_dict_defaults, type_utils
 from .GUI._impl import utils as gui_utils
@@ -57,7 +56,7 @@ class EtSyncSetup(typed_dict_defaults.TypedDictDefault, total=False):
 class ValidationSetup(typed_dict_defaults.TypedDictDefault, total=False):
     do_global_shift             : bool                      = True
     max_dist_fac                : float                     = .5
-    dq_types                    : set[DataQualityType]|None = None
+    dq_types                    : set[_data_types.DataType]|None = None
     allow_dq_fallback           : bool                      = False
     include_data_loss           : bool                      = False
     I2MC_settings               : I2MCSettings              = typed_dict_defaults.Field(default_factory=lambda: I2MCSettings())
@@ -771,7 +770,7 @@ class Study:
             if 'episodes_to_code' in kwds:
                 kwds['episodes_to_code'] = {annotation.EventType(e) for e in kwds['episodes_to_code']}
             if 'validate_dq_types' in kwds:
-                kwds['validate_dq_types']= {DataQualityType(d) for d in kwds['validate_dq_types']}
+                kwds['validate_dq_types']= {_data_types.data_type_val_to_enum_val(d) for d in kwds['validate_dq_types']}
             if 'mapped_video_which_gaze_type_on_plane' in kwds:
                 kwds['mapped_video_which_gaze_type_on_plane'] = gaze_worldref.Type(kwds['mapped_video_which_gaze_type_on_plane'])
             # backward compatibility: ensure value are stored in sets, not lists
@@ -910,8 +909,8 @@ class Study:
 _params = inspect.signature(Study.__init__).parameters
 study_defaults = {k:d for k in _params if (d:=_params[k].default)!=inspect._empty}
 study_parameter_types = {k:_params[k].annotation for k in _params if k not in ['self','strict_check']}
-def _get_gv_data_quality_type_doc(dq: DataQualityType):
-    t,doc = get_DataQualityType_explanation(dq)
+def _get_gv_data_type_doc(dq: _data_types.DataType):
+    t,doc = _data_types.get_explanation(dq)
     return (dq, type_utils.GUIDocInfo(t,doc))
 def _get_annotation_event_doc(a: annotation.EventType, children: dict = None):
     t = annotation.tooltip_map[a]
@@ -1016,7 +1015,7 @@ event_setup_doc = {
         'max_dist_fac': type_utils.GUIDocInfo('Maximum distance factor', 'Factor for determining distance limit when assigning fixation points to validation targets. If for a given target the closest fixation point is further away than <factor>*[minimum intertarget distance], then no fixation point will be assigned to this target, i.e., it will not be matched to any fixation point. Set to a large value to essentially disable.'),
         'dq_types': type_utils.GUIDocInfo('Data quality types', 'Selects the types of data quality you would like to calculate for each of the recordings. When none are selected, a good default is used for each recording. When none of the selected types is available, depending on the `allow_dq_fallback` setting, either an error is thrown or that same default is used instead. Whether a data quality type is available depends on what type of gaze information is available for a recording, as well as whether the camera is calibrated.',{
             None: # None indicates the doc specification applies to the contained values
-                dict([_get_gv_data_quality_type_doc(dq) for dq in DataQualityType])
+                dict([_get_gv_data_type_doc(dq) for dq in _data_types.DataType])
         }),
         'allow_dq_fallback': type_utils.GUIDocInfo('Allow fallback data quality type?', 'If not enabled, an error is raised when the data quality type(s) indicated in "Data quality types" are not available. If enabled, a sensible default other data type will be used instead. Does not apply if the "glassesValidator: Data quality types" is not set.'),
         'include_data_loss': type_utils.GUIDocInfo('Include data loss?', 'If enabled, the data quality report will include data loss during the episode selected for each target on the validation poster. This is NOT the data loss of the whole recording and thus not what you want to report in your paper.'),
@@ -1191,7 +1190,7 @@ class StudyOverride:
         kwds = json.load(path)
         # help with enum roundtrip
         if 'validate_dq_types' in kwds:
-            kwds['validate_dq_types']= {DataQualityType(d) for d in kwds['validate_dq_types']}
+            kwds['validate_dq_types']= {_data_types.data_type_val_to_enum_val(d) for d in kwds['validate_dq_types']}
         if 'mapped_video_which_gaze_type_on_plane' in kwds:
             kwds['mapped_video_which_gaze_type_on_plane'] = gaze_worldref.Type(kwds['mapped_video_which_gaze_type_on_plane'])
         # backwards compatibility
