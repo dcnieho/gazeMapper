@@ -1249,7 +1249,15 @@ class StudyOverride:
         if 'coding_setup' in kwds:
             for cs in kwds.pop('coding_setup'):
                 name = cs.get('name')
+                # enum roundtrip
+                if 'validation_setup' in cs and cs['validation_setup'] is not None and 'dq_types' in cs['validation_setup']:
+                    cs['validation_setup']['dq_types'] = {_data_types.data_type_val_to_enum_val(d) for d in cs['validation_setup']['dq_types']}
+                if 'gaze_types' in cs and cs['gaze_types'] is not None and 'data_types' in cs['gaze_types']:
+                    cs['gaze_types']['data_types'] = {_data_types.data_type_val_to_enum_val(d) for d in cs['gaze_types']['data_types']}
                 coding_setup_overrides[name] = StudyOverride(level, recording_type, for_event_setup=True, **cs)
+        # enum roundtrip
+        if 'mapped_video_which_gaze_type_on_plane' in kwds:
+            kwds['mapped_video_which_gaze_type_on_plane'] = gaze_worldref.Type(kwds['mapped_video_which_gaze_type_on_plane'])
         return StudyOverride(level, recording_type, **kwds), coding_setup_overrides
 
     @staticmethod
