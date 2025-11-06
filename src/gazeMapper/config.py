@@ -914,9 +914,9 @@ class Study:
 _params = inspect.signature(Study.__init__).parameters
 study_defaults = {k:d for k in _params if (d:=_params[k].default)!=inspect._empty}
 study_parameter_types = {k:_params[k].annotation for k in _params if k not in ['self','strict_check']}
-def _get_gv_data_type_doc(dq: _data_types.DataType):
-    t,doc = _data_types.get_explanation(dq)
-    return (dq, type_utils.GUIDocInfo(t,doc))
+def _get_gv_data_type_doc(dt: _data_types.DataType):
+    t,doc = _data_types.get_explanation(dt)
+    return (dt, type_utils.GUIDocInfo(t,doc))
 def _get_annotation_event_doc(a: annotation.EventType, children: dict = None):
     t = annotation.tooltip_map[a]
     doc = {
@@ -1020,7 +1020,7 @@ event_setup_doc = {
         'max_dist_fac': type_utils.GUIDocInfo('Maximum distance factor', 'Factor for determining distance limit when assigning fixation points to validation targets. If for a given target the closest fixation point is further away than <factor>*[minimum intertarget distance], then no fixation point will be assigned to this target, i.e., it will not be matched to any fixation point. Set to a large value to essentially disable.'),
         'data_types': type_utils.GUIDocInfo('Data types', 'Selects the data types for which you would like to calculate data quality for each of the recordings. When none are selected, a good default is used for each recording. When none of the selected types is available, depending on the `allow_data_type_fallback` setting, either an error is thrown or default chosen depending on what is available is used instead. Whether a data type is available depends on what type of gaze information is available for a recording, as well as whether the camera is calibrated.',{
             None: # None indicates the doc specification applies to the contained values
-                dict([_get_gv_data_type_doc(dq) for dq in _data_types.DataType])
+                dict([_get_gv_data_type_doc(dt) for dt in _data_types.DataType])
         }),
         'allow_data_type_fallback': type_utils.GUIDocInfo('Allow fallback data type?', 'If not enabled, an error is raised when the data type(s) indicated in "Data types" are not available. If enabled, a sensible default other data type will be used instead. Does not apply if the "Data types" is not set.'),
         'include_data_loss': type_utils.GUIDocInfo('Include data loss?', 'If enabled, the data quality report will include data loss during the episode selected for each target on the validation poster. This is NOT the data loss of the whole recording and thus not what you want to report in your paper.'),
