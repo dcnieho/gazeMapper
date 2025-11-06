@@ -626,6 +626,18 @@ class GUI:
         self._window_list = [self._sessions_pane, self._project_settings_pane, self._action_list_pane]
         self._to_focus = self._sessions_pane.label  # ensure sessions pane remains focused
 
+    def _get_possible_value_getter_for_event(self, event: str):
+        cs = [cs for cs in self.study_config.coding_setup if cs['name']==event]
+        if len(cs)!=1:
+            return {}
+        cs = cs[0]
+        # get target planes
+        planes = {p:pc for p in cs['planes'] if isinstance((pc:=self.plane_configs[p]),gt_plane.TargetPlane)}
+        if not planes:
+            return {}
+        # NB: use immediately invoked lambda to capture p correctly (avoid late binding issues)
+        return {'gaze_offset_setup': {'which_targets': {p: (lambda x: lambda: set(planes[x].get_target_IDs()))(p) for p in planes}}}
+
     def _reload_sessions(self):
         sessions = session.get_sessions_from_project_directory(self.project_dir, self.study_config.session_def)
         with self._sessions_lock:
@@ -1475,7 +1487,8 @@ class GUI:
                     fields,
                     config.EventSetup.__annotations__ | {'auto_code': typing.Union[config.AutoCodeEpisodes if annotation.type_map[cs['event_type']]==annotation.Type.Interval else config.AutoCodeSyncPoints,None]},
                     config.EventSetup._field_defaults,
-                    self._possible_value_getters, problems=problem_fields, fixed=fixed_fields, documentation=config.event_setup_doc)
+                    self._possible_value_getters|self._get_possible_value_getter_for_event(cs['name']),
+                    problems=problem_fields, fixed=fixed_fields, documentation=config.event_setup_doc)
                 if changed:
                     try:
                         new_config = copy.deepcopy(self.study_config)
@@ -2048,7 +2061,8 @@ class GUI:
                         fields,
                         config.EventSetup.__annotations__ | {'auto_code': typing.Union[config.AutoCodeEpisodes if annotation.type_map[cs['event_type']]==annotation.Type.Interval else config.AutoCodeSyncPoints,None]},
                         config.EventSetup._field_defaults,
-                        self._possible_value_getters, self.study_config.coding_setup[i], self._session_dict_type_rec[sess.name][c_name], problem_fields, fixed=fixed_fields, documentation=config.event_setup_doc)
+                        self._possible_value_getters|self._get_possible_value_getter_for_event(c_name),
+                        self.study_config.coding_setup[i], self._session_dict_type_rec[sess.name][c_name], problem_fields, fixed=fixed_fields, documentation=config.event_setup_doc)
                     if this_changed:
                         new_config.coding_setup[i] = new_coding_config
                         sess_changed |= this_changed
@@ -2098,7 +2112,8 @@ class GUI:
                                 fields,
                                 config.EventSetup.__annotations__ | {'auto_code': typing.Union[config.AutoCodeEpisodes if annotation.type_map[cs['event_type']]==annotation.Type.Interval else config.AutoCodeSyncPoints,None]},
                                 config.EventSetup._field_defaults,
-                                self._possible_value_getters, effective_config_for_session.coding_setup[i], self._recording_dict_type_rec[sess.name][r][c_name], problem_fields, fixed=fixed_fields, documentation=config.event_setup_doc)
+                                self._possible_value_getters|self._get_possible_value_getter_for_event(c_name),
+                                effective_config_for_session.coding_setup[i], self._recording_dict_type_rec[sess.name][r][c_name], problem_fields, fixed=fixed_fields, documentation=config.event_setup_doc)
                             if this_changed:
                                 new_config.coding_setup[i] = new_coding_config
                                 rec_changed |= this_changed

@@ -93,6 +93,10 @@ def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_get
                     raise ValueError(f'Cannot perform type replacement. possible_value_getter either has no type annotation or can return more than one type')
                 v_type.append(val_types[0])
             n_type.append(typing.Literal[vals])
+    elif possible_value_getter and isinstance(possible_value_getter, dict) and (typing.is_typeddict(f_type) or typed_dict_defaults.is_typeddictdefault(f_type) or type_utils.is_NamedTuple_type(f_type) or (obj and field in obj and isinstance(obj[field], dict))) and o_types and o_types[0]==type(list(possible_value_getter.keys())[0]):
+        # we have a dict of possible values, set as literal
+        n_type = [typing.Literal[tuple(possible_value_getter.keys())]]
+        v_type = [o_types[0]]
     else:
         n_type = None
     if base_type==typing.Any and obj and field in obj:
