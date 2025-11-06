@@ -518,6 +518,7 @@ def draw_value(field_lbl: str, val: _T, f_type: typing.Type, o_type_args: tuple[
     match base_type:
         case _ if val is None:
             new_val = val
+            imgui.align_text_to_frame_padding()
             imgui.text('<not set>, click to set')
             if imgui.is_item_clicked(imgui.MouseButton_.left):
                 draw_value.should_edit_id = imgui.get_id(field_lbl)
