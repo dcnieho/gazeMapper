@@ -936,8 +936,8 @@ class Study:
                 if e==annotation.EventType.Validate and any((k.startswith('validate_') for k in kwds)):
                     kwds['coding_setup'][-1]['validation_setup'] = ValidationSetup()
                     for k in ValidationSetup.__annotations__:
-                        if k in kwds:
-                            kwds['coding_setup'][-1]['validation_setup'][k.removeprefix('validate_')] = kwds.pop(k)
+                        if (old_key := 'validate_'+k) in kwds:
+                            kwds['coding_setup'][-1]['validation_setup'][k] = kwds.pop(old_key)
                     # two further fields that have been renamed
                     if 'validate_dq_types' in kwds:
                         kwds['coding_setup'][-1]['validation_setup']['data_types'] = kwds.pop('validate_dq_types')
@@ -1309,12 +1309,12 @@ class StudyOverride:
                 ))
             if any((k.startswith('validate_') for k in kwds)):
                 # collect all validation settings into a single validation setup
-                val_keys = {k.removeprefix('validate_'):kwds[k] for k in kwds if k.startswith('validate_')}
-                rename_keys = {'dq_types':'data_types', 'allow_dq_type_fallback':'allow_data_type_fallback'}
-                val_keys = {rename_keys.get(k,k):val_keys[k] for k in val_keys}
-                validation_setup = ValidationSetup(**{k: v for k, v in val_keys.items()})
+                val_keys = {k:kwds[k] for k in kwds if k.startswith('validate_')}
                 for k in val_keys:
                     kwds.pop(k)
+                rename_keys = {'dq_types':'data_types', 'allow_dq_type_fallback':'allow_data_type_fallback'}
+                val_keys = {rename_keys.get((key:=k.removeprefix('validate_')),key):val_keys[k] for k in val_keys}
+                validation_setup = ValidationSetup(**{k: v for k, v in val_keys.items()})
                 found = False
                 for e in kwds['coding_setup']:
                     if e['event_type']==annotation.EventType.Validate:
