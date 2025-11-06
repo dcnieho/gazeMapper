@@ -15,6 +15,7 @@ class Action(enum.IntEnum):
     AUTO_CODE_EPISODES = enum.auto()
     SYNC_ET_TO_CAM = enum.auto()
     SYNC_TO_REFERENCE = enum.auto()
+    COMPUTE_GAZE_OFFSETS = enum.auto()
     VALIDATE = enum.auto()
     EXPORT_TRIALS = enum.auto()
     MAKE_MAPPED_GAZE_VIDEO = enum.auto()
@@ -29,7 +30,7 @@ class Action(enum.IntEnum):
         return self in [Action.MAKE_GAZE_OVERLAY_VIDEO, Action.DETECT_MARKERS, Action.GAZE_TO_PLANE, Action.MAKE_MAPPED_GAZE_VIDEO]
     @property
     def has_progress_indication(self):
-        return self in [Action.MAKE_GAZE_OVERLAY_VIDEO, Action.DETECT_MARKERS, Action.GAZE_TO_PLANE, Action.VALIDATE, Action.MAKE_MAPPED_GAZE_VIDEO]
+        return self in [Action.MAKE_GAZE_OVERLAY_VIDEO, Action.DETECT_MARKERS, Action.GAZE_TO_PLANE, Action.COMPUTE_GAZE_OFFSETS, Action.VALIDATE, Action.MAKE_MAPPED_GAZE_VIDEO]
     def next(self):
         v = self.value+1
         if v > Action.MAKE_MAPPED_GAZE_VIDEO.value:
@@ -53,7 +54,7 @@ class Action(enum.IntEnum):
             pass    # we're done
         return vals
 def action_str_to_enum_val(x: str) -> Action:
-    return utils.enum_str_2_val(x, Action, {'MAKE_VIDEO':'MAKE_MAPPED_GAZE_VIDEO', 'RUN_VALIDATION':'VALIDATE', 'AUTO_CODE_TRIALS': 'AUTO_CODE_EPISODES'})
+    return utils.str_int_2_enum_val(x, Action, {'MAKE_VIDEO':'MAKE_MAPPED_GAZE_VIDEO', 'RUN_VALIDATION':'VALIDATE', 'AUTO_CODE_TRIALS': 'AUTO_CODE_EPISODES'})
 json.register_type(json.TypeEntry(Action, '__enum.process.Action__', utils.enum_val_2_str, action_str_to_enum_val))
 
 def action_to_func(action: Action) -> typing.Callable[..., None]|None:
@@ -66,6 +67,7 @@ def action_to_func(action: Action) -> typing.Callable[..., None]|None:
     from .sync_to_ref import run as sync_to_ref
     from .gaze_to_plane import run as gaze_to_plane
     from .export_trials import run as export_trials
+    from .compute_gaze_offsets import run as compute_gaze_offsets
     from .run_validation import run as run_validation
     from .auto_code_sync_points import run as auto_code_sync_points
     from .auto_code_episodes import run as auto_code_episodes
@@ -90,6 +92,8 @@ def action_to_func(action: Action) -> typing.Callable[..., None]|None:
             return sync_et_to_cam
         case Action.SYNC_TO_REFERENCE:
             return sync_to_ref
+        case Action.COMPUTE_GAZE_OFFSETS:
+            return compute_gaze_offsets
         case Action.VALIDATE:
             return run_validation
         case Action.EXPORT_TRIALS:
@@ -114,13 +118,15 @@ def config_has_auto_coding(study_config: 'config.Study', specific_event_type: an
             return True
     return False
 
-def config_has_specific_event_type(study_config: 'config.Study', specific_event_type: annotation.EventType, check_specific_fields: typing.Sequence[str]|None=None) -> bool:
+def config_has_specific_event_type(study_config: 'config.Study', specific_event_type: annotation.EventType|list[annotation.EventType], check_specific_fields: typing.Sequence[str]|None=None) -> bool:
     return not not get_specific_event_types(study_config, specific_event_type, check_specific_fields)
 
-def get_specific_event_types(study_config: 'config.Study', specific_event_type: annotation.EventType|None=None, check_specific_fields: typing.Sequence[str]|None=None) -> list['config.EventSetup']:
+def get_specific_event_types(study_config: 'config.Study', specific_event_type: annotation.EventType|list[annotation.EventType]|None=None, check_specific_fields: typing.Sequence[str]|None=None) -> list['config.EventSetup']:
     if not study_config.coding_setup:
         return []
-    return [cs for cs in study_config.coding_setup if (specific_event_type is None or cs['event_type']==specific_event_type) and (all(f in cs and cs[f] is not None for f in check_specific_fields) if check_specific_fields else True)]
+    if specific_event_type and not isinstance(specific_event_type, list):
+        specific_event_type = [specific_event_type]
+    return [cs for cs in study_config.coding_setup if (specific_event_type is None or cs['event_type'] in specific_event_type) and (all(f in cs and cs[f] is not None for f in check_specific_fields) if check_specific_fields else True)]
 
 def _config_has_et_sync(study_config: 'config.Study') -> bool:
     return not not get_specific_event_types(study_config, annotation.EventType.Sync_ET_Data, ['sync_setup'])
@@ -138,6 +144,9 @@ def is_action_possible_given_config(action: Action, study_config: 'config.Study'
             return _config_has_et_sync(study_config)
         case Action.SYNC_TO_REFERENCE:
             return not not study_config.sync_ref_recording
+        case Action.COMPUTE_GAZE_OFFSETS:
+            cs = get_specific_event_types(study_config, [annotation.EventType.Validate, annotation.EventType.Trial], ['gaze_offset_setup'])
+            return any((wt:=cs['gaze_offset_setup'].get('which_targets')) is not None and any(wt[p] for p in wt) for cs in cs)  # check if any event has at least one plane with at least one target
         case Action.VALIDATE:
             return config_has_specific_event_type(study_config, annotation.EventType.Validate)
         case Action.EXPORT_TRIALS:
@@ -151,7 +160,7 @@ def is_action_possible_given_config(action: Action, study_config: 'config.Study'
 
 def is_action_possible_for_recording(rec: str, rec_type: 'session.RecordingType', action: Action, study_config: 'config.Study') -> bool:
     from .. import session
-    if rec_type==session.RecordingType.Camera and action in [Action.MAKE_GAZE_OVERLAY_VIDEO, Action.GAZE_TO_PLANE, Action.SYNC_ET_TO_CAM, Action.VALIDATE]:
+    if rec_type==session.RecordingType.Camera and action in [Action.MAKE_GAZE_OVERLAY_VIDEO, Action.GAZE_TO_PLANE, Action.SYNC_ET_TO_CAM, Action.COMPUTE_GAZE_OFFSETS, Action.VALIDATE]:
         return False
     elif action==Action.AUTO_CODE_EPISODES and study_config.sync_ref_recording and rec!=study_config.sync_ref_recording:
         # if we have a sync_ref_recording, automatic coding of trials is only possible for the sync_ref_recording, not the other recordings
@@ -198,6 +207,8 @@ def _determine_to_invalidate(action: Action, study_config: 'config.Study') -> tu
             states_to_invalidate = {a for a in Action.GAZE_TO_PLANE.next_values(inclusive=True) if a not in [Action.AUTO_CODE_EPISODES, Action.AUTO_CODE_SYNC, Action.SYNC_ET_TO_CAM]}
         case Action.SYNC_TO_REFERENCE:
             states_to_invalidate = {a for a in Action.GAZE_TO_PLANE.next_values(inclusive=True) if a not in [Action.AUTO_CODE_EPISODES, Action.AUTO_CODE_SYNC, Action.SYNC_ET_TO_CAM, Action.SYNC_TO_REFERENCE]}
+        case Action.COMPUTE_GAZE_OFFSETS:
+            states_to_invalidate = {Action.EXPORT_TRIALS}
         case Action.VALIDATE:
             states_to_invalidate = {Action.EXPORT_TRIALS}
         case Action.EXPORT_TRIALS:
@@ -250,6 +261,8 @@ def _is_recording_action_possible(rec: str, action_states: dict[Action, process_
             preconditions.update([Action.DETECT_MARKERS])
         case Action.SYNC_ET_TO_CAM:
             preconditions.update([Action.CODE_EPISODES, Action.DETECT_MARKERS])
+        case Action.COMPUTE_GAZE_OFFSETS:
+            preconditions.update([Action.CODE_EPISODES, Action.GAZE_TO_PLANE])
         case Action.VALIDATE:
             preconditions.update([Action.CODE_EPISODES, Action.GAZE_TO_PLANE])
         case _:

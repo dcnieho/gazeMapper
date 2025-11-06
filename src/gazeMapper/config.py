@@ -64,6 +64,12 @@ class ValidationSetup(typed_dict_defaults.TypedDictDefault, total=False):
     dynamic_max_gap_duration    : int                       = 4
     dynamic_min_duration        : int                       = 6
 
+class GazeOffsetSetup(typed_dict_defaults.TypedDictDefault, total=False):
+    data_types                  : set[_data_types.DataType]|None    = None
+    viewing_distance_mm         : float|None                        = None
+    allow_data_type_fallback    : bool                              = False
+    which_targets               : dict[str,set[int]]|None           = None
+
 class EventSetup(typed_dict_defaults.TypedDictDefault, total=False):
     event_type      : annotation.EventType
     name            : str
@@ -73,6 +79,7 @@ class EventSetup(typed_dict_defaults.TypedDictDefault, total=False):
     auto_code       : AutoCodeSyncPoints|AutoCodeEpisodes|None = None
     sync_setup      : EtSyncSetup|None = None
     validation_setup: ValidationSetup|None = None
+    gaze_offset_setup: GazeOffsetSetup|None = None
 event_setup_field_order = [
     'event_type',
     'name',
@@ -82,6 +89,7 @@ event_setup_field_order = [
     'auto_code',
     'sync_setup',
     'validation_setup',
+    'gaze_offset_setup'
 ]
 
 class RgbColor(typing.NamedTuple):
@@ -243,6 +251,8 @@ class Study:
             elif cs['event_type']==annotation.EventType.Validate:
                 # for validation events, ensure there is a validation setup
                 cs['validation_setup'] = ValidationSetup()
+            if cs.get('gaze_offset_setup') is not None:
+                cs['gaze_offset_setup'] = GazeOffsetSetup(cs['gaze_offset_setup'])
 
         if strict_check:
             self._check_session_def(strict_check)
@@ -385,6 +395,61 @@ class Study:
                         raise ValueError(msg)
                     else:
                         type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'planes': (type_utils.ProblemLevel.Error, msg)}}})
+            if cs.get('gaze_offset_setup') is not None:
+                # check that this is a trial or validation episode
+                if e not in (annotation.EventType.Trial, annotation.EventType.Validate):
+                    msg = f'Gaze offset setup can only be set up for {annotation.EventType.Trial.value} or {annotation.EventType.Validate.value} episodes, but this is a {annotation.tooltip_map[e]} episode.'
+                    if strict_check:
+                        raise ValueError(msg)
+                    else:
+                        type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'gaze_offset_setup': (type_utils.ProblemLevel.Error, msg)}}})
+                # check that at least one of the defined planes is a target plane
+                if cs['planes']:
+                    p_types = {p:pl_def.type for p in cs['planes'] for pl_def in self.planes if pl_def.name==p}
+                    if not any(t in (plane.Type.Target_Plane_2D, plane.Type.GlassesValidator) for t in p_types.values()):
+                        msg = f'Gaze offset setup can only be set up if at least one of the planes is a {plane.Type.Target_Plane_2D.value} or {plane.Type.GlassesValidator.value} planes, but the selected planes are not.'
+                        if strict_check:
+                            raise ValueError(msg)
+                        else:
+                            type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'gaze_offset_setup': (type_utils.ProblemLevel.Error, msg)}}})
+                # check that which_targets is set, and that it has at least one entry
+                if cs['gaze_offset_setup'].get('which_targets') is None:
+                    msg = 'Gaze offset setup.which_targets should be defined when using a gaze offset setup.'
+                    if strict_check:
+                        raise ValueError(msg)
+                    else:
+                        type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'gaze_offset_setup': {'which_targets': (type_utils.ProblemLevel.Error, msg)}}}})
+                elif not cs['gaze_offset_setup']['which_targets'] or all(not v for v in cs['gaze_offset_setup']['which_targets'].values()):
+                    msg = 'Gaze offset setup.which_targets should have at least one non-empty entry.'
+                    if strict_check:
+                        raise ValueError(msg)
+                    else:
+                        type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'gaze_offset_setup': {'which_targets': (type_utils.ProblemLevel.Error, msg)}}}})
+                if cs['gaze_offset_setup']['which_targets']:
+                    for p in cs['gaze_offset_setup']['which_targets'].keys():
+                        if not cs['gaze_offset_setup']['which_targets'][p]:
+                            msg = f'Gaze offset setup.which_targets entry for plane "{p}" should have at least one target defined.'
+                            if strict_check:
+                                raise ValueError(msg)
+                            else:
+                                type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'gaze_offset_setup': {'which_targets': {p: (type_utils.ProblemLevel.Error, msg)}}}}})
+                # check that the entries in which_targets correspond to defined planes
+                if cs['gaze_offset_setup'].get('which_targets') is not None:
+                    for p in cs['gaze_offset_setup']['which_targets'].keys():
+                        if p not in cs['planes']:
+                            msg = f'Gaze offset setup.which_targets plane "{p}" is not among the defined planes for this episode.'
+                            if strict_check:
+                                raise ValueError(msg)
+                            else:
+                                type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'gaze_offset_setup': {'which_targets': {p: (type_utils.ProblemLevel.Error, msg)}}}}})
+                # check that viewing distance is set if data type viewpos_vidpos_homography is used
+                if cs['gaze_offset_setup'].get('data_types') is not None and _data_types.DataType.viewpos_vidpos_homography in cs['gaze_offset_setup']['data_types']:
+                    if cs['gaze_offset_setup'].get('viewing_distance_mm') is None:
+                        msg = 'Gaze offset setup.viewing_distance_mm should be defined when using the viewpos_vidpos_homography data type.'
+                        if strict_check:
+                            raise ValueError(msg)
+                        else:
+                            type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'gaze_offset_setup': {'viewing_distance_mm': (type_utils.ProblemLevel.Error, msg)}}}})
 
             # check hotkey
             if cs.get('hotkey') is not None and not gui_utils.is_valid_imgui_key(cs['hotkey']):
@@ -889,6 +954,8 @@ class Study:
                 kwds['coding_setup'][i]['event_type'] = annotation.EventType(kwds['coding_setup'][i]['event_type'])
                 if 'validation_setup' in kwds['coding_setup'][i] and kwds['coding_setup'][i]['validation_setup'] is not None and 'data_types' in kwds['coding_setup'][i]['validation_setup']:
                     kwds['coding_setup'][i]['validation_setup']['data_types'] = {_data_types.data_type_val_to_enum_val(d) for d in kwds['coding_setup'][i]['validation_setup']['data_types']}
+                if 'gaze_offset_setup' in kwds['coding_setup'][i] and kwds['coding_setup'][i]['gaze_offset_setup'] is not None and 'data_types' in kwds['coding_setup'][i]['gaze_offset_setup']:
+                    kwds['coding_setup'][i]['gaze_offset_setup']['data_types'] = {_data_types.data_type_val_to_enum_val(d) for d in kwds['coding_setup'][i]['gaze_offset_setup']['data_types']}
             if 'mapped_video_which_gaze_type_on_plane' in kwds:
                 kwds['mapped_video_which_gaze_type_on_plane'] = gaze_worldref.Type(kwds['mapped_video_which_gaze_type_on_plane'])
 
@@ -1045,6 +1112,15 @@ event_setup_doc = {
         'dynamic_max_gap_duration': type_utils.GUIDocInfo('Dynamic, maximum gap duration', 'For a glassesValidator plane that is marked as dynamic (i.e. for a validation procedure using the PsychoPy script), maximum gap (number of frames) in marker detections that will be filled in (ignored).'),
         'dynamic_min_duration': type_utils.GUIDocInfo('Dynamic, minimum duration', 'Minimum duration (number of frames) that a marker should be detected. Shorter runs are removed.'),
     }),
+    'gaze_offset_setup': type_utils.GUIDocInfo('Gaze offset calculation setup', 'Setup for calculating the angular gaze offset to specified targets on a plane.',{
+        'data_types': type_utils.GUIDocInfo('Data types', 'Selects the data types for which you would like to calculate the gaze offset. When none are selected, a good default is used for each recording. When none of the selected types is available, depending on the `allow_data_type_fallback` setting, either an error is thrown or default depending on what is available is used instead. Whether a data quality type is available depends on what type of gaze information is available for a recording, as well as whether the camera is calibrated.',{
+            None: # None indicates the doc specification applies to the contained values
+                dict([_get_gv_data_type_doc(dt) for dt in _data_types.DataType])
+        }),
+        'viewing_distance_mm': type_utils.GUIDocInfo('Viewing distance (mm)', 'Distance from the participant\'s eyes to the plane, in millimeters. Used to calculate angular offsets when using the viewpos_vidpos_homography data type.'),
+        'allow_data_type_fallback': type_utils.GUIDocInfo('Allow fallback data type?', 'If not enabled, an error is raised when the data type(s) indicated in "Data types" are not available. If enabled, a sensible default other data type will be used instead. Does not apply if the "Data types" is not set.'),
+        'which_targets': type_utils.GUIDocInfo('Which targets', 'Specifies which targets on the plane to calculate the gaze offset for. If not set, all targets defined on the plane are used.')
+    }),
 }
 if _missing_params:=[k for k in _params if k not in study_parameter_doc and k not in ['self','session_def','planes','individual_markers','working_directory','coding_setup','strict_check']]:
     raise NotImplementedError('Documentation missing for parameters:\n- '+'\n- '.join(_missing_params))
@@ -1090,7 +1166,7 @@ class StudyOverride:
                 allowed_params = ['auto_code']
             else:
                 # same allowed parameters for a session- or eye-tracker recording-level override
-                allowed_params = ['auto_code', 'sync_setup', 'validation_setup']
+                allowed_params = ['auto_code', 'sync_setup', 'validation_setup', 'gaze_offset_setup']
             exclude = set(all_params)-set(allowed_params)
         else:
             all_params = list(study_parameter_types.keys())
@@ -1259,8 +1335,8 @@ class StudyOverride:
                 # enum roundtrip
                 if 'validation_setup' in cs and cs['validation_setup'] is not None and 'data_types' in cs['validation_setup'] and cs['validation_setup']['data_types']:
                     cs['validation_setup']['data_types'] = {_data_types.data_type_val_to_enum_val(d) for d in cs['validation_setup']['data_types']}
-                if 'gaze_types' in cs and cs['gaze_types'] is not None and 'data_types' in cs['gaze_types']:
-                    cs['gaze_types']['data_types'] = {_data_types.data_type_val_to_enum_val(d) for d in cs['gaze_types']['data_types']}
+                if 'gaze_offset_setup' in cs and cs['gaze_offset_setup'] is not None and 'data_types' in cs['gaze_offset_setup'] and cs['gaze_offset_setup']['data_types']:
+                    cs['gaze_offset_setup']['data_types'] = {_data_types.data_type_val_to_enum_val(d) for d in cs['gaze_offset_setup']['data_types']}
                 coding_setup_overrides[name] = StudyOverride(level, recording_type, for_event_setup=True, **cs)
         # enum roundtrip
         if 'mapped_video_which_gaze_type_on_plane' in kwds:
