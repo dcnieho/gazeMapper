@@ -452,7 +452,8 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
         if not isinstance(field_lbl, str):
             field_lbl = str(field_lbl)
     is_default = val==default
-    is_parent = parent_obj is not None and val==parent_val
+    has_parent = parent_obj is not None
+    is_parent = has_parent and val==parent_val
     if fixed:
         imgui.begin_disabled()
     if problem:
@@ -462,11 +463,18 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
             imgui.push_style_color(imgui.Col_.text, glassesTools.gui.colors.error if problem[0]==type_utils.ProblemLevel.Error else glassesTools.gui.colors.warning)
             glassesTools.gui.utils.draw_hover_text(problem[1],text='')
             imgui.pop_style_color()
-    elif is_default or is_parent or is_none or fixed:
+    draw_bold = False
+    if has_parent:
+        if not is_parent:
+            draw_bold = True
+    else:
+        if not (is_default or is_none or fixed):
+            draw_bold = True
+    if draw_bold:
+        imgui_md.render(f'**{field_lbl}**')
+    else:
         imgui.align_text_to_frame_padding()
         imgui.text_colored(color_darken(imgui.ImColor(imgui.get_style_color_vec4(imgui.Col_.text)), .75).value, field_lbl)
-    else:
-        imgui_md.render(f'**{field_lbl}**')
     if documentation and documentation.doc_str:
         glassesTools.gui.utils.draw_hover_text(documentation.doc_str, text='')
     imgui.table_next_column()
