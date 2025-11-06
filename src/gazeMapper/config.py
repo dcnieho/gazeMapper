@@ -380,7 +380,7 @@ class Study:
                 pl_name = list(cs['planes'])[0]
                 pl_def = [pl for pl in self.planes if pl.name==pl_name]
                 if pl_def and pl_def[0].type!=plane.Type.GlassesValidator:
-                    msg = f'Plane {pl_name} is not a glassesValidator plane, cannot be used for validation.'
+                    msg = f'Plane {pl_name} is not a {plane.Type.GlassesValidator.value} plane, cannot be used for validation.'
                     if strict_check:
                         raise ValueError(msg)
                     else:
