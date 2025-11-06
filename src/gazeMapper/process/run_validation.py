@@ -120,8 +120,8 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None=None, p
                                 validation_plane.config['distance']*10.,    # cm -> mm
                                 working_dir,
                                 filename=f'{naming.validation_prefix}{e}_data_quality.tsv',
-                                dq_types=cs['validation_setup']['dq_types'],
-                                allow_dq_fallback=cs['validation_setup']['allow_dq_fallback'],
+                                d_types=cs['validation_setup']['data_types'],
+                                allow_data_type_fallback=cs['validation_setup']['allow_data_type_fallback'],
                                 include_data_loss=cs['validation_setup']['include_data_loss'])
         progress_indicator.update()
 

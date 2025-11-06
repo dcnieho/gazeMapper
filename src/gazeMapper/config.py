@@ -56,8 +56,8 @@ class EtSyncSetup(typed_dict_defaults.TypedDictDefault, total=False):
 class ValidationSetup(typed_dict_defaults.TypedDictDefault, total=False):
     do_global_shift             : bool                      = True
     max_dist_fac                : float                     = .5
-    dq_types                    : set[_data_types.DataType]|None = None
-    allow_dq_fallback           : bool                      = False
+    data_types                  : set[_data_types.DataType]|None = None
+    allow_data_type_fallback    : bool                      = False
     include_data_loss           : bool                      = False
     I2MC_settings               : I2MCSettings              = typed_dict_defaults.Field(default_factory=lambda: I2MCSettings())
     dynamic_skip_first_duration : float                     = .2
@@ -872,7 +872,12 @@ class Study:
                     kwds['coding_setup'][-1]['validation_setup'] = ValidationSetup()
                     for k in ValidationSetup.__annotations__:
                         if k in kwds:
-                            kwds['coding_setup'][-1]['validation_setup'][k] = kwds.pop(k)
+                            kwds['coding_setup'][-1]['validation_setup'][k.removeprefix('validate_')] = kwds.pop(k)
+                    # two further fields that have been renamed
+                    if 'validate_dq_types' in kwds:
+                        kwds['coding_setup'][-1]['validation_setup']['data_types'] = kwds.pop('validate_dq_types')
+                    if 'validate_allow_dq_fallback' in kwds:
+                        kwds['coding_setup'][-1]['validation_setup']['allow_data_type_fallback'] = kwds.pop('validate_allow_dq_fallback')
             # dump some now unused keys
             kwds.pop('episodes_to_code', None)
             kwds.pop('planes_per_episode', None)
@@ -882,8 +887,8 @@ class Study:
             # ensure enum round trip
             for i in range(len(kwds['coding_setup'])):
                 kwds['coding_setup'][i]['event_type'] = annotation.EventType(kwds['coding_setup'][i]['event_type'])
-                if 'validation_setup' in kwds['coding_setup'][i] and kwds['coding_setup'][i]['validation_setup'] is not None and 'dq_types' in kwds['coding_setup'][i]['validation_setup']:
-                    kwds['coding_setup'][i]['validation_setup']['dq_types'] = {DataQualityType(d) for d in kwds['coding_setup'][i]['validation_setup']['dq_types']}
+                if 'validation_setup' in kwds['coding_setup'][i] and kwds['coding_setup'][i]['validation_setup'] is not None and 'data_types' in kwds['coding_setup'][i]['validation_setup']:
+                    kwds['coding_setup'][i]['validation_setup']['data_types'] = {_data_types.data_type_val_to_enum_val(d) for d in kwds['coding_setup'][i]['validation_setup']['data_types']}
             if 'mapped_video_which_gaze_type_on_plane' in kwds:
                 kwds['mapped_video_which_gaze_type_on_plane'] = gaze_worldref.Type(kwds['mapped_video_which_gaze_type_on_plane'])
 
@@ -1013,11 +1018,11 @@ event_setup_doc = {
     'validation_setup': type_utils.GUIDocInfo('glassesValidator setup', 'Setup for determining the data quality of gaze data based on looking at a validation poster during this event (using glassesValidator).',{
         'do_global_shift': type_utils.GUIDocInfo('Apply global shift?', 'If enabled, for each validation interval the median position will be removed from the gaze data and the mean from the targets, removing any overall shift of the data. This improves the matching of fixations to targets when there is a significant overall offset in the data. It may fail (backfire) if there are data samples far outside the range of the validation targets, or if there is no data for some targets.'),
         'max_dist_fac': type_utils.GUIDocInfo('Maximum distance factor', 'Factor for determining distance limit when assigning fixation points to validation targets. If for a given target the closest fixation point is further away than <factor>*[minimum intertarget distance], then no fixation point will be assigned to this target, i.e., it will not be matched to any fixation point. Set to a large value to essentially disable.'),
-        'dq_types': type_utils.GUIDocInfo('Data quality types', 'Selects the types of data quality you would like to calculate for each of the recordings. When none are selected, a good default is used for each recording. When none of the selected types is available, depending on the `allow_dq_fallback` setting, either an error is thrown or that same default is used instead. Whether a data quality type is available depends on what type of gaze information is available for a recording, as well as whether the camera is calibrated.',{
+        'data_types': type_utils.GUIDocInfo('Data types', 'Selects the data types for which you would like to calculate data quality for each of the recordings. When none are selected, a good default is used for each recording. When none of the selected types is available, depending on the `allow_data_type_fallback` setting, either an error is thrown or default chosen depending on what is available is used instead. Whether a data type is available depends on what type of gaze information is available for a recording, as well as whether the camera is calibrated.',{
             None: # None indicates the doc specification applies to the contained values
                 dict([_get_gv_data_type_doc(dq) for dq in _data_types.DataType])
         }),
-        'allow_dq_fallback': type_utils.GUIDocInfo('Allow fallback data quality type?', 'If not enabled, an error is raised when the data quality type(s) indicated in "Data quality types" are not available. If enabled, a sensible default other data type will be used instead. Does not apply if the "glassesValidator: Data quality types" is not set.'),
+        'allow_data_type_fallback': type_utils.GUIDocInfo('Allow fallback data type?', 'If not enabled, an error is raised when the data type(s) indicated in "Data types" are not available. If enabled, a sensible default other data type will be used instead. Does not apply if the "Data types" is not set.'),
         'include_data_loss': type_utils.GUIDocInfo('Include data loss?', 'If enabled, the data quality report will include data loss during the episode selected for each target on the validation poster. This is NOT the data loss of the whole recording and thus not what you want to report in your paper.'),
         'I2MC_settings': type_utils.GUIDocInfo('I2MC settings','Settings for the I2MC fixation classifier used as part of determining the fixation that are assigned to validation targets. Settings that are "<not set>" will be determined based on the provided eye tracking data.',{
             'freq': type_utils.GUIDocInfo('Sampling frequency', 'Sampling frequency of the eye tracking data.'),
@@ -1228,8 +1233,10 @@ class StudyOverride:
                 ))
             if any((k.startswith('validate_') for k in kwds)):
                 # collect all validation settings into a single validation setup
-                val_keys = {k:kwds[k] for k in kwds if k.startswith('validate_')}
-                validation_setup = ValidationSetup(**{k.removeprefix('validate_'): v for k, v in val_keys.items()})
+                val_keys = {k.removeprefix('validate_'):kwds[k] for k in kwds if k.startswith('validate_')}
+                rename_keys = {'dq_types':'data_types', 'allow_dq_type_fallback':'allow_data_type_fallback'}
+                val_keys = {rename_keys.get(k,k):val_keys[k] for k in val_keys}
+                validation_setup = ValidationSetup(**{k: v for k, v in val_keys.items()})
                 for k in val_keys:
                     kwds.pop(k)
                 found = False
@@ -1250,8 +1257,8 @@ class StudyOverride:
             for cs in kwds.pop('coding_setup'):
                 name = cs.get('name')
                 # enum roundtrip
-                if 'validation_setup' in cs and cs['validation_setup'] is not None and 'dq_types' in cs['validation_setup']:
-                    cs['validation_setup']['dq_types'] = {_data_types.data_type_val_to_enum_val(d) for d in cs['validation_setup']['dq_types']}
+                if 'validation_setup' in cs and cs['validation_setup'] is not None and 'data_types' in cs['validation_setup'] and cs['validation_setup']['data_types']:
+                    cs['validation_setup']['data_types'] = {_data_types.data_type_val_to_enum_val(d) for d in cs['validation_setup']['data_types']}
                 if 'gaze_types' in cs and cs['gaze_types'] is not None and 'data_types' in cs['gaze_types']:
                     cs['gaze_types']['data_types'] = {_data_types.data_type_val_to_enum_val(d) for d in cs['gaze_types']['data_types']}
                 coding_setup_overrides[name] = StudyOverride(level, recording_type, for_event_setup=True, **cs)
