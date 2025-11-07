@@ -51,7 +51,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None=None, p
         p = list(cs['planes'])[0]
         plane_def = [pl for pl in study_config.planes if pl.name==p][0]
         if plane_def.type!=plane.Type.GlassesValidator:
-            raise ValueError(f'Plane {p} is not a glassesValidator plane, cannot be used for validation')
+            raise ValueError(f'Plane {p} is not a {plane.Type.GlassesValidator.value} plane, cannot be used for validation')
         validation_plane = plane.get_plane_from_definition(plane_def, config_dir/p)
 
         plot_limits = [[validation_plane.bbox[0]-validation_plane.marker_size, validation_plane.bbox[2]+validation_plane.marker_size],
