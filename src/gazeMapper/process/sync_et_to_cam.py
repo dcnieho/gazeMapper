@@ -55,7 +55,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     if not coding_file.is_file():
         raise FileNotFoundError(f'A coding file must be available to run sync_et_to_cam, but it is not. Run code_episodes and code at least one {annotation.tooltip_map[annotation.EventType.Sync_ET_Data]}. Not found: {coding_file}')
     episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / naming.coding_file), [cs['name'] for cs in sync_events])
-    if not episodes:
+    if not episodes or not any(episodes[e] for e in episodes):
         raise RuntimeError(f'No {annotation.tooltip_map[annotation.EventType.Sync_ET_Data]}s found for this recording. Run code_episodes and code at least one {annotation.tooltip_map[annotation.EventType.Sync_ET_Data]}.')
 
     # Read gaze data
