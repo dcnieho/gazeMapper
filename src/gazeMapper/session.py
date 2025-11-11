@@ -197,12 +197,16 @@ class Session:
     def load_recording_info(self, which) -> EyeTrackerRecording|CameraRecording:
         r_fold = self.working_directory / which
         if not r_fold.is_dir():
-            return
+            return None
 
         rec_def = self.definition.get_recording_def(which)
         if rec_def.type==RecordingType.Eye_Tracker:
+            if not (r_fold/EyeTrackerRecording.default_json_file_name).is_file():
+                return None
             return EyeTrackerRecording.load_from_json(r_fold)
         else:
+            if not (r_fold/CameraRecording.default_json_file_name).is_file():
+                return None
             return CameraRecording.load_from_json(r_fold)
 
     def add_existing_recording(self, which: str) -> Recording:
@@ -214,6 +218,8 @@ class Session:
 
         # get info about recording
         rec_info = self.load_recording_info(which)
+        if rec_info is None:
+            return
 
         # add recording
         self.add_recording_from_info(which, rec_info)
