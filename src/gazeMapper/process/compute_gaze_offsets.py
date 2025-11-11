@@ -118,9 +118,12 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
                 viewing_distance[p] if p in viewing_distance else None
                 )
             # prepare output data frame
+            new_rows = pd.DataFrame({'frame_idx': frame_idxs}, index=pd.Index(timestamps, name='timestamp'))
             if df is None:
-                df = pd.DataFrame(index=pd.Index(timestamps, name='timestamp'))
-            df.loc[timestamps, 'frame_idx'] = frame_idxs
+                df = new_rows
+            else:
+                df = pd.concat([df, new_rows])
+
             for t in offsets:
                 for d_type in offsets[t]:
                     col_names = [f'{x}_target_{t}_{d_type.name}' for x in ('offset', 'offset_x', 'offset_y')]
