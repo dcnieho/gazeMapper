@@ -685,6 +685,12 @@ class Study:
 
         type_utils.merge_problem_dicts(problems, self._check_recordings([self.sync_ref_recording], 'sync_ref_recording', strict_check))
         type_utils.merge_problem_dicts(problems, self._check_recordings(self.sync_ref_average_recordings, 'sync_average_recordings', strict_check))
+        # check if sync_ref_recording is a replaced recording
+        if self.head_attached_recordings_replace_et_scene is not None and any(r.associated_recording==self.sync_ref_recording for r in self.session_def.recordings if r.name in self.head_attached_recordings_replace_et_scene):
+            if strict_check:
+                raise ValueError(f'sync_ref_recording cannot be a recording that is replaced by a head-attached camera recording')
+            else:
+                problems['sync_ref_recording'] = (type_utils.ProblemLevel.Error, f'sync_ref_recording cannot be a recording that is replaced by a head-attached camera recording')
         if self.sync_ref_do_time_stretch is None:
             if strict_check:
                 raise ValueError(f'sync_ref_do_time_stretch should be set in the study setup when sync_ref_recording is set')
