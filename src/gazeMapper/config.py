@@ -648,13 +648,15 @@ class Study:
             # check listed recordings exist
             type_utils.merge_problem_dicts(problems, self._check_recordings(self.head_attached_recordings_replace_et_scene, 'head_attached_recordings_replace_et_scene', strict_check))
             # check listed recordings are head-attached camera recordings
-            wrong = [r for r in self.head_attached_recordings_replace_et_scene for r2 in self.session_def.recordings if r2.name==r and (r2.type!=session.RecordingType.Camera or r2.camera_recording_type!=camera_recording.Type.Head_attached)]
+            wrong = [r for r in self.head_attached_recordings_replace_et_scene if not any(r2.name==r and r2.type==session.RecordingType.Camera and r2.camera_recording_type==camera_recording.Type.Head_attached for r2 in self.session_def.recordings)]
             if wrong:
                 msg = 'the following recordings are not head-attached camera recordings:\n- ' + ('\n- '.join(wrong))
                 if strict_check:
                     raise ValueError(msg)
                 else:
                     problems = type_utils.merge_problem_dicts(problems, {'head_attached_recordings_replace_et_scene': (type_utils.ProblemLevel.Error, msg)})
+                    for r in wrong:
+                        type_utils.merge_problem_dicts(problems, {'session_def': {r: (type_utils.ProblemLevel.Error, f'{r} is not a head-attached camera recording but is listed in head_attached_recordings_replace_et_scene')}})
             # check that there is not more than one head-attached recording overriding a given ET recording
             overridden = [(r, r2.associated_recording) for r in self.head_attached_recordings_replace_et_scene for r2 in self.session_def.recordings if r2.name==r]
             # get duplicates
@@ -662,12 +664,13 @@ class Study:
             if (duplicates := {x[1] for x in overridden if x[1] in seen or seen.add(x[1])}):
                 for d in duplicates:
                     recs = [r[0] for r in overridden if r[1]==d]
-                    msg = 'the recordings:\n- ' + ('\n- '.join(recs)) + f'\nare all listed as overriding the scene camera of the {d} recording. That is not possible, only a single override is allowed per eye tracker recording'
+                    msg = 'the recordings:\n- ' + ('\n- '.join(recs)) + f'\nare all listed as overriding the scene camera of the "{d}" recording. That is not possible, only a single override is allowed per eye tracker recording'
                     if strict_check:
                         raise ValueError(msg)
                     else:
                         problems = type_utils.merge_problem_dicts(problems, {'head_attached_recordings_replace_et_scene': (type_utils.ProblemLevel.Error, msg)})
-
+                    for r in recs:
+                        type_utils.merge_problem_dicts(problems, {'session_def': {r: (type_utils.ProblemLevel.Error, f'{r} is listed as overriding the scene camera of the "{d}" recording but there is more than one override for that recording. Only a single override is allowed per eye tracker recording.')}})
         return problems
 
     def _check_sync_ref(self, strict_check):
