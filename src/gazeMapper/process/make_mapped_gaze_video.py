@@ -126,17 +126,19 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
         if study_config.mapped_video_process_annotations_for_all_recordings:
             # go through all planes for all episodes and apply them to all recordings
             # not annotation.EventType.Trial as that already comes from only the reference recording
+            # N.B: Sync_ET_Data and Validate may also come from the reference recording if applicable, but we don't need to add complicated logic here filtering those out as they will be skipped later on if they are already in the episode coding
             inserted = False
-            evts = [annotation.EventType.Sync_ET_Data, annotation.EventType.Validate]
+            events = process.get_specific_event_types(study_config, [annotation.EventType.Sync_ET_Data, annotation.EventType.Validate])
             for rec in recs:
-                for e in evts:
-                    if e in episodes[rec]:
+                for e in events:
+                    nm = e['name']
+                    if nm in episodes[rec]:
                         for r in recs-set([rec]):
                             if r==study_config.sync_ref_recording:
-                                inp = episodes_as_ref[rec][e].copy()
+                                inp = episodes_as_ref[rec][nm].copy()
                                 eps = inp
                             else:
-                                inp = [[max(0,ep[0]), min(ep[1],videos_ts[study_config.sync_ref_recording].indices[-1])] if not all([x==-1 for x in ep]) else ep for ep in episodes_as_ref[rec][e]]
+                                inp = [[max(0,ep[0]), min(ep[1],videos_ts[study_config.sync_ref_recording].indices[-1])] if not all([x==-1 for x in ep]) else ep for ep in episodes_as_ref[rec][nm]]
                                 eps = synchronization.reference_frames_to_video(r, sync, inp,
                                                                                 videos_ts[r].timestamps, videos_ts[study_config.sync_ref_recording].timestamps,
                                                                                 study_config.sync_ref_do_time_stretch, study_config.sync_ref_stretch_which)
@@ -147,21 +149,22 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
                             for i,ep in reversed(list(enumerate(eps))):
                                 if all([x==-1 for x in inp[i]]) or \
                                    all([x==-1 for x in ep]) or \
-                                   any([all([abs(y-z)<=1 for y,z in zip(x,ep)]) for x in episodes[r][e]]) or \
-                                   '(' in episodes_seq_nrs[rec][e][i]:
+                                   any([all([abs(y-z)<=1 for y,z in zip(x,ep)]) for x in episodes[r][nm]]) or \
+                                   '(' in episodes_seq_nrs[rec][nm][i]:
                                     continue
-                                episodes[r][e].append(ep)
-                                episodes_as_ref[r][e].append(inp[i])
-                                episodes_seq_nrs[r][e].append(f'{episodes_seq_nrs[rec][e][i]} ({rec})')
+                                episodes[r][nm].append(ep)
+                                episodes_as_ref[r][nm].append(inp[i])
+                                episodes_seq_nrs[r][nm].append(f'{episodes_seq_nrs[rec][nm][i]} ({rec})')
                                 inserted = True
             if inserted:
                 # if any new items added, have to resort the list (though actually it turns out all the below logic doesn't require the lists to be sorted, lets do it anyway as thats not a guarantee)
                 for rec in recs:
-                    for e in evts:
-                        if e not in episodes[rec] or not episodes[rec][e]:
+                    for e in events:
+                        nm = e['name']
+                        if nm not in episodes[rec] or not episodes[rec][nm]:
                             continue
-                        episodes[rec][e], episodes_as_ref[rec][e], episodes_seq_nrs[rec][e] = \
-                            [list(ivs) for ivs in zip(*[(x,y,z) for x,y,z in sorted(zip(episodes[rec][e], episodes_as_ref[rec][e], episodes_seq_nrs[rec][e]), key=lambda x: x[0])])]
+                        episodes[rec][nm], episodes_as_ref[rec][nm], episodes_seq_nrs[rec][nm] = \
+                            [list(ivs) for ivs in zip(*[(x,y,z) for x,y,z in sorted(zip(episodes[rec][nm], episodes_as_ref[rec][nm], episodes_seq_nrs[rec][nm]), key=lambda x: x[0])])]
 
 
         # fix episodes with start or end points outside the reference video
