@@ -2004,6 +2004,7 @@ class GUI:
                     if a in menu_actions_running:
                         hover_text = f'Cancel running {a.displayable_name} for session: {sess.name}'
                         icon = ifa6.ICON_FA_HAND
+                        possible = True
                     else:
                         possible = menu_actions[a][0]
                         if possible:
