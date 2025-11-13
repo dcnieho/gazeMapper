@@ -50,15 +50,14 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
         raise ValueError(f'You can only run gaze_to_plane on eye tracker recordings, not on a {str(rec_def.type).split(".")[1]} recording')
 
     # get episodes for which to transform gaze
-    episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / naming.coding_file), [cs['name'] for cs in study_config.coding_setup])
+    episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / naming.coding_file), [cs['name'] for cs in study_config.coding_setup if cs.get('planes',[])])
     # trial episodes are gotten from the reference recording if there is one and this is not the reference recording
     if study_config.sync_ref_recording and rec_def.name!=study_config.sync_ref_recording:
-        trial_events = process.get_specific_event_types(study_config, annotation.EventType.Trial)
-        if trial_events and any(episodes[cs['name']] for cs in trial_events):
-            raise ValueError(f'Trial episodes are gotten from the reference recording ({study_config.sync_ref_recording}) and should not be coded for this recording ({rec_def.name})')
-        all_recs = [r.name for r in study_config.session_def.recordings]
-        for cs in trial_events:
-            episodes[cs['name']] = synchronization.get_episode_frame_indices_from_ref(working_dir, cs['name'], rec_def.name, study_config.sync_ref_recording, all_recs, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings, study_config.sync_ref_stretch_which)
+        for cs in process.get_specific_event_types(study_config, annotation.EventType.Trial):
+            nm = cs['name']
+            if nm in episodes and episodes[nm]:
+                raise ValueError(f'{nm} episodes are gotten from the reference recording ({study_config.sync_ref_recording}) and should not be coded for this recording ({rec_name})')
+            episodes[cs['name']] = synchronization.get_episode_frame_indices_from_ref(working_dir, cs['name'], rec_name, study_config.sync_ref_recording, all_recs, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings, study_config.sync_ref_stretch_which)
 
     # we transform to map to plane for validate and trial episodes, set it up
     episodes_to_proc = process.get_specific_event_types(study_config, check_specific_fields=['planes'])

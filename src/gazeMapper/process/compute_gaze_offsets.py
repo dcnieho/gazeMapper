@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import polars as pl
 
-from glassesTools import annotation, data_types, gaze_headref, gaze_worldref, naming as gt_naming, ocv, plane as gt_plane, pose as gt_pose, process_pool, propagating_thread
+from glassesTools import annotation, data_types, gaze_worldref, naming as gt_naming, ocv, plane as gt_plane, pose as gt_pose, process_pool
 from glassesTools.validation import Plane as val_Plane
 from glassesTools.validation.config import get_validation_setup
 
@@ -38,12 +38,11 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
     episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / naming.coding_file), [cs['name'] for cs in episodes_to_proc])
     # trial episodes are gotten from the reference recording if there is one and this is not the reference recording
     if study_config.sync_ref_recording and rec_def.name!=study_config.sync_ref_recording:
-        trial_events = process.get_specific_event_types(study_config, annotation.EventType.Trial, check_specific_fields=['gaze_offset_setup'])
-        if trial_events and any(episodes[cs['name']] for cs in trial_events):
-            raise ValueError(f'Trial episodes are gotten from the reference recording ({study_config.sync_ref_recording}) and should not be coded for this recording ({rec_def.name})')
-        all_recs = [r.name for r in study_config.session_def.recordings]
-        for cs in trial_events:
-            episodes[cs['name']] = synchronization.get_episode_frame_indices_from_ref(working_dir, cs['name'], rec_def.name, study_config.sync_ref_recording, all_recs, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings, study_config.sync_ref_stretch_which)
+        for cs in process.get_specific_event_types(study_config, annotation.EventType.Trial):
+            nm = cs['name']
+            if nm in episodes and episodes[nm]:
+                raise ValueError(f'{nm} episodes are gotten from the reference recording ({study_config.sync_ref_recording}) and should not be coded for this recording ({rec_name})')
+            episodes[cs['name']] = synchronization.get_episode_frame_indices_from_ref(working_dir, cs['name'], rec_name, study_config.sync_ref_recording, all_recs, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings, study_config.sync_ref_stretch_which)
 
     # we transform to map to plane for validate and trial episodes, set it up
     episodes_per_plane: dict[str, list[list[int]]] = {}
