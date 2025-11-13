@@ -370,8 +370,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
                             g.draw(frame[v], sub_pixel_fac=sub_pixel_fac, clr=clr, draw_3d_gaze_point=False)
 
                         # check if we need gaze on plane for drawing on any of the videos
-                        plane_gaze_on_this_video = not not study_config.mapped_video_show_gaze_on_plane_in_which and v in study_config.mapped_video_show_gaze_on_plane_in_which
-                        plane_gaze_or_pose_on_other_video = (not not study_config.mapped_video_show_gaze_on_plane_in_which and any((vo!=v for vo in study_config.mapped_video_show_gaze_on_plane_in_which))) or (not not study_config.mapped_video_show_gaze_vec_in_which and any((vo!=v for vo in study_config.mapped_video_show_gaze_vec_in_which))) or (not not study_config.mapped_video_show_camera_in_which and any((vo!=v for vo in study_config.mapped_video_show_camera_in_which)))
+                        plane_gaze_on_this_video = study_config.mapped_video_show_gaze_on_plane_in_which is not None and v in study_config.mapped_video_show_gaze_on_plane_in_which
+                        plane_gaze_or_pose_on_other_video = (study_config.mapped_video_show_gaze_on_plane_in_which is not None and any((vo!=v for vo in study_config.mapped_video_show_gaze_on_plane_in_which))) or (study_config.mapped_video_show_gaze_vec_in_which is not None and any((vo!=v for vo in study_config.mapped_video_show_gaze_vec_in_which))) or (study_config.mapped_video_show_camera_in_which is not None and any((vo!=v for vo in study_config.mapped_video_show_camera_in_which)))
                         if not ppose[v] or not (plane_gaze_on_this_video or plane_gaze_or_pose_on_other_video):
                             continue
 
@@ -390,7 +390,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
                             continue
 
                         # draw on current video
-                        if v in study_config.mapped_video_show_gaze_on_plane_in_which:
+                        if study_config.mapped_video_show_gaze_on_plane_in_which is not None and v in study_config.mapped_video_show_gaze_on_plane_in_which:
                             plane_gazes[best[0]][2].draw_on_world_video(frame[v], camera_params[v], sub_pixel_fac, ppose[v][best[0]], study_config.mapped_video_projected_vidPos_color, study_config.mapped_video_projected_world_pos_color, study_config.mapped_video_projected_left_ray_color, study_config.mapped_video_projected_right_ray_color, study_config.mapped_video_projected_average_ray_color)
 
                         # also draw on other recordings, if so configured
@@ -411,9 +411,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
                                                      camera_params[vo], clr,
                                                      study_config.mapped_video_which_gaze_type_on_plane,
                                                      study_config.mapped_video_which_gaze_type_on_plane_allow_fallback,
-                                                     vo in study_config.mapped_video_show_gaze_on_plane_in_which,
-                                                     vo in study_config.mapped_video_show_gaze_vec_in_which,
-                                                     vo in study_config.mapped_video_show_camera_in_which,
+                                                     study_config.mapped_video_show_gaze_on_plane_in_which is not None and vo in study_config.mapped_video_show_gaze_on_plane_in_which,
+                                                     study_config.mapped_video_show_gaze_vec_in_which is not None and vo in study_config.mapped_video_show_gaze_vec_in_which,
+                                                     study_config.mapped_video_show_camera_in_which is not None and vo in study_config.mapped_video_show_camera_in_which,
                                                      sub_pixel_fac)
 
 
