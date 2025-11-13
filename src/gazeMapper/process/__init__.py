@@ -165,6 +165,15 @@ def is_action_possible_for_recording(rec: str, rec_type: 'session.RecordingType'
     elif action==Action.AUTO_CODE_EPISODES and study_config.sync_ref_recording and rec!=study_config.sync_ref_recording:
         # if we have a sync_ref_recording, automatic coding of trials is only possible for the sync_ref_recording, not the other recordings
         return False
+    if action==Action.DETECT_MARKERS and study_config.head_attached_recordings_replace_et_scene is not None:
+            # check if this recording's pose is not replaced by that of a head-attached camera
+            is_replaced_recording = study_config.head_attached_recordings_replace_et_scene is not None and any(r.associated_recording==rec for r in study_config.session_def.recordings if r.name in study_config.head_attached_recordings_replace_et_scene)
+            if is_replaced_recording:
+                # furthermore check if there are sync events to process
+                sync_events = get_specific_event_types(study_config, annotation.EventType.Sync_Camera, ['auto_code'])
+                if not sync_events or not any(e['auto_code'].get('markers', []) for e in sync_events):
+                    # no sync events to process for this replaced recording, so nothing to do
+                    return False
     return True
 
 def get_actions_for_config(study_config: 'config.Study', exclude_session_level: bool=False) -> set[Action]:
