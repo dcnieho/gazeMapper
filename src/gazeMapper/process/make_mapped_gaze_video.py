@@ -12,7 +12,7 @@ from ffpyplayer.pic import Image
 import ffpyplayer.tools
 from fractions import Fraction
 
-from glassesTools import annotation, aruco, drawing, intervals, gaze_headref, gaze_worldref, naming as gt_naming, ocv, plane, pose, process_pool, propagating_thread, timestamps, transforms, utils
+from glassesTools import annotation, aruco, drawing, intervals, gaze_headref, gaze_worldref, naming as gt_naming, ocv, plane, pose, process_pool, propagating_thread, timestamps, utils
 from glassesTools.gui import video_player
 
 from .. import config, episode, marker, naming, process, session, synchronization
@@ -105,22 +105,21 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
         for r in sync.index.get_level_values('recording').unique():
             # for each frame in the reference video, get the corresponding frame in this recording
             ref_frame_idxs[r] = synchronization.reference_frames_to_video(r, sync, videos_ts[study_config.sync_ref_recording].indices,
-                                                                              videos_ts[r].timestamps, videos_ts[study_config.sync_ref_recording].timestamps,
-                                                                              study_config.sync_ref_do_time_stretch, study_config.sync_ref_stretch_which)
+                                                                          videos_ts[r].timestamps, videos_ts[study_config.sync_ref_recording].timestamps,
+                                                                          study_config.sync_ref_do_time_stretch, study_config.sync_ref_stretch_which)
             ref_frame_idxs[r] = synchronization.smooth_video_frames_indices(ref_frame_idxs[r])
             # make sure episodes has a trial annotation, which comes from the reference recording
-            trial_events = process.get_specific_event_types(study_config, annotation.EventType.Trial)
-            for cs in trial_events:
+            for cs in process.get_specific_event_types(study_config, annotation.EventType.Trial):
                 nm = cs['name']
                 episodes[r][nm] = synchronization.reference_frames_to_video(r, sync, episodes[study_config.sync_ref_recording][nm],
-                                                                                                videos_ts[r].timestamps, videos_ts[study_config.sync_ref_recording].timestamps,
-                                                                                                study_config.sync_ref_do_time_stretch, study_config.sync_ref_stretch_which)
+                                                                            videos_ts[r].timestamps, videos_ts[study_config.sync_ref_recording].timestamps,
+                                                                            study_config.sync_ref_do_time_stretch, study_config.sync_ref_stretch_which)
                 episodes_seq_nrs[r][nm] = episodes_seq_nrs[study_config.sync_ref_recording][nm]
             episode_colors[r] = {k:c for k,c in zip(episodes[r], colors)}
             # also get this recording's coded events in the reference's frames idxs
             episodes_as_ref[r] = {e: synchronization.video_frames_to_reference(r, sync, episodes[r][e],
-                                                                        videos_ts[r].timestamps, videos_ts[study_config.sync_ref_recording].timestamps,
-                                                                        study_config.sync_ref_do_time_stretch, study_config.sync_ref_stretch_which)
+                                                                               videos_ts[r].timestamps, videos_ts[study_config.sync_ref_recording].timestamps,
+                                                                               study_config.sync_ref_do_time_stretch, study_config.sync_ref_stretch_which)
                            for e in episodes[r]}
 
         if study_config.mapped_video_process_annotations_for_all_recordings:
