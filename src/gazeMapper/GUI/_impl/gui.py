@@ -793,9 +793,9 @@ class GUI:
             if not r.name in self.cam_calibrations or not isinstance(self.cam_calibrations[r.name],ocv.CameraParams):
                 continue
             if not self.cam_calibrations[r.name].has_intrinsics():
-                type_utils.merge_problem_dicts(self._problems_cache, {'session_def': {r.name: f'The provided calibration file does not include camera intrinsics, not usable'}})
+                type_utils.merge_problem_dicts(self._problems_cache, {'session_def': {r.name: (type_utils.ProblemLevel.Error,f'The provided calibration file does not include camera intrinsics, not usable')}})
             if self.study_config.head_attached_recordings_replace_et_scene is not None and r.name in self.study_config.head_attached_recordings_replace_et_scene and not self.cam_calibrations[r.name].has_extrinsics():
-                type_utils.merge_problem_dicts(self._problems_cache, {'session_def': {r.name: f'The provided calibration file does not include camera extrinsics (transformation between this head-attached camera and the scene camera of the associated eye tracker recording), but these are required because the recording is configured to replace the eye tracker recording\'s scene camera (see the head_attached_recordings_replace_et_scene setting)'}})
+                type_utils.merge_problem_dicts(self._problems_cache, {'session_def': {r.name: (type_utils.ProblemLevel.Error,f'The provided calibration file does not include camera extrinsics (transformation between this head-attached camera and the scene camera of the associated eye tracker recording), but these are required because the recording is configured to replace the eye tracker recording\'s scene camera (see the head_attached_recordings_replace_et_scene setting)')}})
 
     def _session_lister_set_actions_to_show(self, lister: session_lister.List):
         if self.study_config is None:
