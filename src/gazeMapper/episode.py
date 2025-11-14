@@ -62,7 +62,7 @@ def write_list_to_file(episodes: list[Episode],
     df = df[['event','event_type','start_frame','end_frame']]
     df.to_csv(str(fileName), index=False, sep='\t', na_rep='nan')
 
-def load_episodes_from_all_recordings(study_config: config.Study, recording_dir: str|pathlib.Path, episode_subset: set[str]|None=None, empty_if_no_coding=True, error_if_unwanted_found=True, missing_other_coding_ok=False) -> tuple[dict[str, list[list[int]]], set[str]]:
+def load_episodes_from_all_recordings(study_config: config.Study, recording_dir: str|pathlib.Path, episode_subset: set[str]|None=None, load_from_other_recordings=True, empty_if_no_coding=True, error_if_unwanted_found=True, missing_other_coding_ok=False) -> tuple[dict[str, list[list[int]]], set[str]]:
     from . import synchronization
     # loads episodes for both the current recording, and from other synced recordings in the session as set up in the study config
     recording_dir = pathlib.Path(recording_dir)
@@ -96,6 +96,9 @@ def load_episodes_from_all_recordings(study_config: config.Study, recording_dir:
     for evt in to_code:
         if evt not in episodes:
             episodes[evt] = []
+
+    if not load_from_other_recordings:
+        return episodes, to_code
 
     # now check if there is coding to get from other recordings, or if there is coding that should not be there
     rec_name = recording_dir.name
