@@ -13,6 +13,7 @@ if isMacOS:
     import AppKit
 
 from glassesTools import annotation, drawing, gaze_headref, gaze_worldref, naming as gt_naming, ocv, plane as gt_plane, pose as gt_pose, process_pool, propagating_thread, timestamps
+from glassesTools.camera_recording import Type as CameraRecordingType
 from glassesTools.gui.video_player import GUI
 
 
@@ -53,17 +54,18 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     # get info about recording
     rec_def  = study_config.session_def.get_recording_def(working_dir.name)
     in_video = session.read_recording_info(working_dir, rec_def.type)[1]
+    planes = {v for cs in study_config.coding_setup for v in cs['planes']}
     if rec_def.type==session.RecordingType.Camera:
-        has_gaze, has_plane_gaze, has_plane_pose = False, False, False
-        # no Sync_ET_Data or Validate events for camera recordings, remove
-        study_config.coding_setup = [cs for cs in study_config.coding_setup if cs['event_type'] not in (annotation.EventType.Sync_ET_Data, annotation.EventType.Validate)]
+        has_gaze, has_plane_gaze = False, False
+        # unless head-attached and this is the reference recording, no Sync_ET_Data or Validate events for camera recordings, remove
+        if not (study_config.sync_ref_recording==rec_def.name and rec_def.camera_recording_type==CameraRecordingType.Head_attached):
+            study_config.coding_setup = [cs for cs in study_config.coding_setup if cs['event_type'] not in (annotation.EventType.Sync_ET_Data, annotation.EventType.Validate)]
     elif rec_def.type==session.RecordingType.Eye_Tracker:
         # Read gaze data
         has_gaze = True
         gazes = gaze_headref.read_dict_from_file(working_dir / gt_naming.gaze_data_fname, ts_column_suffixes=['VOR',''])[0]
 
         # Read gaze on poster data, if available
-        planes = {v for cs in study_config.coding_setup for v in cs['planes']}
         plane_files = [working_dir/f'{naming.world_gaze_prefix}{p}.tsv' for p in planes]
         plane_gazes = {p:gaze_worldref.read_dict_from_file(f) for p,f in zip(planes,plane_files) if f.is_file()}
         has_plane_gaze = not not plane_gazes
@@ -73,13 +75,13 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
             for p in planes:
                 p_def = [pl for pl in study_config.planes if pl.name==p][0]
                 planes_setup[p] = plane.get_plane_from_definition(p_def, config_dir/p)
-
-        # Read plane poses, if available
-        plane_files = [working_dir/f'{naming.plane_pose_prefix}{p}.tsv' for p in planes]
-        poses = {p:gt_pose.read_dict_from_file(f) for p,f in zip(planes,plane_files) if f.is_file()}
-        has_plane_pose = not not poses
     else:
         raise ValueError(f'recording type "{rec_def.type}" is not understood')
+
+    # Read plane poses, if available
+    plane_files = [working_dir/f'{naming.plane_pose_prefix}{p}.tsv' for p in planes]
+    poses = {p:gt_pose.read_dict_from_file(f) for p,f in zip(planes,plane_files) if f.is_file()}
+    has_plane_pose = not not poses
 
     # get camera calibration info
     cam_params = ocv.CameraParams.read_from_file(working_dir / gt_naming.scene_camera_calibration_fname)
