@@ -186,6 +186,8 @@ def get_episode_frame_indices_from_other_video(working_dir: str|pathlib.Path, ev
     video_ts_other = timestamps.VideoTimestamps(working_dir.parent / other_rec / gt_naming.frame_timestamps_fname)
     video_ts       = timestamps.VideoTimestamps(working_dir / gt_naming.frame_timestamps_fname)
     # if other recording is the reference recording, we can directly go from reference to this recording
+    def _check_bounds(eps: list[list[int]], max_i: int) -> list[list[int]]:
+        return [[max(0,ep[0]), min(ep[1], max_i)] for ep in eps if not all([x==-1 for x in ep])]
     if other_rec==ref_rec:
         frame_idx = reference_frames_to_video(rec, sync, other_episodes[event], video_ts.timestamps, video_ts_other.timestamps, do_time_stretch, stretch_which)
     elif rec==ref_rec:
@@ -194,11 +196,11 @@ def get_episode_frame_indices_from_other_video(working_dir: str|pathlib.Path, ev
         # first go from other recording to reference recording
         video_ts_ref = timestamps.VideoTimestamps(working_dir.parent / ref_rec / gt_naming.frame_timestamps_fname)
         ref_frame_idx = video_frames_to_reference(other_rec, sync, other_episodes[event], video_ts_other.timestamps, video_ts_ref.timestamps, do_time_stretch, stretch_which)
-        ref_frame_idx = [fi for fi in ref_frame_idx if not all([x==-1 for x in fi])]
+        ref_frame_idx = _check_bounds(ref_frame_idx, video_ts_ref.indices[-1])
         # then from reference recording to this recording
         frame_idx = reference_frames_to_video(rec, sync, ref_frame_idx, video_ts.timestamps, video_ts_ref.timestamps, do_time_stretch, stretch_which)
     # remove out of range
-    frame_idx = [fi for fi in frame_idx if not all([x==-1 for x in fi])]
+    frame_idx = _check_bounds(frame_idx, video_ts.indices[-1])
     return [[i+e for i,e in zip(ifs, [-extra_fr, extra_fr])] for ifs in frame_idx]   # expand by extra_fr frames on each edge
 
 @overload
