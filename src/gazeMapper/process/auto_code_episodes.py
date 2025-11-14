@@ -32,14 +32,10 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
 
     # get already coded interval(s), if any
     episodes_to_code = [cs['name'] for cs in events if working_dir.name in cs.get('which_recordings',set())]
-    coding_file = working_dir / naming.coding_file
-    if coding_file.is_file():
-        episodes = episode.list_to_marker_dict(episode.read_list_from_file(coding_file), episodes_to_code)
-        # flatten
-        for e in episodes:
-            episodes[e] = [i for iv in episodes[e] for i in iv]
-    else:
-        episodes = episode.get_empty_marker_dict(episodes_to_code)
+    episodes = episode.load_episodes_from_all_recordings(study_config, working_dir, episodes_to_code, load_from_other_recordings=False)[0]
+    # flatten
+    for e in episodes:
+        episodes[e] = [i for iv in episodes[e] for i in iv]
     episodes_original = copy.deepcopy(episodes)
 
     # get marker files
@@ -171,7 +167,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
         # now insert into coding file. This just overwrites whatever is there
         if cs['name'] not in episodes:
             episodes[cs['name']] = []
-        episodes[cs['name']] = [y for x in intervals for y in x]
+        episodes[cs['name']] = [int(y) for x in intervals for y in x]
 
     # early exit if nothing has changed
     if episodes==episodes_original:
@@ -181,7 +177,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
         return
 
     # back up coding file if it exists
-    if coding_file.is_file():
+    if (coding_file := working_dir/naming.coding_file).is_file():
         shutil.move(coding_file, coding_file.with_stem(f'{naming.coding_file.split(".")[0]}_backup_before_episode_auto_code'))
     # store coded intervals to file
     episode.write_list_to_file(episode.marker_dict_to_list(episodes), coding_file)
