@@ -1006,6 +1006,18 @@ class Study:
             return None
         sess_def = session.SessionDefinition.load_from_json(s_path)
 
+        # one more backwards compatibility fix: if there is a sync ref recording, and multiple recordings, ensure that coding setups have which_recordings set
+        # set according to the behavior of v1
+        if len(sess_def.recordings)>1 and 'sync_ref_recording' in kwds:
+            for cs in kwds['coding_setup']:
+                if 'which_recordings' not in cs or cs['which_recordings'] is None:
+                    if cs['event_type']==annotation.EventType.Sync_Camera:
+                        continue
+                    elif cs['event_type']==annotation.EventType.Trial:
+                        cs['which_recordings'] = {kwds['sync_ref_recording']}
+                    else:
+                        cs['which_recordings'] = set([r.name for r in sess_def.recordings if r.name!=kwds['sync_ref_recording']])
+
         # get planes
         planes: list[plane.Definition] = []
         for p_dir in path.iterdir():
