@@ -162,28 +162,40 @@ def get_coding_file(working_dir: str|pathlib.Path, missing_ref_coding_ok=False):
     return episodes
 
 def get_episode_frame_indices_from_ref(working_dir: str|pathlib.Path, event: str, rec: str, ref_rec:str, all_recs: list[str], do_time_stretch: bool, average_recordings: list[str], stretch_which: str, extra_fr=0, missing_ref_coding_ok=False) -> list[list[int]]:
+    return get_episode_frame_indices_from_other_video(working_dir, event, rec, ref_rec, ref_rec, all_recs, do_time_stretch, average_recordings, stretch_which, extra_fr, missing_ref_coding_ok)
+
+def get_episode_frame_indices_from_other_video(working_dir: str|pathlib.Path, event: str, rec: str, other_rec: str, ref_rec:str, all_recs: list[str], do_time_stretch: bool, average_recordings: list[str], stretch_which: str, extra_fr=0, missing_other_coding_ok=False) -> list[list[int]]:
     working_dir  = pathlib.Path(working_dir)
-    ref_coding_file = working_dir.parent / ref_rec / naming.coding_file
-    if not ref_coding_file.is_file():
-        if missing_ref_coding_ok:
+    other_coding_file = working_dir.parent / other_rec / naming.coding_file
+    if not other_coding_file.is_file():
+        if missing_other_coding_ok:
             return [[]]
-        raise FileNotFoundError(f'The coding file for the reference recording is not found, cannot continue ("{ref_coding_file}").')
-    ref_episodes = episode.list_to_marker_dict(episode.read_list_from_file(ref_coding_file))
-    if event not in ref_episodes:
-        if missing_ref_coding_ok:
+        raise FileNotFoundError(f'The coding file for the other recording is not found, cannot continue ("{other_coding_file}").')
+    other_episodes = episode.list_to_marker_dict(episode.read_list_from_file(other_coding_file))
+    if event not in other_episodes:
+        if missing_other_coding_ok:
             return [[]]
         evt_info = annotation.get_event_by_name(event)
         if evt_info is None:
-            raise KeyError(f'Requested event "{event}" is unknown. Cannot get codes from the reference recording ({ref_rec}).')
-        raise KeyError(f'Trying to get {event} codes (a {annotation.tooltip_map[evt_info.event_type]}) from the reference recording ({ref_rec}), but the coding file for this reference recording doesn\'t contain any {event} codes')
+            raise KeyError(f'Requested event "{event}" is unknown. Cannot get codes from the other recording ({other_rec}).')
+        raise KeyError(f'Trying to get {event} codes (a {annotation.tooltip_map[evt_info.event_type]}) from the other recording ({other_rec}), but the coding file for this other recording doesn\'t contain any {event} codes')
     # get sync and timestamp info we need to transform reference frames indices to frame indices of this recording
-    sync = get_sync_for_recs(working_dir.parent, all_recs, ref_rec, do_time_stretch, average_recordings, missing_ref_coding_ok)
+    sync = get_sync_for_recs(working_dir.parent, all_recs, ref_rec, do_time_stretch, average_recordings, missing_other_coding_ok)
     if sync is None:
         return [[]]
-    video_ts_ref = timestamps.VideoTimestamps(working_dir.parent / ref_rec / gt_naming.frame_timestamps_fname)
-    video_ts     = timestamps.VideoTimestamps(working_dir / gt_naming.frame_timestamps_fname)
-    # get frame indices in this recording's video corresponding to each of the reference frames
-    frame_idx = reference_frames_to_video(rec, sync, ref_episodes[event], video_ts.timestamps, video_ts_ref.timestamps, do_time_stretch, stretch_which)
+    video_ts_other = timestamps.VideoTimestamps(working_dir.parent / other_rec / gt_naming.frame_timestamps_fname)
+    video_ts       = timestamps.VideoTimestamps(working_dir / gt_naming.frame_timestamps_fname)
+    # if other recording is the reference recording, we can directly go from reference to this recording
+    if other_rec==ref_rec:
+        frame_idx = reference_frames_to_video(rec, sync, other_episodes[event], video_ts.timestamps, video_ts_other.timestamps, do_time_stretch, stretch_which)
+    elif rec==ref_rec:
+        frame_idx = video_frames_to_reference(other_rec, sync, other_episodes[event], video_ts_other.timestamps, video_ts.timestamps, do_time_stretch, stretch_which)
+    else:
+        # first go from other recording to reference recording
+        video_ts_ref = timestamps.VideoTimestamps(working_dir.parent / ref_rec / gt_naming.frame_timestamps_fname)
+        ref_frame_idx = video_frames_to_reference(other_rec, sync, other_episodes[event], video_ts_other.timestamps, video_ts_ref.timestamps, do_time_stretch, stretch_which)
+        # then from reference recording to this recording
+        frame_idx = reference_frames_to_video(rec, sync, ref_frame_idx, video_ts.timestamps, video_ts_ref.timestamps, do_time_stretch, stretch_which)
     return [[i+e for i,e in zip(ifs, [-extra_fr, extra_fr])] for ifs in frame_idx]   # expand by extra_fr frames on each edge
 
 @overload
