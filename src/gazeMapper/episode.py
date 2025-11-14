@@ -117,10 +117,13 @@ def load_episodes_from_all_recordings(study_config: config.Study, recording_dir:
         if episode_subset is not None and nm not in episode_subset:
             continue
         which_recs = cs.get('which_recordings')
-        if which_recs is None or rec_name in which_recs:
-            continue    # this coding is for this recording, so we already have it
+        if which_recs is None:
+            continue
+        which_recs.discard(rec_name)    # skip this recording
+        if not which_recs:
+            continue
         # get coding from other recordings
-        single_rec = len(which_recs)==1
+        single_rec = len(which_recs)==1 and nm not in episodes
         for other_rec in which_recs:
             # NB: don't error if we don't need trial episodes for coding.
             extra = '' if single_rec else f' (from recording {other_rec})'
