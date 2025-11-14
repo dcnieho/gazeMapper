@@ -1505,7 +1505,15 @@ def store_overrides_to_json(overrides: tuple[StudyOverride, dict[str, StudyOverr
         to_dump['coding_setup'] = [dump for eo in eos.values() if (dump:=eo.get_dump())]
         if not to_dump['coding_setup']:
             del to_dump['coding_setup']
-    json.dump(to_dump, path)
+    if not to_dump:
+        if path.exists():
+            # no overrides to store, remove existing file if present as it would be empty
+            try:
+                path.unlink()
+            except:
+                pass
+    else:
+        json.dump(to_dump, path)
 
 def load_or_create_override(level: OverrideLevel, override_path: str|pathlib.Path, recording_type: session.RecordingType|None = None) -> tuple[StudyOverride, dict[str,StudyOverride]]:
     override_path = pathlib.Path(override_path)
