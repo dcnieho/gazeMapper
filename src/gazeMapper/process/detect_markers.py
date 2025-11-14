@@ -69,30 +69,15 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
         # get interval(s) coded to be analyzed, if any
         # We don't need them if they would be ignored because the whole video would be processed. The whole video is processed when study_config.auto_code_sync_points or study_config.auto_code_episodes are set
         has_auto_code = process.config_has_auto_coding(study_config)
-        episode_file = working_dir / naming.coding_file
-        episodes_with_planes = [cs['name'] for cs in study_config.coding_setup if cs.get('planes',[])]
-        if episode_file.is_file():
-            episodes = episode.list_to_marker_dict(episode.read_list_from_file(episode_file), episodes_with_planes)
-            episodes = {cs:episodes[cs] for cs in episodes if episodes[cs]}
-        else:
-            episodes = episode.get_empty_marker_dict(episodes_with_planes)
-
-        # trial episodes are gotten from the reference recording if there is one and this is not the reference recording
-        if study_config.sync_ref_recording and rec_name!=study_config.sync_ref_recording:
-            all_recs = [r.name for r in study_config.session_def.recordings]
-            for cs in process.get_specific_event_types(study_config, annotation.EventType.Trial):
-                nm = cs['name']
-                if nm in episodes and episodes[nm]:
-                    raise ValueError(f'{nm} episodes are gotten from the reference recording ({study_config.sync_ref_recording}) and should not be coded for this recording ({rec_name})')
-                # NB: don't error on missing sync if we don't need episodes coding for processing
-                episodes[cs['name']] = synchronization.get_episode_frame_indices_from_ref(working_dir, cs['name'], rec_name, study_config.sync_ref_recording, all_recs, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings, study_config.sync_ref_stretch_which, missing_ref_coding_ok=has_auto_code)
+        episodes_with_planes = {cs['name'] for cs in study_config.coding_setup if cs.get('planes',[])}
+        episodes = episode.load_episodes_from_all_recordings(study_config, working_dir, episodes_with_planes, missing_other_coding_ok=has_auto_code)[0]
 
         # remove empty episode lists (no coding)
         episodes = {cs:episodes[cs] for cs in episodes if episodes[cs]}
 
         # check there is anything to do
         if not episodes and not has_auto_code:   # missing coding is ok when auto coding is set up, as then we process all frames anyway
-            raise RuntimeError(f'Coding is missing, cannot run Detect Markers\n{episode_file}')
+            raise RuntimeError(f'Coding is missing, cannot run Detect Markers. Check {working_dir/naming.coding_file}')
 
         sync_target_functions, function_frames  = _get_sync_function(study_config, rec_def, episodes)
         planes_setup, plane_frames              = _get_plane_setup(study_config, config_dir, episodes)

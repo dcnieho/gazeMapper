@@ -51,10 +51,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
         raise ValueError(f'You can only run sync_et_to_cam on eye tracker recordings, not on a {str(rec_def.type).split(".")[1]} recording')
 
     # get interval coding
-    coding_file = working_dir / naming.coding_file
-    if not coding_file.is_file():
-        raise FileNotFoundError(f'A coding file must be available to run sync_et_to_cam, but it is not. Run code_episodes and code at least one {annotation.tooltip_map[annotation.EventType.Sync_ET_Data]}. Not found: {coding_file}')
-    episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / naming.coding_file), [cs['name'] for cs in sync_events])
+    episodes = episode.load_episodes_from_all_recordings(study_config, working_dir, {cs['name'] for cs in sync_events})[0]
     if not episodes or not any(episodes[e] for e in episodes):
         raise RuntimeError(f'No {annotation.tooltip_map[annotation.EventType.Sync_ET_Data]}s found for this recording. Run code_episodes and code at least one {annotation.tooltip_map[annotation.EventType.Sync_ET_Data]}.')
 
