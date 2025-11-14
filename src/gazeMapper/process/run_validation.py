@@ -37,7 +37,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None=None, p
         raise RuntimeError(f'There are no validation episodes coded for session "{working_dir.parent.name}", recording "{working_dir.name}", nothing to process')
 
     # prep progress indicator
-    total = 2+sum(len(episodes[e]) for e in episodes)*3
+    total = 2*len(episodes) + sum(len(episodes[e]) for e in episodes)*3
     progress_indicator.set_total(total)
     progress_indicator.set_intervals(int(total/200), int(total/200))
     progress_indicator.update(n=0)  # ensure a complete hover text appears before first processing step is finished
