@@ -17,21 +17,21 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
 
     # get settings for the study
     study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent, config.OverrideLevel.Recording: working_dir}, **study_settings)
-    sync_events: list[config.EventSetup] = []
+    events: list[config.EventSetup] = []
     for ev in [e for e in annotation.EventType if annotation.type_map[e]==annotation.Type.Interval]:
-        sync_events.extend(process.get_specific_event_types(study_config, ev, check_specific_fields=['auto_code']))
-    if not sync_events:
+        events.extend(process.get_specific_event_types(study_config, ev, check_specific_fields=['auto_code']))
+    if not events:
         raise ValueError('No auto-coded event start and ends are configured for the study, nothing to process')
 
     rec_def = study_config.session_def.get_recording_def(working_dir.name)
     if study_config.sync_ref_recording and rec_def.name!=study_config.sync_ref_recording:
         # Trial events are only coded for the reference recording, so they should be discarded here
-        sync_events = [cs for cs in sync_events if cs['event_type']!=annotation.EventType.Trial]
-        if not sync_events:
+        events = [cs for cs in events if cs['event_type']!=annotation.EventType.Trial]
+        if not events:
             raise RuntimeError(f'Nothing to do, auto-coding of event start and ends is defined only for trial events and you have a sync_ref_recording ({study_config.sync_ref_recording}), but this recording ({rec_def.name}) is another one')
 
     # get already coded interval(s), if any
-    episodes_to_code = [cs['name'] for cs in sync_events]
+    episodes_to_code = [cs['name'] for cs in events if working_dir.name in cs.get('which_recordings',set())]
     coding_file = working_dir / naming.coding_file
     if coding_file.is_file():
         episodes = episode.list_to_marker_dict(episode.read_list_from_file(coding_file), episodes_to_code)
@@ -43,7 +43,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
     episodes_original = copy.deepcopy(episodes)
 
     # get marker files
-    for cs in sync_events:
+    for cs in events:
         for m in ('start_markers','end_markers'):
             if m not in cs['auto_code'] or not cs['auto_code'][m]:
                 raise ValueError(f'No {m} configured for auto coding of sync event "{cs["name"]}"')
