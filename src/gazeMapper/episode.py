@@ -62,7 +62,7 @@ def write_list_to_file(episodes: list[Episode],
     df = df[['event','event_type','start_frame','end_frame']]
     df.to_csv(str(fileName), index=False, sep='\t', na_rep='nan')
 
-def load_episodes_from_all_recordings(study_config: config.Study, recording_dir: str|pathlib.Path, episode_subset: set[str]|None=None, empty_if_no_coding=True, error_if_unwanted_found=True) -> tuple[dict[str, list[list[int]]], set[str]]:
+def load_episodes_from_all_recordings(study_config: config.Study, recording_dir: str|pathlib.Path, episode_subset: set[str]|None=None, empty_if_no_coding=True, error_if_unwanted_found=True, missing_other_coding_ok=False) -> tuple[dict[str, list[list[int]]], set[str]]:
     from . import synchronization
     # loads episodes for both the current recording, and from other synced recordings in the session as set up in the study config
     recording_dir = pathlib.Path(recording_dir)
@@ -121,7 +121,7 @@ def load_episodes_from_all_recordings(study_config: config.Study, recording_dir:
         for other_rec in which_recs:
             # NB: don't error if we don't need trial episodes for coding.
             extra = '' if single_rec else f' (from recording {other_rec})'
-            eps = synchronization.get_episode_frame_indices_from_other_video(recording_dir, nm, rec_name, other_rec, study_config.sync_ref_recording, all_recs, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings, study_config.sync_ref_stretch_which, missing_other_coding_ok=True)
+            eps = synchronization.get_episode_frame_indices_from_other_video(recording_dir, nm, rec_name, other_rec, study_config.sync_ref_recording, all_recs, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings, study_config.sync_ref_stretch_which, missing_other_coding_ok=missing_other_coding_ok)
             if eps:
                 episodes[nm+extra] = eps
 
