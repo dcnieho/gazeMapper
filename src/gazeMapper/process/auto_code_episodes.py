@@ -3,9 +3,9 @@ import numpy as np
 import shutil
 import copy
 
-from glassesTools import annotation, marker as gt_marker, process_pool
+from glassesTools import annotation, marker as gt_marker, process_pool, validation
 
-from .. import config, episode, naming, process, session
+from .. import config, episode, naming, plane, process, session
 
 
 def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None, **study_settings):
@@ -99,6 +99,75 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
             # these are consumed
             s_idx+=mini+1
             e_idx+=1
+        # if this is a dynamic validation episode, and the option to split consecutive repetitions is on, refine the interval now
+        if cs['event_type']==annotation.EventType.Validate and cs['validation_setup'] and cs['validation_setup']['dynamic_split_consecutive']:
+            # This deals with multiple consecutive marker presentation without intervening segmentation markers. It is assumed that all targets are shown in
+            # multiple runs of all individual targets (possibly random) order (so not fully randomized over all target presentations, then can't split).
+            # Intervals are then split smaller after each run of all targets has been presented.
+            p = list(cs['planes'])[0]
+            plane_def = [pl for pl in study_config.planes if pl.name==p][0]
+            if plane_def.type!=plane.Type.GlassesValidator:
+                raise ValueError(f'Plane {p} is not a {plane.Type.GlassesValidator.value} plane')
+            validation_plane = plane.get_plane_from_definition(plane_def, config_dir/p)
+            all_marker_observations_per_target, markers_per_target = validation.dynamic.get_marker_observations(validation_plane, working_dir)
+            for e in intervals:
+                # make local copy of marker_observations, containing only the current episode
+                marker_observations_per_target = {t:mo.loc[e[0]:e[1],:] for t,mo in all_marker_observations_per_target.items()}
+                # check we have data for at least one of the markers for a given target
+                failed = False
+                for t in marker_observations_per_target:
+                    if marker_observations_per_target[t].empty:
+                        missing_str  = '\n- '.join([gt_marker.marker_ID_to_str(m) for m in markers_per_target[t]])
+                        print(f'None of the markers for target {t} were observed during the episode from frame {e[0]} to frame {e[1]}:\n- {missing_str}')
+                        failed = True
+                        break
+                if failed:
+                    continue
+
+                # marker presence signal only contains marker detections (True). We need to fill the gaps in between detections with False (not detected) so we have a continuous signal without gaps
+                marker_observations_per_target = {t: gt_marker.expand_detection(marker_observations_per_target[t], fill_value=False) for t in marker_observations_per_target}
+
+                # for each target, see when it is presented using the marker presence signal
+                target_observation_map: list[tuple[tuple[int,int],int]] = []  # ((start_frame,end_frame), target_id)
+                for t in marker_observations_per_target:
+                    start, end = gt_marker.get_appearance_starts_ends(marker_observations_per_target[t], cs['validation_setup']['dynamic_max_gap_duration'], cs['validation_setup']['dynamic_min_duration'])
+                    for s,en in zip(start,end):
+                        target_observation_map.append(((s,en), t))
+                # sort on start frame
+                target_observation_map.sort(key=lambda x: x[0][0])
+                # check each target occurs equally often
+                target_counts = {t:0 for t in markers_per_target}
+                for _,t in target_observation_map:
+                    target_counts[t]+=1
+                counts_set = set(target_counts.values())
+                if len(counts_set)!=1:
+                    print(f'Not all targets were presented equally often during the episode from frame {e[0]} to frame {e[1]}, cannot split consecutive repetitions')
+                    continue
+                # check each target is only presented once per consecutive run
+                n_repetitions = counts_set.pop()
+                n_targets     = len(markers_per_target)
+                for rep in range(1, n_repetitions):
+                    si, ei = (rep-1)*n_targets, rep*n_targets
+                    targets_in_run = set(t for _,t in target_observation_map[si:ei])
+                    if len(targets_in_run)!=n_targets:  # not all targets present in this run
+                        print(f'Not all targets were presented during repetition {rep} in the episode from frame {e[0]} to frame {e[1]}, cannot split consecutive repetitions')
+                        failed = True
+                        break
+                # find break points between consecutive runs
+                for rep in range(1, n_repetitions):
+                    # find the index in target_observation_map where the next repetition starts
+                    break_idx = rep * n_targets
+                    # get the frame to split at: halfway between the end of the last target in the previous run and the start of the first target in this run
+                    split_frame = (target_observation_map[break_idx-1][0][1] + target_observation_map[break_idx][0][0]) // 2
+                    # now adjust intervals accordingly
+                    # find which interval this split frame falls into
+                    for int_idx in range(len(intervals)):
+                        if intervals[int_idx][0]<=split_frame<=intervals[int_idx][1]:
+                            # split here
+                            old_int = intervals[int_idx]
+                            intervals[int_idx] = (old_int[0], split_frame)
+                            intervals.insert(int_idx+1, (split_frame+1, old_int[1]))
+                            break
         # now insert into coding file. This just overwrites whatever is there
         if cs['name'] not in episodes:
             episodes[cs['name']] = []

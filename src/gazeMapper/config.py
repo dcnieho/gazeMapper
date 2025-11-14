@@ -63,6 +63,7 @@ class ValidationSetup(typed_dict_defaults.TypedDictDefault, total=False):
     dynamic_skip_first_duration : float                     = .2
     dynamic_max_gap_duration    : int                       = 4
     dynamic_min_duration        : int                       = 6
+    dynamic_split_consecutive   : bool                      = False
 
 class GazeOffsetSetup(typed_dict_defaults.TypedDictDefault, total=False):
     data_types                  : set[_data_types.DataType]|None    = None
@@ -1121,6 +1122,7 @@ event_setup_doc = {
         'dynamic_skip_first_duration': type_utils.GUIDocInfo('Dynamic, skip first duration', 'For a glassesValidator plane that is marked as dynamic (i.e. for a validation procedure using the PsychoPy script), how many seconds of data to not use from the beginning of each target interval.'),
         'dynamic_max_gap_duration': type_utils.GUIDocInfo('Dynamic, maximum gap duration', 'For a glassesValidator plane that is marked as dynamic (i.e. for a validation procedure using the PsychoPy script), maximum gap (number of frames) in marker detections that will be filled in (ignored).'),
         'dynamic_min_duration': type_utils.GUIDocInfo('Dynamic, minimum duration', 'Minimum duration (number of frames) that a marker should be detected. Shorter runs are removed.'),
+        'dynamic_split_consecutive': type_utils.GUIDocInfo('Dynamic, split consecutive repetitions', 'For a glassesValidator plane that is marked as dynamic (i.e. for a validation procedure using the PsychoPy script), there is the option to show multiple repetitions without intervening segmentation markers. Split these into multiple intervals.'),
     }),
     'gaze_offset_setup': type_utils.GUIDocInfo('Gaze offset calculation setup', 'Setup for calculating the angular gaze offset to specified targets on a plane.',{
         'data_types': type_utils.GUIDocInfo('Data types', 'Selects the data types for which you would like to calculate the gaze offset. When none are selected, a good default is used for each recording. When none of the selected types is available, depending on the `allow_data_type_fallback` setting, either an error is thrown or default depending on what is available is used instead. Whether a data quality type is available depends on what type of gaze information is available for a recording, as well as whether the camera is calibrated.',{
