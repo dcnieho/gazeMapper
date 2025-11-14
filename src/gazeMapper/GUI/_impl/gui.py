@@ -617,6 +617,7 @@ class GUI:
             'session_def_et_recordings': _get_known_recordings_only_eye_tracker,
             'planes': _get_known_planes,
             'auto_code': {'markers': _get_known_individual_markers, 'start_markers': _get_known_individual_markers, 'end_markers': _get_known_individual_markers},
+            'which_recording': _get_known_recordings
         }
 
         self._need_set_window_title = True

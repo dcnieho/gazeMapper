@@ -77,6 +77,7 @@ class EventSetup(typed_dict_defaults.TypedDictDefault, total=False):
     description     : str|None = None
     hotkey          : str|None = None
     planes          : set[str] = typed_dict_defaults.Field(default_factory=lambda: set())
+    which_recording : str|None = None
     auto_code       : AutoCodeSyncPoints|AutoCodeEpisodes|None = None
     sync_setup      : EtSyncSetup|None = None
     validation_setup: ValidationSetup|None = None
@@ -87,6 +88,7 @@ event_setup_field_order = [
     'description',
     'hotkey',
     'planes',
+    'which_recording',
     'auto_code',
     'sync_setup',
     'validation_setup',
@@ -547,6 +549,37 @@ class Study:
                                     raise ValueError(msg)
                                 else:
                                     type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'auto_code': {f: (type_utils.ProblemLevel.Error, msg)}}}})
+
+            # check which_recording settings
+            if cs['event_type']==annotation.EventType.Sync_Camera:
+                # for camera sync episodes, which_recording should not be set
+                if cs.get('which_recording') is not None:
+                    msg = f'which_recording should not be set for a {annotation.tooltip_map[cs["event_type"]]} episode.'
+                    if strict_check:
+                        raise ValueError(msg)
+                    else:
+                        type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'which_recording': (type_utils.ProblemLevel.Error, msg)}}})
+            else:
+                if self.sync_ref_recording is not None and not cs.get('which_recording'):
+                    msg = 'When a sync reference recording is defined, each coding setup.which_recording should also be defined.'
+                    if strict_check:
+                        raise ValueError(msg)
+                    else:
+                        type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'which_recording': (type_utils.ProblemLevel.Error, msg)}}})
+                if cs.get('which_recording') is not None:
+                    if not self.sync_ref_recording:
+                        msg = 'When no sync reference recording is defined, coding setup.which_recording should not be defined.'
+                        if strict_check:
+                            raise ValueError(msg)
+                        else:
+                            type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'which_recording': (type_utils.ProblemLevel.Error, msg)}}})
+                    # check the defined recording exists
+                    if not self._check_recording(cs['which_recording']):
+                        msg = f'Recording "{cs["which_recording"]}" not known'
+                        if strict_check:
+                            raise ValueError(msg+ f', check coding_setup[{i}].which_recording in the study configuration')
+                        else:
+                            type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'which_recording': (type_utils.ProblemLevel.Error, msg)}}})
 
         sync_events = [(i, cs) for i, cs in enumerate(self.coding_setup) if cs['event_type']==annotation.EventType.Sync_ET_Data]
         use_average_settings = [cs['sync_setup'].get('use_average', False) for _, cs in sync_events if cs['sync_setup'] is not None]
@@ -1071,6 +1104,7 @@ event_setup_doc = {
     'description': type_utils.GUIDocInfo('Event description', 'Description of the event to be shown in the coding GUI as tooltip.'),
     'hotkey': type_utils.GUIDocInfo('Event hotkey', 'Hotkey to be used for coding this event in the coding GUI.'),
     'planes': type_utils.GUIDocInfo('Planes for event', 'Set of planes which will be looked for and gaze mapped to during the episode.'),
+    'which_recording': type_utils.GUIDocInfo('Which recording', 'Recording for which you should code this event. If not set, the event is taken from the reference recording.'),
     'auto_code': type_utils.GUIDocInfo('Auto-coding setup', 'Setup for automatically coding this event based on individual marker detections.',{
         'markers': type_utils.GUIDocInfo('Marker(s)', 'Set of marker IDs whose appearance indicates a synchronization timepoint.'),
         'start_markers': type_utils.GUIDocInfo('Start marker(s)', 'A single marker ID or a sequence of marker IDs that indicate the start of an episode.'),
