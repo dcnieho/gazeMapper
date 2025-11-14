@@ -5,7 +5,7 @@ from typing import overload
 
 from glassesTools import annotation, naming as gt_naming, timestamps, video_utils
 
-from . import episode, naming
+from . import config, episode, naming, process
 
 def get_cols(do_time_stretch: bool):
     cols    = ['t_ref','t_this','offset']
@@ -18,7 +18,10 @@ def get_sync_for_recs(working_dir: str|pathlib.Path, recs: str|list[str], ref_re
     working_dir  = pathlib.Path(working_dir)
     if isinstance(recs,str):
         recs = [recs]
-    ref_episodes = get_coding_file(working_dir / ref_rec, missing_ref_coding_ok)
+    config_dir = config.guess_config_dir(working_dir)
+    study_config = config.Study.load_from_json(config_dir)
+    sync_events = process.get_specific_event_types(study_config, annotation.EventType.Sync_Camera)
+    ref_episodes = get_coding_file(working_dir / ref_rec, [cs['name'] for cs in sync_events], missing_ref_coding_ok)
     if ref_episodes is None:
         return None
     video_ts_ref = timestamps.VideoTimestamps(working_dir / ref_rec / gt_naming.frame_timestamps_fname)
@@ -40,7 +43,7 @@ def get_sync_for_recs(working_dir: str|pathlib.Path, recs: str|list[str], ref_re
     # collect timestamps for the recordings
     for r in recs:
         # get interval coding for this recording
-        episodes = get_coding_file(working_dir / r, missing_ref_coding_ok)
+        episodes = get_coding_file(working_dir / r, [cs['name'] for cs in sync_events], missing_ref_coding_ok)
         if episodes is None:
             if missing_ref_coding_ok:
                 return None
@@ -143,17 +146,16 @@ def apply_sync(rec: str,
         fr_ref = None
     return new_data_timestamps, new_reference_video_timestamps, fr_ref
 
-def get_coding_file(working_dir: str|pathlib.Path, missing_ref_coding_ok=False):
+def get_coding_file(working_dir: str|pathlib.Path, all_sync_events: list[str], missing_ref_coding_ok=False):
     working_dir  = pathlib.Path(working_dir)
     coding_file = working_dir / naming.coding_file
     if not coding_file.is_file():
         if missing_ref_coding_ok:
             return None
         raise FileNotFoundError(f'A coding file must be available for the recording ({working_dir.name}) to run sync_to_ref, but it is not. Run code_episodes and code at least one {annotation.tooltip_map[annotation.EventType.Sync_Camera]}. Not found: {coding_file}')
-    all_sync_events = annotation.get_events_by_type(annotation.EventType.Sync_Camera)
     if not all_sync_events:
         raise ValueError('No camera sync events have been set up to be coded. Cannot continue.')
-    episodes = episode.list_to_marker_dict(episode.read_list_from_file(coding_file), [e.name for e in all_sync_events])
+    episodes = episode.list_to_marker_dict(episode.read_list_from_file(coding_file), [e for e in all_sync_events])
     episodes = [x[0] for e in episodes for x in episodes[e]] # merge all sync codes and remove inner wrapping list, there are only single values in it anyway
     if not episodes:
         if missing_ref_coding_ok:
