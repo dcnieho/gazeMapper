@@ -100,13 +100,16 @@ def load_episodes_from_all_recordings(study_config: config.Study, recording_dir:
     # now check if there is coding to get from other recordings, or if there is coding that should not be there
     rec_name = recording_dir.name
     # check for unwanted coding
+    to_remove = []
     for nm in episodes:
         if episodes[nm] and nm not in to_code:
             if error_if_unwanted_found:
                 cs = [cs for cs in study_config.coding_setup if cs['name']==nm][0]
                 raise ValueError(f'{nm} episodes are gotten from the recordings {cs.get("which_recordings")} and should not be coded for this recording ({rec_name})')
             else:
-                del episodes[nm]
+                to_remove.append(nm)
+    for nm in to_remove:
+        del episodes[nm]
     # check for coding to get from other recordings
     all_recs = [r.name for r in study_config.session_def.recordings if r.name!=study_config.sync_ref_recording]
     for cs in study_config.coding_setup:
