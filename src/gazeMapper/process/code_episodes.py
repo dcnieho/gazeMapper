@@ -87,27 +87,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     cam_params = ocv.CameraParams.read_from_file(working_dir / gt_naming.scene_camera_calibration_fname)
 
     # get previous interval coding, if available
-    to_code = [cs['name'] for cs in study_config.coding_setup]
-    coding_file = working_dir / naming.coding_file
-    if coding_file.is_file():
-        episodes = episode.list_to_marker_dict(episode.read_list_from_file(coding_file), to_code)
-    else:
-        episodes = episode.get_empty_marker_dict(to_code)
-    episodes_to_code = {e for e in episodes}
-    # trial episodes are gotten from the reference recording if there is one and this is not the reference recording
-    if study_config.sync_ref_recording and rec_def.name!=study_config.sync_ref_recording:
-        # any trial coding there is should be discarded
-        trial_events = process.get_specific_event_types(study_config, annotation.EventType.Trial)
-        for cs in trial_events:
-            episodes.pop(cs['name'], None)
-            # also mark as not codable
-            episodes_to_code.remove(cs['name'])
-        # if there is trial coding for the reference recording, get them and show them (read only)
-        if trial_events:
-            all_recs = [r.name for r in study_config.session_def.recordings if r.name!=study_config.sync_ref_recording]
-            for cs in trial_events:
-                # NB: don't error if we don't need trial episodes for coding.
-                episodes[cs['name']] = synchronization.get_episode_frame_indices_from_ref(working_dir, cs['name'], rec_def.name, study_config.sync_ref_recording, all_recs, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings, study_config.sync_ref_stretch_which, missing_ref_coding_ok=True)
+    episodes, episodes_to_code = episode.load_episodes_from_all_recordings(study_config, working_dir, error_if_unwanted_found=False)
     episodes = annotation.flatten_annotation_dict(episodes)
     episodes_original = copy.deepcopy(episodes)
 
@@ -229,11 +209,10 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
         return
 
     # store coded intervals to file
-    if study_config.sync_ref_recording and rec_def.name!=study_config.sync_ref_recording:
-        # any (read only) trial coding there is should not be written to file
-        for cs in trial_events:
-            episodes.pop(cs['name'], None)
-    episode.write_list_to_file(episode.marker_dict_to_list(episodes), coding_file)
+    to_remove = [nm for nm in episodes if nm not in episodes_to_code]
+    for nm in to_remove:
+        episodes.pop(nm)
+    episode.write_list_to_file(episode.marker_dict_to_list(episodes), working_dir / naming.coding_file)
 
     # update state
     session.update_action_states(working_dir, process.Action.CODE_EPISODES, process_pool.State.Completed, study_config)
