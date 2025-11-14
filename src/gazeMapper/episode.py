@@ -62,13 +62,15 @@ def write_list_to_file(episodes: list[Episode],
     df = df[['event','event_type','start_frame','end_frame']]
     df.to_csv(str(fileName), index=False, sep='\t', na_rep='nan')
 
-def load_episodes_from_all_recordings(study_config: config.Study, recording_dir: str|pathlib.Path, empty_if_no_coding=True, error_if_unwanted_found=True) -> tuple[dict[str, list[list[int]]], set[str]]:
+def load_episodes_from_all_recordings(study_config: config.Study, recording_dir: str|pathlib.Path, episode_subset: set[str]|None=None, empty_if_no_coding=True, error_if_unwanted_found=True) -> tuple[dict[str, list[list[int]]], set[str]]:
     from . import synchronization
     # loads episodes for both the current recording, and from other synced recordings in the session as set up in the study config
     recording_dir = pathlib.Path(recording_dir)
     coding_file = recording_dir / naming.coding_file
     if coding_file.is_file():
         episodes = list_to_marker_dict(read_list_from_file(coding_file))
+        if episode_subset is not None:
+            episodes = {k:v for k,v in episodes.items() if k in episode_subset}
     else:
         if not empty_if_no_coding:
             raise FileNotFoundError(f'No coding file found at {coding_file}')
@@ -87,6 +89,8 @@ def load_episodes_from_all_recordings(study_config: config.Study, recording_dir:
             which_recs = cs.get('which_recordings')
             if recording_dir.name in which_recs:
                 to_code.add(cs['name'])
+    if episode_subset is not None:
+        to_code = to_code.intersection(episode_subset)
 
     # add missing fields
     for evt in to_code:
@@ -106,6 +110,9 @@ def load_episodes_from_all_recordings(study_config: config.Study, recording_dir:
     # check for coding to get from other recordings
     all_recs = [r.name for r in study_config.session_def.recordings if r.name!=study_config.sync_ref_recording]
     for cs in study_config.coding_setup:
+        nm = cs['name']
+        if episode_subset is not None and nm not in episode_subset:
+            continue
         which_recs = cs.get('which_recordings')
         if which_recs is None or rec_name in which_recs:
             continue    # this coding is for this recording, so we already have it
@@ -114,9 +121,9 @@ def load_episodes_from_all_recordings(study_config: config.Study, recording_dir:
         for other_rec in which_recs:
             # NB: don't error if we don't need trial episodes for coding.
             extra = '' if single_rec else f' (from recording {other_rec})'
-            eps = synchronization.get_episode_frame_indices_from_other_video(recording_dir, cs['name'], rec_name, other_rec, study_config.sync_ref_recording, all_recs, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings, study_config.sync_ref_stretch_which, missing_other_coding_ok=True)
+            eps = synchronization.get_episode_frame_indices_from_other_video(recording_dir, nm, rec_name, other_rec, study_config.sync_ref_recording, all_recs, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings, study_config.sync_ref_stretch_which, missing_other_coding_ok=True)
             if eps:
-                episodes[cs['name']+extra] = eps
+                episodes[nm+extra] = eps
 
     return episodes, to_code
 
