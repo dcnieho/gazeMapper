@@ -215,7 +215,7 @@ def _get_plane_setup(study_config: config.Study,
         if episodes:
             # determine for which frames this plane should be used
             anal_events  = [cs['name'] for cs in study_config.coding_setup if p in cs['planes']]
-            all_episodes = [ep for k in anal_events for ep in episodes[k] if ep]  # filter out empty
+            all_episodes = [ep for k in anal_events if k in episodes for ep in episodes[k] if ep]  # filter out empty
             analyze_frames[p] = sorted(all_episodes, key = lambda x: x[1])
         else:
             analyze_frames[p] = None
