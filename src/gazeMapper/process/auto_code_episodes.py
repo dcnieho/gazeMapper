@@ -33,9 +33,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
     # get already coded interval(s), if any
     episodes_to_code = [cs['name'] for cs in events if working_dir.name in cs.get('which_recordings',set())]
     episodes = episode.load_episodes_from_all_recordings(study_config, working_dir, episodes_to_code, load_from_other_recordings=False)[0]
-    # flatten
-    for e in episodes:
-        episodes[e] = [i for iv in episodes[e] for i in iv]
+    episodes = annotation.flatten_annotation_dict(episodes)
     episodes_original = copy.deepcopy(episodes)
 
     # get marker files
