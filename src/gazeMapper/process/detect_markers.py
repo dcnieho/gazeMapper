@@ -2,6 +2,7 @@ import pathlib
 import pandas as pd
 import numpy as np
 import typing
+import cv2
 
 from glassesTools import annotation, aruco, drawing, marker as gt_marker, naming as gt_naming, pose, process_pool, propagating_thread, ocv, timestamps
 from glassesTools.camera_recording import Type as CameraRecordingType
@@ -149,6 +150,44 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
         df = pd.DataFrame([[v, *t] for v,t in sync_target_signals[s]],columns=['frame_idx','target_x','target_y'])
         nm = s.removeprefix('sync_')
         df.to_csv(working_dir/f'{naming.target_sync_prefix}{nm}.tsv', sep='\t', index=False, na_rep='nan', float_format="%.8f")
+
+    # if this is a head-attached recording, further check whether its pose is used to replace pose for another camera
+    # if so, write a pose file for that camera also
+    is_head_attached_camera_recording = rec_def.type==session.RecordingType.Camera and rec_def.camera_recording_type==CameraRecordingType.Head_attached
+    if is_head_attached_camera_recording and study_config.head_attached_recordings_replace_et_scene is not None and rec_name in study_config.head_attached_recordings_replace_et_scene:
+        to_replace = [r for r in study_config.session_def.recordings if r.name==rec_name][0].associated_recording   # don't need to check it exists, thats a config error check much earlier
+        # we need to have camera sync for the head-attached camera recording to be able to replace the eye tracker scene camera poses
+        sync = synchronization.get_sync_for_recs(working_dir.parent, [to_replace], rec_name, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings, missing_ref_coding_ok=True)
+        if sync is not None:
+            # get eye tracker scene camera frame indices we have poses for
+            videos_ts = {r:timestamps.VideoTimestamps(working_dir.parent / r / gt_naming.frame_timestamps_fname) for r in [to_replace, rec_name]}
+            to_sync_frame_idxs = synchronization.reference_frames_to_video(to_replace, sync, videos_ts[rec_name].indices,
+                                                                           videos_ts[to_replace].timestamps, videos_ts[rec_name].timestamps,
+                                                                           study_config.sync_ref_do_time_stretch, study_config.sync_ref_stretch_which)
+            frame_map = {frep:fr for fr,frep in zip(videos_ts[rec_name].indices,to_sync_frame_idxs) if frep!=-1}
+            # turn poses into a dict for easy access
+            poses = {pl:{p.frame_idx:p for p in poses[pl]} for pl in poses}
+            # use camera extrinsics to make new poses for the eye tracker scene camera
+            cam_params = ocv.CameraParams.read_from_file(working_dir / gt_naming.scene_camera_calibration_fname)
+            Rmat = cv2.Rodrigues(cam_params.rotation_vec)[0]
+            # now, per plane, transform head-attached camera poses into eye tracker scene camera poses and store
+            for pl in poses:
+                # get poses
+                replaced_poses: list[pose.Pose] = []
+                for frep in frame_map:
+                    if frame_map[frep] in poses[pl]:
+                        ha_pose = poses[pl][frame_map[frep]]
+                        R_ha = cv2.Rodrigues(ha_pose.pose_R_vec)[0]
+                        t_ha = ha_pose.pose_T_vec
+                        R_et = Rmat @ R_ha
+                        t_et = (Rmat @ t_ha).flatten() + cam_params.position
+                        rvec_et = cv2.Rodrigues(R_et)[0].flatten()
+                        replaced_poses.append(pose.Pose(frame_idx=frep, pose_R_vec=rvec_et, pose_T_vec=t_et, pose_N_points=ha_pose.pose_N_points))
+                # store to file
+                pose.write_list_to_file(replaced_poses, working_dir.parent/to_replace/f'{naming.plane_pose_prefix}{pl}.tsv', skip_failed=True)
+        else:
+            print(f'Cannot replace eye tracker scene camera poses with head-attached camera poses: missing camera synchronization between head-attached camera recording "{rec_name}" and eye tracker scene camera recording "{to_replace}". Run Auto Coding if you have this set up, or manually code at least one sync point for both recordings, and then run the Detect Markers action again.')
+
 
     # update state
     session.update_action_states(working_dir, process.Action.DETECT_MARKERS, process_pool.State.Completed, study_config)
