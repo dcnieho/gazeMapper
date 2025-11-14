@@ -2,7 +2,6 @@ import pathlib
 import numpy as np
 import cv2
 import copy
-import typing
 
 from ffpyplayer.player import MediaPlayer
 
@@ -17,7 +16,7 @@ from glassesTools.camera_recording import Type as CameraRecordingType
 from glassesTools.gui.video_player import GUI
 
 
-from .. import config, episode, naming, plane, process, session, synchronization
+from .. import config, episode, naming, plane, process, session
 
 # This script shows a video player that is used to indicate the interval(s)
 # during which the poster should be found in the video and in later
@@ -87,7 +86,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     cam_params = ocv.CameraParams.read_from_file(working_dir / gt_naming.scene_camera_calibration_fname)
 
     # get previous interval coding, if available
-    episodes, episodes_to_code = episode.load_episodes_from_all_recordings(study_config, working_dir, error_if_unwanted_found=False)
+    episodes, episodes_to_code = episode.load_episodes_from_all_recordings(study_config, working_dir, error_if_unwanted_found=False, missing_other_coding_ok=True)
     episodes = annotation.flatten_annotation_dict(episodes)
     episodes_original = copy.deepcopy(episodes)
 
@@ -212,7 +211,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     to_remove = [nm for nm in episodes if nm not in episodes_to_code]
     for nm in to_remove:
         episodes.pop(nm)
-    episode.write_list_to_file(episode.marker_dict_to_list(episodes), working_dir / naming.coding_file)
+    episode.write_list_to_file(episode.marker_dict_to_list(episodes), working_dir/naming.coding_file)
 
     # update state
     session.update_action_states(working_dir, process.Action.CODE_EPISODES, process_pool.State.Completed, study_config)
