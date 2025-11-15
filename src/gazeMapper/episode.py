@@ -62,7 +62,7 @@ def write_list_to_file(episodes: list[Episode],
     df = df[['event','event_type','start_frame','end_frame']]
     df.to_csv(str(fileName), index=False, sep='\t', na_rep='nan')
 
-def load_episodes_from_all_recordings(study_config: config.Study, recording_dir: str|pathlib.Path, episode_subset: set[str]|None=None, load_from_other_recordings=True, empty_if_no_coding=True, error_if_unwanted_found=True, missing_other_coding_ok=False) -> tuple[dict[str, list[list[int]]], set[str]]:
+def load_episodes_from_all_recordings(study_config: config.Study, recording_dir: str|pathlib.Path, episode_subset: set[str]|None=None, load_from_other_recordings=True, empty_if_no_coding=True, error_if_unwanted_found=True, missing_other_coding_ok=False) -> tuple[dict[str, list[list[int]]], set[str], dict[str, annotation.EventType]]:
     from . import synchronization
     # loads episodes for both the current recording, and from other synced recordings in the session as set up in the study config
     recording_dir = pathlib.Path(recording_dir)
@@ -97,8 +97,11 @@ def load_episodes_from_all_recordings(study_config: config.Study, recording_dir:
         if evt not in episodes:
             episodes[evt] = []
 
+    # get event type of each event
+    event_types = {evt: [cs for cs in study_config.coding_setup if cs['name']==evt][0]['event_type'] for evt in episodes}
+
     if not load_from_other_recordings:
-        return episodes, to_code
+        return episodes, to_code, event_types
 
     # now check if there is coding to get from other recordings, or if there is coding that should not be there
     rec_name = recording_dir.name
@@ -113,6 +116,7 @@ def load_episodes_from_all_recordings(study_config: config.Study, recording_dir:
                 to_remove.append(nm)
     for nm in to_remove:
         del episodes[nm]
+        event_types.pop(nm, None)
     # check for coding to get from other recordings
     all_recs = [r.name for r in study_config.session_def.recordings if r.name!=study_config.sync_ref_recording]
     for cs in study_config.coding_setup:
@@ -133,8 +137,9 @@ def load_episodes_from_all_recordings(study_config: config.Study, recording_dir:
             eps = synchronization.get_episode_frame_indices_from_other_video(recording_dir, nm, rec_name, other_rec, study_config.sync_ref_recording, all_recs, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings, study_config.sync_ref_stretch_which, missing_other_coding_ok=missing_other_coding_ok)
             if eps:
                 episodes[nm+extra] = eps
+                event_types[nm+extra] = cs['event_type']
 
-    return episodes, to_code
+    return episodes, to_code, event_types
 
 
 def get_empty_marker_dict(episodes: list[str]) -> dict[str,list[list[int]]]:
