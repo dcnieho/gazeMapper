@@ -1113,7 +1113,7 @@ event_setup_doc = {
     'description': type_utils.GUIDocInfo('Event description', 'Description of the event to be shown in the coding GUI as tooltip.'),
     'hotkey': type_utils.GUIDocInfo('Event hotkey', 'Hotkey to be used for coding this event in the coding GUI.'),
     'planes': type_utils.GUIDocInfo('Planes for event', 'Set of planes which will be looked for and gaze mapped to during the episode.'),
-    'which_recording': type_utils.GUIDocInfo('Which recording', 'Recording for which you should code this event. If not set, the event is taken from the reference recording.'),
+    'which_recordings': type_utils.GUIDocInfo('Which recordings', 'Recordings for which you should code this event. If not set, the event is taken from the reference recording.'),
     'auto_code': type_utils.GUIDocInfo('Auto-coding setup', 'Setup for automatically coding this event based on individual marker detections.',{
         'markers': type_utils.GUIDocInfo('Marker(s)', 'Set of marker IDs whose appearance indicates a synchronization timepoint.'),
         'start_markers': type_utils.GUIDocInfo('Start marker(s)', 'A single marker ID or a sequence of marker IDs that indicate the start of an episode.'),
