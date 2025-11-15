@@ -70,7 +70,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
         # We don't need them if they would be ignored because the whole video would be processed. The whole video is processed when study_config.auto_code_sync_points or study_config.auto_code_episodes are set
         has_auto_code = process.config_has_auto_coding(study_config)
         episodes_with_planes = {cs['name'] for cs in study_config.coding_setup if cs.get('planes',[])}
-        episodes = episode.load_episodes_from_all_recordings(study_config, working_dir, episodes_with_planes, missing_other_coding_ok=has_auto_code)[0]
+        episodes, _, event_types = episode.load_episodes_from_all_recordings(study_config, working_dir, episodes_with_planes, missing_other_coding_ok=has_auto_code)
 
         # remove empty episode lists (no coding)
         episodes = {cs:episodes[cs] for cs in episodes if episodes[cs]}
@@ -110,7 +110,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
         estimator.register_extra_processing_fun(f'sync_{sfe}', function_frames[sfe], *sync_target_functions[sfe])
     estimator.attach_gui(gui)
     if gui is not None:
-        gui.set_show_timeline(True, timestamps.VideoTimestamps(working_dir / gt_naming.frame_timestamps_fname), annotation.flatten_annotation_dict(episodes), window_id=gui.main_window_id)
+        eps = annotation.flatten_annotation_dict(episodes)
+        timeline_episodes = {e:(event_types[e], eps[e]) for e in eps}
+        gui.set_show_timeline(True, timestamps.VideoTimestamps(working_dir / gt_naming.frame_timestamps_fname), timeline_episodes, window_id=gui.main_window_id)
         # override colors with settings, but do not disable drawing ones that settings disable
         colors = {}
         for c in ('mapped_video_plane_marker_color','mapped_video_recovered_plane_marker_color','mapped_video_individual_marker_color','mapped_video_unexpected_marker_color'):
