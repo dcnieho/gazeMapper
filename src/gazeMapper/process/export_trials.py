@@ -57,12 +57,12 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
             continue
         # get trial coding
         # trial episodes are gotten from the reference recording if there is one and this is not the reference recording
-        episodes_to_code = [cs['name'] for cs in trial_events]
+        events = [cs['name'] for cs in trial_events]
         if study_config.sync_ref_recording and r!=study_config.sync_ref_recording:
-            episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / study_config.sync_ref_recording / naming.coding_file), episodes_to_code)
+            episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / study_config.sync_ref_recording / naming.coding_file), events)
             subset_var = 'frame_idx_ref'
         else:
-            episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / r / naming.coding_file), episodes_to_code)
+            episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / r / naming.coding_file), events)
             subset_var = 'frame_idx'
         if not any(episodes[e] for e in episodes):
             print(f'Warning: no {annotation.tooltip_map[annotation.EventType.Trial]} events found in the coding file for recording {r} in session {working_dir.name}. Skipping...')
