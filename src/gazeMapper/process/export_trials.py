@@ -57,14 +57,8 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
             continue
         # get trial coding
         # trial episodes are gotten from the reference recording if there is one and this is not the reference recording
-        events = [cs['name'] for cs in trial_events]
-        if study_config.sync_ref_recording and r!=study_config.sync_ref_recording:
-            episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / study_config.sync_ref_recording / naming.coding_file), events)
-            subset_var = 'frame_idx_ref'
-        else:
-            episodes = episode.list_to_marker_dict(episode.read_list_from_file(working_dir / r / naming.coding_file), events)
-            subset_var = 'frame_idx'
-        if not any(episodes[e] for e in episodes):
+        episodes = episode.load_episodes_from_all_recordings(study_config, working_dir/r, {cs['name'] for cs in trial_events})[0]
+        if not any(episodes[e][1] for e in episodes):
             print(f'Warning: no {annotation.tooltip_map[annotation.EventType.Trial]} events found in the coding file for recording {r} in session {working_dir.name}. Skipping...')
             continue
 
@@ -100,8 +94,13 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
         ori_plane_gazes = copy.deepcopy(plane_gazes)
         for cs in trial_events:
             nm = cs['name']
-            if not episodes[nm]:
+            if not episodes[nm][1]:
                 continue
+
+            if not cs['which_recordings'] or r in cs['which_recordings']:
+                subset_var = 'frame_idx'
+            else:
+                subset_var = 'frame_idx_ref'
 
             # now merge
             planes = list(cs['planes'])
@@ -141,7 +140,7 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
             # add trial numbers
             idx = max([cols.index(c) for c in cols if c.startswith('frame_ts')])+1
             plane_gazes.insert(idx,'trial',np.int32(-1))
-            for i,e in enumerate(episodes[nm]):
+            for i,e in enumerate(episodes[nm][1]):
                 sel = (plane_gazes[subset_var] >= e[0]) & (plane_gazes[subset_var] <= e[1])
                 plane_gazes.loc[sel,'trial'] = i+1
 
