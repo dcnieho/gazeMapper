@@ -1,7 +1,8 @@
 import pathlib
 import numpy as np
+import pandas as pd
 
-from glassesTools import annotation, fixation_classification, naming as gt_naming, process_pool, validation
+from glassesTools import annotation, fixation_classification, naming as gt_naming, process_pool, timestamps, validation
 from glassesTools.validation import assign_intervals, compute_offsets
 
 from .. import config, episode, naming, plane, process, session
@@ -33,11 +34,11 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None=None, p
 
     # get interval(s) coded to be analyzed, if any
     episodes = episode.load_episodes_from_all_recordings(study_config, working_dir, {cs['name'] for cs in val_events})[0]
-    if not any(episodes[e] for e in episodes):
+    if not any(episodes[e][1] for e in episodes):
         raise RuntimeError(f'There are no validation episodes coded for session "{working_dir.parent.name}", recording "{working_dir.name}", nothing to process')
 
     # prep progress indicator
-    total = 2*len(episodes) + sum(len(episodes[e]) for e in episodes)*3
+    total = 2*len(episodes) + sum(len(episodes[e][1]) for e in episodes)*3
     progress_indicator.set_total(total)
     progress_indicator.set_intervals(int(total/200), int(total/200))
     progress_indicator.update(n=0)  # ensure a complete hover text appears before first processing step is finished
@@ -65,21 +66,34 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None=None, p
             marker_observations_per_target, markers_per_target = validation.dynamic.get_marker_observations(validation_plane, working_dir)
         else:
             fixation_classification.from_plane_gaze(working_dir/f'{naming.world_gaze_prefix}{p}.tsv',
-                                                    episodes[e],
+                                                    episodes[e][1],
                                                     working_dir,
                                                     I2MC_settings_override=cs['validation_setup']['I2MC_settings'],
                                                     filename_stem=f'{naming.validation_prefix}{e}_fixations',
                                                     plot_limits=plot_limits)
         progress_indicator.update()
 
+        # see if we have user-coded intervals
+        has_override = False
+        fname_override = working_dir/f'{naming.validation_prefix}{e}_fixation_assignment_override.tsv'
+        if fname_override.exists():
+            target_coding = pd.read_csv(fname_override, delimiter='\t', dtype={'target':int, 'marker_interval':int},index_col='target')
+            has_override = True
+
         # assign intervals
-        for idx,_ in enumerate(episodes[e]):
-            if validation_plane.is_dynamic():
+        for idx,_ in enumerate(episodes[e][1]):
+            if has_override:
+                other_intervals = None
+                selected_intervals = target_coding[target_coding['marker_interval']==idx+1].copy()
+                selected_intervals = selected_intervals.rename(columns={'start_timestamp':'startT', 'end_timestamp':'endT'})
+                progress_indicator.update()
+
+            elif validation_plane.is_dynamic():
                 selected_intervals, other_intervals = \
                     assign_intervals.dynamic_markers(marker_observations_per_target,
                                                     markers_per_target,
                                                     working_dir/gt_naming.frame_timestamps_fname,
-                                                    episodes[e][idx],
+                                                    episodes[e][1][idx],
                                                     cs['validation_setup']['dynamic_skip_first_duration'],
                                                     cs['validation_setup']['dynamic_max_gap_duration'],
                                                     cs['validation_setup']['dynamic_min_duration'])
@@ -97,7 +111,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None=None, p
                                 other_intervals,
                                 targets,
                                 working_dir/f'{naming.world_gaze_prefix}{p}.tsv',
-                                episodes[e][idx],
+                                episodes[e][1][idx],
                                 working_dir,
                                 filename_stem=f'{naming.validation_prefix}{e}_fixation_assignment',
                                 iteration=idx,
@@ -114,8 +128,8 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None=None, p
 
         compute_offsets.compute(working_dir/f'{naming.world_gaze_prefix}{p}.tsv',
                                 working_dir/f'{naming.plane_pose_prefix}{p}.tsv',
-                                working_dir/f'{naming.validation_prefix}{e}_fixation_assignment.tsv',
-                                episodes[e],
+                                working_dir/f'{naming.validation_prefix}{e}_fixation_assignment{("_override" if has_override else "")}.tsv',
+                                episodes[e][1],
                                 targets,
                                 validation_plane.config['distance']*10.,    # cm -> mm
                                 working_dir,
