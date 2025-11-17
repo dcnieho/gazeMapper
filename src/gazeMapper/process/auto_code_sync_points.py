@@ -44,8 +44,8 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
         marker_starts = [s for m in markers for s in gt_marker.get_appearance_starts_ends(m, cs['auto_code']['max_gap_duration'], cs['auto_code']['min_duration'])[0]]
         # insert in episodes
         if cs['name'] not in episodes:
-            episodes[cs['name']] = []
-        [episodes[cs['name']].append(i) for i in marker_starts if i not in episodes[cs['name']]]
+            episodes[cs['name']] = (cs['event_type'], [])
+        [episodes[cs['name']][1].append(i) for i in marker_starts if i not in episodes[cs['name']][1]]
 
     # early exit if nothing has changed
     if episodes==episodes_original:

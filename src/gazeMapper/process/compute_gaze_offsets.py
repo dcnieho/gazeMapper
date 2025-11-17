@@ -54,7 +54,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
                 d_types_per_plane[p] = set()
                 allow_d_fallback_per_plane[p] = False
                 viewing_distance_per_plane[nm][p] = {}
-            episodes_per_plane[p].extend(episodes[cs['name']])
+            episodes_per_plane[p].extend(episodes[cs['name']][1])
             targets_per_plane[p].update(cs['gaze_offset_setup']['which_targets'][p])
             if cs['gaze_offset_setup']['data_types'] is not None:
                 d_types_per_plane[p].update(cs['gaze_offset_setup']['data_types'])

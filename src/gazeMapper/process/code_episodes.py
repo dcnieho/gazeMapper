@@ -86,7 +86,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     cam_params = ocv.CameraParams.read_from_file(working_dir / gt_naming.scene_camera_calibration_fname)
 
     # get previous interval coding, if available
-    episodes, episodes_to_code, event_types = episode.load_episodes_from_all_recordings(study_config, working_dir, error_if_unwanted_found=False, missing_other_coding_ok=True)
+    episodes, episodes_to_code = episode.load_episodes_from_all_recordings(study_config, working_dir, error_if_unwanted_found=False, missing_other_coding_ok=True)
     episodes = annotation.flatten_annotation_dict(episodes)
     episodes_original = copy.deepcopy(episodes)
 
@@ -106,7 +106,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     gui.set_allow_annotate(episodes_to_code,
                            {cs['name']:cs['hotkey'] for cs in study_config.coding_setup if cs['hotkey'] is not None},
                            {cs['name']:cs['description'] for cs in study_config.coding_setup if cs['description'] is not None})
-    gui.set_show_timeline(True, video_ts, {e:(event_types[e], episodes[e]) for e in episodes}, gui.main_window_id)
+    gui.set_show_timeline(True, video_ts, episodes, gui.main_window_id)
     gui.set_show_annotation_label(True, gui.main_window_id)
     gui.set_show_action_tooltip(True, gui.main_window_id)
 
@@ -183,13 +183,15 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
                     player.seek(pts+p, relative=False)
                 case 'add_coding':
                     event,frame_idx = p
-                    if frame_idx not in episodes[event]:
-                        episodes[event].append(frame_idx)
-                        episodes[event].sort()
+                    if frame_idx not in episodes[event][1]:
+                        episodes[event][1].append(frame_idx)
+                        episodes[event][1].sort()
                         gui.notify_annotations_changed()
                 case 'delete_coding':
                     event,frame_idxs = p
-                    episodes[event] = [i for i in episodes[event] if i not in frame_idxs]
+                    for f in frame_idxs:
+                        if f in episodes[event][1]:
+                            episodes[event][1].remove(f)
                     gui.notify_annotations_changed()
                 case 'exit':
                     should_exit = True

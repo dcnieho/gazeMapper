@@ -70,10 +70,10 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
         # We don't need them if they would be ignored because the whole video would be processed. The whole video is processed when study_config.auto_code_sync_points or study_config.auto_code_episodes are set
         has_auto_code = process.config_has_auto_coding(study_config)
         episodes_with_planes = {cs['name'] for cs in study_config.coding_setup if cs.get('planes',[])}
-        episodes, _, event_types = episode.load_episodes_from_all_recordings(study_config, working_dir, episodes_with_planes, missing_other_coding_ok=has_auto_code)
+        episodes = episode.load_episodes_from_all_recordings(study_config, working_dir, episodes_with_planes, missing_other_coding_ok=has_auto_code)[0]
 
         # remove empty episode lists (no coding)
-        episodes = {cs:episodes[cs] for cs in episodes if episodes[cs]}
+        episodes = {cs:episodes[cs] for cs in episodes if episodes[cs][1]}
 
         # check there is anything to do
         if not episodes and not has_auto_code:   # missing coding is ok when auto coding is set up, as then we process all frames anyway
@@ -110,9 +110,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
         estimator.register_extra_processing_fun(f'sync_{sfe}', function_frames[sfe], *sync_target_functions[sfe])
     estimator.attach_gui(gui)
     if gui is not None:
-        eps = annotation.flatten_annotation_dict(episodes)
-        timeline_episodes = {e:(event_types[e], eps[e]) for e in eps}
-        gui.set_show_timeline(True, timestamps.VideoTimestamps(working_dir / gt_naming.frame_timestamps_fname), timeline_episodes, window_id=gui.main_window_id)
+        gui.set_show_timeline(True, timestamps.VideoTimestamps(working_dir / gt_naming.frame_timestamps_fname), annotation.flatten_annotation_dict(episodes), window_id=gui.main_window_id)
         # override colors with settings, but do not disable drawing ones that settings disable
         colors = {}
         for c in ('mapped_video_plane_marker_color','mapped_video_recovered_plane_marker_color','mapped_video_individual_marker_color','mapped_video_unexpected_marker_color'):
@@ -182,9 +180,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
 
 def _get_sync_function(study_config: config.Study,
                        rec_def: session.RecordingDefinition,
-                       episodes: dict[str,list[list[int]]]|None = None) -> tuple[dict[str, tuple[typing.Callable[[str,int,np.ndarray,ocv.CameraParams,typing.Any], tuple[float,float]], dict[str, typing.Any], typing.Callable[[str,np.ndarray,int,tuple[float,float]], None]]], dict[str, list[list[int]]|None]]:
+                       episodes: dict[str,tuple[annotation.EventType, list[list[int]]]]|None = None) -> tuple[dict[str, tuple[typing.Callable[[str,int,np.ndarray,ocv.CameraParams,typing.Any], tuple[float,float]], dict[str, typing.Any], typing.Callable[[str,np.ndarray,int,tuple[float,float]], None]]], dict[str, tuple[annotation.EventType, list[list[int]]]|None]]:
     sync_target_function: dict[str, tuple[typing.Callable[[str,int,np.ndarray,ocv.CameraParams,typing.Any], tuple[float,float]], dict[str, typing.Any], typing.Callable[[str,np.ndarray,int,tuple[float,float]], None]]] = {}
-    analyze_frames: dict[str, list[list[int]]|None] = {}
+    analyze_frames: dict[str, tuple[annotation.EventType, list[list[int]]]|None] = {}
     # NB: only for eye tracker recordings, others don't have eye tracking data and thus nothing to sync
     if rec_def.type==session.RecordingType.Eye_Tracker:
         et_sync_events = process.get_specific_event_types(study_config, annotation.EventType.Sync_ET_Data, ['sync_setup'])
@@ -227,22 +225,22 @@ def _sync_function_output_drawer(proc_name: str, frame: np.ndarray, frame_idx: i
 
 def _get_plane_setup(study_config: config.Study,
                      config_dir: pathlib.Path,
-                     episodes: dict[str,list[list[int]]]|None = None) -> tuple[dict[str, aruco.PlaneSetup], dict[str, list[list[int]]|None]]:
+                     episodes: dict[str, tuple[annotation.EventType, list[list[int]]]]|None = None) -> tuple[dict[str, aruco.PlaneSetup], dict[str, tuple[annotation.EventType, list[list[int]]]|None]]:
     # process the above into a dict of plane definitions and a dict with frame number intervals for which to use each
     codings = [e for e in episodes] if episodes else [cs['name'] for cs in study_config.coding_setup if cs.get('planes',[])]
     coding_setups = [cs for cs in study_config.coding_setup if cs['name'] in codings]
     planes = {v for cs in coding_setups for v in cs['planes']}
     planes_setup: dict[str, aruco.PlaneSetup] = {}
-    analyze_frames: dict[str, list[list[int]]|None] = {}
+    analyze_frames: dict[str, tuple[annotation.EventType, list[list[int]]]|None] = {}
     for p in planes:
         p_def = [pl for pl in study_config.planes if pl.name==p][0]
         pl = plane.get_plane_from_definition(p_def, config_dir/p)
         planes_setup[p] = pl.get_plane_setup()
         if episodes:
             # determine for which frames this plane should be used
-            anal_events  = [cs['name'] for cs in study_config.coding_setup if p in cs['planes']]
-            all_episodes = [ep for k in anal_events if k in episodes for ep in episodes[k] if ep]  # filter out empty
-            analyze_frames[p] = sorted(all_episodes, key = lambda x: x[1])
+            anal_events  = {cs['name']: cs['event_type'] for cs in study_config.coding_setup if p in cs['planes']}
+            all_episodes = [ep for k in anal_events if k in episodes for ep in episodes[k][1] if ep]  # filter out empty
+            analyze_frames[p] = (list(anal_events.values())[0],sorted(all_episodes, key = lambda x: x[1]))
         else:
             analyze_frames[p] = None
 

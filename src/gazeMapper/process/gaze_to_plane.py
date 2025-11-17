@@ -60,7 +60,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
         for p in cs['planes']:
             if p not in mapping_setup:
                 mapping_setup[p] = []
-            mapping_setup[p].extend(episodes[cs['name']])
+            mapping_setup[p].extend(episodes[cs['name']][1])
     mapping_setup = {p:sorted(mapping_setup[p], key = lambda x: x[0]) for p in mapping_setup}
 
     planes: dict[str,gt_plane.Plane] = {}

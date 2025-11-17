@@ -52,11 +52,11 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
 
     # get interval coding
     episodes = episode.load_episodes_from_all_recordings(study_config, working_dir, {cs['name'] for cs in sync_events})[0]
-    if not episodes or not any(episodes[e] for e in episodes):
+    if not episodes or not any(episodes[e][1] for e in episodes):
         raise RuntimeError(f'No {annotation.tooltip_map[annotation.EventType.Sync_ET_Data]}s found for this recording. Run code_episodes and code at least one {annotation.tooltip_map[annotation.EventType.Sync_ET_Data]}.')
 
     # Read gaze data
-    gazes = gaze_headref.read_dict_from_file(working_dir / gt_naming.gaze_data_fname, [v for e in episodes for v in episodes[e]])[0]
+    gazes = gaze_headref.read_dict_from_file(working_dir / gt_naming.gaze_data_fname, [v for e in episodes for v in episodes[e][1]])[0]
     # time info
     video_ts = timestamps.VideoTimestamps(working_dir / gt_naming.frame_timestamps_fname)
 
@@ -74,7 +74,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
                 pln_file = working_dir/f'{naming.plane_pose_prefix}{pln}.tsv'
                 if not pln_file.is_file():
                     raise FileNotFoundError(f'A planePose file for the {pln} plane is not found, but is needed. Run detect_markers to create this file.')
-                poses = pose.read_dict_from_file(pln_file, episodes[nm])
+                poses = pose.read_dict_from_file(pln_file, episodes[nm][1])
 
                 # get camera calibration info
                 camera_params = ocv.CameraParams.read_from_file(working_dir / gt_naming.scene_camera_calibration_fname)
@@ -91,7 +91,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
                 target_positions[nm] = {idx:TargetPos(video_ts.get_timestamp(idx), **kwargs) for idx,kwargs in zip(df['frame_idx'].values,df[['frame_idx','cam_pos']].to_dict(orient='records'))}
 
     # flatten into list of tuples for easier processing
-    episodes = [(e, v) for e in episodes for v in episodes[e]]
+    episodes = [(e, v) for e in episodes for v in episodes[e][1]]
 
     # get previous sync settings, if any
     VOR_sync_file = working_dir / naming.VOR_sync_file
