@@ -536,12 +536,12 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
                 # prep config for validation export
                 # data quality type
                 type_idx = t_dq_df.index.names.index('type')
-                dq_set[nm]['dq_types'] = {k:False for k in sorted(list(t_dq_df.index.levels[type_idx]), key=lambda dq: dq.value)}
+                dq_set[nm]['data_types'] = {k:False for k in sorted(list(t_dq_df.index.levels[type_idx]), key=lambda dq: dq.value)}
                 for dq in data_types.DataType:
-                    if cs['validation_setup']['dq_types'] is not None and dq in cs['validation_setup']['dq_types'] and dq in dq_set[nm]['dq_types']:
-                        dq_set[nm]['dq_types'][dq] = True
-                if not any(dq_set[nm]['dq_types'].values()):
-                    dq_set[nm]['dq_types'][default_dq_type] = True
+                    if cs['validation_setup']['data_types'] is not None and dq in cs['validation_setup']['data_types'] and dq in dq_set[nm]['data_types']:
+                        dq_set[nm]['data_types'][dq] = True
+                if not any(dq_set[nm]['data_types'].values()):
+                    dq_set[nm]['data_types'][default_dq_type] = True
 
                 # targets
                 dq_set[nm]['targets']     = {t:True for t in dq_targets}
@@ -577,7 +577,7 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
                     if not imgui.tree_node(f'{nm} ({cs["description"]})'):
                         continue
 
-                if len(dq_set[nm]['dq_types'])>1:
+                if len(dq_set[nm]['data_types'])>1:
                     if imgui.tree_node('Data quality types'):
                         imgui.text_unformatted("Indicate which type(s) of\ndata quality to export.")
                         if imgui.begin_table("##export_popup_validation", columns=2, flags=imgui.TableFlags_.no_clip):
@@ -587,7 +587,7 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
                             imgui.table_set_column_index(1)  # Right
                             imgui.dummy((right_width, 1))
 
-                            for dq in dq_set[nm]['dq_types']:
+                            for dq in dq_set[nm]['data_types']:
                                 imgui.table_next_row()
                                 imgui.table_next_column()
                                 imgui.align_text_to_frame_padding()
@@ -595,7 +595,7 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
                                 imgui.text(t)
                                 gt_gui.utils.draw_hover_text(ht, text="")
                                 imgui.table_next_column()
-                                _, dq_set[nm]['dq_types'][dq] = imgui.checkbox(f"##{dq.name}", dq_set[nm]['dq_types'][dq])
+                                _, dq_set[nm]['data_types'][dq] = imgui.checkbox(f"##{dq.name}", dq_set[nm]['data_types'][dq])
 
                             imgui.end_table()
                             imgui.spacing()
@@ -660,7 +660,7 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
         # export data quality for all recordings in all sessions
         if 'validation' in to_export and to_export['validation']:
             for nm in dq_set:
-                dq_types = [dq for dq in dq_set[nm]['dq_types'] if dq_set[nm]['dq_types'][dq]]
+                dq_types = [dq for dq in dq_set[nm]['data_types'] if dq_set[nm]['data_types'][dq]]
                 targets  = [t for t in dq_set[nm]['targets'] if dq_set[nm]['targets'][t]]
                 export.summarize_and_store_data_quality(dq_df[nm], path/f'data_quality_{nm}.tsv', dq_types, targets, dq_set[nm]['targets_avg'], dq_set[nm]['include_data_loss'])
 
