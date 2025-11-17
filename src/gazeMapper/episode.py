@@ -9,15 +9,9 @@ from . import config, naming
 
 
 class Episode:
-    def __init__(self, event:str, start_frame:int, end_frame:int|None=None, event_type:annotation.EventType|None=None):
-        # check event is known
-        if (evt:=annotation.get_event_by_name(event)) is None:
-            raise ValueError(f'Event "{event}" is not registered. Cannot create Episode instance.')
+    def __init__(self, event:str, event_type:annotation.EventType, start_frame:int, end_frame:int|None=None):
         self.event          = event
-        if event_type is not None:
-            if event_type != evt.event_type:
-                raise ValueError(f'Event type mismatch for event "{event}". Provided: {event_type}, expected from registry: {evt.event_type}')
-        self.event_type     = evt.event_type
+        self.event_type     = event_type
         self.start_frame    = start_frame
 
         if annotation.type_map[self.event_type]==annotation.Type.Interval:
@@ -62,7 +56,7 @@ def write_list_to_file(episodes: list[Episode],
     df = df[['event','event_type','start_frame','end_frame']]
     df.to_csv(str(fileName), index=False, sep='\t', na_rep='nan')
 
-def load_episodes_from_all_recordings(study_config: config.Study, recording_dir: str|pathlib.Path, episode_subset: set[str]|None=None, load_from_other_recordings=True, empty_if_no_coding=True, error_if_unwanted_found=True, missing_other_coding_ok=False) -> tuple[dict[str, list[list[int]]], set[str], dict[str, annotation.EventType]]:
+def load_episodes_from_all_recordings(study_config: config.Study, recording_dir: str|pathlib.Path, episode_subset: set[str]|None=None, load_from_other_recordings=True, empty_if_no_coding=True, error_if_unwanted_found=True, missing_other_coding_ok=False) -> tuple[dict[str, tuple[annotation.EventType, list[list[int]]]], set[str]]:
     from . import synchronization
     # loads episodes for both the current recording, and from other synced recordings in the session as set up in the study config
     recording_dir = pathlib.Path(recording_dir)
@@ -97,11 +91,8 @@ def load_episodes_from_all_recordings(study_config: config.Study, recording_dir:
         if evt not in episodes:
             episodes[evt] = []
 
-    # get event type of each event
-    event_types = {evt: [cs for cs in study_config.coding_setup if cs['name']==evt][0]['event_type'] for evt in episodes}
-
     if not load_from_other_recordings:
-        return episodes, to_code, event_types
+        return episodes, to_code
 
     # now check if there is coding to get from other recordings, or if there is coding that should not be there
     rec_name = recording_dir.name
@@ -116,7 +107,6 @@ def load_episodes_from_all_recordings(study_config: config.Study, recording_dir:
                 to_remove.append(nm)
     for nm in to_remove:
         del episodes[nm]
-        event_types.pop(nm, None)
     # check for coding to get from other recordings
     all_recs = [r.name for r in study_config.session_def.recordings if r.name!=study_config.sync_ref_recording]
     for cs in study_config.coding_setup:
@@ -136,55 +126,37 @@ def load_episodes_from_all_recordings(study_config: config.Study, recording_dir:
             extra = '' if single_rec else f' (from recording {other_rec})'
             eps = synchronization.get_episode_frame_indices_from_other_video(recording_dir, nm, rec_name, other_rec, study_config.sync_ref_recording, all_recs, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings, study_config.sync_ref_stretch_which, missing_other_coding_ok=missing_other_coding_ok)
             if eps:
-                episodes[nm+extra] = eps
-                event_types[nm+extra] = cs['event_type']
+                episodes[nm+extra] = (cs['event_type'], eps)
 
-    return episodes, to_code, event_types
+    return episodes, to_code
 
 
-def get_empty_marker_dict(episodes: list[str]) -> dict[str,list[list[int]]]:
-    return {e:[] for e in sorted(episodes)}
+def get_empty_marker_dict(episodes: list[tuple[str, annotation.EventType]]) -> dict[str, tuple[annotation.EventType, list[list[int]]]]:
+    return {e:(et, []) for e,et in sorted(episodes)}
 
-def list_to_marker_dict(episodes: list[Episode], expected_types: list[str]|None=None) -> dict[str,list[list[int]]]:
-    e_dict = get_empty_marker_dict(expected_types or list(set(e.event for e in episodes)))
+def list_to_marker_dict(episodes: list[Episode], expected_events: list[tuple[str, annotation.EventType]]|None=None) -> dict[str, tuple[annotation.EventType, list[list[int]]]]:
+    e_dict = get_empty_marker_dict(expected_events or list(set((e.event, e.event_type) for e in episodes)))
     for e in episodes:
         if e.event not in e_dict:
-            #raise ValueError(f'{e.event} (a {annotation.tooltip_map[e.event_type]}) found, but not expected (e.g. should not be coded for this study according to the study setup)')
             continue    # ignore unexpected events
         if e.end_frame is not None:
-            e_dict[e.event].append([e.start_frame, e.end_frame])
+            e_dict[e.event][1].append([e.start_frame, e.end_frame])
         else:
-            e_dict[e.event].append([e.start_frame])
+            e_dict[e.event][1].append([e.start_frame])
     return e_dict
 
-def marker_dict_to_list(episodes: typing.Mapping[str,list[int]|list[list[int]]]) -> list[Episode]:
+def marker_dict_to_list(episodes: typing.Mapping[str, tuple[annotation.EventType, list[int]|list[list[int]]]]) -> list[Episode]:
     e_list: list[Episode] = []
     for e in episodes:
-        if not episodes[e]:
+        if not episodes[e] or not episodes[e][1]:
             continue
-        if isinstance(episodes[e][0],list):
-            e_list.extend([Episode(e, *v) for v in episodes[e]])
+        if isinstance(episodes[e][1][0],list):
+            e_list.extend([Episode(e, v[0], *v[1]) for v in episodes[e]])
         else:
-            ev = annotation.get_event_by_name(e)
-            if annotation.type_map[ev.event_type]==annotation.Type.Interval:
-                for m in range(0,len(episodes[e])-1,2): # read in batches of two, and run until -1 to make sure we don't pick up incomplete intervals
-                    e_list.append(Episode(e, *episodes[e][m:m+2]))
+            if annotation.type_map[episodes[e][0]]==annotation.Type.Interval:
+                for m in range(0,len(episodes[e][1])-1,2): # read in batches of two, and run until -1 to make sure we don't pick up incomplete intervals
+                    e_list.append(Episode(e, episodes[e][0], *episodes[e][1][m:m+2]))
             else:
-                e_list.extend([Episode(e,m) for m in episodes[e]])
+                e_list.extend([Episode(e, episodes[e][0], m) for m in episodes[e][1]])
 
     return sorted(e_list, key=lambda x: x.start_frame)
-
-
-def is_in_interval(episodes: dict[str,list[int]|list[list[int]]]|list[Episode], idx: int) -> dict[str, bool]:
-    if isinstance(episodes,dict):
-        episodes = marker_dict_to_list(episodes)
-
-    e_dict: dict[str,bool] = {e.event:False for e in episodes}
-    for e in episodes:
-        if annotation.type_map[e.event_type]==annotation.Type.Interval:
-            if idx>=e.start_frame and idx<=e.end_frame:
-                e_dict[e.event] = True
-        else:
-            if idx==e.start_frame:
-                e_dict[e.event] = True
-    return e_dict
