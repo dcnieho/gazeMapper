@@ -25,7 +25,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None=None, p
     study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent, config.OverrideLevel.Recording: working_dir}, **study_settings)
     val_events = process.get_specific_event_types(study_config, annotation.EventType.Validate)
     if not val_events:
-        raise ValueError('No validation events are configured for the study, nothing to process')
+        raise ValueError(f'No {annotation.tooltip_map[annotation.EventType.Validate]} events are configured for the study, nothing to process')
 
     # get info about recording
     rec_def = study_config.session_def.get_recording_def(working_dir.name)
@@ -35,7 +35,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None=None, p
     # get interval(s) coded to be analyzed, if any
     episodes = episode.load_episodes_from_all_recordings(study_config, working_dir, {cs['name'] for cs in val_events})[0]
     if not any(episodes[e][1] for e in episodes):
-        raise RuntimeError(f'There are no validation episodes coded for session "{working_dir.parent.name}", recording "{working_dir.name}", nothing to process')
+        raise RuntimeError(f'There are no {annotation.tooltip_map[annotation.EventType.Validate]} episodes coded for session "{working_dir.parent.name}", recording "{working_dir.name}", nothing to process')
 
     # prep progress indicator
     total = 2*len(episodes) + sum(len(episodes[e][1]) for e in episodes)*3
