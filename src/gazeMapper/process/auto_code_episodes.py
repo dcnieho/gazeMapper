@@ -1,9 +1,10 @@
 import pathlib
 import numpy as np
+import pandas as pd
 import shutil
 import copy
 
-from glassesTools import annotation, marker as gt_marker, process_pool, validation
+from glassesTools import annotation, marker as gt_marker, naming as gt_naming, process_pool, timestamps, validation
 
 from .. import config, episode, naming, plane, process, session
 
@@ -99,47 +100,61 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
             # multiple runs of all individual targets (possibly random) order (so not fully randomized over all target presentations, then can't split).
             # Intervals are then split smaller after each run of all targets has been presented.
             p = list(cs['planes'])[0]
-            plane_def = [pl for pl in study_config.planes if pl.name==p][0]
-            if plane_def.type!=plane.Type.GlassesValidator:
-                raise ValueError(f'Plane {p} is not a {plane.Type.GlassesValidator.value} plane')
-            validation_plane = plane.get_plane_from_definition(plane_def, config_dir/p)
-            all_marker_observations_per_target, markers_per_target = validation.dynamic.get_marker_observations(validation_plane, working_dir)
-            for e in intervals:
-                # make local copy of marker_observations, containing only the current episode
-                marker_observations_per_target = {t:mo.loc[e[0]:e[1],:] for t,mo in all_marker_observations_per_target.items()}
-                # check we have data for at least one of the markers for a given target
-                failed = False
-                for t in marker_observations_per_target:
-                    if marker_observations_per_target[t].empty:
-                        missing_str  = '\n- '.join([gt_marker.marker_ID_to_str(m) for m in markers_per_target[t]])
-                        print(f'None of the markers for target {t} were observed during the episode from frame {e[0]} to frame {e[1]}:\n- {missing_str}')
-                        failed = True
-                        break
-                if failed:
-                    continue
+            if (fname:=working_dir/f'{naming.validation_prefix}{p}_fixation_assignment_override.tsv').exists():
+                coding = pd.read_csv(fname, delimiter='\t', dtype={'target':int, 'marker_interval':int},index_col=None)
+                has_override = True
+            else:
+                plane_def = [pl for pl in study_config.planes if pl.name==p][0]
+                if plane_def.type!=plane.Type.GlassesValidator:
+                    raise ValueError(f'Plane {p} is not a {plane.Type.GlassesValidator.value} plane')
+                validation_plane = plane.get_plane_from_definition(plane_def, config_dir/p)
+                all_marker_observations_per_target, markers_per_target = validation.dynamic.get_marker_observations(validation_plane, working_dir)
+                has_override = False
+            for e in intervals.copy():
+                if not has_override:
+                    # make local copy of marker_observations, containing only the current episode
+                    marker_observations_per_target = {t:mo.loc[e[0]:e[1],:] for t,mo in all_marker_observations_per_target.items()}
+                    # check we have data for at least one of the markers for a given target
+                    failed = False
+                    for t in marker_observations_per_target:
+                        if marker_observations_per_target[t].empty:
+                            missing_str  = '\n- '.join([gt_marker.marker_ID_to_str(m) for m in markers_per_target[t]])
+                            print(f'None of the markers for target {t} were observed during the episode from frame {e[0]} to frame {e[1]}:\n- {missing_str}')
+                            failed = True
+                            break
+                    if failed:
+                        continue
 
-                # marker presence signal only contains marker detections (True). We need to fill the gaps in between detections with False (not detected) so we have a continuous signal without gaps
-                marker_observations_per_target = {t: gt_marker.expand_detection(marker_observations_per_target[t], fill_value=False) for t in marker_observations_per_target}
+                    # marker presence signal only contains marker detections (True). We need to fill the gaps in between detections with False (not detected) so we have a continuous signal without gaps
+                    marker_observations_per_target = {t: gt_marker.expand_detection(marker_observations_per_target[t], fill_value=False) for t in marker_observations_per_target}
 
-                # for each target, see when it is presented using the marker presence signal
-                target_observation_map: list[tuple[tuple[int,int],int]] = []  # ((start_frame,end_frame), target_id)
-                for t in marker_observations_per_target:
-                    start, end = gt_marker.get_appearance_starts_ends(marker_observations_per_target[t], cs['validation_setup']['dynamic_max_gap_duration'], cs['validation_setup']['dynamic_min_duration'])
-                    for s,en in zip(start,end):
-                        target_observation_map.append(((s,en), t))
-                # sort on start frame
-                target_observation_map.sort(key=lambda x: x[0][0])
-                # check each target occurs equally often
-                target_counts = {t:0 for t in markers_per_target}
-                for _,t in target_observation_map:
-                    target_counts[t]+=1
+                    # for each target, see when it is presented using the marker presence signal
+                    target_observation_map: list[tuple[tuple[int,int],int]] = []  # ((start_frame,end_frame), target_id)
+                    for t in marker_observations_per_target:
+                        start, end = gt_marker.get_appearance_starts_ends(marker_observations_per_target[t], cs['validation_setup']['dynamic_max_gap_duration'], cs['validation_setup']['dynamic_min_duration'])
+                        for s,en in zip(start,end):
+                            target_observation_map.append(((s,en), t))
+                    # sort on start frame
+                    target_observation_map.sort(key=lambda x: x[0][0])
+                    # check each target occurs equally often
+                    target_counts = {t:0 for t in all_marker_observations_per_target}
+                    for _,t in target_observation_map:
+                        target_counts[t]+=1
+                else:
+                    video_ts = timestamps.VideoTimestamps(working_dir / gt_naming.frame_timestamps_fname)
+                    target_observation_map = []
+                    for _, row in coding.iterrows():
+                        start_frame = video_ts.find_frame(row['start_timestamp'])
+                        end_frame   = video_ts.find_frame(row['end_timestamp'])
+                        target_observation_map.append(((start_frame, end_frame), int(row['target'])))
+                    target_counts = coding['target'].value_counts().to_dict()
                 counts_set = set(target_counts.values())
                 if len(counts_set)!=1:
                     print(f'Not all targets were presented equally often during the episode from frame {e[0]} to frame {e[1]}, cannot split consecutive repetitions')
                     continue
                 # check each target is only presented once per consecutive run
                 n_repetitions = counts_set.pop()
-                n_targets     = len(markers_per_target)
+                n_targets     = len(target_counts)
                 for rep in range(1, n_repetitions):
                     si, ei = (rep-1)*n_targets, rep*n_targets
                     targets_in_run = set(t for _,t in target_observation_map[si:ei])
