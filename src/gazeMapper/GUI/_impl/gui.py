@@ -633,7 +633,7 @@ class GUI:
             return {}
         cs = cs[0]
         # get target planes
-        planes = {p:pc for p in cs['planes'] if isinstance((pc:=self.plane_configs[p]),gt_plane.TargetPlane)}
+        planes = {p:pc for p in cs['planes'] if p in self.plane_configs and isinstance((pc:=self.plane_configs[p]),gt_plane.TargetPlane)}
         if not planes:
             return {}
         # NB: use immediately invoked lambda to capture p correctly (avoid late binding issues)
