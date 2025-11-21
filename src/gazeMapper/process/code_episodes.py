@@ -88,6 +88,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
             for t in targets:
                 values = coding.loc[t, ['start_frame', 'end_frame']].to_dict(orient='records')
                 episodes[_get_target_name(t)] = (annotation.EventType.Target, [list(v.values()) for v in values])
+        else:
+            for t in targets:
+                episodes[_get_target_name(t)] = (annotation.EventType.Target, [])
         # add validation episodes (read only), for reference
         e = episode.load_episodes_from_all_recordings(study_config, working_dir, error_if_unwanted_found=False, missing_other_coding_ok=True)[0]
         if val_coding_event in e:
