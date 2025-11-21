@@ -99,11 +99,11 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
             # This deals with multiple consecutive marker presentation without intervening segmentation markers. It is assumed that all targets are shown in
             # multiple runs of all individual targets (possibly random) order (so not fully randomized over all target presentations, then can't split).
             # Intervals are then split smaller after each run of all targets has been presented.
-            p = list(cs['planes'])[0]
-            if (fname:=working_dir/f'{naming.validation_prefix}{p}_fixation_assignment_override.tsv').exists():
+            if (fname:=working_dir/f'{naming.validation_prefix}{cs["name"]}_fixation_assignment_override.tsv').exists():
                 coding = pd.read_csv(fname, delimiter='\t', dtype={'target':int, 'marker_interval':int},index_col=None)
                 has_override = True
             else:
+                p = list(cs['planes'])[0]
                 plane_def = [pl for pl in study_config.planes if pl.name==p][0]
                 if plane_def.type!=plane.Type.GlassesValidator:
                     raise ValueError(f'Plane {p} is not a {plane.Type.GlassesValidator.value} plane')
