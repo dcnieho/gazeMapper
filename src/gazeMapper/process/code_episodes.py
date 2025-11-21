@@ -78,7 +78,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
         episodes = {}
         descriptions = {}
         # get coding
-        fname = working_dir/f'{naming.validation_prefix}{cs["name"]}_fixation_assignment_override.tsv'
+        fname = working_dir/f'{naming.validation_prefix}{val_coding_event}_fixation_assignment_override.tsv'
         if not fname.exists():
             fname = working_dir/f'{naming.validation_prefix}{cs["name"]}_fixation_assignment.tsv'
         if fname.exists():
