@@ -86,7 +86,12 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
             coding['start_frame'] = [video_ts.find_frame(t) for t in coding['start_timestamp'].to_numpy()]
             coding['end_frame'] = [video_ts.find_frame(t) for t in coding['end_timestamp'].to_numpy()]
             for t in targets:
-                values = coding.loc[t, ['start_frame', 'end_frame']].to_dict(orient='records')
+                if (cnt:=sum(coding.index==t)) > 1:
+                    values = coding.loc[t, ['start_frame', 'end_frame']].to_dict(orient='records')
+                elif cnt==1:
+                    values = [coding.loc[t, ['start_frame', 'end_frame']].to_dict()]
+                else:
+                    values = []
                 episodes[_get_target_name(t)] = (annotation.EventType.Target, [list(v.values()) for v in values])
         else:
             for t in targets:
