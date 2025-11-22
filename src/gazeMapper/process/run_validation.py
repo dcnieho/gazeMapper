@@ -86,8 +86,6 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None=None, p
                 other_intervals = None
                 selected_intervals = target_coding[target_coding['marker_interval']==idx+1].copy()
                 selected_intervals = selected_intervals.rename(columns={'start_timestamp':'startT', 'end_timestamp':'endT'})
-                progress_indicator.update()
-
             elif validation_plane.is_dynamic():
                 selected_intervals, other_intervals = \
                     assign_intervals.dynamic_markers(marker_observations_per_target,
