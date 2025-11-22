@@ -92,7 +92,8 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None=None, p
                                                     episodes[e][1][idx],
                                                     cs['validation_setup']['dynamic_skip_first_duration'],
                                                     cs['validation_setup']['dynamic_max_gap_duration'],
-                                                    cs['validation_setup']['dynamic_min_duration'])
+                                                    cs['validation_setup']['dynamic_min_duration'],
+                                                    e)
             else:
                 fix_file = working_dir / f'{naming.validation_prefix}{e}_fixations_interval_{idx+1:02d}.tsv'
                 selected_intervals, other_intervals = \

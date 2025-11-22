@@ -108,7 +108,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
                 if plane_def.type!=plane.Type.GlassesValidator:
                     raise ValueError(f'Plane {p} is not a {plane.Type.GlassesValidator.value} plane')
                 validation_plane = plane.get_plane_from_definition(plane_def, config_dir/p)
-                all_marker_observations_per_target, markers_per_target = validation.dynamic.get_marker_observations(validation_plane, working_dir)
+                all_marker_observations_per_target, markers_per_target = validation.dynamic.get_marker_observations(validation_plane, working_dir, cs['name'])
                 has_override = False
             for e in intervals.copy():
                 if not has_override:
