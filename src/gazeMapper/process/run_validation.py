@@ -61,9 +61,14 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None=None, p
                             np.array([validation_plane.bbox[x] for x in (0,2,3,1)]))
         targets = {t_id: np.append(validation_plane.targets[t_id].center, 0.) for t_id in validation_plane.targets}   # get centers of targets
 
-        # find intervals
-        if validation_plane.is_dynamic():
-            marker_observations_per_target, markers_per_target = validation.dynamic.get_marker_observations(validation_plane, working_dir)
+        # use user-coded intervals if available else find intervals
+        has_override = False
+        fname_override = working_dir/f'{naming.validation_prefix}{e}_fixation_assignment_override.tsv'
+        if fname_override.exists():
+            target_coding = pd.read_csv(fname_override, delimiter='\t', dtype={'target':int, 'marker_interval':int},index_col='target')
+            has_override = True
+        elif validation_plane.is_dynamic():
+            marker_observations_per_target, markers_per_target = validation.dynamic.get_marker_observations(validation_plane, working_dir, e)
         else:
             fixation_classification.from_plane_gaze(working_dir/f'{naming.world_gaze_prefix}{p}.tsv',
                                                     episodes[e][1],
@@ -72,13 +77,6 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None=None, p
                                                     filename_stem=f'{naming.validation_prefix}{e}_fixations',
                                                     plot_limits=plot_limits)
         progress_indicator.update()
-
-        # see if we have user-coded intervals
-        has_override = False
-        fname_override = working_dir/f'{naming.validation_prefix}{e}_fixation_assignment_override.tsv'
-        if fname_override.exists():
-            target_coding = pd.read_csv(fname_override, delimiter='\t', dtype={'target':int, 'marker_interval':int},index_col='target')
-            has_override = True
 
         # assign intervals
         for idx,_ in enumerate(episodes[e][1]):
