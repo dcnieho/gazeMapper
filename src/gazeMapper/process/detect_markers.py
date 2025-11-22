@@ -69,8 +69,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
         # get interval(s) coded to be analyzed, if any
         # We don't need them if they would be ignored because the whole video would be processed. The whole video is processed when study_config.auto_code_sync_points or study_config.auto_code_episodes are set
         has_auto_code = process.config_has_auto_coding(study_config)
-        episodes_with_planes = {cs['name'] for cs in study_config.coding_setup if cs.get('planes',[])}
-        episodes = episode.load_episodes_from_all_recordings(study_config, working_dir, episodes_with_planes, missing_other_coding_ok=has_auto_code)[0]
+        wanted_episodes = {cs['name'] for cs in study_config.coding_setup if cs.get('planes',[]) or cs.get('sync_setup',None) is not None}
+        episodes = episode.load_episodes_from_all_recordings(study_config, working_dir, wanted_episodes, missing_other_coding_ok=has_auto_code)[0]
 
         # remove empty episode lists (no coding)
         episodes = {cs:episodes[cs] for cs in episodes if episodes[cs][1]}
