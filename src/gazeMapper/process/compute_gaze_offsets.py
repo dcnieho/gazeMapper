@@ -78,9 +78,6 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
     viewing_distance = {p: get_validation_setup(config_dir/p)['distance']*10. for p in targets_per_plane if isinstance(planes[p], val_Plane)}
     targets_for_homography = {p: {t_id: np.append(planes[p].targets[t_id].center, viewing_distance[p]) for t_id in targets_per_plane[p]} for p in targets_per_plane if isinstance(planes[p], val_Plane)}
 
-    # get camera calibration info
-    camera_params = ocv.CameraParams.read_from_file(working_dir / gt_naming.scene_camera_calibration_fname)
-
     # prep progress indicator
     total = sum(len(plane_gazes[p][f]) for p in poses for f in poses[p] if f in plane_gazes[p])
     progress_indicator.set_total(total)
