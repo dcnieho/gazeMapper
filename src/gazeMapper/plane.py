@@ -212,7 +212,7 @@ definition_parameter_types: dict[Type, dict['str', typing.Type]] = {}
 for _t,_cls in zip([Type.GlassesValidator, Type.Plane_2D, Type.Target_Plane_2D],[Definition_GlassesValidator, Definition_Plane_2D, Definition_Target_Plane_2D]):
     _params = inspect.signature(_cls.__init__).parameters
     definition_defaults[_t]        = {k:d for k in _params if (d:=_params[k].default)!=inspect._empty}
-    definition_parameter_types[_t] = {k:_params[k].annotation for k in _params if k!='self'}
+    definition_parameter_types[_t] = {k:_params[k].annotation for k in _params if k not in ['self', 'kwargs']}
     del _params
 definition_parameter_doc = {
     'name': type_utils.GUIDocInfo('Name','The name of the plane.'),
