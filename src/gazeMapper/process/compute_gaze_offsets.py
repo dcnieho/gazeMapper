@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import polars as pl
 
-from glassesTools import data_types, gaze_worldref, naming as gt_naming, ocv, plane as gt_plane, pose as gt_pose, process_pool
+from glassesTools import data_types, gaze_worldref, naming as gt_naming, plane as gt_plane, pose as gt_pose, process_pool
 from glassesTools.validation import Plane as val_Plane
 from glassesTools.validation.config import get_validation_setup
 
@@ -37,7 +37,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
     # get episodes for which to compute gaze offsets from targets
     episodes = episode.load_episodes_from_all_recordings(study_config, working_dir, {cs['name'] for cs in episodes_to_proc})[0]
 
-    # we transform to map to plane for validate and trial episodes, set it up
+    # get info about targets and other info needed to compute gaze offsets, per plane
     episodes_per_plane: dict[str, list[list[int]]] = {}
     targets_per_plane: dict[str, set[int]] = {}
     d_types_per_plane: dict[str, set[data_types.DataType]] = {}
@@ -72,6 +72,18 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
     # load gaze data and poses
     plane_gazes = {p: gaze_worldref.read_dict_from_file(working_dir / f'{naming.world_gaze_prefix}{p}.tsv', episodes=episodes_per_plane[p], ts_column_suffixes=['VOR','']) for p in episodes_per_plane}
     poses = {p:gt_pose.read_dict_from_file(working_dir/f'{naming.plane_pose_prefix}{p}.tsv', episodes_per_plane[p]) for p in episodes_per_plane}
+    head_gaze = pd.read_csv(working_dir/gt_naming.gaze_data_fname, delimiter='\t', index_col=False)
+
+
+    # get first plane gaze
+    p = list(plane_gazes.keys())[0]
+    has_VOR = plane_gazes[p][list(plane_gazes[p].keys())[0]][0].timestamp_VOR is not None
+    extra_suffix = '_VOR' if has_VOR else ''
+    # for head_gaze, keep only timestamp and frame_idx columns (and VOR versions, if available)
+    head_gaze_cols = ['timestamp','frame_idx']
+    if 'timestamp_VOR' in head_gaze.columns:
+        head_gaze_cols.extend(['timestamp_VOR','frame_idx_VOR'])
+    head_gaze = head_gaze[head_gaze_cols].set_index('timestamp'+extra_suffix)
 
     # get target positions on the plane(s), in mm
     targets = {p: {t_id: np.append(planes[p].targets[t_id].center, 0.) for t_id in targets_per_plane[p]} for p in targets_per_plane}
@@ -107,7 +119,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
                 viewing_distance[p] if p in viewing_distance else None
                 )
             # prepare output data frame
-            new_rows = pd.DataFrame({'frame_idx': frame_idxs}, index=pd.Index(timestamps, name='timestamp'))
+            new_rows = pd.DataFrame({'frame_idx'+extra_suffix: frame_idxs}, index=pd.Index(timestamps, name='timestamp'+extra_suffix))
             if df is None:
                 df = new_rows
             else:
@@ -118,6 +130,17 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
                     col_names = [f'{x}_target_{t}_{d_type.name}' for x in ('offset', 'offset_x', 'offset_y')]
                     df.loc[timestamps, col_names] = offsets[t][d_type]
                     progress_indicator.update(n=len(frame_idxs))
+
+        # merge with original timestamps so that we have nan in the signal for missing gaze timestamps
+        rng = [episodes_per_plane[p][0][0], episodes_per_plane[p][-1][1]]
+        hg = head_gaze.loc[(head_gaze['frame_idx'+extra_suffix]>=rng[0]) & (head_gaze['frame_idx'+extra_suffix]<=rng[1])]
+        # combine to add missing rows (if we have a VOR column, need some special handling to preserve integer type)
+        if has_VOR:
+            frame_idx_VOR = df.pop('frame_idx_VOR').combine_first(hg.pop('frame_idx_VOR'))
+        df = df.merge(hg[['timestamp', 'frame_idx']], how='outer', left_index=True, right_index=True)
+        if has_VOR:
+            # Combine back in the VOR column
+            df['frame_idx_VOR'] = frame_idx_VOR
 
         # store to file
         df = pl.from_pandas(df, include_index=True)
