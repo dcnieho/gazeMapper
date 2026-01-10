@@ -73,7 +73,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
         plane_points = {t:pl.targets[t].center for t in pl.targets}
         def _get_target_name(t: int) -> str:
             return f'Target {t}'
-        hotkeys = {_get_target_name(t):f'_{t}' if t<=9 else chr(ord('a')+(t-10)) for t in targets}
+        used_keys = {k.lower() for k in gui.get_shortcut_keys(include_unused=True)}
+        possible_hotkeys = [c for a in range(ord('a'), ord('z') + 1) if (c:=chr(a)) not in used_keys]
+        hotkeys = {_get_target_name(t):f'_{t}' if t<=9 else possible_hotkeys[t-10] for t in targets}
         episodes_to_code = set(hotkeys.keys())
         episodes = {}
         descriptions = {}
