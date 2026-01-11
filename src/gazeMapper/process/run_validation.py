@@ -2,7 +2,7 @@ import pathlib
 import numpy as np
 import pandas as pd
 
-from glassesTools import annotation, fixation_classification, naming as gt_naming, process_pool, timestamps, validation
+from glassesTools import annotation, fixation_classification, naming as gt_naming, process_pool, validation
 from glassesTools.validation import assign_intervals, compute_offsets
 
 from .. import config, episode, naming, plane, process, session
