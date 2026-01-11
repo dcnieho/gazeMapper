@@ -131,6 +131,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
     # get info about recording
     rec_def  = study_config.session_def.get_recording_def(working_dir.name)
     in_video = session.read_recording_info(working_dir, rec_def.type)[1]
+    if not in_video.is_file():
+        raise FileNotFoundError(f'Input video file "{in_video}" for recording "{rec_def.name}" not found')
     planes = {v for cs in study_config.coding_setup for v in cs['planes']}
     if rec_def.type==session.RecordingType.Camera:
         has_gaze, has_plane_gaze = False, False
