@@ -179,7 +179,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
                             break
         # now insert into coding file. This just overwrites whatever is there
         if cs['name'] not in episodes:
-            episodes[cs['name']] = []
+            episodes[cs['name']] = (cs['event_type'], [])
         episodes[cs['name']] = (cs['event_type'], [int(y) for x in intervals for y in x])
 
     # early exit if nothing has changed
