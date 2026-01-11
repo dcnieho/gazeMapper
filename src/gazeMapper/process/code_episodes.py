@@ -12,9 +12,10 @@ isMacOS = sys.platform.startswith("darwin")
 if isMacOS:
     import AppKit
 
-from glassesTools import annotation, drawing, gaze_headref, gaze_worldref, naming as gt_naming, ocv, plane as gt_plane, pose as gt_pose, process_pool, propagating_thread, timestamps
+from glassesTools import annotation, drawing, gaze_headref, gaze_worldref, naming as gt_naming, ocv, plane as gt_plane, pose as gt_pose, process_pool, propagating_thread, timestamps, validation
 from glassesTools.camera_recording import Type as CameraRecordingType
 from glassesTools.gui.video_player import GUI
+from glassesTools.validation import assign_intervals
 
 
 from .. import config, episode, naming, plane, process, session
@@ -66,6 +67,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
         if not evts:
             raise ValueError(f'Coding of validation targets for the "{val_coding_event}" was selected, but this event is unknown, can\'t continue')
         cs = evts[0]
+        # get coded episodes, if available:
+        e = episode.load_episodes_from_all_recordings(study_config, working_dir, error_if_unwanted_found=False, missing_other_coding_ok=True)[0]
         # get targets to code
         val_p_def = [pl for pl in study_config.planes if pl.name in cs['planes']][0]    # NB: only one plane for a validation interval
         pl    = plane.get_plane_from_definition(val_p_def, config_dir/val_p_def.name)
@@ -98,8 +101,24 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
         else:
             for t in targets:
                 episodes[_get_target_name(t)] = (annotation.EventType.Target, [])
+            if val_p_def.is_dynamic and val_coding_event in e:
+                # dynamic plane but no coding yet, try and prepopulate the coding based on ArUco marker detections (c.f. run_validation)
+                marker_observations_per_target, markers_per_target = validation.dynamic.get_marker_observations(pl, working_dir, val_coding_event, missing_ok=True)
+                for idx,_ in enumerate(e[val_coding_event][1]):
+                    selected_intervals, _ = assign_intervals.dynamic_markers(marker_observations_per_target,
+                                                markers_per_target,
+                                                working_dir/gt_naming.frame_timestamps_fname,
+                                                e[val_coding_event][1][idx],
+                                                cs['validation_setup']['dynamic_skip_first_duration'],
+                                                cs['validation_setup']['dynamic_max_gap_duration'],
+                                                cs['validation_setup']['dynamic_min_duration'],
+                                                val_coding_event,
+                                                allow_missing=True)
+                    for t in targets:
+                        target_name = _get_target_name(t)
+                        if t in selected_intervals.index:
+                            episodes[target_name][1].append([video_ts.find_frame(t) for t in selected_intervals.loc[t, ['startT', 'endT']].to_list()])
         # add validation episodes (read only), for reference
-        e = episode.load_episodes_from_all_recordings(study_config, working_dir, error_if_unwanted_found=False, missing_other_coding_ok=True)[0]
         if val_coding_event in e:
             episodes[val_coding_event] = e[val_coding_event]
             if cs['description'] is not None:
