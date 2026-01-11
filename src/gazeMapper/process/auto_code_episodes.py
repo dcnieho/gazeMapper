@@ -94,6 +94,9 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
             # these are consumed
             s_idx+=mini+1
             e_idx+=1
+        # if no intervals found, see if there are user-coded intervals to fall back on
+        if not intervals and (eps:=episodes.get(cs['name'], None)):
+            intervals = [(eps[1][i], eps[1][i+1]) for i in range(0, len(eps[1]), 2)]
         # if this is a dynamic validation episode, and the option to split consecutive repetitions is on, refine the interval now
         if cs['event_type']==annotation.EventType.Validate and cs['validation_setup'] and cs['validation_setup']['dynamic_split_consecutive']:
             # This deals with multiple consecutive marker presentation without intervening segmentation markers. It is assumed that all targets are shown in
