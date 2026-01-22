@@ -146,7 +146,7 @@ def is_action_possible_given_config(action: Action, study_config: 'config.Study'
             return not not study_config.sync_ref_recording
         case Action.COMPUTE_GAZE_OFFSETS:
             cs = get_specific_event_types(study_config, [annotation.EventType.Validate, annotation.EventType.Trial], ['gaze_offset_setup'])
-            return any((wt:=cs['gaze_offset_setup'].get('which_targets')) is not None and any(wt[p] for p in wt) for cs in cs)  # check if any event has at least one plane with at least one target
+            return any(not not (gs['which_targets']) for cs in cs for gs in cs['gaze_offset_setup'].values())  # check if any event has at least one plane with at least one target
         case Action.VALIDATE:
             return config_has_specific_event_type(study_config, annotation.EventType.Validate)
         case Action.EXPORT_TRIALS:

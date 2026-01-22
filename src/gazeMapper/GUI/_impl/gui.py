@@ -637,7 +637,7 @@ class GUI:
         if not planes:
             return {}
         # NB: use immediately invoked lambda to capture p correctly (avoid late binding issues)
-        return {'gaze_offset_setup': {'which_targets': {p: (lambda x: lambda: set(planes[x].get_target_IDs()))(p) for p in planes}}}
+        return {'gaze_offset_setup': {p: {'which_targets': (lambda x: lambda: set(planes[x].get_target_IDs()))(p)} for p in planes}}
 
     def _reload_sessions(self):
         sessions = session.get_sessions_from_project_directory(self.project_dir, self.study_config.session_def)
