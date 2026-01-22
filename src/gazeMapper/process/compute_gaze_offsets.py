@@ -38,40 +38,47 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
     episodes = episode.load_episodes_from_all_recordings(study_config, working_dir, {cs['name'] for cs in episodes_to_proc})[0]
 
     # get info about targets and other info needed to compute gaze offsets, per plane
-    episodes_per_plane: dict[str, list[list[int]]] = {}
-    targets_per_plane: dict[str, set[int]] = {}
-    d_types_per_plane: dict[str, set[data_types.DataType]] = {}
-    allow_d_fallback_per_plane: dict[str, bool] = {}
+    episodes_per_plane:         dict[str, dict[str, list[list[int]]]] = {}
+    targets_per_plane:          dict[str, dict[str, list[int]]] = {}
+    d_types_per_plane:          dict[str, dict[str, set[data_types.DataType]]] = {}
+    allow_d_fallback_per_plane: dict[str, dict[str, bool]] = {}
     viewing_distance_per_plane: dict[str, dict[str, float]] = {}
     for cs in episodes_to_proc:
         nm = cs['name']
         if nm not in viewing_distance_per_plane:
-            viewing_distance_per_plane[nm] = {}
-        for p in cs['gaze_offset_setup']['which_targets']:
-            if p not in episodes_per_plane:
-                episodes_per_plane[p] = []
-                targets_per_plane[p] = set()
-                d_types_per_plane[p] = set()
-                allow_d_fallback_per_plane[p] = False
-                viewing_distance_per_plane[nm][p] = {}
-            episodes_per_plane[p].extend(episodes[cs['name']][1])
-            targets_per_plane[p].update(cs['gaze_offset_setup']['which_targets'][p])
-            if cs['gaze_offset_setup']['data_types'] is not None:
-                d_types_per_plane[p].update(cs['gaze_offset_setup']['data_types'])
-            allow_d_fallback_per_plane[p] |= cs['gaze_offset_setup']['allow_data_type_fallback']
-            viewing_distance_per_plane[nm][p] = cs['gaze_offset_setup'].get('viewing_distance_mm', None)
-    # sort episodes per plane by start frame, and sort viewing distance using the same order
-    episodes_per_plane = {p:sorted(episodes_per_plane[p], key = lambda x: x[0]) for p in episodes_per_plane}
-    targets_per_plane = {p:sorted(list(targets_per_plane[p])) for p in targets_per_plane}
-    viewing_distance_per_plane = {nm: {p: viewing_distance_per_plane[nm][p] for p in episodes_per_plane} for nm in viewing_distance_per_plane}
+            episodes_per_plane[nm]          = {}
+            targets_per_plane[nm]           = {}
+            d_types_per_plane[nm]           = {}
+            allow_d_fallback_per_plane[nm]  = {}
+            viewing_distance_per_plane[nm]  = {}
+        for p in cs['gaze_offset_setup']:
+            episodes_per_plane[nm][p] = sorted(list(episodes[cs['name']][1]))
+            targets_per_plane[nm][p]  = sorted(list(cs['gaze_offset_setup'][p]['which_targets']))
+            d_types_per_plane[nm][p]  = set()
+            if cs['gaze_offset_setup'][p]['data_types'] is not None:
+                d_types_per_plane[nm][p].update(cs['gaze_offset_setup'][p]['data_types'])
+            allow_d_fallback_per_plane[nm][p] = cs['gaze_offset_setup'][p]['allow_data_type_fallback']
+            viewing_distance_per_plane[nm][p] = cs['gaze_offset_setup'][p].get('viewing_distance_mm', None)
+
+    # get information about the planes
+    all_planes = {p for nm in episodes_per_plane for p in episodes_per_plane[nm]}
     planes: dict[str,gt_plane.TargetPlane] = {}
-    for p in episodes_per_plane:
+    for p in all_planes:
         p_def = [pl for pl in study_config.planes if pl.name==p][0]
         planes[p] = plane.get_plane_from_definition(p_def, config_dir/p)
+        # for validation planes, fall back to viewing distance from config if not specified in the gaze offset setup
+        for nm in viewing_distance_per_plane:
+            if p in viewing_distance_per_plane[nm] and viewing_distance_per_plane[nm][p] is None and isinstance(planes[p], val_Plane):
+                viewing_distance_per_plane[nm][p] = get_validation_setup(config_dir/p)['distance']*10.
 
     # load gaze data and poses
-    plane_gazes = {p: gaze_worldref.read_dict_from_file(working_dir / f'{naming.world_gaze_prefix}{p}.tsv', episodes=episodes_per_plane[p], ts_column_suffixes=['VOR','']) for p in episodes_per_plane}
-    poses = {p:gt_pose.read_dict_from_file(working_dir/f'{naming.plane_pose_prefix}{p}.tsv', episodes_per_plane[p]) for p in episodes_per_plane}
+    all_episodes_per_plane = {p: [] for p in all_planes}
+    for nm in episodes_per_plane:
+        for p in episodes_per_plane[nm]:
+            all_episodes_per_plane[p].extend(episodes_per_plane[nm][p])
+    all_episodes_per_plane = {p: sorted(all_episodes_per_plane[p]) for p in all_episodes_per_plane}
+    plane_gazes = {p: gaze_worldref.read_dict_from_file(working_dir / f'{naming.world_gaze_prefix}{p}.tsv', episodes=all_episodes_per_plane[p], ts_column_suffixes=['VOR','']) for p in all_planes}
+    poses = {p:gt_pose.read_dict_from_file(working_dir/f'{naming.plane_pose_prefix}{p}.tsv', all_episodes_per_plane[p]) for p in all_planes}
     head_gaze = pd.read_csv(working_dir/gt_naming.gaze_data_fname, delimiter='\t', index_col=False)
 
 
@@ -86,61 +93,67 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
     head_gaze = head_gaze[head_gaze_cols].set_index('timestamp'+extra_suffix)
 
     # get target positions on the plane(s), in mm
-    targets = {p: {t_id: np.append(planes[p].targets[t_id].center, 0.) for t_id in targets_per_plane[p]} for p in targets_per_plane}
-    viewing_distance = {p: get_validation_setup(config_dir/p)['distance']*10. for p in targets_per_plane if isinstance(planes[p], val_Plane)}
-    targets_for_homography = {p: {t_id: np.append(planes[p].targets[t_id].center, viewing_distance[p]) for t_id in targets_per_plane[p]} for p in targets_per_plane if isinstance(planes[p], val_Plane)}
+    targets                 = {nm: {p: {t_id: np.append(planes[p].targets[t_id].center, 0.                               ) for t_id in targets_per_plane[nm][p]} for p in targets_per_plane[nm]} for nm in episodes_per_plane}
+    targets_for_homography  = {nm: {p: {t_id: np.append(planes[p].targets[t_id].center, viewing_distance_per_plane[nm][p]) for t_id in targets_per_plane[nm][p]} for p in targets_per_plane[nm]} for nm in episodes_per_plane}
 
     # prep progress indicator
-    total = sum(len(plane_gazes[p][f]) for p in poses for f in poses[p] if f in plane_gazes[p])
+    total = sum(e[1]-e[0]+1 for nm in episodes_per_plane for p in episodes_per_plane[nm] for e in episodes_per_plane[nm][p])
     progress_indicator.set_total(total)
     progress_indicator.set_intervals(step:=min(50,int(total/200)), step)
 
     # per plane, per target, compute gaze offsets from target
-    for p in episodes_per_plane:
+    for p in all_planes:
         df: pd.DataFrame|None = None
-        for e in episodes_per_plane[p]:
-            this_gaze = {k:v for (k,v) in plane_gazes[p].items() if k>=e[0] and k<=e[1]}
-            if not this_gaze:
-                raise RuntimeError(f'There is no gaze data on the glassesValidator surface for episode "{e}" on plane "{p}", cannot proceed. This may be because there was no gaze during this interval or because the plane was not detected.')
+        for nm in episodes_per_plane:
+            if not p in episodes_per_plane[nm]:
+                continue
+            for e in episodes_per_plane[nm][p]:
+                this_gaze = {k:v for (k,v) in plane_gazes[p].items() if k>=e[0] and k<=e[1]}
+                if not this_gaze:
+                    raise RuntimeError(f'There is no gaze data on the plane for episode "{e}" on plane "{p}", cannot proceed. This may be because there was no gaze during this interval or because the plane was not detected.')
 
-            # compute offsets
-            # check what data quality types we should output. Go with good defaults
-            # first see what we have available
-            d_have = data_types.get_available_data_types(this_gaze)
-            # then determine, based on what user requests, what we will output
-            d_types = data_types.select_data_types_to_use(d_types_per_plane[p], d_have, allow_d_fallback_per_plane[p])
+                # compute offsets
+                # check what data quality types we should output. Go with good defaults
+                # first see what we have available
+                d_have = data_types.get_available_data_types(this_gaze)
+                # then determine, based on what user requests, what we will output
+                d_types = data_types.select_data_types_to_use(d_types_per_plane[nm][p], d_have, allow_d_fallback_per_plane[nm][p])
 
-            frame_idxs, timestamps, offsets = data_types.calculate_gaze_angles_to_point(
-                this_gaze,
-                poses[p],
-                targets[p],
-                d_types,
-                targets_for_homography[p] if p in viewing_distance else None,
-                viewing_distance[p] if p in viewing_distance else None
-                )
-            # prepare output data frame
-            new_rows = pd.DataFrame({'frame_idx'+extra_suffix: frame_idxs}, index=pd.Index(timestamps, name='timestamp'+extra_suffix))
-            if df is None:
-                df = new_rows
-            else:
-                df = pd.concat([df, new_rows])
+                frame_idxs, timestamps, offsets = data_types.calculate_gaze_angles_to_point(
+                    this_gaze,
+                    poses[p],
+                    targets[nm][p],
+                    d_types,
+                    targets_for_homography[nm][p],
+                    viewing_distance_per_plane[nm][p]
+                    )
+                # prepare output data frame
+                new_rows = pd.DataFrame({'frame_idx'+extra_suffix: frame_idxs}, index=pd.Index(timestamps, name='timestamp'+extra_suffix))
+                new_rows['episode'] = nm
+                if df is None:
+                    df = new_rows
+                else:
+                    df = pd.concat([df, new_rows])
 
-            for t in offsets:
-                for d_type in offsets[t]:
-                    col_names = [f'{x}_target_{t}_{d_type.name}' for x in ('offset', 'offset_x', 'offset_y')]
-                    df.loc[timestamps, col_names] = offsets[t][d_type]
-                    progress_indicator.update(n=len(frame_idxs))
+                for t in offsets:
+                    for d_type in offsets[t]:
+                        col_names = [f'{x}_target_{t}_{d_type.name}' for x in ('offset', 'offset_x', 'offset_y')]
+                        df.loc[timestamps, col_names] = offsets[t][d_type]
+                        progress_indicator.update(n=e[1]-e[0]+1)
 
         # merge with original timestamps so that we have nan in the signal for missing gaze timestamps
-        rng = [episodes_per_plane[p][0][0], episodes_per_plane[p][-1][1]]
+        rng = [all_episodes_per_plane[p][0][0], all_episodes_per_plane[p][-1][1]]
         hg = head_gaze.loc[(head_gaze['frame_idx'+extra_suffix]>=rng[0]) & (head_gaze['frame_idx'+extra_suffix]<=rng[1])]
-        # combine to add missing rows (if we have a VOR column, need some special handling to preserve integer type)
+        # combine to add missing rows
         if has_VOR:
+            # also add non-VOR timestamps and frame_idxs, plus need some special handling to preserve integer type
             frame_idx_VOR = df.pop('frame_idx_VOR').combine_first(hg.pop('frame_idx_VOR'))
-        df = df.merge(hg[['timestamp', 'frame_idx']], how='outer', left_index=True, right_index=True)
-        if has_VOR:
+            # merge in the original timestamps and frame indexes (and adds missing rows)
+            df = df.merge(hg[['timestamp', 'frame_idx']], how='outer', left_index=True, right_index=True)
             # Combine back in the VOR column
             df['frame_idx_VOR'] = frame_idx_VOR
+        else:
+            df = df.merge(pd.DataFrame(index=hg.index), how='outer', left_index=True, right_index=True)
 
         # store to file
         df = pl.from_pandas(df, include_index=True)
