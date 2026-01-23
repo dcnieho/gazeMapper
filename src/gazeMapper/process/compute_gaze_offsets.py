@@ -142,8 +142,12 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
                         progress_indicator.update(n=e[1]-e[0]+1)
 
         # merge with original timestamps so that we have nan in the signal for missing gaze timestamps
-        rng = [all_episodes_per_plane[p][0][0], all_episodes_per_plane[p][-1][1]]
-        hg = head_gaze.loc[(head_gaze['frame_idx'+extra_suffix]>=rng[0]) & (head_gaze['frame_idx'+extra_suffix]<=rng[1])]
+        # select all coded intervals that are configured for this plane
+        selector = np.zeros(len(head_gaze), dtype=bool)
+        for nm in episodes_per_plane:
+            if p in episodes_per_plane[nm]:
+                selector |= (head_gaze['frame_idx'+extra_suffix]>=episodes_per_plane[nm][p][0][0]) & (head_gaze['frame_idx'+extra_suffix]<=episodes_per_plane[nm][p][-1][1])
+        hg = head_gaze.loc[selector]
         # combine to add missing rows
         if has_VOR:
             # also add non-VOR timestamps and frame_idxs, plus need some special handling to preserve integer type
