@@ -29,6 +29,9 @@ def run(working_dir: str|pathlib.Path, export_path: str|pathlib.Path, to_export:
     if 'plane_gaze' in to_export:
         export_plane_gaze(export_path, working_dir, study_config, et_recs)
 
+    if 'gaze_offsets' in to_export:
+        export_gaze_offsets(export_path, working_dir, study_config, et_recs)
+
     if 'gaze_overlay_video' in to_export:
         export_gazeOverlay_video(export_path, working_dir, et_recs)
 
@@ -49,10 +52,10 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
     # per recording, read the relevant files and put them all together
     for r in recs:
         # check if files needed for export are present, else skip
-        if not all(((working_dir / r / f'{naming.world_gaze_prefix}{p}.tsv').is_file() for p in planes)):
+        if not all((working_dir / r / f'{naming.world_gaze_prefix}{p}.tsv').is_file() for p in planes):
             print(f'Warning: not all plane gaze files found for recording {r} in session {working_dir.name}. Skipping...')
             continue
-        if not all((gt_marker.get_file_name(m.id, m.aruco_dict_id, working_dir/r).is_file() for m in study_config.individual_markers)):
+        if not all(gt_marker.get_file_name(m.id, m.aruco_dict_id, working_dir/r).is_file() for m in study_config.individual_markers):
             print(f'Warning: not all individual marker detection files found for recording {r} in session {working_dir.name}. Skipping...')
             continue
         # get trial coding
@@ -147,7 +150,100 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
             # store
             # write into df (use polars as that library saves to file waaay faster)
             plane_gazes = pl.from_pandas(plane_gazes)
-            plane_gazes.write_csv(export_path / f'{naming.gaze_export_name}_{working_dir.name}_{r}_{nm}.tsv', separator='\t', null_value='nan', float_precision=8)
+            plane_gazes.write_csv(export_path / f'{naming.gaze_export_prefix}{working_dir.name}_{r}_{nm}.tsv', separator='\t', null_value='nan', float_precision=8)
+
+def export_gaze_offsets(export_path: pathlib.Path, working_dir: pathlib.Path, study_config: config.Study, recs: list[str]):
+    episodes_to_proc = process.get_specific_event_types(study_config, check_specific_fields=['gaze_offset_setup'])
+    if not episodes_to_proc:
+        raise ValueError('No episodes configured for gaze offset computation (need at least one episode with planes defined)')
+
+    # data is stored per recording, per plane, with all episodes for a given plane in the same file
+    # reorganize to get one file per participant per episode, with all planes for that episode in the same file
+    planes = set()
+    for cs in episodes_to_proc:
+        planes.update(cs['gaze_offset_setup'])
+
+    # per recording, read the relevant files and put them all together
+    for r in recs:
+        # check if files needed for export are present, else skip
+        if not all((working_dir / r / f'{naming.gaze_offset_prefix}{p}.tsv').is_file() for p in planes):
+            print(f'Warning: not all plane gaze files found for recording {r} in session {working_dir.name}. Skipping...')
+            continue
+        # get episode coding
+        episodes = episode.load_episodes_from_all_recordings(study_config, working_dir/r, {cs['name'] for cs in episodes_to_proc})[0]
+        if not any(episodes[e][1] for e in episodes):
+            print(f'Warning: no coding for any of the events with gaze offset setup was found in the coding file for recording {r} in session {working_dir.name}. Skipping...')
+            continue
+
+        # get gaze offset data per plane
+        gaze_offsets = {p:pd.read_csv(working_dir / r / f'{naming.gaze_offset_prefix}{p}.tsv', sep='\t') for p in planes}
+
+        # rename putting plane name in there so that names are unique
+        for p in gaze_offsets:
+            cols = {}
+            for c in gaze_offsets[p].columns:
+                if c.startswith('offset_'):
+                    # find position of '_target' in the column name, we want to insert plane name before that
+                    pos = c.find('_target')
+                    cols[c] = f'{c[:pos]}_{p}{c[pos:]}'
+            gaze_offsets[p] = gaze_offsets[p].rename(columns=cols)
+
+        # rest per coding stream
+        ori_gaze_offsets = copy.deepcopy(gaze_offsets)
+        for cs in episodes_to_proc:
+            nm = cs['name']
+            if not episodes[nm][1]:
+                continue
+
+            if not cs['which_recordings'] or r in cs['which_recordings']:
+                subset_var = 'frame_idx'
+            else:
+                subset_var = 'frame_idx_ref'
+
+            # now merge
+            planes = list(cs['gaze_offset_setup'].keys())
+            gaze_offsets = {}
+            for p in planes:
+                this_gaze_offsets = ori_gaze_offsets[p][ori_gaze_offsets[p]['episode']==nm].copy().drop(columns=['episode'])
+                if not this_gaze_offsets.empty:
+                    gaze_offsets[p] = this_gaze_offsets
+            for i in range(1,len(planes)):
+                # NB: by not providing on, merge is done on intersection of columns (so that is all timestamp and frame_idx columns, which is what we want)
+                gaze_offsets[planes[0]] = gaze_offsets[planes[0]].merge(gaze_offsets[planes[i]], how='outer')
+            gaze_offsets = gaze_offsets[planes[0]]
+
+            # drop columns that are all nan (this can just be offset columns for targets that were not configured for this episode, so is safe to call over whole dataframe)
+            gaze_offsets = gaze_offsets.dropna(axis=1, how='all')
+
+            # add scene and reference camera timestamp info, if present
+            ts = pd.read_csv(working_dir / r / gt_naming.frame_timestamps_fname,sep='\t').rename(columns={'timestamp':'frame_ts'})
+            gaze_offsets = gaze_offsets.merge(ts, how="left", on='frame_idx')
+            to_move = 1
+            if 'frame_idx_VOR' in gaze_offsets.columns:
+                ts = ts.rename(columns={'frame_idx':'frame_idx_VOR','frame_ts':'frame_ts_VOR'})
+                gaze_offsets = gaze_offsets.merge(ts, how="left", on='frame_idx_VOR')
+                to_move += 1
+            if 'frame_idx_ref' in gaze_offsets.columns:
+                ts = pd.read_csv(working_dir / study_config.sync_ref_recording / gt_naming.frame_timestamps_fname,sep='\t').rename(columns={'frame_idx':'frame_idx_ref','timestamp':'frame_ts_ref','timestamp_stretched':'frame_ts_ref_stretched'})
+                gaze_offsets = gaze_offsets.merge(ts, how="left", on='frame_idx_ref')
+                to_move += len([c for c in ts.columns if c.startswith('frame_ts_')])
+            # reorder to get ts columns in the right place
+            cols= gaze_offsets.columns.to_list()
+            idx = max([cols.index(c) for c in cols if c.startswith('frame_idx')])+1
+            cols= cols[:idx] + cols[-to_move:] + cols[idx:-to_move]
+            gaze_offsets = gaze_offsets[cols]
+
+            # add trial numbers
+            idx = max([cols.index(c) for c in cols if c.startswith('frame_ts')])+1
+            gaze_offsets.insert(idx,'trial',np.int32(-1))
+            for i,e in enumerate(episodes[nm][1]):
+                sel = (gaze_offsets[subset_var] >= e[0]) & (gaze_offsets[subset_var] <= e[1])
+                gaze_offsets.loc[sel,'trial'] = i+1
+
+            # store
+            # write into df (use polars as that library saves to file waaay faster)
+            gaze_offsets = pl.from_pandas(gaze_offsets)
+            gaze_offsets.write_csv(export_path / f'{naming.offset_export_prefix}{working_dir.name}_{r}_{nm}.tsv', separator='\t', null_value='nan', float_precision=8)
 
 def export_gazeOverlay_video(export_path: pathlib.Path, working_dir: pathlib.Path, recs: list[str]):
     for r in recs:

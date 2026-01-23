@@ -505,6 +505,9 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
         if 'plane gaze' not in to_export:
             if any(cs['event_type']==annotation.EventType.Trial for cs in g.study_config.coding_setup) and any((s.recordings[r].state[process.Action.GAZE_TO_PLANE]==process_pool.State.Completed for r in s.recordings)):
                 to_export['plane gaze'] = True
+        if 'gaze offsets' not in to_export:
+            if any('gaze_offset_setup' in cs and cs['gaze_offset_setup'] is not None for cs in g.study_config.coding_setup) and any((s.recordings[r].state[process.Action.COMPUTE_GAZE_OFFSETS]==process_pool.State.Completed for r in s.recordings)):
+                to_export['gaze offsets'] = True
         if recs:=[s.recordings[r].info.working_directory for r in s.recordings if s.recordings[r].state[process.Action.VALIDATE]==process_pool.State.Completed]:
             to_export['validation'] = True
             rec_dirs_val.extend(recs)
@@ -650,6 +653,8 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
         exp = []
         if 'plane gaze' in to_export and to_export['plane gaze']:
             exp.append('plane_gaze')
+        if 'gaze offsets' in to_export and to_export['gaze offsets']:
+            exp.append('gaze_offsets')
         if 'gaze overlay video' in to_export and to_export['gaze overlay video']:
             exp.append('gaze_overlay_video')
         if 'mapped gaze video' in to_export and to_export['mapped gaze video']:
