@@ -46,7 +46,16 @@ def load_image_with_helper(path_or_image: pathlib.Path|np.ndarray):
         return image_helper.ImageHelper(path_or_image)
 
 def is_valid_imgui_key(key: str) -> bool:
-    return hasattr(imgui.Key, key)
+    """
+    Return True if `key` corresponds to a member on imgui.Key.
+    For digit keys "0"..."9", we test against the enum names "_0"..."_9".
+    """
+    if key in '0123456789':
+        key = f'_{key}'
+    try:
+        return hasattr(imgui.Key, key)
+    except Exception:
+        return False
 
 class JobInfo(typing.NamedTuple):
     action:     process.Action
