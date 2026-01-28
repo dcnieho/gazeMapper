@@ -129,7 +129,7 @@ class GUI:
                 # import recordings
                 if not self.can_accept_sessions:
                     return
-                callbacks.add_recordings(self, paths, [s for s in self._selected_sessions if self._selected_sessions[s] and not self.sessions[s].has_all_recordings()])
+                callbacks.add_recordings(self, paths, [])
             else:
                 # load project
                 if len(paths)!=1 or not (path := paths[0]).is_dir():
@@ -962,11 +962,11 @@ class GUI:
             callbacks.new_session_button(self)
         imgui.same_line()
         if imgui.button(ifa6.ICON_FA_FILE_IMPORT+' import eye tracker recordings'):
-            gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='add_et_recordings', sessions=[s for s in self._selected_sessions if self._selected_sessions[s] and self.sessions[s].missing_recordings(session.RecordingType.Eye_Tracker)]))
+            gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='add_et_recordings', sessions=[]))
         if any((r.type==session.RecordingType.Camera for r in self.study_config.session_def.recordings)):
             imgui.same_line()
             if imgui.button(ifa6.ICON_FA_FILE_IMPORT+' import camera recordings'):
-                gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='add_cam_recordings', sessions=[s for s in self._selected_sessions if self._selected_sessions[s] and self.sessions[s].missing_recordings(session.RecordingType.Camera)]))
+                gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='add_cam_recordings', sessions=[]))
         self._session_lister.draw()
 
     def _unopened_interface_drawer(self):

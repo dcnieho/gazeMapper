@@ -1040,13 +1040,9 @@ def get_and_filter_eligible_sessions(g, sessions: list[str], dev_type:session.Re
     from . import gui
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
     if not sessions:
-        sessions: list[str] = []
-        for s in g.sessions:
-            if not g.sessions[s].missing_recordings(dev_type):
-                continue
-            sessions.append(s)
+        sessions = [s for s in g.sessions if g.sessions[s].missing_recordings(dev_type)]
     else:
-        sessions = [s for s in sessions if g.sessions[s].missing_recordings(dev_type)]
+        sessions = [s for s in   sessions if g.sessions[s].missing_recordings(dev_type)]
     return sessions
 
 def _set_glob_filter_for_camera(glob_filter):
