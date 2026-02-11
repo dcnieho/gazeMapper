@@ -141,7 +141,7 @@ def apply_sync(rec: str,
         if has_data_ts:
             new_data_timestamps += sync.loc[(rec,0),'mean_off']*1000.   # s -> ms
     if has_data_ts:
-        fr_ref = video_utils.timestamps_to_frame_number(new_data_timestamps,new_reference_video_timestamps,trim=True)['frame_idx'].to_numpy()
+        fr_ref = video_utils.timestamps_to_frame_number(new_data_timestamps,new_reference_video_timestamps,trim=True)['frame_idx'].to_numpy(copy=True)
     else:
         fr_ref = None
     return new_data_timestamps, new_reference_video_timestamps, fr_ref
@@ -215,7 +215,7 @@ def reference_frames_to_video(rec: str, sync: pd.DataFrame, fr_idxs: list[int]|l
 
     # get where (which frame) each of this video's timestamps occur in the reference video, given the sync info
     # (fr_idx_ref contains the reference frame_idxs corresponding to this video's frames, video_ts)
-    fr_idx_ref = video_utils.timestamps_to_frame_number(video_ts_ref, this_video_ts_ref, trim=True)['frame_idx'].to_numpy()
+    fr_idx_ref = video_utils.timestamps_to_frame_number(video_ts_ref, this_video_ts_ref, trim=True)['frame_idx'].to_numpy(copy=True)
     fr_idx_ref[video_ts_ref<this_video_ts_ref[0]] = -1
     # in case only the first fr_idx is trimmed, a little bit of leeway is ok
     if fr_idx_ref.size>=2 and fr_idx_ref[0]==-1 and fr_idx_ref[1]>0:
@@ -239,7 +239,7 @@ def video_frames_to_reference(rec: str, sync: pd.DataFrame, fr_idxs: list[int]|l
 
     # get where (which frame) each of the reference video frames occur in this video, given the sync info
     # (fr_idx contains this video's frame_idxs corresponding to this reference's frames, video_ts)
-    fr_idx = video_utils.timestamps_to_frame_number(this_video_ts_ref, video_ts_ref, trim=True)['frame_idx'].to_numpy()
+    fr_idx = video_utils.timestamps_to_frame_number(this_video_ts_ref, video_ts_ref, trim=True)['frame_idx'].to_numpy(copy=True)
     fr_idx[this_video_ts_ref<video_ts_ref[0]] = -1
 
     return fr_idx[fr_idxs].tolist()
