@@ -1848,6 +1848,7 @@ class GUI:
         all_actions = [a for a in process.Action if a in all_actions]   # ensure order
         for a in all_actions:
             running= [r for r in actions_running if a in actions_running[r]]
+            val_coding_options: list[str] = []
             if running:
                 possible = True
                 hover_text = f'Cancel running {a.displayable_name} for recordings:\n- '+'\n- '.join(running)
@@ -1863,10 +1864,23 @@ class GUI:
                 status = max(status) if status else process_pool.State.Not_Run
                 if a.has_options and possible:
                     hover_text += '\nShift-click to bring up a popup with configuration options for this run.'
+                if a==process.Action.CODE_EPISODES and not running:
+                    if (val_events:=process.get_specific_event_types(self.study_config, annotation.EventType.Validate)):
+                        val_coding_options = [cs['name'] for cs in val_events]
                 icon = ifa6.ICON_FA_PLAY if status<process_pool.State.Completed else ifa6.ICON_FA_ARROW_ROTATE_RIGHT
             if not possible:
                 imgui.begin_disabled()
-            if imgui.selectable(icon+f" {a.displayable_name}##{session_name}", False)[0]:
+            if val_coding_options:
+                if imgui.begin_menu(icon+f" {a.displayable_name}"):
+                    if imgui.selectable(a.displayable_name, False)[0]:
+                        for r in to_run:
+                            self.launch_task(session_name, r, a)
+                    for v in val_coding_options:
+                        if imgui.selectable(f'Code targets for {v}', False)[0]:
+                            for r in to_run:
+                                self.launch_task(session_name, r, a, val_coding_event=v)
+                    imgui.end_menu()
+            elif imgui.selectable(icon+f" {a.displayable_name}##{session_name}", False)[0]:
                 if running:
                     for r in running:
                         self.job_scheduler.cancel_job(actions_running[r][a])
