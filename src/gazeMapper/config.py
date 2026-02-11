@@ -1124,7 +1124,7 @@ event_setup_doc = {
         'max_intermarker_gap_duration': type_utils.GUIDocInfo('Maximum intermarker gap duration', 'Maximum gap (number of frames) that is allowed between the detection of two markers in a sequence.'),
         'min_duration': type_utils.GUIDocInfo('Minimum duration', 'Minimum duration (number of frames) that a marker should be detected. Shorter runs are removed.')
     }),
-    'sync_setup': type_utils.GUIDocInfo('Eye tracker synchronization setup', 'Setup for synchronizing eye tracker data to the scene camera based on plane tracking data.',{
+    'sync_setup': type_utils.GUIDocInfo('Eye tracker synchronization setup', 'Setup for synchronizing eye tracker data to the scene camera.',{
         'get_cam_movement_method': type_utils.GUIDocInfo('Gaze data synchronization: Method to get camera movement', 'Method used to derive the head motion for synchronizing eye tracker data and scene camera.',{
         None: {     # indicates the doc specification applies to the contained values
             'plane': type_utils.GUIDocInfo('Plane', 'Head movement is represented by the position of the origin of the plane in the scene camera video (the plane that is set up to be used for "Sync ET Data" episodes), as extracted through pose estimation or homography using a gazeMapper plane.'),
