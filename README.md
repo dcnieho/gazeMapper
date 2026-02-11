@@ -1066,3 +1066,8 @@ If you use the functionality for automatic determining the data quality (accurac
     doi = {10.3758/s13428-023-02105-5}
 }
 ```
+
+# Acknowledgements
+![New project screen](https://raw.githubusercontent.com/dcnieho/gazeMapper/master/.github/images/SEL_LOGO_color_black.png?raw=true)
+
+This work is supported by Riksbankens Jubileumsfond grant IN25-0046. This work is furthermore supported by EssilorLuxottica through the Smart Eyewear Lab, a Joint Research Center between EssilorLuxottica and Politecnico di Milano.
