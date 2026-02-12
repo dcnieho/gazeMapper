@@ -162,6 +162,18 @@ def is_action_possible_for_recording(rec: str, rec_type: 'session.RecordingType'
     from .. import session
     if rec_type==session.RecordingType.Camera and action in [Action.MAKE_GAZE_OVERLAY_VIDEO, Action.GAZE_TO_PLANE, Action.SYNC_ET_TO_CAM, Action.COMPUTE_GAZE_OFFSETS, Action.VALIDATE]:
         return False
+    elif action in [Action.SYNC_ET_TO_CAM, Action.GAZE_TO_PLANE, Action.VALIDATE]:
+        # check there are any events of the relevant type configured for this recording
+        if action==Action.SYNC_ET_TO_CAM:
+            event_types = [annotation.EventType.Sync_ET_Data]
+        elif action==Action.GAZE_TO_PLANE:
+            event_types = [annotation.EventType.Validate, annotation.EventType.Trial]
+        elif action==Action.VALIDATE:
+            event_types = [annotation.EventType.Validate]
+        events = get_specific_event_types(study_config, event_types)
+        # remove events that are not configured for this recording
+        events = [cs for cs in events if cs['which_recordings'] is None or rec in cs['which_recordings']]
+        return not not events
     elif action==Action.AUTO_CODE_EPISODES:
         # check if there is any auto coding configured for this specific recording
         auto_code_episodes = get_specific_event_types(study_config, check_specific_fields=['auto_code'], specific_episode_type=annotation.Type.Interval)

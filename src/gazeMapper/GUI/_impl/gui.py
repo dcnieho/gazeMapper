@@ -817,10 +817,6 @@ class GUI:
                 gt_gui.utils.draw_process_state(item.state[action], progress=progress)
             else:
                 imgui.text('-')
-                if action==process.Action.AUTO_CODE_EPISODES and cfg.sync_ref_recording and item.definition.name!=cfg.sync_ref_recording:
-                    msg = f'Not applicable to a recording that is not the sync_ref_recording'
-                else:
-                    msg = f'Not applicable to a {item.definition.type.value} recording'
                 gt_gui.utils.draw_hover_text(msg,'')
         def _get_sort_value(action: process.Action, iid: int):
             item = self.sessions[sess].recordings[iid]
