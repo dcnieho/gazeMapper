@@ -121,12 +121,12 @@ def config_has_auto_coding(study_config: 'config.Study', specific_event_type: an
 def config_has_specific_event_type(study_config: 'config.Study', specific_event_type: annotation.EventType|list[annotation.EventType], check_specific_fields: typing.Sequence[str]|None=None) -> bool:
     return not not get_specific_event_types(study_config, specific_event_type, check_specific_fields)
 
-def get_specific_event_types(study_config: 'config.Study', specific_event_type: annotation.EventType|list[annotation.EventType]|None=None, check_specific_fields: typing.Sequence[str]|None=None) -> list['config.EventSetup']:
+def get_specific_event_types(study_config: 'config.Study', specific_event_type: annotation.EventType|list[annotation.EventType]|None=None, check_specific_fields: typing.Sequence[str]|None=None, specific_episode_type: annotation.Type|None=None) -> list['config.EventSetup']:
     if not study_config.coding_setup:
         return []
     if specific_event_type and not isinstance(specific_event_type, list):
         specific_event_type = [specific_event_type]
-    return [cs for cs in study_config.coding_setup if (specific_event_type is None or cs['event_type'] in specific_event_type) and (all(f in cs and cs[f] is not None for f in check_specific_fields) if check_specific_fields else True)]
+    return [cs for cs in study_config.coding_setup if (specific_event_type is None or cs['event_type'] in specific_event_type) and (all(f in cs and cs[f] is not None for f in check_specific_fields) if check_specific_fields else True) and (specific_episode_type is None or annotation.type_map[cs['event_type']] == specific_episode_type)]
 
 def _config_has_et_sync(study_config: 'config.Study') -> bool:
     return not not get_specific_event_types(study_config, annotation.EventType.Sync_ET_Data, ['sync_setup'])
@@ -162,9 +162,18 @@ def is_action_possible_for_recording(rec: str, rec_type: 'session.RecordingType'
     from .. import session
     if rec_type==session.RecordingType.Camera and action in [Action.MAKE_GAZE_OVERLAY_VIDEO, Action.GAZE_TO_PLANE, Action.SYNC_ET_TO_CAM, Action.COMPUTE_GAZE_OFFSETS, Action.VALIDATE]:
         return False
-    elif action==Action.AUTO_CODE_EPISODES and study_config.sync_ref_recording and rec!=study_config.sync_ref_recording:
-        # if we have a sync_ref_recording, automatic coding of trials is only possible for the sync_ref_recording, not the other recordings
-        return False
+    elif action==Action.AUTO_CODE_EPISODES:
+        # check if there is any auto coding configured for this specific recording
+        auto_code_episodes = get_specific_event_types(study_config, check_specific_fields=['auto_code'], specific_episode_type=annotation.Type.Interval)
+        # remove events that are not configured for this recording
+        auto_code_episodes = [cs for cs in auto_code_episodes if cs['which_recordings'] is None or rec in cs['which_recordings']]
+        if not auto_code_episodes:
+            return False
+        # second, if we have a sync_ref_recording, automatic coding of trials is only possible for the sync_ref_recording, not the other recordings.
+        # So if this is not a sync_ref_recording and there only is auto coding defined for trial events and no other episode types, then auto coding is not possible for this recording
+        has_other_episode_auto_code = get_specific_event_types(study_config, [annotation.EventType.Sync_ET_Data, annotation.EventType.Validate], ['auto_code'])
+        if study_config.sync_ref_recording and rec!=study_config.sync_ref_recording and not has_other_episode_auto_code:
+            return False
     if action==Action.DETECT_MARKERS and study_config.head_attached_recordings_replace_et_scene is not None:
             # check if this recording's pose is not replaced by that of a head-attached camera
             is_replaced_recording = study_config.head_attached_recordings_replace_et_scene is not None and any(r.associated_recording==rec for r in study_config.session_def.recordings if r.name in study_config.head_attached_recordings_replace_et_scene)
