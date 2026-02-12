@@ -582,6 +582,13 @@ class Study:
                     this_problems = self._check_recordings(cs['which_recordings'], 'which_recordings', strict_check, full_field=f'coding_setup[{i}].which_recordings')
                     if this_problems:
                         type_utils.merge_problem_dicts(problems, {'coding_setup': {i: this_problems}})
+                    # check it makes sense to be defined for a given episode type
+                    if cs['event_type'] in [annotation.EventType.Validate, annotation.EventType.Sync_ET_Data] and (problem_recs := [r for r in cs['which_recordings'] if any(r==rec.name and rec.type==session.RecordingType.Camera for rec in self.session_def.recordings)]):
+                        msg = f'which_recordings should not include camera recordings for a {annotation.tooltip_map[cs["event_type"]]} episode. Offending recording(s): {problem_recs[0] if len(problem_recs)==1 else problem_recs}'
+                        if strict_check:
+                            raise ValueError(msg)
+                        else:
+                            type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'which_recordings': (type_utils.ProblemLevel.Error, msg)}}})
 
         sync_events = [(i, cs) for i, cs in enumerate(self.coding_setup) if cs['event_type']==annotation.EventType.Sync_ET_Data]
         use_average_settings = [cs['sync_setup'].get('use_average', False) for _, cs in sync_events if cs['sync_setup'] is not None]
