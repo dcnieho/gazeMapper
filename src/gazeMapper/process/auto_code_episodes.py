@@ -21,6 +21,8 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
     events: list[config.EventSetup] = []
     for ev in [e for e in annotation.EventType if annotation.type_map[e]==annotation.Type.Interval]:
         events.extend(process.get_specific_event_types(study_config, ev, check_specific_fields=['auto_code']))
+    # remove events that are not configured for this recording
+    events = [cs for cs in events if cs['which_recordings'] is None or working_dir.name in cs['which_recordings']]
     if not events:
         raise ValueError('No auto-coded event start and ends are configured for the study, nothing to process')
 
