@@ -32,8 +32,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
             raise RuntimeError(f'Nothing to do, auto-coding of event start and ends is defined only for trial events and you have a sync_ref_recording ({study_config.sync_ref_recording}), but this recording ({rec_def.name}) is another one')
 
     # get already coded interval(s), if any
-    episodes_to_code = [cs['name'] for cs in events if not (wr:=cs.get('which_recordings',set())) or working_dir.name in wr]
-    episodes = episode.load_episodes_from_all_recordings(study_config, working_dir, episodes_to_code, load_from_other_recordings=False)[0]
+    episodes = episode.load_episodes_from_all_recordings(study_config, working_dir, load_from_other_recordings=False)[0]
     episodes = annotation.flatten_annotation_dict(episodes)
     episodes_original = copy.deepcopy(episodes)
 

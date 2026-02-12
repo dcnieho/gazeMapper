@@ -21,8 +21,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
         raise ValueError('No auto-coded camera sync events are configured for the study, nothing to process')
 
     # get already coded interval(s), if any
-    episodes_to_code = [cs['name'] for cs in sync_events]
-    episodes = episode.load_episodes_from_all_recordings(study_config, working_dir, episodes_to_code, load_from_other_recordings=False)[0]
+    episodes = episode.load_episodes_from_all_recordings(study_config, working_dir, load_from_other_recordings=False)[0]
     episodes = annotation.flatten_annotation_dict(episodes)
     episodes_original = copy.deepcopy(episodes)
 
