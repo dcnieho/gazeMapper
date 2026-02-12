@@ -354,23 +354,26 @@ class Study:
                 type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'planes': (type_utils.ProblemLevel.Error, f'Plane(s) "{mp}" not known.')}}})
 
             # check correct number of planes is defined for the episode
-            allow_one_plane = False
-            allow_more_than_one = False
+            num_planes_allowed = []    # min, max number of planes allowed. 99 means more than one allowed, 0 means none allowed
             match (e:=cs['event_type']):
                 case annotation.EventType.Sync_Camera:
-                    allow_one_plane = allow_more_than_one = False
+                    num_planes_allowed = [0,0]
                 case annotation.EventType.Sync_ET_Data:
                     if cs['sync_setup'] is not None and cs['sync_setup'].get('get_cam_movement_method','')=='plane':
-                        allow_one_plane = True
-                        allow_more_than_one = False
+                        num_planes_allowed = [1,1]
                     else:
-                        allow_one_plane = allow_more_than_one = False
+                        num_planes_allowed = [0,0]
                 case annotation.EventType.Validate:
-                    allow_one_plane = True
-                    allow_more_than_one = False
+                    num_planes_allowed = [1,1]
                 case annotation.EventType.Trial:
-                    allow_one_plane = allow_more_than_one = True
-            if not allow_one_plane and cs['planes']:
+                    num_planes_allowed = [0,99]
+            if num_planes_allowed[0]==1 and not cs['planes']:
+                msg = ('At least one' if num_planes_allowed[1]>1 else 'One')+f' plane should be defined for a {annotation.tooltip_map[e]}'
+                if strict_check:
+                    raise ValueError(msg)
+                else:
+                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'planes': (type_utils.ProblemLevel.Error, msg)}}})
+            elif num_planes_allowed[1]==0 and cs['planes']:
                 msg = f'No planes should be defined for a {annotation.tooltip_map[e]} episode.'
                 if e==annotation.EventType.Sync_ET_Data:
                     msg += ' Alternatively, you may want to set the sync_setup.get_cam_movement_method for this episode to "plane".'
@@ -378,13 +381,7 @@ class Study:
                     raise ValueError(msg)
                 else:
                     type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'planes': (type_utils.ProblemLevel.Error, msg)}}})
-            elif allow_one_plane and not cs['planes']:
-                msg = ('At least one' if allow_more_than_one else 'One')+f' plane should be defined for a {annotation.tooltip_map[e]}'
-                if strict_check:
-                    raise ValueError(msg)
-                else:
-                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'planes': (type_utils.ProblemLevel.Error, msg)}}})
-            elif not allow_more_than_one and len(cs['planes'])>1:
+            elif num_planes_allowed[1]==1 and len(cs['planes'])>1:
                 msg = f'Only one plane should be defined for a {annotation.tooltip_map[e]}'
                 if strict_check:
                     raise ValueError(msg)
