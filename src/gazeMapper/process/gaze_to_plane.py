@@ -49,12 +49,13 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
     if rec_def.type!=session.RecordingType.Eye_Tracker:
         raise ValueError(f'You can only run gaze_to_plane on eye tracker recordings, not on a {str(rec_def.type).split(".")[1]} recording')
 
-    # get episodes for which to transform gaze
-    episodes_with_planes = {cs['name'] for cs in study_config.coding_setup if cs.get('planes',[])}
-    episodes = episode.load_episodes_from_all_recordings(study_config, working_dir, episodes_with_planes)[0]
+    # get episodes for which to transform gaze (episodes should have a plane and apply to this recording)
+    episodes_to_proc = [cs for cs in study_config.coding_setup if cs.get('planes') and (cs['which_recordings'] is None or working_dir.name in cs['which_recordings'])]
+    if not episodes_to_proc:
+        raise RuntimeError(f'There are no episodes with planes configured for session "{working_dir.parent.name}", recording "{working_dir.name}", nothing to process')
+    episodes = episode.load_episodes_from_all_recordings(study_config, working_dir, {cs['name'] for cs in episodes_to_proc})[0]
 
-    # we transform to map to plane for validate and trial episodes, set it up
-    episodes_to_proc = process.get_specific_event_types(study_config, check_specific_fields=['planes'])
+    # get planes we should process
     mapping_setup: dict[str, list[list[int]]] = {}
     for cs in episodes_to_proc:
         for p in cs['planes']:

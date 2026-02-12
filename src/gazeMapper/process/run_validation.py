@@ -24,8 +24,10 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None=None, p
     # get settings for the study
     study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir.parent, config.OverrideLevel.Recording: working_dir}, **study_settings)
     val_events = process.get_specific_event_types(study_config, annotation.EventType.Validate)
+    # remove events that are not configured for this recording
+    val_events = [cs for cs in val_events if cs['which_recordings'] is None or working_dir.name in cs['which_recordings']]
     if not val_events:
-        raise ValueError(f'No {annotation.tooltip_map[annotation.EventType.Validate]} events are configured for the study, nothing to process')
+        raise ValueError(f'No {annotation.tooltip_map[annotation.EventType.Validate]} events are configured for the study or apply to this recording, nothing to process')
 
     # get info about recording
     rec_def = study_config.session_def.get_recording_def(working_dir.name)
