@@ -42,6 +42,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
 
     # check there is a sync setup
     sync_events = process.get_specific_event_types(study_config, annotation.EventType.Sync_ET_Data)
+    # remove events that are not configured for this recording
+    sync_events = [cs for cs in sync_events if cs['which_recordings'] is None or working_dir.name in cs['which_recordings']]
     if not sync_events:
         raise ValueError('No ET sync events are configured for the study, nothing to process')
 
