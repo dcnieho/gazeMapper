@@ -152,7 +152,7 @@ def marker_dict_to_list(episodes: typing.Mapping[str, tuple[annotation.EventType
         if not episodes[e] or not episodes[e][1]:
             continue
         if isinstance(episodes[e][1][0],list):
-            e_list.extend([Episode(e, v[0], *v[1]) for v in episodes[e]])
+            e_list.extend([Episode(e, episodes[e][0], *v) for v in episodes[e][1]])
         else:
             if annotation.type_map[episodes[e][0]]==annotation.Type.Interval:
                 for m in range(0,len(episodes[e][1])-1,2): # read in batches of two, and run until -1 to make sure we don't pick up incomplete intervals
