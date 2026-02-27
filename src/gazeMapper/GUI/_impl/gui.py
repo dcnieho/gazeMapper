@@ -817,7 +817,6 @@ class GUI:
                 gt_gui.utils.draw_process_state(item.state[action], progress=progress)
             else:
                 imgui.text('-')
-                gt_gui.utils.draw_hover_text(msg,'')
         def _get_sort_value(action: process.Action, iid: int):
             item = self.sessions[sess].recordings[iid]
             if process.is_action_possible_for_recording(item.definition.name, item.definition.type, action, cfg):
