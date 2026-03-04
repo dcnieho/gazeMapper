@@ -1471,7 +1471,7 @@ class GUI:
             if 'coding_setup' in self._problems_cache and i in self._problems_cache['coding_setup']:
                 problem_fields = self._problems_cache['coding_setup'][i]
             extra = ''
-            lbl = f'{cs['name']} ({annotation.tooltip_map[cs['event_type']]})'
+            lbl = f"{cs['name']} ({annotation.tooltip_map[cs['event_type']]})"
             if (has_error:=problem_fields):
                 extra = '*'
                 imgui.push_style_color(imgui.Col_.text, colors.error if type_utils.get_error_level(problem_fields)==type_utils.ProblemLevel.Error else colors.warning)
@@ -2074,7 +2074,7 @@ class GUI:
                 if 'coding_setup' in field_problems and i in field_problems['coding_setup']:
                     problem_fields = field_problems['coding_setup'][i]
                 extra = ''
-                lbl = f'{cs['name']} ({annotation.tooltip_map[cs['event_type']]})'
+                lbl = f"{cs['name']} ({annotation.tooltip_map[cs['event_type']]})"
                 if (has_error:=problem_fields):
                     extra = '*'
                     imgui.push_style_color(imgui.Col_.text, colors.error if type_utils.get_error_level(problem_fields)==type_utils.ProblemLevel.Error else colors.warning)
@@ -2125,7 +2125,7 @@ class GUI:
                         if 'coding_setup' in field_problems and i in field_problems['coding_setup']:
                             problem_fields = field_problems['coding_setup'][i]
                         extra = ''
-                        lbl = f'{cs['name']} ({annotation.tooltip_map[cs['event_type']]})'
+                        lbl = f"{cs['name']} ({annotation.tooltip_map[cs['event_type']]})"
                         if (has_error:=problem_fields):
                             extra = '*'
                             imgui.push_style_color(imgui.Col_.text, colors.error if type_utils.get_error_level(problem_fields)==type_utils.ProblemLevel.Error else colors.warning)
