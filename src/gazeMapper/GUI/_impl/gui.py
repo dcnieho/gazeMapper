@@ -1545,7 +1545,7 @@ class GUI:
                     imgui.table_next_column()
                     imgui.set_next_item_width(-1)
                     c_idx = annotation.event_types.index(new_coding_type) if new_coding_type is not None else -1
-                    _,c_idx = imgui.combo("##coding_type_selector", c_idx, [c.name for c in annotation.event_types])
+                    _,c_idx = imgui.combo("##coding_type_selector", c_idx, [c.name for c in annotation.event_types if c not in annotation.internal_types])
                     new_coding_type = None if c_idx==-1 else annotation.event_types[c_idx]
                     imgui.end_table()
 
