@@ -117,6 +117,7 @@ def load_episodes_from_all_recordings(study_config: config.Study, recording_dir:
         which_recs = cs.get('which_recordings')
         if which_recs is None:
             continue
+        which_recs = which_recs.copy()  # make sure we operate on a copy, as we will be modifying it
         which_recs.discard(rec_name)    # skip this recording
         if not which_recs:
             continue
