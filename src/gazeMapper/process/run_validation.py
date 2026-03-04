@@ -97,7 +97,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None=None, p
                                                     cs['validation_setup']['dynamic_min_duration'],
                                                     e)
             else:
-                fix_file = working_dir / f'{naming.validation_prefix}{e}_fixations_interval_{idx+1:02d}.tsv'
+                fix_file = working_dir / f'{naming.validation_prefix}{e}{naming.val_fixation_infix}{idx+1:02d}.tsv'
                 selected_intervals, other_intervals = \
                     assign_intervals.distance(targets,
                                             fix_file,
