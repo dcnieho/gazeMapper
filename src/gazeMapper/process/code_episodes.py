@@ -123,6 +123,17 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
             episodes[val_coding_event] = e[val_coding_event]
             if cs['description'] is not None:
                 descriptions[val_coding_event] = cs['description']
+        # if non-dynamic validation, there could be fixation episodes as well, add those if found (read only), for reference
+        if not val_p_def.is_dynamic and val_coding_event in e:
+            fix_episodes = []
+            for idx,_ in enumerate(e[val_coding_event][1]):
+                fix_file = working_dir / f'{naming.validation_prefix}{val_coding_event}{naming.val_fixation_infix}{idx+1:02d}.tsv'
+                if fix_file.exists():
+                    coding = pd.read_csv(fix_file, delimiter='\t')
+                    fix_episodes.extend([[video_ts.find_frame(t) for t in v[['startT','endT']].values] for _,v in coding.iterrows()])
+            if fix_episodes:
+                episodes['Fixations'] = (annotation.EventType.Fixation, fix_episodes)
+                descriptions['Fixations'] = 'Fixations detected by I2MC'
 
     episodes = annotation.flatten_annotation_dict(episodes)
     episodes_original = copy.deepcopy(episodes)
