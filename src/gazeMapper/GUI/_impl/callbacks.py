@@ -174,21 +174,36 @@ def set_auto_coding_for_dynamic_validation_plane(g, p_def: plane.Definition_Glas
         return applied
     def _apply_automatic_val_coding():
         cs = [cs for cs in g.study_config.coding_setup if cs['event_type']==annotation.EventType.Validate and p_def.name in cs['planes']]
+        auto_code  = config.AutoCodeEpisodes(
+            start_markers = auto_coding_setup['start_markers'],
+            end_markers   = auto_coding_setup['end_markers'],
+        )
+        auto_code.apply_defaults()
+        validation_setup = None
+        if auto_coding_setup['split_consecutive']:
+            validation_setup = config.ValidationSetup(
+                dynamic_split_consecutive = True
+            )
+            validation_setup.apply_defaults()
         if not cs:
             g.study_config.coding_setup.append(config.EventSetup(
                 event_type = annotation.EventType.Validate,
                 name = f'Dynamic validation ({p_def.name})',
                 description = f'Dynamic validation setup for {p_def.name}',
                 planes     = set([p_def.name]),
-                auto_code  = config.AutoCodeEpisodes(
-                    start_markers = auto_coding_setup['start_markers'],
-                    end_markers   = auto_coding_setup['end_markers'],
-                )
+                auto_code  = auto_code,
+                validation_setup = validation_setup
             ))
-            g.study_config.coding_setup[-1]['auto_code'].apply_defaults()
         else:
-            cs[0]['auto_code']['start_markers'] = auto_coding_setup['start_markers']
-            cs[0]['auto_code']['end_markers']   = auto_coding_setup['end_markers']
+            if cs[0]['auto_code'] is None:
+                cs[0]['auto_code'] = auto_code
+            else:
+                cs[0]['auto_code']['start_markers'] = auto_coding_setup['start_markers']
+                cs[0]['auto_code']['end_markers']   = auto_coding_setup['end_markers']
+            if validation_setup is not None and cs[0]['validation_setup'] is None:
+                cs[0]['validation_setup'] = validation_setup
+            elif cs[0]['validation_setup'] is not None:
+                cs[0]['validation_setup']['dynamic_split_consecutive'] = auto_coding_setup['split_consecutive']
         _apply_individual_markers_if_needed()
         # persist changed config
         g.study_config.store_as_json()
@@ -200,7 +215,8 @@ def set_auto_coding_for_dynamic_validation_plane(g, p_def: plane.Definition_Glas
     if exists:
         if len(cs)>1:
             raise RuntimeError(f'Multiple coding setups found for {annotation.tooltip_map[annotation.EventType.Validate]}s for plane {p_def.name}, cannot proceed')
-        matches = all((cs[0]['auto_code'][f]==auto_coding_setup[f] for f in ('start_markers','end_markers')))
+        matches = cs[0]['auto_code'] and all((cs[0]['auto_code'][f]==auto_coding_setup[f] for f in ('start_markers','end_markers')))
+        matches = matches and ((cs[0]['validation_setup'] is None and auto_coding_setup['split_consecutive']) or (cs[0]['validation_setup'] is not None and cs[0]['validation_setup']['dynamic_split_consecutive']==auto_coding_setup['split_consecutive']))
         if matches:
             # nothing to do, do check all individual markers are also defined
             if _apply_individual_markers_if_needed():
@@ -215,10 +231,12 @@ def set_auto_coding_for_dynamic_validation_plane(g, p_def: plane.Definition_Glas
     msg = f'The following setup for automatic coding of {annotation.tooltip_map[annotation.EventType.Validate]}s was found upon import of the dynamic validation setup for the {p_def.name} plane:\n'
     for f in ('start_markers','end_markers'):
         msg += f'{f}: ['+(', '.join((gt_marker.marker_ID_to_str(m) for m in auto_coding_setup[f])))+']\n'
+    msg += f"Split consecutive repetitions: {auto_coding_setup['split_consecutive']}\n"
     if exists:
         msg += f'\nThe following setup for automatic coding of {annotation.tooltip_map[annotation.EventType.Validate]}s using the {p_def.name} plane is already set:\n'
         for f in ('start_markers','end_markers'):
             msg += f'{f}: ['+(', '.join((gt_marker.marker_ID_to_str(m) for m in cs[0]['auto_code'][f])))+']\n'
+        msg += f"Split consecutive repetitions: {False if cs[0]['validation_setup'] is None else cs[0]['validation_setup']['dynamic_split_consecutive']}\n"
         msg += '\nDo you want to overwrite this configuration with the above?'
     else:
         msg += '\nDo you want to apply this configuration?'
