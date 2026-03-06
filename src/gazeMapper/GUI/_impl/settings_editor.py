@@ -566,8 +566,8 @@ def draw_value(field_lbl: str, val: _T, f_type: typing.Type, o_type_args: tuple[
             else:
                 new_val = val
         case config.RgbColor:
-            new_val = imgui.color_edit3(f'##{field_lbl}', [x/255. for x in val], imgui.ColorEditFlags_.picker_hue_wheel | imgui.ColorEditFlags_.uint8 | imgui.ColorEditFlags_.display_rgb | imgui.ColorEditFlags_.input_rgb)[1]
-            new_val = config.RgbColor(*tuple(int(x*255) for x in new_val))
+            new_val = imgui.color_edit3(f'##{field_lbl}', [x/255. for x in val]+[1.], imgui.ColorEditFlags_.picker_hue_wheel | imgui.ColorEditFlags_.uint8 | imgui.ColorEditFlags_.display_rgb | imgui.ColorEditFlags_.input_rgb)[1]
+            new_val = config.RgbColor(*(tuple(int(x*255) for x in new_val)[:3]))
         case _:
             if new_edit:
                 new_val = val
