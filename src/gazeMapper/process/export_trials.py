@@ -55,9 +55,6 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
         if not all((working_dir / r / f'{naming.world_gaze_prefix}{p}.tsv').is_file() for p in planes):
             print(f'Warning: not all plane gaze files found for recording {r} in session {working_dir.name}. Skipping...')
             continue
-        if not all(gt_marker.get_file_name(m.id, m.aruco_dict_id, working_dir/r).is_file() for m in study_config.individual_markers):
-            print(f'Warning: not all individual marker detection files found for recording {r} in session {working_dir.name}. Skipping...')
-            continue
         # get trial coding
         # trial episodes are gotten from the reference recording if there is one and this is not the reference recording
         episodes = episode.load_episodes_from_all_recordings(study_config, working_dir/r, {cs['name'] for cs in trial_events})[0]
@@ -84,7 +81,7 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
 
         # if there are individual markers, load them so they can be added later
         # load
-        markers = {m.id: gt_marker.read_dataframe_from_file(m.id, m.aruco_dict_id, working_dir/r) for m in study_config.individual_markers}
+        markers = {m.id: gt_marker.read_dataframe_from_file(m.id, m.aruco_dict_id, working_dir/r) for m in study_config.individual_markers if gt_marker.get_file_name(m.id, m.aruco_dict_id, working_dir/r).is_file()}
         # recode to presence/absence if wanted
         if study_config.export_only_code_marker_presence:
             markers = gt_marker.code_for_presence(markers, allow_failed=True)
