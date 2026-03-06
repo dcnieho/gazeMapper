@@ -25,6 +25,10 @@ def run():
         except Exception:
             pass
 
+    # trigger process submodule imports to register process functions, so we don't have a pause upon first action execution
+    from .. import process
+    process.action_to_func(process.Action.CODE_EPISODES)
+
     g = gui.GUI()
     async_thread.setup()
     g.run()
