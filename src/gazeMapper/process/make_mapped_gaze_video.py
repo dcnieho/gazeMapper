@@ -16,7 +16,8 @@ from glassesTools import annotation, aruco, drawing, intervals, gaze_headref, ga
 from glassesTools.gui import video_player
 
 from .. import config, episode, marker, naming, process, session, synchronization
-from .detect_markers import _get_plane_setup, _get_sync_function
+from .detect_markers import _get_plane_setup
+from .run_sync_function import _get_sync_function
 
 
 def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None, show_visualization=False, progress_indicator: process_pool.JobProgress|None = None, **study_settings):

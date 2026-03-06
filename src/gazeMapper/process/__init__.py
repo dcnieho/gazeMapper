@@ -10,6 +10,7 @@ class Action(enum.IntEnum):
     MAKE_GAZE_OVERLAY_VIDEO = enum.auto()
     CODE_EPISODES = enum.auto()
     DETECT_MARKERS = enum.auto()
+    RUN_SYNC_FUNCTION = enum.auto()
     GAZE_TO_PLANE = enum.auto()
     AUTO_CODE_SYNC = enum.auto()
     AUTO_CODE_EPISODES = enum.auto()
@@ -27,7 +28,7 @@ class Action(enum.IntEnum):
         return self in [Action.CODE_EPISODES, Action.SYNC_ET_TO_CAM]
     @property
     def has_options(self):
-        return self in [Action.MAKE_GAZE_OVERLAY_VIDEO, Action.DETECT_MARKERS, Action.GAZE_TO_PLANE, Action.MAKE_MAPPED_GAZE_VIDEO]
+        return self in [Action.MAKE_GAZE_OVERLAY_VIDEO, Action.DETECT_MARKERS, Action.RUN_SYNC_FUNCTION, Action.GAZE_TO_PLANE, Action.MAKE_MAPPED_GAZE_VIDEO]
     @property
     def has_progress_indication(self):
         return self in [Action.MAKE_GAZE_OVERLAY_VIDEO, Action.DETECT_MARKERS, Action.GAZE_TO_PLANE, Action.COMPUTE_GAZE_OFFSETS, Action.VALIDATE, Action.MAKE_MAPPED_GAZE_VIDEO]
@@ -63,6 +64,7 @@ def action_to_func(action: Action) -> typing.Callable[..., None]|None:
     from .make_gaze_overlay_video import run as make_gaze_overlay_video
     from .code_episodes import run as do_coding
     from .detect_markers import run as detect_markers
+    from .run_sync_function import run as run_sync_function
     from .sync_et_to_cam import run as sync_et_to_cam
     from .sync_to_ref import run as sync_to_ref
     from .gaze_to_plane import run as gaze_to_plane
@@ -82,6 +84,8 @@ def action_to_func(action: Action) -> typing.Callable[..., None]|None:
             return do_coding
         case Action.DETECT_MARKERS:
             return detect_markers
+        case Action.RUN_SYNC_FUNCTION:
+            return run_sync_function
         case Action.GAZE_TO_PLANE:
             return gaze_to_plane
         case Action.AUTO_CODE_SYNC:
@@ -136,6 +140,9 @@ def is_action_possible_given_config(action: Action, study_config: 'config.Study'
         case Action.CODE_EPISODES | Action.DETECT_MARKERS | Action.GAZE_TO_PLANE:
             # if there is any form of config beyond a session definition, these will be possible (whether config is complete is handled by error messages so no need to worry about that here)
             return not not study_config.planes or not not study_config.coding_setup or not not study_config.individual_markers
+        case Action.RUN_SYNC_FUNCTION:
+            cs = get_specific_event_types(study_config, check_specific_fields=['sync_setup'])
+            return any(cs['sync_setup']['get_cam_movement_method']=='function' for cs in cs)
         case Action.AUTO_CODE_SYNC:
             return config_has_auto_coding(study_config, specific_event_type=annotation.EventType.Sync_Camera)
         case Action.AUTO_CODE_EPISODES:
@@ -187,14 +194,22 @@ def is_action_possible_for_recording(rec: str, rec_type: 'session.RecordingType'
         if study_config.sync_ref_recording and rec!=study_config.sync_ref_recording and not has_other_episode_auto_code:
             return False
     if action==Action.DETECT_MARKERS and study_config.head_attached_recordings_replace_et_scene is not None:
-            # check if this recording's pose is not replaced by that of a head-attached camera
-            is_replaced_recording = study_config.head_attached_recordings_replace_et_scene is not None and any(r.associated_recording==rec for r in study_config.session_def.recordings if r.name in study_config.head_attached_recordings_replace_et_scene)
-            if is_replaced_recording:
-                # furthermore check if there are sync events to process
-                sync_events = get_specific_event_types(study_config, annotation.EventType.Sync_Camera, ['auto_code'])
-                if not sync_events or not any(e['auto_code'].get('markers', []) for e in sync_events):
-                    # no sync events to process for this replaced recording, so nothing to do
-                    return False
+        # check if this recording's pose is not replaced by that of a head-attached camera
+        is_replaced_recording = study_config.head_attached_recordings_replace_et_scene is not None and any(r.associated_recording==rec for r in study_config.session_def.recordings if r.name in study_config.head_attached_recordings_replace_et_scene)
+        if is_replaced_recording:
+            # furthermore check if there are sync events to process
+            sync_events = get_specific_event_types(study_config, annotation.EventType.Sync_Camera, ['auto_code'])
+            if not sync_events or not any(e['auto_code'].get('markers', []) for e in sync_events):
+                # no sync events to process for this replaced recording, so nothing to do
+                return False
+    if action==Action.RUN_SYNC_FUNCTION:
+        is_replaced_recording = study_config.head_attached_recordings_replace_et_scene is not None and any(r.associated_recording==rec for r in study_config.session_def.recordings if r.name in study_config.head_attached_recordings_replace_et_scene)
+        if is_replaced_recording:
+            # Run Sync Function should not be run for recordings whose pose is replaced by that of a head-attached camera
+            return False
+        # check if there are any sync functions to run for this recording
+        cs = get_specific_event_types(study_config, check_specific_fields=['sync_setup'])
+        return any(cs['sync_setup']['get_cam_movement_method']=='function' and (cs['which_recordings'] is None or rec in cs['which_recordings']) for cs in cs)
     return True
 
 def get_actions_for_config(study_config: 'config.Study', exclude_session_level: bool=False) -> set[Action]:
@@ -211,12 +226,12 @@ def _determine_to_invalidate(action: Action, study_config: 'config.Study') -> tu
         case Action.MAKE_GAZE_OVERLAY_VIDEO:
             states_to_invalidate = {Action.EXPORT_TRIALS}
         case Action.CODE_EPISODES:
-            states_to_invalidate = {a for a in action.next_values() if a not in [Action.AUTO_CODE_SYNC, Action.AUTO_CODE_EPISODES]}
+            states_to_invalidate = {a for a in action.next_values() if a not in [Action.DETECT_MARKERS, Action.AUTO_CODE_SYNC, Action.AUTO_CODE_EPISODES]}
             for_all_recs = not not study_config.sync_ref_recording
         case Action.DETECT_MARKERS:
             # N.B.: don't invalidate auto code sync and auto code episodes as the individual markers used for these
             # automated coding actions are always detected throughout the whole video
-            actions = {a for a in action.next_values() if a not in [Action.SYNC_TO_REFERENCE, Action.AUTO_CODE_SYNC, Action.AUTO_CODE_EPISODES]}
+            actions = {a for a in action.next_values() if a not in [Action.RUN_SYNC_FUNCTION]}
             if (study_config.mapped_video_process_planes_for_all_frames or
                 study_config.mapped_video_plane_marker_color is not None or # NB: no need to check mapped_video_recovered_plane_marker_color as it only overrides colors for some plane markers
                 study_config.mapped_video_individual_marker_color is not None or
@@ -225,13 +240,15 @@ def _determine_to_invalidate(action: Action, study_config: 'config.Study') -> tu
                 # in this case MAKE_MAPPED_GAZE_VIDEO processes each frame itself, so output of DETECT_MARKERS is not used
                 actions.discard(Action.MAKE_MAPPED_GAZE_VIDEO)
             states_to_invalidate = actions
+        case Action.RUN_SYNC_FUNCTION:
+            states_to_invalidate = {a for a in action.next_values() if a not in [Action.AUTO_CODE_SYNC, Action.AUTO_CODE_EPISODES]}
         case Action.GAZE_TO_PLANE:
-            # NB: SYNC_ET_TO_CAM and SYNC_TO_REFERENCE operate on gazeData not gaze on plane data, and MAKE_VIDEO does the job itself/doesn't use this file
+            # NB: SYNC_ET_TO_CAM and SYNC_TO_REFERENCE operate on gazeData not gaze on plane data, and MAKE_MAPPED_GAZE_VIDEO does the job itself/doesn't use this file
             states_to_invalidate = {a for a in action.next_values() if a not in [Action.AUTO_CODE_SYNC, Action.AUTO_CODE_EPISODES, Action.SYNC_ET_TO_CAM, Action.SYNC_TO_REFERENCE, Action.MAKE_MAPPED_GAZE_VIDEO]}
         case Action.AUTO_CODE_SYNC:
             states_to_invalidate = {Action.CODE_EPISODES, Action.GAZE_TO_PLANE, Action.SYNC_TO_REFERENCE, Action.EXPORT_TRIALS, Action.MAKE_MAPPED_GAZE_VIDEO}
         case Action.AUTO_CODE_EPISODES:
-            states_to_invalidate = {a for a in Action.CODE_EPISODES.next_values(inclusive=True) if a not in [Action.AUTO_CODE_EPISODES, Action.AUTO_CODE_SYNC, Action.SYNC_ET_TO_CAM, Action.SYNC_TO_REFERENCE, Action.VALIDATE]}
+            states_to_invalidate = {a for a in Action.CODE_EPISODES.next_values(inclusive=True) if a not in [Action.DETECT_MARKERS, Action.AUTO_CODE_EPISODES, Action.AUTO_CODE_SYNC, Action.SYNC_TO_REFERENCE]}
             for_all_recs = not not study_config.sync_ref_recording and config_has_auto_coding(study_config, specific_event_type=annotation.EventType.Trial)
         case Action.SYNC_ET_TO_CAM:
             states_to_invalidate = {a for a in Action.GAZE_TO_PLANE.next_values(inclusive=True) if a not in [Action.AUTO_CODE_EPISODES, Action.AUTO_CODE_SYNC, Action.SYNC_ET_TO_CAM]}
@@ -277,8 +294,9 @@ def _is_recording_action_possible(rec: str, action_states: dict[Action, process_
         case Action.CODE_EPISODES:
             pass    # nothing besides import
         case Action.DETECT_MARKERS:
-            if not config_has_auto_coding(study_config):
-                preconditions.add(Action.CODE_EPISODES)
+            pass    # nothing besides import
+        case Action.RUN_SYNC_FUNCTION:
+            preconditions.add(Action.CODE_EPISODES)
         case Action.GAZE_TO_PLANE:
             preconditions.update([Action.CODE_EPISODES, Action.DETECT_MARKERS])
             if study_config.sync_ref_recording:
@@ -290,7 +308,12 @@ def _is_recording_action_possible(rec: str, action_states: dict[Action, process_
         case Action.AUTO_CODE_EPISODES:
             preconditions.update([Action.DETECT_MARKERS])
         case Action.SYNC_ET_TO_CAM:
-            preconditions.update([Action.CODE_EPISODES, Action.DETECT_MARKERS])
+            preconditions.update([Action.CODE_EPISODES])
+            cs = get_specific_event_types(study_config, check_specific_fields=['sync_setup'])
+            if any(cs['sync_setup']['get_cam_movement_method']=='plane' and (cs['which_recordings'] is None or rec in cs['which_recordings']) for cs in cs):
+                preconditions.add(Action.DETECT_MARKERS)
+            if any(cs['sync_setup']['get_cam_movement_method']=='function' and (cs['which_recordings'] is None or rec in cs['which_recordings']) for cs in cs):
+                preconditions.add(Action.RUN_SYNC_FUNCTION)
         case Action.COMPUTE_GAZE_OFFSETS:
             preconditions.update([Action.CODE_EPISODES, Action.GAZE_TO_PLANE])
         case Action.VALIDATE:

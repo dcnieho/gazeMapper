@@ -457,6 +457,10 @@ def show_action_options(g, session_name: str, rec_name: str|None, action: proces
                 ], 'visualization_show_rejected_markers': [
                     False, 'Show rejected markers', 'Rejected ArUco marker candidates are also shown in the viewer. Possibly useful for debug.'
                 ]}
+        case process.Action.RUN_SYNC_FUNCTION:
+            options = {'show_visualization': [
+                    False, 'Show visualization', 'Show a viewer that allows to follow the processing of the video. Each frame is shown overlaid with output of the synchronization function.'
+                ]}
         case process.Action.GAZE_TO_PLANE:
             options = {'show_visualization': [
                     False, 'Show visualization', 'Show a viewer that visualizes the mapped gaze to plane. Each frame of the video is shown in the viewer, overlaid with info about detected planes and projected gaze.'

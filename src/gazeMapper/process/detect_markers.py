@@ -1,10 +1,7 @@
 import pathlib
-import pandas as pd
-import numpy as np
-import typing
 import cv2
 
-from glassesTools import annotation, aruco, drawing, marker as gt_marker, naming as gt_naming, pose, process_pool, propagating_thread, ocv, timestamps
+from glassesTools import annotation, aruco, marker as gt_marker, naming as gt_naming, pose, process_pool, propagating_thread, ocv, timestamps
 from glassesTools.camera_recording import Type as CameraRecordingType
 from glassesTools.gui.video_player import GUI
 
@@ -54,7 +51,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
     rec_def = study_config.session_def.get_recording_def(rec_name)
     in_video = session.read_recording_info(working_dir, rec_def.type)[1]
 
-    # check whether this recordings pose is not replaced by that of a head-attached camera. If so, we only have to run any camera sync detections here
+    # check whether this recording's pose is replaced by that of a head-attached camera. If so, we only have to run any camera sync detections here
     is_replaced_recording = study_config.head_attached_recordings_replace_et_scene is not None and any(r.associated_recording==rec_name for r in study_config.session_def.recordings if r.name in study_config.head_attached_recordings_replace_et_scene)
     if is_replaced_recording:
         sync_events = process.get_specific_event_types(study_config, annotation.EventType.Sync_Camera, ['auto_code'])
@@ -63,13 +60,12 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
 
         sync_markers = {m for e in sync_events for m in e['auto_code'].get('markers', [])}
         individual_markers_to_process = [m for m in study_config.individual_markers if (m.id,m.aruco_dict_id) in sync_markers]
-        planes_setup, sync_target_functions = {}, {}
-        plane_frames, function_frames = {}, {}
+        planes_setup, plane_frames, episodes = {}, {}, {}
     else:
         # get interval(s) coded to be analyzed, if any
         # We don't need them if they would be ignored because the whole video would be processed. The whole video is processed when study_config.auto_code_sync_points or study_config.auto_code_episodes are set
         has_auto_code = process.config_has_auto_coding(study_config)
-        wanted_episodes = {cs['name'] for cs in study_config.coding_setup if cs.get('planes',[]) or cs.get('sync_setup',None) is not None}
+        wanted_episodes = {cs['name'] for cs in study_config.coding_setup if cs.get('planes',[])}
         episodes = episode.load_episodes_from_all_recordings(study_config, working_dir, wanted_episodes, missing_other_coding_ok=has_auto_code)[0]
 
         # remove empty episode lists (no coding)
@@ -79,8 +75,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
         if not episodes and not has_auto_code:   # missing coding is ok when auto coding is set up, as then we process all frames anyway
             raise RuntimeError(f'Coding is missing, cannot run Detect Markers. Check {working_dir/naming.coding_file}')
 
-        sync_target_functions, function_frames  = _get_sync_function(study_config, rec_def, episodes)
-        planes_setup, plane_frames              = _get_plane_setup(study_config, config_dir, episodes)
+        planes_setup, _ = _get_plane_setup(study_config, config_dir, episodes)  # we don't need to know for which frames to run the detection, we always process all frames
 
         if not planes_setup and not study_config.individual_markers:
             raise RuntimeError(f'No planes or individual markers are configured for detection for the "{rec_name}" recording (a {rec_def.type.value} recording), cannot run Detect Markers')
@@ -92,7 +87,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
     # will then wrap their detection and register them with the pose estimator
     aruco_manager = aruco.Manager()
     for p in planes_setup:
-        aruco_manager.add_plane(p, planes_setup[p], plane_frames[p])
+        aruco_manager.add_plane(p, planes_setup[p])
         if hasattr(planes_setup[p]['plane'],'is_dynamic') and planes_setup[p]['plane'].is_dynamic():
             markers = planes_setup[p]['plane'].get_marker_IDs()
             marker_setup = planes_setup[p]['plane'].get_dynamic_marker_setup()
@@ -100,14 +95,11 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
                 if c=='plane':
                     continue
                 for m in markers[c]:
-                    aruco_manager.add_individual_marker(m, marker_setup, plane_frames[p])
+                    aruco_manager.add_individual_marker(m, marker_setup)
     for m in (markers:=marker.get_setup_for_markers(individual_markers_to_process)):
         aruco_manager.add_individual_marker(m, markers[m])
     aruco_manager.consolidate_setup(study_config.allow_duplicated_markers)
     aruco_manager.register_with_estimator(estimator)
-    # other setup of estimator
-    for sfe in sync_target_functions:
-        estimator.register_extra_processing_fun(f'sync_{sfe}', function_frames[sfe], *sync_target_functions[sfe])
     estimator.attach_gui(gui)
     if gui is not None:
         gui.set_show_timeline(True, timestamps.VideoTimestamps(working_dir / gt_naming.frame_timestamps_fname), annotation.flatten_annotation_dict(episodes), window_id=gui.main_window_id)
@@ -125,16 +117,12 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
     progress_indicator.set_intervals(step:=min(20,int(total/200)), step)
     estimator.set_progress_updater(progress_indicator.update)
 
-    poses, individual_markers, sync_target_signals = estimator.process_video()
+    poses, individual_markers, _ = estimator.process_video()
 
     for p in poses:
         pose.write_list_to_file(poses[p], working_dir/f'{naming.plane_pose_prefix}{p}.tsv', skip_failed=True)
     for m in individual_markers:
         gt_marker.write_list_to_file(individual_markers[m], gt_marker.get_file_name(m.m_id, m.aruco_dict_id, working_dir), skip_failed=False)
-    for s in sync_target_signals:
-        df = pd.DataFrame([[v, *t] for v,t in sync_target_signals[s]],columns=['frame_idx','target_x','target_y'])
-        nm = s.removeprefix('sync_')
-        df.to_csv(working_dir/f'{naming.target_sync_prefix}{nm}.tsv', sep='\t', index=False, na_rep='nan', float_format="%.8f")
 
     # if this is a head-attached recording, further check whether its pose is used to replace pose for another camera
     # if so, write a pose file for that camera also
@@ -177,51 +165,6 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
     # update state
     session.update_action_states(working_dir, process.Action.DETECT_MARKERS, process_pool.State.Completed, study_config)
 
-
-def _get_sync_function(study_config: config.Study,
-                       rec_def: session.RecordingDefinition,
-                       episodes: dict[str,tuple[annotation.EventType, list[list[int]]]]|None = None) -> tuple[dict[str, tuple[typing.Callable[[str,int,np.ndarray,ocv.CameraParams,typing.Any], tuple[float,float]], dict[str, typing.Any], typing.Callable[[str,np.ndarray,int,tuple[float,float]], None]]], dict[str, tuple[annotation.EventType, list[list[int]]]|None]]:
-    sync_target_function: dict[str, tuple[typing.Callable[[str,int,np.ndarray,ocv.CameraParams,typing.Any], tuple[float,float]], dict[str, typing.Any], typing.Callable[[str,np.ndarray,int,tuple[float,float]], None]]] = {}
-    analyze_frames: dict[str, tuple[annotation.EventType, list[list[int]]]|None] = {}
-    # NB: only for eye tracker recordings, others don't have eye tracking data and thus nothing to sync
-    if rec_def.type==session.RecordingType.Eye_Tracker:
-        et_sync_events = process.get_specific_event_types(study_config, annotation.EventType.Sync_ET_Data, ['sync_setup'])
-        for cs in et_sync_events:
-            match cs['sync_setup']['get_cam_movement_method']:
-                case 'plane':
-                    if not cs['planes']:
-                        raise ValueError(f'The method for synchronizing eye tracker data to the scene camera (get_cam_movement_method) is set to "plane" for the "{cs["name"]}" event but no plane is configured for this event. Cannot continue.')
-                    # NB: no extra_funcs to run
-                case 'function':
-                    import importlib
-                    to_load = cs['sync_setup']['get_cam_movement_function']['module_or_file']
-                    if (to_load_path:=pathlib.Path(to_load)).is_file():
-                        import sys
-                        module_name = to_load_path.stem
-                        spec = importlib.util.spec_from_file_location(module_name, to_load_path)
-                        module = importlib.util.module_from_spec(spec)
-                        sys.modules[module_name] = module
-                        spec.loader.exec_module(module)
-                    else:
-                        module = importlib.import_module(cs['sync_setup']['get_cam_movement_function']['module_or_file'])
-                    func = getattr(module, cs['sync_setup']['get_cam_movement_function']['function'])
-                    sync_target_function[cs["name"]] = (func, cs['sync_setup']['get_cam_movement_function']['parameters'], _sync_function_output_drawer)
-                    if episodes and cs['name'] in episodes:
-                        analyze_frames[cs['name']] = episodes[cs['name']]
-                    else:
-                        analyze_frames[cs['name']] = None
-                case _:
-                    raise ValueError(f'sync_setup.get_cam_movement_method={cs["sync_setup"]["get_cam_movement_method"]} for the "{cs["name"]}" event not understood')
-
-    return sync_target_function, analyze_frames
-
-def _sync_function_output_drawer(proc_name: str, frame: np.ndarray, frame_idx: int, t: tuple[float,float], sub_pixel_fac=8):
-    # input is tx, ty pixel positions on the camera image
-    ll = 20
-    tx,ty = t
-    drawing.openCVLine(frame, (tx,ty-ll), (tx,ty+ll), (0,255,0), 1, sub_pixel_fac)
-    drawing.openCVLine(frame, (tx-ll,ty), (tx+ll,ty), (0,255,0), 1, sub_pixel_fac)
-    drawing.openCVCircle(frame, (tx,ty), 3, (0,0,255), -1, sub_pixel_fac)
 
 def _get_plane_setup(study_config: config.Study,
                      config_dir: pathlib.Path,
