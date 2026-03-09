@@ -360,10 +360,7 @@ def _is_session_action_possible(session_action_states: dict[Action, process_pool
         else:
             met1 = [is_action_possible_for_recording(r, rec_types[r], p, study_config) for r in recording_action_states]
             met2 = [recording_action_states[r][p]==process_pool.State.Completed for r in recording_action_states]
-            if preconditions_test=='or':
-                met = [m1 and m2 for m1,m2 in zip(met1,met2)]       # need both that action is possible for that recording and that it is completed for that recording (could probably simplify this to just check if it's completed, but lets be conservative)
-            else:
-                met = [(not m1) or m2 for m1,m2 in zip(met1,met2)]  # not m1 because ignore if action isn't possible for that recording anyway
+            met = [m2 for m1,m2 in zip(met1,met2) if m1]  # use m1 to ignore if action isn't possible for that recording
             all_met = all(met) if met else False
             precond_met[p] = (all_met, [] if all_met else [r for r,m1,m2 in zip(recording_action_states,met1,met2) if m1 and not m2])
 
