@@ -1742,6 +1742,12 @@ class GUI:
         all_actions = {a for s in actions for a in actions[s]}
         all_actions |= {a for r in actions_running for a in actions_running[r]}
         all_actions = [a for a in process.Action if a in all_actions]   # ensure order
+        def _runner(action: process.Action, which: list[tuple[str,str|None]], what, sort_order: list, *args, **kwargs):
+            # sort which by GUI order, then submit
+            which.sort(key=lambda x: sort_order.index(x[0]) if x[0] in sort_order else -1)
+            for s,r in which:
+                what(s, r, action, *args, **kwargs)
+        sort_order = self._session_lister.sorted_ids
         for a in all_actions:
             running = [r for r in actions_running if a in actions_running[r]]
             val_coding_options: list[str] = []
@@ -1783,12 +1789,10 @@ class GUI:
             if val_coding_options:
                 if imgui.begin_menu(icon+f" {a.displayable_name}"):
                     if imgui.selectable(a.displayable_name, False)[0]:
-                        for s,r in to_run:
-                            self.launch_task(s, r, a)
+                        _runner(a, to_run, self.launch_task, sort_order)
                     for v in val_coding_options:
                         if imgui.selectable(f'Code targets for {v}', False)[0]:
-                            for s,r in to_run:
-                                self.launch_task(s, r, a, val_coding_event=v)
+                            _runner(a, to_run, self.launch_task, sort_order, val_coding_event=v)
                     imgui.end_menu()
             elif imgui.selectable(icon+f" {a.displayable_name}", False)[0]:
                 if running:
@@ -1804,11 +1808,11 @@ class GUI:
                         # and what to export
                         gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='export', sessions=[s for s,_ in to_run]))
                     else:
-                        for s,r in to_run:
-                            if a.has_options and imgui.get_io().key_shift:
-                                callbacks.show_action_options(self, s, r, a)
-                            else:
-                                self.launch_task(s, r, a)
+                        if a.has_options and imgui.get_io().key_shift:
+                            # NB: reversed order so popup show in correct order (first is on bottom)
+                            _runner(a, to_run, callbacks.show_action_options, sort_order[::-1], self)
+                        else:
+                            _runner(a, to_run, self.launch_task, sort_order)
             if not possible:
                 imgui.end_disabled()
             gt_gui.utils.draw_hover_text(hover_text, '')
@@ -1841,6 +1845,12 @@ class GUI:
         all_actions = {a for r in actions for a in actions[r]}
         all_actions |= {a for r in actions_running for a in actions_running[r]}
         all_actions = [a for a in process.Action if a in all_actions]   # ensure order
+        def _runner(action: process.Action, s: str, which: list[str], what, sort_order: list, *args, **kwargs):
+            # sort which by GUI order, then submit
+            which.sort(key=lambda x: sort_order.index(x) if x in sort_order else -1)
+            for r in which:
+                what(s, r, action, *args, **kwargs)
+        sort_order = self._recording_listers[session_name].sorted_recordings_ids
         for a in all_actions:
             running= [r for r in actions_running if a in actions_running[r]]
             val_coding_options: list[str] = []
@@ -1868,23 +1878,21 @@ class GUI:
             if val_coding_options:
                 if imgui.begin_menu(icon+f" {a.displayable_name}"):
                     if imgui.selectable(a.displayable_name, False)[0]:
-                        for r in to_run:
-                            self.launch_task(session_name, r, a)
+                        _runner(a, session_name, to_run, self.launch_task, sort_order)
                     for v in val_coding_options:
                         if imgui.selectable(f'Code targets for {v}', False)[0]:
-                            for r in to_run:
-                                self.launch_task(session_name, r, a, val_coding_event=v)
+                            _runner(a, session_name, to_run, self.launch_task, sort_order, val_coding_event=v)
                     imgui.end_menu()
             elif imgui.selectable(icon+f" {a.displayable_name}##{session_name}", False)[0]:
                 if running:
                     for r in running:
                         self.job_scheduler.cancel_job(actions_running[r][a])
                 else:
-                    for r in to_run:
-                        if a.has_options and imgui.get_io().key_shift:
-                            callbacks.show_action_options(self, session_name, r, a)
-                        else:
-                            self.launch_task(session_name, r, a)
+                    if a.has_options and imgui.get_io().key_shift:
+                        # NB: reversed order so popup show in correct order (first is on bottom)
+                        _runner(a, session_name, to_run, callbacks.show_action_options, sort_order[::-1], self)
+                    else:
+                        _runner(a, session_name, to_run, self.launch_task, sort_order)
             if not possible:
                 imgui.end_disabled()
             gt_gui.utils.draw_hover_text(hover_text, '')
@@ -2051,7 +2059,7 @@ class GUI:
                                 gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='export', sessions=[sess.name]))
                             else:
                                 if a.has_options and imgui.get_io().key_shift:
-                                    callbacks.show_action_options(self, sess.name, None, a)
+                                    callbacks.show_action_options(sess.name, None, a, self)
                                 else:
                                     self.launch_task(sess.name, None, a)
                     if not possible:
