@@ -177,7 +177,7 @@ def get_episode_frame_indices_from_other_video(working_dir: str|pathlib.Path, ev
     if event not in other_episodes:
         if missing_other_coding_ok:
             return [[]]
-        raise KeyError(f'Requested event "{event}" is not found. Either te requested event does not exist in the event coding for the other recording ({other_rec}) or the event is unknown.')
+        raise KeyError(f'Requested event "{event}" is not found. Either the requested event does not exist in the event coding for the other recording ({other_rec}) or the event is unknown.')
     # get sync and timestamp info we need to transform reference frames indices to frame indices of this recording
     sync = get_sync_for_recs(working_dir.parent, all_recs, ref_rec, do_time_stretch, average_recordings, missing_other_coding_ok)
     if sync is None:
