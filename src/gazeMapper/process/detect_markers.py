@@ -62,20 +62,11 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
         individual_markers_to_process = [m for m in study_config.individual_markers if (m.id,m.aruco_dict_id) in sync_markers]
         planes_setup, plane_frames, episodes = {}, {}, {}
     else:
-        # get interval(s) coded to be analyzed, if any
-        # We don't need them if they would be ignored because the whole video would be processed. The whole video is processed when study_config.auto_code_sync_points or study_config.auto_code_episodes are set
-        has_auto_code = process.config_has_auto_coding(study_config)
+        # get coded interval(s) with planes, if any. Just to show in GUI, if attached
         wanted_episodes = {cs['name'] for cs in study_config.coding_setup if cs.get('planes',[])}
-        episodes = episode.load_episodes_from_all_recordings(study_config, working_dir, wanted_episodes, missing_other_coding_ok=has_auto_code)[0]
+        episodes = episode.load_episodes_from_all_recordings(study_config, working_dir, wanted_episodes, missing_other_coding_ok=True)[0]
 
-        # remove empty episode lists (no coding)
-        episodes = {cs:episodes[cs] for cs in episodes if episodes[cs][1]}
-
-        # check there is anything to do
-        if not episodes and not has_auto_code:   # missing coding is ok when auto coding is set up, as then we process all frames anyway
-            raise RuntimeError(f'Coding is missing, cannot run Detect Markers. Check {working_dir/naming.coding_file}')
-
-        planes_setup, _ = _get_plane_setup(study_config, config_dir, episodes)  # we don't need to know for which frames to run the detection, we always process all frames
+        planes_setup, _ = _get_plane_setup(study_config, config_dir)  # we don't need to know for which frames to run the detection, we always process all frames
 
         if not planes_setup and not study_config.individual_markers:
             raise RuntimeError(f'No planes or individual markers are configured for detection for the "{rec_name}" recording (a {rec_def.type.value} recording), cannot run Detect Markers')
