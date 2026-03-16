@@ -7,6 +7,8 @@ import subprocess
 import pathvalidate
 import threading
 import natsort
+import dataclasses
+import copy
 from imgui_bundle import imgui, imspinner, hello_imgui, icons_fontawesome_6 as ifa6
 
 from glassesTools import annotation, aruco, async_thread, camera_recording, data_types, eyetracker, gui as gt_gui, marker as gt_marker, naming as gt_naming, platform, process_pool, recording, video_utils
@@ -15,6 +17,7 @@ from glassesTools.gui import colors
 
 from . import utils
 from ... import config, marker, naming, plane, process, session
+from ...process import export_trials
 
 _picker_last_folder = None
 def get_folder_picker(g, reason: str, *args, **kwargs):
@@ -516,69 +519,14 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
     path = pathlib.Path(path)
 
-    # for the sessions, see what we have to export
-    to_export: dict[str,bool] = {}
-    rec_dirs_val: list[pathlib.Path] = []
-    rec_dirs_et_sync: list[pathlib.Path] = []
-    for s_name in sessions:
-        s = g.sessions.get(s_name,None)
-        if s is None:
-            continue
-        if 'plane gaze' not in to_export:
-            if any(cs['event_type']==annotation.EventType.Trial for cs in g.study_config.coding_setup) and any((s.recordings[r].state[process.Action.GAZE_TO_PLANE]==process_pool.State.Completed for r in s.recordings)):
-                to_export['plane gaze'] = True
-        if 'gaze offsets' not in to_export:
-            if any('gaze_offset_setup' in cs and cs['gaze_offset_setup'] is not None for cs in g.study_config.coding_setup) and any((s.recordings[r].state[process.Action.COMPUTE_GAZE_OFFSETS]==process_pool.State.Completed for r in s.recordings)):
-                to_export['gaze offsets'] = True
-        if recs:=[s.recordings[r].info.working_directory for r in s.recordings if s.recordings[r].state[process.Action.VALIDATE]==process_pool.State.Completed]:
-            to_export['validation'] = True
-            rec_dirs_val.extend(recs)
-        if recs:=[s.recordings[r].info.working_directory for r in s.recordings if s.recordings[r].state[process.Action.SYNC_ET_TO_CAM]==process_pool.State.Completed]:
-            to_export['eye tracker synchronization'] = True
-            rec_dirs_et_sync.extend(recs)
-        if 'gaze overlay video' not in to_export:
-            if any((s.recordings[r].state[process.Action.MAKE_GAZE_OVERLAY_VIDEO]==process_pool.State.Completed for r in s.recordings)):
-                to_export['gaze overlay video'] = True
-        if 'mapped gaze video' not in to_export:
-            if s.state[process.Action.MAKE_MAPPED_GAZE_VIDEO]==process_pool.State.Completed:
-                to_export['mapped gaze video'] = True
+    export_config = export_trials.prep_export(g.study_config.working_directory, sessions)
+    if export is None:
+        gt_gui.utils.push_popup(g, gt_gui.msg_box.msgbox, "Nothing to export", "No data available for export.", gt_gui.msg_box.MsgBox.error)
+        return
 
-    dq_df, dq_set = None, None
-    if rec_dirs_val:
-        val_events = process.get_specific_event_types(g.study_config, annotation.EventType.Validate)
-        for cs in val_events:
-            nm = cs['name']
-            pl = list(cs['planes'])[0]
-            t_dq_df, default_dq_type, dq_targets = export.collect_data_quality(rec_dirs_val, {pl:f'{naming.validation_prefix}{nm}_data_quality.tsv'}, col_for_parent='session')
-            if t_dq_df is not None:
-                if dq_df is None:
-                    dq_df = {nm: t_dq_df}
-                    dq_set = {nm: {}}
-                else:
-                    dq_df[nm] = t_dq_df
-                    dq_set[nm] = {}
-
-                # prep config for validation export
-                # data quality type
-                type_idx = t_dq_df.index.names.index('type')
-                dq_set[nm]['data_types'] = {k:False for k in sorted(list(t_dq_df.index.levels[type_idx]), key=lambda dq: dq.value)}
-                for dq in data_types.DataType:
-                    if cs['validation_setup']['data_types'] is not None and dq in cs['validation_setup']['data_types'] and dq in dq_set[nm]['data_types']:
-                        dq_set[nm]['data_types'][dq] = True
-                if not any(dq_set[nm]['data_types'].values()):
-                    dq_set[nm]['data_types'][default_dq_type] = True
-
-                # targets
-                dq_set[nm]['targets']     = {t:True for t in dq_targets}
-                dq_set[nm]['targets_avg'] = False
-
-                # other settings
-                dq_set[nm]['include_data_loss'] = cs['validation_setup']['include_data_loss']
-        if dq_df is None:
-            to_export.pop('validation', None)
-
+    c_fields = [f for f in dataclasses.fields(export_config)]
     def set_export_config_popup():
-        nonlocal to_export, dq_set
+        nonlocal export_config
         spacing = 2 * imgui.get_style().item_spacing.x
         color = (0.45, 0.09, 1.00, 1.00)
         imgui.push_font(None, imgui.get_style().font_size_base*g._icon_font_size_multiplier)
@@ -590,113 +538,140 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
         imgui.dummy((0,2*imgui.get_style().item_spacing.y))
         imgui.text_unformatted(f'Select below what you wish to export to the folder\n{path}')
         imgui.dummy((0,1.5*imgui.get_style().item_spacing.y))
-        for e in to_export:
-            _, to_export[e] = imgui.checkbox(e, to_export[e])
+        for f in c_fields:
+            fld = getattr(export_config, f.name)
+            if not fld.available:
+                continue
+            _, fld.do_it = imgui.checkbox(f.name, fld.do_it)
 
-        if 'validation' in to_export and to_export['validation'] and imgui.tree_node('Validation export settings'):
-            right_width = hello_imgui.dpi_window_size_factor()*90
-            need_node = len(dq_set)>1
-            for nm in dq_set:
-                cs = [c for c in val_events if c['name']==nm][0]
-                if need_node:
-                    if not imgui.tree_node(f'{nm} ({cs["description"]})'):
-                        continue
+            t_fields = [ff for ff in dataclasses.fields(fld) if ff.name not in ('available','do_it','sess','recs')]
+            if t_fields and fld.do_it and imgui.tree_node(f'{f.name} settings'):
+                right_width = hello_imgui.dpi_window_size_factor()*90
+                if f.name=='validation':
+                    need_node = len(fld.episodes)>1
+                    for nm in fld.episodes:
+                        cs = [c for c in g.study_config.coding_setup if c['name']==nm][0]
+                        if need_node:
+                            if not imgui.tree_node(f'{nm} ({cs["description"]})'):
+                                continue
 
-                if len(dq_set[nm]['data_types'])>1:
-                    if imgui.tree_node('Data quality types'):
-                        imgui.text_unformatted("Indicate which type(s) of\ndata quality to export.")
-                        if imgui.begin_table("##export_popup_validation", columns=2, flags=imgui.TableFlags_.no_clip):
-                            imgui.table_setup_column("##settings_validation_left", imgui.TableColumnFlags_.width_stretch)
-                            imgui.table_setup_column("##settings_validation_right", imgui.TableColumnFlags_.width_fixed)
+                        if len(fld.episodes[nm].d_types)>1:
+                            if imgui.tree_node('Data quality types'):
+                                imgui.text_unformatted("Indicate which type(s) of\ndata quality to export.")
+                                if imgui.begin_table("##export_popup_validation", columns=2, flags=imgui.TableFlags_.no_clip):
+                                    imgui.table_setup_column("##settings_validation_left", imgui.TableColumnFlags_.width_stretch)
+                                    imgui.table_setup_column("##settings_validation_right", imgui.TableColumnFlags_.width_fixed)
+                                    imgui.table_next_row()
+                                    imgui.table_set_column_index(1)  # Right
+                                    imgui.dummy((right_width, 1))
+
+                                    for dq in fld.episodes[nm].d_types:
+                                        imgui.table_next_row()
+                                        imgui.table_next_column()
+                                        imgui.align_text_to_frame_padding()
+                                        t,ht = data_types.get_explanation(dq)
+                                        imgui.text(t)
+                                        gt_gui.utils.draw_hover_text(ht, text="")
+                                        imgui.table_next_column()
+                                        _, fld.episodes[nm].d_types[dq] = imgui.checkbox(f"##{dq.name}", fld.episodes[nm].d_types[dq])
+
+                                    imgui.end_table()
+                                    imgui.spacing()
+                                imgui.tree_pop()
+
+                        if imgui.tree_node('Targets'):
+                            imgui.text_unformatted("Indicate for which target(s) you\nwant to export data quality metrics.")
+                            if imgui.begin_table("##export_popup_targets", columns=2, flags=imgui.TableFlags_.no_clip):
+                                imgui.table_setup_column("##settings_targets_left", imgui.TableColumnFlags_.width_stretch)
+                                imgui.table_setup_column("##settings_targets_right", imgui.TableColumnFlags_.width_fixed)
+                                imgui.table_next_row()
+                                imgui.table_set_column_index(1)  # Right
+                                imgui.dummy((right_width, 1))
+
+                                for t in fld.episodes[nm].targets:
+                                    imgui.table_next_row()
+                                    imgui.table_next_column()
+                                    imgui.align_text_to_frame_padding()
+                                    imgui.text(f"target {t}:")
+                                    imgui.table_next_column()
+                                    _, fld.episodes[nm].targets[t] = imgui.checkbox(f"##target_{t}", fld.episodes[nm].targets[t])
+
+                                imgui.end_table()
+                                imgui.spacing()
+                            imgui.tree_pop()
+
+                        if imgui.begin_table("##export_popup_targets_avg", columns=2, flags=imgui.TableFlags_.no_clip):
+                            imgui.table_setup_column("##settings_targets_avg_left", imgui.TableColumnFlags_.width_stretch)
+                            imgui.table_setup_column("##settings_targets_avg_right", imgui.TableColumnFlags_.width_fixed)
                             imgui.table_next_row()
                             imgui.table_set_column_index(1)  # Right
                             imgui.dummy((right_width, 1))
 
-                            for dq in dq_set[nm]['data_types']:
-                                imgui.table_next_row()
-                                imgui.table_next_column()
-                                imgui.align_text_to_frame_padding()
-                                t,ht = data_types.get_explanation(dq)
-                                imgui.text(t)
-                                gt_gui.utils.draw_hover_text(ht, text="")
-                                imgui.table_next_column()
-                                _, dq_set[nm]['data_types'][dq] = imgui.checkbox(f"##{dq.name}", dq_set[nm]['data_types'][dq])
+                            imgui.table_next_row()
+                            imgui.table_next_column()
+                            imgui.align_text_to_frame_padding()
+                            imgui.text("Average over selected targets:")
+                            imgui.table_next_column()
+                            _, fld.episodes[nm].targets_avg = imgui.checkbox("##average_over_targets", fld.episodes[nm].targets_avg)
 
                             imgui.end_table()
                             imgui.spacing()
-                        imgui.tree_pop()
 
-                if imgui.tree_node('Targets'):
-                    imgui.text_unformatted("Indicate for which target(s) you\nwant to export data quality metrics.")
-                    if imgui.begin_table("##export_popup_targets", columns=2, flags=imgui.TableFlags_.no_clip):
-                        imgui.table_setup_column("##settings_targets_left", imgui.TableColumnFlags_.width_stretch)
-                        imgui.table_setup_column("##settings_targets_right", imgui.TableColumnFlags_.width_fixed)
+                        if need_node:
+                            imgui.tree_pop()
+                else:
+                    if imgui.begin_table(f"##export_popup_{f.name}", columns=2, flags=imgui.TableFlags_.no_clip):
+                        imgui.table_setup_column(f"##settings_{f.name}_left", imgui.TableColumnFlags_.width_stretch)
+                        imgui.table_setup_column(f"##settings_{f.name}_right", imgui.TableColumnFlags_.width_fixed)
                         imgui.table_next_row()
                         imgui.table_set_column_index(1)  # Right
                         imgui.dummy((right_width, 1))
 
-                        for t in dq_set[nm]['targets']:
+                        for tf in t_fields:
+                            if tf.type!=bool:
+                                continue
                             imgui.table_next_row()
                             imgui.table_next_column()
                             imgui.align_text_to_frame_padding()
-                            imgui.text(f"target {t}:")
+                            imgui.text(tf.name.replace('_',' ').capitalize()+':')
                             imgui.table_next_column()
-                            _, dq_set[nm]['targets'][t] = imgui.checkbox(f"##target_{t}", dq_set[nm]['targets'][t])
-
+                            tfld = getattr(fld, tf.name)
+                            _, tmp = imgui.checkbox(f'##{tf.name}', tfld)
+                            setattr(fld, tf.name, tmp)
                         imgui.end_table()
-                        imgui.spacing()
-                    imgui.tree_pop()
-
-                if imgui.begin_table("##export_popup_targets_avg", columns=2, flags=imgui.TableFlags_.no_clip):
-                    imgui.table_setup_column("##settings_targets_avg_left", imgui.TableColumnFlags_.width_stretch)
-                    imgui.table_setup_column("##settings_targets_avg_right", imgui.TableColumnFlags_.width_fixed)
-                    imgui.table_next_row()
-                    imgui.table_set_column_index(1)  # Right
-                    imgui.dummy((right_width, 1))
-
-                    imgui.table_next_row()
-                    imgui.table_next_column()
-                    imgui.align_text_to_frame_padding()
-                    imgui.text("Average over selected targets:")
-                    imgui.table_next_column()
-                    _, dq_set[nm]['targets_avg'] = imgui.checkbox("##average_over_targets", dq_set[nm]['targets_avg'])
-
-                    imgui.end_table()
-                    imgui.spacing()
-
-                if need_node:
-                    imgui.tree_pop()
-
-            imgui.tree_pop()
+                imgui.tree_pop()
+            imgui.spacing()
 
         imgui.end_group()
 
     def launch_export():
-        exp = []
-        if 'plane gaze' in to_export and to_export['plane gaze']:
-            exp.append('plane_gaze')
-        if 'gaze offsets' in to_export and to_export['gaze offsets']:
-            exp.append('gaze_offsets')
-        if 'gaze overlay video' in to_export and to_export['gaze overlay video']:
-            exp.append('gaze_overlay_video')
-        if 'mapped gaze video' in to_export and to_export['mapped gaze video']:
-            exp.append('mapped_gaze_video')
-        for s in sessions:
-            g.launch_task(s, None, process.Action.EXPORT_TRIALS, export_path=path, to_export=exp)
+        fields = [f for f in dataclasses.fields(export_config) if f.name not in ('validation','eye_tracker_sync')]
+        sess = list({s for f in fields for s in getattr(export_config, f.name).sess})
+        for s in sess:
+            this_config = copy.deepcopy(export_config)
+            this_config.validation.episodes.clear()  # validation export is handled separately below, clear here to avoid copying large amounts of data
+            # check there is anything to do for this session, for each of the tasks
+            do_it = False
+            for f in fields:
+                exp = getattr(this_config, f.name)
+                exp.recs = [r for ss,r in zip(exp.sess, exp.recs) if ss==s]
+                exp.sess = s
+                exp.do_it = not not exp.recs
+                do_it = do_it or exp.do_it
+            if do_it:
+                g.launch_task(s, None, process.Action.EXPORT_TRIALS, export_path=path, export_config=this_config)
 
         # export data quality for all recordings in all sessions
-        if 'validation' in to_export and to_export['validation']:
-            for nm in dq_set:
-                dq_types = [dq for dq in dq_set[nm]['data_types'] if dq_set[nm]['data_types'][dq]]
-                targets  = [t for t in dq_set[nm]['targets'] if dq_set[nm]['targets'][t]]
-                export.summarize_and_store_data_quality(dq_df[nm], path/f'data_quality_{nm}.tsv', dq_types, targets, dq_set[nm]['targets_avg'], dq_set[nm]['include_data_loss'])
+        if export_config.validation.do_it:
+            export_trials.export_validation(path, export_config.validation)
 
         # export et sync for all recordings in all sessions
-        if 'eye tracker synchronization' in to_export and to_export['eye tracker synchronization']:
-            export.export_et_sync(rec_dirs_et_sync, naming.VOR_sync_file, path/'et_sync.tsv')
+        if export_config.eye_tracker_sync.do_it:
+            sess_recs = [(s,r) for s,r in zip(export_config.eye_tracker_sync.sess, export_config.eye_tracker_sync.recs) if s in sess]
+            export_trials.export_et_sync(g.study_config.working_directory, sess_recs, path)
 
     buttons = {
-        ifa6.ICON_FA_CHECK+f" Continue": (launch_export, lambda: not any((to_export[e] for e in to_export))),
+        ifa6.ICON_FA_CHECK+f" Continue": (launch_export, lambda: not any(getattr(export_config, f.name).do_it for f in c_fields)),
         ifa6.ICON_FA_CIRCLE_XMARK+f" Cancel": None
     }
 
