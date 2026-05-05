@@ -6,6 +6,7 @@ import cv2
 import numpy as np
 import copy
 import subprocess
+import typing
 
 from ffpyplayer.writer import MediaWriter
 from ffpyplayer.pic import Image
@@ -276,6 +277,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
         frame               : dict[str, np.ndarray]             = {}
         frame_idx           : dict[str, int]                    = {}
         frame_ts            : dict[str, float]                  = {}
+        frame_info          : dict[str, dict[str, typing.Any]]  = {}
         ppose               : dict[str, dict[str, pose.Pose]]   = {}
         gui_window_ids      : dict[str, int]                    = {}
 
@@ -336,7 +338,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
         while True:
             if should_exit:
                 break
-            status, ppose[lead_vid], _, _, (frame[lead_vid], frame_idx[lead_vid], frame_ts[lead_vid]) = \
+            status, ppose[lead_vid], _, _, (frame[lead_vid], frame_idx[lead_vid], frame_ts[lead_vid], frame_info[lead_vid]) = \
                 pose_estimators[lead_vid].process_one_frame()
             # TODO: if there is a discontinuity, fill in the missing frames so audio stays in sync
             # check if we're done
@@ -352,11 +354,11 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
                     ppose[v] = {p: ps for p in plane_names if (ps:=all_poses[v][p].get(fr_idx_this, None)) is not None}
                     continue
                 if fr_idx_this==-1:
-                    _, ppose[v], _, _, (frame[v], frame_idx[v], frame_ts[v]) = \
-                        None, None, None, None, (None, None, None)
+                    _, ppose[v], _, _, (frame[v], frame_idx[v], frame_ts[v], frame_info[v]) = \
+                        None, None, None, None, (None, None, None, None)
                 else:
                     # read it
-                    _, ppose[v], _, _, (frame[v], frame_idx[v], frame_ts[v]) = \
+                    _, ppose[v], _, _, (frame[v], frame_idx[v], frame_ts[v], frame_info[v]) = \
                         pose_estimators[v].process_one_frame(fr_idx_this)
 
             for v in write_vids:
@@ -394,7 +396,11 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
 
                         # draw on current video
                         if study_config.mapped_video_show_gaze_on_plane_in_which is not None and v in study_config.mapped_video_show_gaze_on_plane_in_which:
-                            plane_gazes[best[0]][2].draw_on_world_video(frame[v], camera_params[v], sub_pixel_fac, ppose[v][best[0]], study_config.mapped_video_projected_vidPos_color, study_config.mapped_video_projected_world_pos_color, study_config.mapped_video_projected_left_ray_color, study_config.mapped_video_projected_right_ray_color, study_config.mapped_video_projected_average_ray_color)
+                            if 'offset_x' in frame_info[v] and 'offset_y' in frame_info[v]:
+                                ROI_offset = (frame_info[v]['offset_x'], frame_info[v]['offset_y'])
+                            else:
+                                ROI_offset = (0,0)
+                            plane_gazes[best[0]][2].draw_on_world_video(frame[v], camera_params[v], ROI_offset, sub_pixel_fac, ppose[v][best[0]], study_config.mapped_video_projected_vidPos_color, study_config.mapped_video_projected_world_pos_color, study_config.mapped_video_projected_left_ray_color, study_config.mapped_video_projected_right_ray_color, study_config.mapped_video_projected_average_ray_color)
 
                         # also draw on other recordings, if so configured
                         # depending on configuration also includes camera and gaze vector between the two
@@ -409,6 +415,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
                             # draw gaze point, camera position, and gaze vector between them on the other video, as configured
                             # and as possible (camera position and gaze vector require pose, not only homography)
                             draw_gaze_on_other_video(frame[vo],
+                                                     frame_info[vo],
                                                      ppose[v][pl], ppose[vo][pl],
                                                      plane_gazes[pl][2],
                                                      camera_params[vo], clr,
@@ -536,7 +543,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
     # update state
     session.update_action_states(working_dir, process.Action.MAKE_MAPPED_GAZE_VIDEO, process_pool.State.Completed, study_config)
 
-def draw_gaze_on_other_video(frame_other, pose_this: pose.Pose, pose_other: pose.Pose, plane_gaze: gaze_worldref.Gaze, camera_params_other, clr, which_gaze_on_plane, which_gaze_on_plane_allow_fallback, do_draw_gaze, do_draw_gaze_vec, do_draw_camera, sub_pixel_fac):
+def draw_gaze_on_other_video(frame_other, frame_info_other, pose_this: pose.Pose, pose_other: pose.Pose, plane_gaze: gaze_worldref.Gaze, camera_params_other, clr, which_gaze_on_plane, which_gaze_on_plane_allow_fallback, do_draw_gaze, do_draw_gaze_vec, do_draw_camera, sub_pixel_fac):
     if not do_draw_gaze and not do_draw_gaze_vec and not do_draw_camera:
         # nothing to do
         return
@@ -548,11 +555,16 @@ def draw_gaze_on_other_video(frame_other, pose_this: pose.Pose, pose_other: pose
         else:
             raise RuntimeError(f'Gaze of type {which_gaze_on_plane.value} was requested, but is not available. Select a different gaze type or set allow_fallback to True.')
 
+    if 'offset_x' in frame_info_other and 'offset_y' in frame_info_other:
+        ROI_offset = (frame_info_other['offset_x'], frame_info_other['offset_y'])
+    else:
+        ROI_offset = (0,0)
+
     if not pose_this.pose_successful() or not pose_other.pose_successful():
         if not do_draw_gaze:
             return
         # use homography
-        gaze_pos_other = pose_other.plane_to_cam_homography(gaze_point_plane, camera_params_other)
+        gaze_pos_other = pose_other.plane_to_cam_homography(gaze_point_plane, camera_params_other, ROI_offset)
         drawing.openCVCircle(frame_other, gaze_pos_other, 8, clr, 2, sub_pixel_fac)
         # can only do gaze position on plane with homography, so, exit
         return
@@ -562,7 +574,7 @@ def draw_gaze_on_other_video(frame_other, pose_this: pose.Pose, pose_other: pose
     # it won't be visible and projecting it anyway yields a nonsensical result
     if gaze_ok := pose_other.world_frame_to_cam(gaze_point_plane)[2]>0:
         # project from plane to camera
-        gaze_pos_other = pose_other.plane_to_cam_pose(gaze_point_plane, camera_params_other)
+        gaze_pos_other = pose_other.plane_to_cam_pose(gaze_point_plane, camera_params_other, ROI_offset)
         # draw on the other video
         if do_draw_gaze:
             drawing.openCVCircle(frame_other, gaze_pos_other, 8, clr, 2, sub_pixel_fac)
@@ -576,7 +588,7 @@ def draw_gaze_on_other_video(frame_other, pose_this: pose.Pose, pose_other: pose
             # and projecting it anyway yields a nonsensical result
             return
         # draw on the other video
-        cam_pos_other = pose_other.plane_to_cam_pose(cam_pos_world_this, camera_params_other)
+        cam_pos_other = pose_other.plane_to_cam_pose(cam_pos_world_this, camera_params_other, ROI_offset)
         if do_draw_camera:
             drawing.openCVCircle(frame_other, cam_pos_other, 3, clr, 1, sub_pixel_fac)
         # and draw line connecting the camera and the gaze point
