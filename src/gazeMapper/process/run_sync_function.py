@@ -103,9 +103,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
 
 def _get_sync_function(study_config: config.Study,
                        rec_def: session.RecordingDefinition,
-                       episodes: dict[str,tuple[annotation.EventType, list[list[int]]]]|None = None) -> tuple[dict[str, tuple[typing.Callable[[str,int,np.ndarray,ocv.CameraParams,typing.Any], tuple[float,float]], dict[str, typing.Any], typing.Callable[[str,np.ndarray,int,tuple[float,float]], None]]], dict[str, tuple[annotation.EventType, list[list[int]]]|None]]:
+                       episodes: dict[str,tuple[annotation.EventType, list[list[int]]]]|None = None) -> tuple[dict[str, tuple[typing.Callable[[str,int,np.ndarray,ocv.CameraParams,typing.Any], tuple[float,float]], dict[str, typing.Any], typing.Callable[[str,np.ndarray,int,dict[str, typing.Any],tuple[float,float]], None]]], dict[str, tuple[annotation.EventType, list[list[int]]]|None]]:
     from .. import process
-    sync_target_function: dict[str, tuple[typing.Callable[[str,int,np.ndarray,ocv.CameraParams,typing.Any], tuple[float,float]], dict[str, typing.Any], typing.Callable[[str,np.ndarray,int,tuple[float,float]], None]]] = {}
+    sync_target_function: dict[str, tuple[typing.Callable[[str,int,np.ndarray,ocv.CameraParams,typing.Any], tuple[float,float]], dict[str, typing.Any], typing.Callable[[str,np.ndarray,int,dict[str, typing.Any],tuple[float,float]], None]]] = {}
     analyze_frames: dict[str, tuple[annotation.EventType, list[list[int]]]|None] = {}
     # NB: only for eye tracker recordings, others don't have eye tracking data and thus nothing to sync
     et_sync_events = process.get_specific_event_types(study_config, annotation.EventType.Sync_ET_Data, ['sync_setup'])
@@ -138,7 +138,7 @@ def _get_sync_function(study_config: config.Study,
 
     return sync_target_function, analyze_frames
 
-def _sync_function_output_drawer(proc_name: str, frame: np.ndarray, frame_idx: int, t: tuple[float,float], sub_pixel_fac=8):
+def _sync_function_output_drawer(proc_name: str, frame: np.ndarray, frame_info: dict[str, typing.Any], frame_idx: int, t: tuple[float,float], sub_pixel_fac=8):
     # input is tx, ty pixel positions on the camera image
     ll = 20
     tx,ty = t
