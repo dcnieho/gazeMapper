@@ -184,20 +184,18 @@ def get_episode_frame_indices_from_other_video(working_dir: str|pathlib.Path, ev
         return [[]]
     video_ts_other = timestamps.VideoTimestamps(working_dir.parent / other_rec / gt_naming.frame_timestamps_fname)
     video_ts       = timestamps.VideoTimestamps(working_dir / gt_naming.frame_timestamps_fname)
-    # if other recording is the reference recording, we can directly go from reference to this recording
     def _check_bounds(eps: list[list[int]], max_i: int) -> list[list[int]]:
         return [[max(0,ep[0]), min(ep[1], max_i)] for ep in eps if not all([x==-1 for x in ep])]
+    # if one of the recordings is the reference recording, we can directly go from reference to this recording
     if other_rec==ref_rec:
         frame_idx = reference_frames_to_video(rec, sync, other_episodes[event][1], video_ts.timestamps, video_ts_other.timestamps, do_time_stretch, stretch_which)
     elif rec==ref_rec:
         frame_idx = video_frames_to_reference(other_rec, sync, other_episodes[event][1], video_ts_other.timestamps, video_ts.timestamps, do_time_stretch, stretch_which)
     else:
-        # first go from other recording to reference recording
+        # else we need to go from other_rec to ref_rec and then from ref_rec to this recording. Do so with a function that does not clip, nor quantize to the frames in the reference video
+        # so that we do not lose precision or range
         video_ts_ref = timestamps.VideoTimestamps(working_dir.parent / ref_rec / gt_naming.frame_timestamps_fname)
-        ref_frame_idx = video_frames_to_reference(other_rec, sync, other_episodes[event][1], video_ts_other.timestamps, video_ts_ref.timestamps, do_time_stretch, stretch_which)
-        ref_frame_idx = _check_bounds(ref_frame_idx, video_ts_ref.indices[-1])
-        # then from reference recording to this recording
-        frame_idx = reference_frames_to_video(rec, sync, ref_frame_idx, video_ts.timestamps, video_ts_ref.timestamps, do_time_stretch, stretch_which)
+        frame_idx = video_frames_to_other_video(other_rec, rec, sync, other_episodes[event][1], video_ts_other.timestamps, video_ts.timestamps, video_ts_ref.timestamps, do_time_stretch, stretch_which)
     # remove out of range
     frame_idx = _check_bounds(frame_idx, video_ts.indices[-1])
     return [[i+e for i,e in zip(ifs, [-extra_fr, extra_fr])] for ifs in frame_idx]   # expand by extra_fr frames on each edge
@@ -243,6 +241,24 @@ def video_frames_to_reference(rec: str, sync: pd.DataFrame, fr_idxs: list[int]|l
     fr_idx[this_video_ts_ref<video_ts_ref[0]] = -1
 
     return fr_idx[fr_idxs].tolist()
+
+@overload
+def video_frames_to_other_video(other_rec: str, rec: str, sync: pd.DataFrame, fr_idxs: list[int], other_video_ts: list[float]|np.ndarray, this_video_ts: list[float]|np.ndarray, video_ts_ref: list[float]|np.ndarray, do_time_stretch: bool, stretch_which: str) -> list[int]: ...
+@overload
+def video_frames_to_other_video(other_rec: str, rec: str, sync: pd.DataFrame, fr_idxs: list[list[int]], other_video_ts: list[float]|np.ndarray, this_video_ts: list[float]|np.ndarray, video_ts_ref: list[float]|np.ndarray, do_time_stretch: bool, stretch_which: str) -> list[list[int]]: ...
+def video_frames_to_other_video(other_rec: str, rec: str, sync: pd.DataFrame, fr_idxs: list[int]|list[list[int]], other_video_ts: list[float]|np.ndarray, this_video_ts: list[float]|np.ndarray, video_ts_ref: list[float]|np.ndarray, do_time_stretch: bool, stretch_which: str) -> list[int]|list[list[int]]:
+    if not fr_idxs:
+        return []
+
+    # get timestamps of both videos in time of the reference video
+    other_video_ts_ref, _, _ = apply_sync(other_rec, sync, other_video_ts, video_ts_ref, do_time_stretch, stretch_which)
+    this_video_ts_ref, _, _ = apply_sync(rec, sync, this_video_ts, video_ts_ref, do_time_stretch, stretch_which)
+
+    # then directly match the two videos' timestamps now that they are expressed in a common clock (reference time) to get corresponding frame indices
+    frame_idx = video_utils.timestamps_to_frame_number(other_video_ts_ref, this_video_ts_ref, trim=True)['frame_idx'].to_numpy(copy=True)
+    frame_idx[other_video_ts_ref<this_video_ts_ref[0]] = -1
+
+    return frame_idx[fr_idxs].tolist()
 
 def smooth_video_frames_indices(fr_idxs: list[int]):
     # detect plateaus of N samples followed by a step of N samples
