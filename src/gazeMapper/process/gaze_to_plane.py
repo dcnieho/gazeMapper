@@ -50,7 +50,10 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
         raise ValueError(f'You can only run gaze_to_plane on eye tracker recordings, not on a {str(rec_def.type).split(".")[1]} recording')
 
     # get episodes for which to transform gaze (episodes should have a plane and apply to this recording)
-    episodes_to_proc = [cs for cs in study_config.coding_setup if cs.get('planes') and (cs['which_recordings'] is None or working_dir.name in cs['which_recordings'])]
+    recs_to_check = [working_dir.name]
+    if study_config.sync_ref_recording:
+        recs_to_check.append(study_config.sync_ref_recording)
+    episodes_to_proc = [cs for cs in study_config.coding_setup if cs.get('planes') and (cs['which_recordings'] is None or any(rec in cs['which_recordings'] for rec in recs_to_check))]
     if not episodes_to_proc:
         raise RuntimeError(f'There are no episodes with planes configured for session "{working_dir.parent.name}", recording "{working_dir.name}", nothing to process')
     episodes = episode.load_episodes_from_all_recordings(study_config, working_dir, {cs['name'] for cs in episodes_to_proc})[0]

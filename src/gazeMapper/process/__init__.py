@@ -179,7 +179,10 @@ def is_action_possible_for_recording(rec: str, rec_type: 'session.RecordingType'
             event_types = [annotation.EventType.Validate]
         events = get_specific_event_types(study_config, event_types)
         # remove events that are not configured for this recording
-        events = [cs for cs in events if cs['which_recordings'] is None or rec in cs['which_recordings']]
+        recs_to_check = [rec]
+        if study_config.sync_ref_recording:
+            recs_to_check.append(study_config.sync_ref_recording)
+        events = [cs for cs in events if cs['which_recordings'] is None or any(rec in cs['which_recordings'] for rec in recs_to_check)]
         return not not events
     elif action==Action.AUTO_CODE_EPISODES:
         # check if there is any auto coding configured for this specific recording
