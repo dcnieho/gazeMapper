@@ -716,7 +716,7 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, o_type_ar
             if imgui.internal.item_add(t_bb, iid):
                 # enable interaction
                 if (has_order and len(val)>1) or val_tooltips[i]:
-                    _, hovered, held = imgui.internal.button_behavior(t_bb, iid, False, False, imgui.internal.ButtonFlagsPrivate_.allow_overlap)
+                    _, hovered, held = imgui.internal.button_behavior(t_bb, iid, False, False, imgui.ButtonFlags_.allow_overlap)
                 if val_tooltips[i]:
                     glassesTools.gui.utils.draw_hover_text(val_tooltips[i],'')
                 if has_order and len(val)>1:
