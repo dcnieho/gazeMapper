@@ -325,11 +325,6 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
             if not episodes[nm][1]:
                 continue
 
-            if not cs['which_recordings'] or r in cs['which_recordings']:
-                subset_var = 'frame_idx'
-            else:
-                subset_var = 'frame_idx_ref'
-
             # now merge
             planes = list(cs['planes'])
             plane_gazes = {p:ori_plane_gazes[p].copy() for p in planes}
@@ -389,7 +384,7 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
             idx = max([cols.index(c) for c in cols if c.startswith('frame_ts')])+1
             plane_gazes.insert(idx,'trial',np.int32(-1))
             for i,e in enumerate(episodes[nm][1]):
-                sel = (plane_gazes[subset_var] >= e[0]) & (plane_gazes[subset_var] <= e[1])
+                sel = (plane_gazes['frame_idx'] >= e[0]) & (plane_gazes['frame_idx'] <= e[1])
                 plane_gazes.loc[sel,'trial'] = i+1
 
             # store
