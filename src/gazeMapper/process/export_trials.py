@@ -228,8 +228,16 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
                 column_info[c] = 'mm'
             elif c == 'frame_idx':
                 column_info[c] = 'frame number'
+            elif c == 'frame_idx_VOR':
+                column_info[c] = 'frame number (after gaze to camera sync)'
+            elif c == 'frame_idx_ref':
+                column_info[c] = 'frame number (in reference camera video)'
             elif c == 'timestamp':
                 column_info[c] = 'ms'
+            elif c == 'timestamp_VOR':
+                column_info[c] = 'ms (timestamp after gaze to camera sync)'
+            elif c == 'timestamp_ref':
+                column_info[c] = 'ms (timestamp in clock of reference camera video)'
 
         # get head-referenced gaze
         if export_config.include_head_ref_gaze:
@@ -303,7 +311,7 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
         # if head pose is wanted, load it so it can be added later
         if export_config.include_head_pose:
             head_pose = {pl: pd.read_csv(working_dir / r / f'{naming.plane_pose_prefix}{pl}.tsv', sep='\t') for pl in planes}
-            column_info.update({f: 'unit vector component' for f in ('pose_R_vec_x','pose_R_vec_y','pose_R_vec_z')})
+            column_info.update({f: 'rotation vector component' for f in ('pose_R_vec_x','pose_R_vec_y','pose_R_vec_z')})
             column_info.update({f: 'mm' for f in ('pose_T_vec_x','pose_T_vec_y','pose_T_vec_z')})
             if export_config.include_head_pose_Fick_angles:
                 pass    # TODO
@@ -369,10 +377,13 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
             if 'frame_idx_VOR' in plane_gazes.columns:
                 ts = ts.rename(columns={'frame_idx':'frame_idx_VOR','frame_ts':'frame_ts_VOR'})
                 plane_gazes = plane_gazes.merge(ts, how="left", on='frame_idx_VOR')
+                column_info['frame_ts_VOR'] = 'scene camera frame timestamp (ms) after gaze to camera sync'
                 to_move += 1
             if 'frame_idx_ref' in plane_gazes.columns:
                 ts = pd.read_csv(working_dir / study_config.sync_ref_recording / gt_naming.frame_timestamps_fname,sep='\t').rename(columns={'frame_idx':'frame_idx_ref','timestamp':'frame_ts_ref','timestamp_stretched':'frame_ts_ref_stretched'})
                 plane_gazes = plane_gazes.merge(ts, how="left", on='frame_idx_ref')
+                column_info['frame_ts_ref'] = 'reference camera frame timestamp (ms)'
+                column_info['frame_ts_ref_stretched'] = 'reference camera frame timestamp (ms), stretched so that clocks run at same rate'
                 to_move += len([c for c in ts.columns if c.startswith('frame_ts_')])
             # reorder to get ts columns in the right place
             cols= plane_gazes.columns.to_list()
@@ -386,6 +397,7 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
             for i,e in enumerate(episodes[nm][1]):
                 sel = (plane_gazes['frame_idx'] >= e[0]) & (plane_gazes['frame_idx'] <= e[1])
                 plane_gazes.loc[sel,'trial'] = i+1
+            column_info['trial'] = 'trial number (-1 means not during trial)'
 
             # store
             # to add second header row with column information, turn column index into a multiindex
