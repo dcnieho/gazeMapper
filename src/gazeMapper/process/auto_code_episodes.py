@@ -26,13 +26,6 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
     if not events:
         raise ValueError('No auto-coded event start and ends are configured for the study, nothing to process')
 
-    rec_def = study_config.session_def.get_recording_def(working_dir.name)
-    if study_config.sync_ref_recording and rec_def.name!=study_config.sync_ref_recording:
-        # Trial events are only coded for the reference recording, so they should be discarded here
-        events = [cs for cs in events if cs['event_type']!=annotation.EventType.Trial]
-        if not events:
-            raise RuntimeError(f'Nothing to do, auto-coding of event start and ends is defined only for trial events and you have a sync_ref_recording ({study_config.sync_ref_recording}), but this recording ({rec_def.name}) is another one')
-
     # get already coded interval(s), if any
     episodes = episode.load_episodes_from_all_recordings(study_config, working_dir, load_from_other_recordings=False)[0]
     episodes = annotation.flatten_annotation_dict(episodes)
