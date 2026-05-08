@@ -253,8 +253,11 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
                 elif c.startswith('gaze_dir'):
                     column_info[c] = 'unit vector component'
             if export_config.include_head_ref_gaze_Fick_angles:
+                # get w.r.t. straight ahead ([0, 0, 1] in camera coordinates)
                 cam=ocv.CameraParams.read_from_file(working_dir / r / gt_naming.scene_camera_calibration_fname)
+                # first unproject to get gaze vector from gaze position in pixels on the camera image
                 gazew=transforms.unproject_points(head_ref_gaze[['gaze_pos_vid_x', 'gaze_pos_vid_y']].values, cam)
+                # then get Fick angles from gaze vector (NB: positive angles are rightward and downward)
                 head_ref_gaze['azimuth'], head_ref_gaze['elevation'] = vector_to_Fick(gazew[:,0], gazew[:,1], gazew[:,2])
                 column_info.update({'azimuth': 'deg (Fick)', 'elevation': 'deg (Fick)'})
 
