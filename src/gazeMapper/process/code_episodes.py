@@ -168,6 +168,10 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
     else:
         raise ValueError(f'recording type "{rec_def.type}" is not understood')
 
+    # get frame info for video, if available
+    frame_info_file = in_video.parent / (in_video.stem+gt_naming.frame_info_suffix)
+    frame_info = ocv.FrameInfoHandler(frame_info_file)
+
     # Read plane poses, if available
     plane_files = [working_dir/f'{naming.plane_pose_prefix}{p}.tsv' for p in planes]
     poses = {p:gt_pose.read_dict_from_file(f) for p,f in zip(planes,plane_files) if f.is_file()}
@@ -210,6 +214,11 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
         if frame is not None:
             # the audio is my shepherd and nothing shall I lack :-)
             frame_idx = video_ts.find_frame(pts*1000)  # pts is in seconds, our frame timestamps are in ms
+            ROI_offset = [0., 0.]
+            if frame_info.data is not None:
+                info = frame_info.get_frame_info(frame_idx)
+                if 'offset_x' in info and 'offset_y' in info:
+                    ROI_offset = [info['offset_x'], info['offset_y']]
 
             # if we have plane pose, draw plane origin or targets on video
             if has_plane_pose:
@@ -218,7 +227,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
                         continue
                     if p in poses and frame_idx in poses[p]:
                         for pp in plane_points:
-                            a = poses[p][frame_idx].get_plane_point_on_image(plane_points[pp], cam_params)
+                            a = poses[p][frame_idx].get_plane_point_on_image(plane_points[pp], cam_params, ROI_offset)
                             drawing.openCVCircle(frame, a, 3, (0,255,0), -1, sub_pixel_fac)
                             drawing.openCVLine(frame, (a[0],a[1]-10), (a[0],a[1]+10), (0,255,0), 1, sub_pixel_fac)
                             drawing.openCVLine(frame, (a[0]-10,a[1]), (a[0]+10,a[1]), (0,255,0), 1, sub_pixel_fac)
@@ -229,7 +238,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
             # NB: usually have multiple gaze samples for a video frame, draw one
             if has_gaze:
                 if frame_idx in gazes:
-                    gazes[frame_idx][0].draw(frame, cam_params, sub_pixel_fac)
+                    gazes[frame_idx][0].draw(frame, cam_params, sub_pixel_fac, ROI_offset=ROI_offset)
 
             # if have gaze in world info, draw it too (also only first sample)
             if has_plane_gaze:
@@ -243,7 +252,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
                 # check if gaze is not too far outside all planes, draw
                 if best is not None:
                     p = best[0]
-                    plane_gazes[p][frame_idx][0].draw_on_world_video(frame, cam_params, sub_pixel_fac, None if not p in poses or not frame_idx in poses[p] else poses[p][frame_idx])
+                    plane_gazes[p][frame_idx][0].draw_on_world_video(frame, cam_params, ROI_offset, sub_pixel_fac, None if not p in poses or not frame_idx in poses[p] else poses[p][frame_idx])
 
             if frame is not None:
                 gui.update_image(frame, pts, frame_idx, window_id=gui.main_window_id)
