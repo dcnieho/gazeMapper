@@ -532,7 +532,7 @@ class GUI:
         if state==process_pool.State.Failed:
             exc = future.exception()    # should not throw exception since CancelledError is already encoded in state and future is done
             tb = gt_gui.utils.get_traceback(type(exc), exc, exc.__traceback__)
-            lbl = f'session "{job.session}"'
+            lbl = f'action "{job.action.displayable_name}" for session "{job.session}"'
             if not session_level:
                 lbl += f', recording "{job.recording}"'
             lbl_complete = lbl + f' (work item {job_id}, action {job.action.displayable_name})'
