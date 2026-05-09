@@ -593,6 +593,20 @@ class Study:
                             raise ValueError(msg)
                         else:
                             type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'which_recordings': (type_utils.ProblemLevel.Error, msg)}}})
+            # check load_from_other_recordings settings
+            if cs['event_type']==annotation.EventType.Sync_Camera and  cs.get('load_from_other_recordings'):
+                msg = f'load_from_other_recordings should not be set for a {annotation.tooltip_map[cs["event_type"]]} episode.'
+                if strict_check:
+                    raise ValueError(msg)
+                else:
+                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'load_from_other_recordings': (type_utils.ProblemLevel.Error, msg)}}})
+            elif cs.get('load_from_other_recordings') and not self.sync_ref_recording:
+                # this is really because there is only one recording, in which case load_from_other_recordings should not be set
+                msg = 'When no sync reference recording is defined for the project, load_from_other_recordings should not be defined.'
+                if strict_check:
+                    raise ValueError(msg)
+                else:
+                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'load_from_other_recordings': (type_utils.ProblemLevel.Error, msg)}}})
 
         sync_events = [(i, cs) for i, cs in enumerate(self.coding_setup) if cs['event_type']==annotation.EventType.Sync_ET_Data]
         use_average_settings = [cs['sync_setup'].get('use_average', False) for _, cs in sync_events if cs['sync_setup'] is not None]
