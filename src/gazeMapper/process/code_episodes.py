@@ -65,8 +65,10 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
         # code target occurrences on a validation plane
         evts = [cs for cs in study_config.coding_setup if cs['name']==val_coding_event]
         if not evts:
-            raise ValueError(f'Coding of validation targets for the "{val_coding_event}" was selected, but this event is unknown, can\'t continue')
+            raise ValueError(f'Coding of validation targets for the "{val_coding_event}" episode was selected, but this event is unknown, can\'t continue')
         cs = evts[0]
+        if cs['which_recordings'] and working_dir.name not in cs['which_recordings']:
+            raise ValueError(f'Coding of validation targets for the "{val_coding_event}" episode was selected, but this event is not configured for the recording "{working_dir.name}", can\'t continue')
         # get coded episodes, if available:
         e = episode.load_episodes_from_all_recordings(study_config, working_dir, error_if_unwanted_found=False, missing_other_coding_ok=True)[0]
         # get targets to code
