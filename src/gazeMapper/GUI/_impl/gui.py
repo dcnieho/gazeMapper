@@ -1958,7 +1958,7 @@ class GUI:
                 if recs:
                     actions_running[a] = recs
             else:
-                if (job_id:=self._get_active_job(a, session_name, recs)[0]):
+                if (job_id:=self._get_active_job(a, session_name, recs)[0]) is not None:
                     actions_running[a] = job_id
 
         # filter out running actions from possible actions
