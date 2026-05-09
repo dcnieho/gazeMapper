@@ -163,9 +163,6 @@ def get_coding_file(working_dir: str|pathlib.Path, all_sync_events: list[tuple[s
         raise ValueError(f'No {annotation.tooltip_map[annotation.EventType.Sync_Camera]} codes found for this recording ({working_dir.name}). Run code_episodes and code at least one of the configured {annotation.tooltip_map[annotation.EventType.Sync_Camera]} events.')
     return episodes
 
-def get_episode_frame_indices_from_ref(working_dir: str|pathlib.Path, event: str, rec: str, ref_rec:str, all_recs: list[str], do_time_stretch: bool, average_recordings: list[str], stretch_which: str, extra_fr=0, missing_ref_coding_ok=False) -> list[list[int]]:
-    return get_episode_frame_indices_from_other_video(working_dir, event, rec, ref_rec, ref_rec, all_recs, do_time_stretch, average_recordings, stretch_which, extra_fr, missing_ref_coding_ok)
-
 def get_episode_frame_indices_from_other_video(working_dir: str|pathlib.Path, event: str, rec: str, other_rec: str, ref_rec:str, all_recs: list[str], do_time_stretch: bool, average_recordings: list[str], stretch_which: str, extra_fr=0, missing_other_coding_ok=False) -> list[list[int]]:
     working_dir  = pathlib.Path(working_dir)
     other_coding_file = working_dir.parent / other_rec / naming.coding_file
