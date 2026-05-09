@@ -163,22 +163,22 @@ def get_coding_file(working_dir: str|pathlib.Path, all_sync_events: list[tuple[s
         raise ValueError(f'No {annotation.tooltip_map[annotation.EventType.Sync_Camera]} codes found for this recording ({working_dir.name}). Run code_episodes and code at least one of the configured {annotation.tooltip_map[annotation.EventType.Sync_Camera]} events.')
     return episodes
 
-def get_episode_frame_indices_from_other_video(working_dir: str|pathlib.Path, event: str, rec: str, other_rec: str, ref_rec:str, all_recs: list[str], do_time_stretch: bool, average_recordings: list[str], stretch_which: str, extra_fr=0, missing_other_coding_ok=False) -> list[list[int]]:
+def get_episode_frame_indices_from_other_video(working_dir: str|pathlib.Path, event: str, rec: str, other_rec: str, ref_rec:str, all_recs: list[str], do_time_stretch: bool, average_recordings: list[str], stretch_which: str, extra_fr=0, missing_other_coding_ok=False) -> list[list[int]]|None:
     working_dir  = pathlib.Path(working_dir)
     other_coding_file = working_dir.parent / other_rec / naming.coding_file
     if not other_coding_file.is_file():
         if missing_other_coding_ok:
-            return [[]]
+            return None
         raise FileNotFoundError(f'The coding file for the other recording is not found, cannot continue ("{other_coding_file}").')
     other_episodes = episode.list_to_marker_dict(episode.read_list_from_file(other_coding_file))
     if event not in other_episodes:
         if missing_other_coding_ok:
-            return [[]]
+            return None
         raise KeyError(f'Requested event "{event}" is not found. Either the requested event does not exist in the event coding for the other recording ({other_rec}) or the event is unknown.')
     # get sync and timestamp info we need to transform reference frames indices to frame indices of this recording
     sync = get_sync_for_recs(working_dir.parent, all_recs, ref_rec, do_time_stretch, average_recordings, missing_other_coding_ok)
     if sync is None:
-        return [[]]
+        return None
     video_ts_other = timestamps.VideoTimestamps(working_dir.parent / other_rec / gt_naming.frame_timestamps_fname)
     video_ts       = timestamps.VideoTimestamps(working_dir / gt_naming.frame_timestamps_fname)
     def _check_bounds(eps: list[list[int]], max_i: int) -> list[list[int]]:

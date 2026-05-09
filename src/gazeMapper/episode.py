@@ -58,7 +58,7 @@ def write_list_to_file(episodes: list[Episode],
 
 def load_episodes_from_all_recordings(study_config: config.Study, recording_dir: str|pathlib.Path, episode_subset: set[str]|None=None, load_from_other_recordings=True, empty_if_no_coding=True, error_if_unwanted_found=True, missing_other_coding_ok=False) -> tuple[dict[str, tuple[annotation.EventType, list[list[int]]]], set[str]]:
     from . import synchronization
-    # loads episodes for both the current recording, and from other synced recordings in the session as set up in the study config
+    # loads episodes for both the current recording, and optionally also from other synced recordings in the session as set up in the study config
     recording_dir = pathlib.Path(recording_dir)
     coding_file = recording_dir / naming.coding_file
     if coding_file.is_file():
@@ -96,6 +96,7 @@ def load_episodes_from_all_recordings(study_config: config.Study, recording_dir:
         return episodes, to_code
 
     # now check if there is coding to get from other recordings, or if there is coding that should not be there
+    # checking for coding from other recordings is done using the study config setup, it can be switched off for specific events
     rec_name = recording_dir.name
     # check for unwanted coding
     to_remove = []
@@ -103,7 +104,7 @@ def load_episodes_from_all_recordings(study_config: config.Study, recording_dir:
         if episodes[nm][1] and nm not in to_code:
             if error_if_unwanted_found:
                 cs = [cs for cs in study_config.coding_setup if cs['name']==nm][0]
-                raise ValueError(f'{nm} episodes are gotten from the recordings {cs.get("which_recordings")} and should not be coded for this recording ({rec_name})')
+                raise ValueError(f'{nm} episodes are gotten from the recordings {", ".join(sorted(cs.get("which_recordings")))} and should not be coded for this recording ({rec_name})')
             else:
                 to_remove.append(nm)
     for nm in to_remove:
@@ -122,13 +123,23 @@ def load_episodes_from_all_recordings(study_config: config.Study, recording_dir:
         if not which_recs:
             continue
         # get coding from other recordings
-        single_rec = len(which_recs)==1 and nm not in episodes
+        should_get_from_other = cs.get('load_from_other_recordings')
+        gotten_from_other = False
         for other_rec in which_recs:
             # NB: don't error if we don't need trial episodes for coding.
-            extra = '' if single_rec else f' (from recording {other_rec})'
-            eps = synchronization.get_episode_frame_indices_from_other_video(recording_dir, nm, rec_name, other_rec, study_config.sync_ref_recording, all_recs, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings, study_config.sync_ref_stretch_which, missing_other_coding_ok=missing_other_coding_ok)
+            eps = synchronization.get_episode_frame_indices_from_other_video(recording_dir, nm, rec_name, other_rec, study_config.sync_ref_recording, all_recs, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings, study_config.sync_ref_stretch_which, missing_other_coding_ok=True)
             if eps:
-                episodes[nm+extra] = (cs['event_type'], eps)
+                episodes[f'{nm} (from recording {other_rec})'] = (cs['event_type'], eps)
+                if should_get_from_other and not gotten_from_other:
+                    episodes[nm] = (cs['event_type'], eps)
+                gotten_from_other = True
+        if not gotten_from_other and should_get_from_other and not missing_other_coding_ok:
+            other_recs = ', '.join(sorted(which_recs))
+            if rec_name in cs.get('which_recordings'):
+                msg_part = f'Coding for {nm} is expected to be coded for this recording ({rec_name}), but not found in this or any other recording that it may be found in ({other_recs}).'
+            else:
+                msg_part = f'Coding for {nm} (not expected for this recording, {rec_name}) was not found in any other recording for which it may be expected ({other_recs}).'
+            raise ValueError(f'{msg_part} Please ensure coding for {nm} is present.')
 
     return episodes, to_code
 
