@@ -65,7 +65,10 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
             if p not in mapping_setup:
                 mapping_setup[p] = []
             mapping_setup[p].extend(episodes[cs['name']][1])
-    mapping_setup = {p:sorted(mapping_setup[p], key = lambda x: x[0]) for p in mapping_setup}
+    # make sure we have no empty episode lists, and that episodes are sorted
+    mapping_setup = {p:sorted(mapping_setup[p], key = lambda x: x[0]) for p in mapping_setup if mapping_setup[p]}
+    if not mapping_setup:
+        raise RuntimeError(f'Nothing to process: no coded episodes found for any planes (session "{working_dir.parent.name}", recording "{working_dir.name}")')
 
     planes: dict[str,gt_plane.Plane] = {}
     for p in mapping_setup:
