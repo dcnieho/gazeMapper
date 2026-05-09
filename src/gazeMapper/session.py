@@ -209,7 +209,7 @@ class Session:
                 return None
             return CameraRecording.load_from_json(r_fold)
 
-    def add_existing_recording(self, which: str) -> Recording:
+    def add_existing_recording(self, which: str) -> Recording|None:
         if which in self.recordings:
             return  # nothing to do
         r_fold = self.working_directory / which
