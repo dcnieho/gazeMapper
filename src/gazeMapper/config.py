@@ -78,6 +78,7 @@ class EventSetup(typed_dict_defaults.TypedDictDefault, total=False):
     hotkey          : str|None = None
     planes          : set[str] = typed_dict_defaults.Field(default_factory=lambda: set())
     which_recordings: set[str]|None = None
+    load_from_other_recordings: bool = False
     auto_code       : AutoCodeSyncPoints|AutoCodeEpisodes|None = None
     sync_setup      : EtSyncSetup|None = None
     validation_setup: ValidationSetup|None = None
@@ -89,6 +90,7 @@ event_setup_field_order = [
     'hotkey',
     'planes',
     'which_recordings',
+    'load_from_other_recordings',
     'auto_code',
     'sync_setup',
     'validation_setup',
@@ -566,6 +568,7 @@ class Study:
                         type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'which_recordings': (type_utils.ProblemLevel.Error, msg)}}})
             else:
                 if self.sync_ref_recording is not None and not cs.get('which_recordings'):
+                    # NB: this is really because there is more than one recording, in which case sync_ref must be set
                     msg = 'When a sync reference recording is defined for the project, which_recordings should also be defined.'
                     if strict_check:
                         raise ValueError(msg)
@@ -573,6 +576,7 @@ class Study:
                         type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'which_recordings': (type_utils.ProblemLevel.Error, msg)}}})
                 if cs.get('which_recordings') is not None:
                     if not self.sync_ref_recording:
+                        # this is really because there is only one recording, in which case which_recordings should not be set
                         msg = 'When no sync reference recording is defined for the project, which_recordings should not be defined.'
                         if strict_check:
                             raise ValueError(msg)
@@ -1021,6 +1025,7 @@ class Study:
                         continue
                     elif cs['event_type']==annotation.EventType.Trial:
                         cs['which_recordings'] = {kwds['sync_ref_recording']}
+                        cs['load_from_other_recordings'] = True
                     else:
                         cs['which_recordings'] = set([r.name for r in sess_def.recordings if r.name!=kwds['sync_ref_recording']])
 
@@ -1120,6 +1125,7 @@ event_setup_doc = {
     'hotkey': type_utils.GUIDocInfo('Event hotkey', 'Hotkey to be used for coding this event in the coding GUI.'),
     'planes': type_utils.GUIDocInfo('Planes for event', 'Set of planes which will be looked for and gaze mapped to during the episode.'),
     'which_recordings': type_utils.GUIDocInfo('Which recordings', 'Recordings for which you should code this event. If not set, the event is taken from the reference recording.'),
+    'load_from_other_recordings': type_utils.GUIDocInfo('Load from other recordings?', 'If enabled, coding for this event is also allowed to come from another recording, if it is not found in the current recording (or even cannot be coded for the current recording because it is not listed in the "Which recordings" setting).'),
     'auto_code': type_utils.GUIDocInfo('Auto-coding setup', 'Setup for automatically coding this event based on individual marker detections.',{
         'markers': type_utils.GUIDocInfo('Marker(s)', 'Set of marker IDs whose appearance indicates a synchronization timepoint.'),
         'start_markers': type_utils.GUIDocInfo('Start marker(s)', 'A single marker ID or a sequence of marker IDs that indicate the start of an episode.'),
