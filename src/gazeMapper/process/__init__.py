@@ -221,8 +221,7 @@ def get_actions_for_config(study_config: 'config.Study', exclude_session_level: 
         actions = {a for a in actions if not is_session_level_action(a)}
     return actions
 
-def _determine_to_invalidate(action: Action, study_config: 'config.Study') -> tuple[set[Action],bool]:
-    for_all_recs = False    # if True, recording-level states should be invalidated for all recordings in a session
+def _determine_to_invalidate(action: Action, study_config: 'config.Study') -> set[Action]:
     match action:
         case Action.IMPORT:
             states_to_invalidate = action.next_values()
@@ -230,7 +229,6 @@ def _determine_to_invalidate(action: Action, study_config: 'config.Study') -> tu
             states_to_invalidate = {Action.EXPORT_TRIALS}
         case Action.CODE_EPISODES:
             states_to_invalidate = {a for a in action.next_values() if a not in [Action.DETECT_MARKERS, Action.AUTO_CODE_SYNC, Action.AUTO_CODE_EPISODES]}
-            for_all_recs = not not study_config.sync_ref_recording
         case Action.DETECT_MARKERS:
             # N.B.: don't invalidate auto code sync and auto code episodes as the individual markers used for these
             # automated coding actions are always detected throughout the whole video
@@ -252,7 +250,6 @@ def _determine_to_invalidate(action: Action, study_config: 'config.Study') -> tu
             states_to_invalidate = {Action.CODE_EPISODES, Action.GAZE_TO_PLANE, Action.SYNC_TO_REFERENCE, Action.EXPORT_TRIALS, Action.MAKE_MAPPED_GAZE_VIDEO}
         case Action.AUTO_CODE_EPISODES:
             states_to_invalidate = {a for a in Action.CODE_EPISODES.next_values(inclusive=True) if a not in [Action.DETECT_MARKERS, Action.AUTO_CODE_EPISODES, Action.AUTO_CODE_SYNC, Action.SYNC_TO_REFERENCE]}
-            for_all_recs = not not study_config.sync_ref_recording and config_has_auto_coding(study_config, specific_event_type=annotation.EventType.Trial)
         case Action.SYNC_ET_TO_CAM:
             states_to_invalidate = {a for a in Action.GAZE_TO_PLANE.next_values(inclusive=True) if a not in [Action.AUTO_CODE_EPISODES, Action.AUTO_CODE_SYNC, Action.SYNC_ET_TO_CAM]}
         case Action.SYNC_TO_REFERENCE:
@@ -267,20 +264,20 @@ def _determine_to_invalidate(action: Action, study_config: 'config.Study') -> tu
             states_to_invalidate = set()
         case _:
             raise NotImplementedError(f'Logic is not implemented for {action.displayable_name} ({action}), major developer oversight! Let him know.')
-    return states_to_invalidate, for_all_recs
+    return states_to_invalidate
 
-def action_update_and_invalidate(action: Action, state: process_pool.State, study_config: 'config.Study') -> tuple[dict[Action, process_pool.State], bool]:
+def action_update_and_invalidate(action: Action, state: process_pool.State, study_config: 'config.Study') -> dict[Action, process_pool.State]:
     # set status of indicated task
     action_state_mutations = {action: state}
 
     # determine what other (later) actions are invalidated (and should thus be reset to not started state) by this action
     # being performed. There may be a better way of doing this, but i prefer to actively, per case, think this through
     # and explicitly write it out
-    states_to_invalidate, for_all_recs = _determine_to_invalidate(action, study_config)
+    states_to_invalidate = _determine_to_invalidate(action, study_config)
     for a in states_to_invalidate:
         action_state_mutations[a] = process_pool.State.Not_Run
 
-    return action_state_mutations, for_all_recs
+    return action_state_mutations
 
 def _is_recording_action_possible(rec: str, action_states: dict[Action, process_pool.State], study_config: 'config.Study', rec_type: 'session.RecordingType', action: Action) -> tuple[bool,list[Action]|None]:
     if not is_action_possible_given_config(action, study_config):

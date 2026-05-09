@@ -411,14 +411,14 @@ def update_action_states(working_dir: str|pathlib.Path, action: process.Action, 
         return
 
     # determine state mutations
-    action_state_mutations, for_all_recs = process.action_update_and_invalidate(action, state, study_config)
+    action_state_mutations = process.action_update_and_invalidate(action, state, study_config)
     # split in session-level and recording-level actions, report them separately
     session_state_mutations   = {a:action_state_mutations[a] for a in action_state_mutations if     process.is_session_level_action(a)}
     recording_state_mutations = {a:action_state_mutations[a] for a in action_state_mutations if not process.is_session_level_action(a)}
 
     # get which recordings to apply to
     session_dir = working_dir.parent if for_recording else working_dir
-    if not for_recording or for_all_recs:
+    if not for_recording:
         sess = get_session_from_directory(session_dir)
         recs = list(sess.recordings.keys())
     else:
