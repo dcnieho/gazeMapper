@@ -191,11 +191,6 @@ def is_action_possible_for_recording(rec: str, rec_type: 'session.RecordingType'
         auto_code_episodes = [cs for cs in auto_code_episodes if cs['which_recordings'] is None or rec in cs['which_recordings']]
         if not auto_code_episodes:
             return False
-        # second, if we have a sync_ref_recording, automatic coding of trials is only possible for the sync_ref_recording, not the other recordings.
-        # So if this is not a sync_ref_recording and there only is auto coding defined for trial events and no other episode types, then auto coding is not possible for this recording
-        has_other_episode_auto_code = get_specific_event_types(study_config, [annotation.EventType.Sync_ET_Data, annotation.EventType.Validate], ['auto_code'])
-        if study_config.sync_ref_recording and rec!=study_config.sync_ref_recording and not has_other_episode_auto_code:
-            return False
     if action==Action.DETECT_MARKERS and study_config.head_attached_recordings_replace_et_scene is not None:
         # check if this recording's pose is not replaced by that of a head-attached camera
         is_replaced_recording = study_config.head_attached_recordings_replace_et_scene is not None and any(r.associated_recording==rec for r in study_config.session_def.recordings if r.name in study_config.head_attached_recordings_replace_et_scene)
