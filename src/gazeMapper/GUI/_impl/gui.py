@@ -1792,6 +1792,11 @@ class GUI:
                         _runner(a, to_run, self.launch_task, sort_order)
                     for v in val_coding_options:
                         if imgui.selectable(f'Code targets for {v}', False)[0]:
+                            # filter out recordings for which this validation coding episode is not set up
+                            cs = [cs for cs in self.study_config.coding_setup if cs['name']==v][0]
+                            if cs['which_recordings']:  # if not defined, then all recordings are valid targets
+                                to_run = [(s,r) for s,r in to_run if r in cs['which_recordings']]
+                            # run
                             _runner(a, to_run, self.launch_task, sort_order, val_coding_event=v)
                     imgui.end_menu()
             elif imgui.selectable(icon+f" {a.displayable_name}", False)[0]:
@@ -1870,7 +1875,7 @@ class GUI:
                 if a.has_options and possible:
                     hover_text += '\nShift-click to bring up a popup with configuration options for this run.'
                 if a==process.Action.CODE_EPISODES and not running:
-                    if (val_events:=process.get_specific_event_types(self.study_config, annotation.EventType.Validate)):
+                    if (val_events:=[cs for cs in process.get_specific_event_types(self.study_config, annotation.EventType.Validate) if not cs['which_recordings'] or any(r in cs['which_recordings'] for r in to_run)]):
                         val_coding_options = [cs['name'] for cs in val_events]
                 icon = ifa6.ICON_FA_PLAY if status<process_pool.State.Completed else ifa6.ICON_FA_ARROW_ROTATE_RIGHT
             if not possible:
@@ -1881,6 +1886,11 @@ class GUI:
                         _runner(a, session_name, to_run, self.launch_task, sort_order)
                     for v in val_coding_options:
                         if imgui.selectable(f'Code targets for {v}', False)[0]:
+                            # filter out recordings for which this validation coding episode is not set up
+                            cs = [cs for cs in self.study_config.coding_setup if cs['name']==v][0]
+                            if cs['which_recordings']:  # if not defined, then all recordings are valid targets
+                                to_run = [r for r in to_run if r in cs['which_recordings']]
+                            # run
                             _runner(a, session_name, to_run, self.launch_task, sort_order, val_coding_event=v)
                     imgui.end_menu()
             elif imgui.selectable(icon+f" {a.displayable_name}##{session_name}", False)[0]:
