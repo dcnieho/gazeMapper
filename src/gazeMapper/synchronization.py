@@ -211,11 +211,12 @@ def reference_frames_to_video(rec: str, sync: pd.DataFrame, fr_idxs: list[int]|l
     # get where (which frame) each of this video's timestamps occur in the reference video, given the sync info
     # (fr_idx_ref contains the reference frame_idxs corresponding to this video's frames, video_ts)
     fr_idx_ref = video_utils.timestamps_to_frame_number(video_ts_ref, this_video_ts_ref, trim=True)['frame_idx'].to_numpy(copy=True)
+    # Reference frames before the synced video starts have no match in this recording.
     fr_idx_ref[video_ts_ref<this_video_ts_ref[0]] = -1
-    # in case only the first fr_idx is trimmed, a little bit of leeway is ok
+    # Allow a normal first-frame interval to map back to frame 0 instead of dropping it.
     if fr_idx_ref.size>=2 and fr_idx_ref[0]==-1 and fr_idx_ref[1]>0:
         ifi = np.mean(np.diff(video_ts_ref))
-        # that means, do assign a frame to the first frame if its a usual frame (judged by ifi)
+        # If the first reference timestamp is only about one frame early, keep it.
         if video_ts_ref[1]-video_ts_ref[0] < ifi*1.2:
             fr_idx_ref[0] = fr_idx_ref[1]-1
 
@@ -251,9 +252,14 @@ def video_frames_to_other_video(other_rec: str, rec: str, sync: pd.DataFrame, fr
     other_video_ts_ref, _, _ = apply_sync(other_rec, sync, other_video_ts, video_ts_ref, do_time_stretch, stretch_which)
     this_video_ts_ref, _, _ = apply_sync(rec, sync, this_video_ts, video_ts_ref, do_time_stretch, stretch_which)
 
-    # then directly match the two videos' timestamps now that they are expressed in a common clock (reference time) to get corresponding frame indices
-    frame_idx = video_utils.timestamps_to_frame_number(other_video_ts_ref, this_video_ts_ref, trim=True)['frame_idx'].to_numpy(copy=True)
+    # Match both videos after expressing them in the same reference-time clock.
+    frame_idx = video_utils.timestamps_to_frame_number(other_video_ts_ref, this_video_ts_ref, trim=False)['frame_idx'].to_numpy(copy=True)
+    # Timestamps before this recording starts cannot map to any frame here.
     frame_idx[other_video_ts_ref<this_video_ts_ref[0]] = -1
+    if this_video_ts_ref.size>=2:
+        ifi = np.mean(np.diff(this_video_ts_ref))
+        # Likewise, reject timestamps that land more than about one frame past the end.
+        frame_idx[other_video_ts_ref>this_video_ts_ref[-1]+ifi] = -1
 
     return frame_idx[fr_idxs].tolist()
 
