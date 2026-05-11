@@ -36,6 +36,9 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None=None, p
 
     # get interval(s) coded to be analyzed, if any
     episodes = episode.load_episodes_from_all_recordings(study_config, working_dir, {cs['name'] for cs in val_events})[0]
+    # remove events loaded from other recordings and tagged as such (if any), not relevant here since that is just for display
+    episodes = {e:episodes[e] for e in episodes if e in {cs['name'] for cs in val_events}}
+    # check if there are any coded episodes for any of the validation events, if not, then there is nothing to process
     if not any(episodes[e][1] for e in episodes):
         raise RuntimeError(f'There are no {annotation.tooltip_map[annotation.EventType.Validate]} episodes coded for session "{working_dir.parent.name}", recording "{working_dir.name}", nothing to process')
 
