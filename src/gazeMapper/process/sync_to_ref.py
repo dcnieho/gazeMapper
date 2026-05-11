@@ -60,7 +60,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
     sync = synchronization.get_sync_for_recs(working_dir, recs, study_config.sync_ref_recording, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings)
 
     # early exit if nothing has changed
-    if sync_original is not None and np.all(np.isclose(sync.values, sync_original.values, atol=0.0, equal_nan=True)):
+    if sync_original is not None and len(sync)==len(sync_original) and np.all(np.isclose(sync.values, sync_original.values, atol=0.0, equal_nan=True)):
         if session.get_action_states(working_dir, False)[process.Action.SYNC_TO_REFERENCE]==process_pool.State.Completed:
             return
         session.update_action_states(working_dir, process.Action.SYNC_TO_REFERENCE, process_pool.State.Completed, study_config, unchanged=True)
