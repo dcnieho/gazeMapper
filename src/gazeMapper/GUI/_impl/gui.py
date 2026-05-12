@@ -133,7 +133,7 @@ class GUI:
             else:
                 # load project
                 if len(paths)!=1 or not (path := paths[0]).is_dir():
-                    gt_gui.utils.push_popup(gt_gui.msg_box.msgbox, "Project opening error", "Only a single project directory should be drag-dropped on the glassesValidator GUI.", gt_gui.msg_box.MsgBox.error, more="Dropped paths:\n"+('\n'.join([str(p) for p in paths])))
+                    gt_gui.utils.push_popup(gt_gui.msg_box.msgbox, "Project opening error", "Only a single project directory should be drag-dropped on the gazeMapper GUI.", gt_gui.msg_box.MsgBox.error, more="Dropped paths:\n"+('\n'.join([str(p) for p in paths])))
                 else:
                     callbacks.try_load_project(self, path, 'loading')
 
