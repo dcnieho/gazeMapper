@@ -574,6 +574,37 @@ class GUI:
             more=more,
         )
 
+    def _format_job_warning_details(self, warning: process_pool.JobWarning, number: int | None = None) -> str:
+        prefix = f'{number}. ' if number is not None else ''
+        details = f'{prefix}{warning.category}: {warning.message}\nFile "{warning.filename}", line {warning.lineno}'
+        if warning.line:
+            details += f'\n{warning.line}'
+        return details
+
+    def _get_job_queue_hover_text(self, job_state: process_pool.State, progress: tuple[float, str] | None, warnings: list[process_pool.JobWarning], error: str | None) -> str:
+        if job_state == process_pool.State.Completed and warnings:
+            hover_text = 'Completed with warnings'
+        else:
+            hover_text = job_state.displayable_name
+            if job_state == process_pool.State.Running and progress is not None:
+                hover_text += f' ({progress[1]})'
+
+        if warnings:
+            hover_text += '\n\nWarnings:\n' + '\n\n'.join(
+                self._format_job_warning_details(warning, index)
+                for index, warning in enumerate(warnings, start=1)
+            )
+        if error:
+            hover_text += f'\n\nError:\n{error}'
+        return hover_text
+
+    def _draw_job_queue_state(self, job_state: process_pool.State, progress: tuple[float, str] | None, warnings: list[process_pool.JobWarning], error: str | None):
+        if job_state == process_pool.State.Completed and warnings:
+            imgui.text_colored(colors.warning, ifa6.ICON_FA_TRIANGLE_EXCLAMATION)
+        else:
+            gt_gui.utils.draw_process_state(job_state, have_hover_popup=False, progress=progress)
+        gt_gui.utils.draw_hover_text(self._get_job_queue_hover_text(job_state, progress, warnings, error), text='')
+
     def _update_job_states_impl(self, job: utils.JobInfo, job_state: process_pool.State):
         sess = self.sessions.get(job.session,None)
         if sess is None:
@@ -1126,7 +1157,7 @@ class GUI:
             imgui.text('No actions have been enqueued or performed')
             return
 
-        # gather all file actions
+        # gather all jobs. copy to avoid concurrency issues
         jobs = self.job_scheduler.jobs.copy()
         job_ids = sorted(jobs.keys())
         job_states = {job_id:jobs[job_id].get_state() for job_id in job_ids}
@@ -1189,12 +1220,10 @@ class GUI:
                         case 1:
                             # Status
                             job_state = jobs[job_id].get_state()
-                            progress = None
-                            if job_state==process_pool.State.Running:
-                                progress = jobs[job_id].progress.get_progress() if jobs[job_id].progress is not None else None
-                            gt_gui.utils.draw_process_state(job_state, progress=progress)
+                            progress = jobs[job_id].progress.get_progress() if job_state==process_pool.State.Running and jobs[job_id].progress is not None else None
+                            job_warnings = jobs[job_id].warnings
+                            self._draw_job_queue_state(job_state, progress, job_warnings, jobs[job_id].error)
                             if jobs[job_id].error:
-                                gt_gui.utils.draw_hover_text(jobs[job_id].error, text='')
                                 imgui.same_line()
                                 if imgui.small_button(ifa6.ICON_FA_COPY+f'##{job_id}_copy_error'):
                                     imgui.set_clipboard_text(jobs[job_id].error)
