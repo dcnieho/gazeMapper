@@ -553,7 +553,7 @@ class GUI:
         lbl = f'action "{job.action.displayable_name}" for session "{job.session}"'
         if job.recording is not None:
             lbl += f', recording "{job.recording}"'
-        lbl_complete = lbl + f' (work item {job_id}, action {job.action.displayable_name})'
+        lbl_complete = lbl + f' (work item {job_id})'
         return lbl, lbl_complete
 
     def _notify_job_warning(self, job_id: int, job: utils.JobInfo, warning: process_pool.JobWarning):
