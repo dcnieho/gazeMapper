@@ -679,20 +679,17 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
     gt_gui.utils.push_popup(g, lambda: gt_gui.utils.popup(f"Set what to export", set_export_config_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, closable=True, outside=False))
 
 
-async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[recording.Recording]|list[camera_recording.Recording]], dev_type: session.RecordingType, dev: eyetracker.EyeTracker|None, sessions: list[str], generic_device_name: str=None):
-    from . import gui
-    g = typing.cast(gui.GUI,g)  # indicate type to typechecker
-
-    sessions = natsort.os_sorted(sessions)
+def _get_addable_recordings_label(dev_type: session.RecordingType, dev: eyetracker.EyeTracker|None, generic_device_name: str|None = None) -> str:
     if dev_type==session.RecordingType.Camera:
-        dev_rec_lbl = 'Camera recordings'
-    else:
-        if dev==eyetracker.EyeTracker.Generic:
-            dev_rec_lbl = f'generic recordings for a {generic_device_name} eye tracker'
-        else:
-            dev_rec_lbl = f'{dev.value} eye tracker recordings'
+        return 'Camera recordings'
+    if dev==eyetracker.EyeTracker.Generic:
+        return f'generic recordings for a {generic_device_name} eye tracker'
+    return f'{dev.value} eye tracker recordings'
 
-    # notify we're preparing the recordings to be opened
+
+def _push_preparing_recordings_popup(g, dev_type: session.RecordingType, dev: eyetracker.EyeTracker|None, generic_device_name: str|None = None):
+    dev_rec_lbl = _get_addable_recordings_label(dev_type, dev, generic_device_name)
+
     def prepping_recs_popup():
         spacing = 2 * imgui.get_style().item_spacing.x
         color = (0.45, 0.09, 1.00, 1.00)
@@ -714,7 +711,15 @@ async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[record
         imgui.dummy((0,2*imgui.get_style().item_spacing.y))
         imgui.end_group()
 
-    gt_gui.utils.push_popup(g, lambda: gt_gui.utils.popup("Preparing import", prepping_recs_popup, buttons=None, button_keymap={0:imgui.Key.enter}, closable=False, outside=False))
+    return gt_gui.utils.push_popup(g, lambda: gt_gui.utils.popup("Preparing import", prepping_recs_popup, buttons=None, button_keymap={0:imgui.Key.enter}, closable=False, outside=False))
+
+
+async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[recording.Recording]|list[camera_recording.Recording]], dev_type: session.RecordingType, dev: eyetracker.EyeTracker|None, sessions: list[str], generic_device_name: str=None, prepping_popup: typing.Callable|None = None):
+    from . import gui
+    g = typing.cast(gui.GUI,g)  # indicate type to typechecker
+
+    sessions = natsort.os_sorted(sessions)
+    dev_rec_lbl = _get_addable_recordings_label(dev_type, dev, generic_device_name)
 
     # step 1, find what recordings of this type of eye tracker/camera files are in the path
     recs = rec_getter()
@@ -735,7 +740,7 @@ async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[record
 
     # get ready to show result
     # 1. remove prepping recordings popup
-    del g.popup_stack[-1]
+    g.close_popup(prepping_popup)
 
     # 2. if nothing importable found, notify
     if not all_recs:
@@ -982,8 +987,16 @@ def add_eyetracking_recordings(g, paths: list[pathlib.Path], sessions: list[str]
 
         return combo_value, eye_tracker
 
+    def _launch_search():
+        selected_generic_et_name = None if not generic_et_name else generic_et_name
+        prepping_popup = _push_preparing_recordings_popup(g, session.RecordingType.Eye_Tracker, eye_tracker, selected_generic_et_name)
+        g.run_async_task(
+            _show_addable_recordings(g, lambda: recording.find_recordings(paths, eye_tracker, selected_generic_et_name), session.RecordingType.Eye_Tracker, eye_tracker, sessions, selected_generic_et_name, prepping_popup),
+            popup=prepping_popup
+        )
+
     buttons = {
-        ifa6.ICON_FA_CHECK+" Continue": (lambda: async_thread.run(_show_addable_recordings(g, lambda: recording.find_recordings(paths, eye_tracker, None if not generic_et_name else generic_et_name), session.RecordingType.Eye_Tracker, eye_tracker, sessions, None if not generic_et_name else generic_et_name)), lambda: invalid or (eye_tracker==eyetracker.EyeTracker.Generic and generic_et_idx==-1)),
+        ifa6.ICON_FA_CHECK+" Continue": (_launch_search, lambda: invalid or (eye_tracker==eyetracker.EyeTracker.Generic and generic_et_idx==-1)),
         ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
     }
 
@@ -1019,7 +1032,11 @@ def add_camera_recordings(g, paths: list[pathlib.Path], glob_filter: str, sessio
     from . import gui
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
     sessions = get_and_filter_eligible_sessions(g, sessions, session.RecordingType.Camera)
-    async_thread.run(_show_addable_recordings(g, lambda: _find_camera_recordings(paths, glob_filter), session.RecordingType.Camera, None, sessions))
+    prepping_popup = _push_preparing_recordings_popup(g, session.RecordingType.Camera, None)
+    g.run_async_task(
+        _show_addable_recordings(g, lambda: _find_camera_recordings(paths, glob_filter), session.RecordingType.Camera, None, sessions, prepping_popup=prepping_popup),
+        popup=prepping_popup
+    )
 
 def _find_camera_recordings(paths: list[pathlib.Path], glob_filter: str) -> list[camera_recording.Recording]:
     extensions = {'.'+x.strip('.* ') for x in glob_filter.split(',')}

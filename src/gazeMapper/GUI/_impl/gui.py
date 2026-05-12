@@ -93,21 +93,48 @@ class GUI:
 
         self._marker_preview_cache  : dict[tuple[int,int,int], image_helper.ImageHelper]= {}
         self._plane_preview_cache   : dict[str               , image_helper.ImageHelper]= {}
+        self._async_task_popups     : dict[concurrent.futures.Future, typing.Callable] = {}
+        self._async_task_popup_lock : threading.Lock = threading.Lock()
 
-        # Show errors in threads
-        def asyncexcepthook(future: asyncio.Future):
-            try:
-                exc = future.exception()
-            except concurrent.futures.CancelledError:
-                return
-            if not exc:
-                return
-            tb = gt_gui.utils.get_traceback(type(exc), exc, exc.__traceback__)
-            if isinstance(exc, asyncio.TimeoutError):
-                gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Processing error", f"A background process has failed:\n{exc}: {str(exc) or 'No further details'}", gt_gui.msg_box.MsgBox.warn, more=tb)
-                return
-            gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Processing error", f"Something went wrong in an asynchronous task of a separate thread", gt_gui.msg_box.MsgBox.error, more=tb)
-        async_thread.done_callback = asyncexcepthook
+        # handle async task completion (e.g., errors in async tasks)
+        async_thread.done_callback = self._handle_async_task_done
+
+    def run_async_task(self, coroutine: typing.Coroutine, popup: typing.Callable|None = None) -> concurrent.futures.Future:
+        future = async_thread.run(coroutine)
+        if popup is None:
+            return future
+
+        with self._async_task_popup_lock:
+            self._async_task_popups[future] = popup
+        return future
+
+    def close_popup(self, popup: typing.Callable|None):
+        if popup is None:
+            return
+        try:
+            self.popup_stack.remove(popup)
+        except ValueError:
+            pass
+
+    def _close_tracked_async_popup(self, future: concurrent.futures.Future):
+        with self._async_task_popup_lock:
+            tracked_popup = self._async_task_popups.pop(future, None)
+        self.close_popup(tracked_popup)
+
+    def _handle_async_task_done(self, future: concurrent.futures.Future):
+        self._close_tracked_async_popup(future)
+        try:
+            exc = future.exception()
+        except concurrent.futures.CancelledError:
+            return
+        if not exc:
+            return
+        # if we get here, an error occurred that we should notify about
+        tb = gt_gui.utils.get_traceback(type(exc), exc, exc.__traceback__)
+        if isinstance(exc, asyncio.TimeoutError):
+            gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Processing error", f"A background process has failed:\n{exc}: {str(exc) or 'No further details'}", gt_gui.msg_box.MsgBox.warn, more=tb)
+            return
+        gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Processing error", "Something went wrong in an asynchronous task of a separate thread", gt_gui.msg_box.MsgBox.error, more=tb)
 
     def _load_fonts(self):
         # load the default font. Do it manually as we want to use Roboto as the default font
