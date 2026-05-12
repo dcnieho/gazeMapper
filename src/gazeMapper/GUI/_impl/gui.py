@@ -506,6 +506,7 @@ class GUI:
         self.job_scheduler.add_job(job, payload, self._action_done_callback, exclusive_id=exclusive_id, priority=priority, progress_indicator=progress_indicator)
 
     def _update_jobs_and_process_pool(self):
+        pending_warning_popups: list[tuple[int, utils.JobInfo, process_pool.JobWarning]] = []
         with self._sessions_lock:
             # tick job scheduler (under lock as checking job validity needs session lock)
             self.job_scheduler.update()
@@ -520,6 +521,15 @@ class GUI:
             for job_id in self.job_scheduler.jobs:
                 if self.job_scheduler.jobs[job_id].get_state() in [process_pool.State.Pending, process_pool.State.Running]:
                     self._active_jobs_cache[self.job_scheduler.jobs[job_id].user_data] = job_id
+
+            for job_id in self._active_jobs_cache.values():
+                job_desc = self.job_scheduler.jobs[job_id]
+                for warning_index, warning in job_desc.get_unnotified_warnings():
+                    job_desc.mark_warning_notified(warning_index)
+                    pending_warning_popups.append((job_id, job_desc.user_data, warning))
+
+        for job_id, job, warning in pending_warning_popups:
+            self._notify_job_warning(job_id, job, warning)
 
         # if there are no jobs left, clean up process pool
         self.process_pool.cleanup_if_no_jobs()
@@ -539,6 +549,31 @@ class GUI:
         else:
             return None, None
 
+    def _get_job_notification_label(self, job_id: int, job: utils.JobInfo) -> tuple[str, str]:
+        lbl = f'action "{job.action.displayable_name}" for session "{job.session}"'
+        if job.recording is not None:
+            lbl += f', recording "{job.recording}"'
+        lbl_complete = lbl + f' (work item {job_id}, action {job.action.displayable_name})'
+        return lbl, lbl_complete
+
+    def _notify_job_warning(self, job_id: int, job: utils.JobInfo, warning: process_pool.JobWarning):
+        lbl, lbl_complete = self._get_job_notification_label(job_id, job)
+        more = (
+            f'{lbl_complete}\n\n'
+            f'{warning.category}: {warning.message}\n'
+            f'File "{warning.filename}", line {warning.lineno}'
+        )
+        if warning.line:
+            more += f'\n\n{warning.line}'
+        gt_gui.utils.push_popup(
+            self,
+            gt_gui.msg_box.msgbox,
+            "Processing warning",
+            f"A warning occurred when processing {lbl}:\n\n{warning.message}",
+            gt_gui.msg_box.MsgBox.warn,
+            more=more,
+        )
+
     def _update_job_states_impl(self, job: utils.JobInfo, job_state: process_pool.State):
         sess = self.sessions.get(job.session,None)
         if sess is None:
@@ -555,14 +590,10 @@ class GUI:
 
     def _action_done_callback(self, future: process_pool.ProcessFuture, job_id: int, job: utils.JobInfo, state: process_pool.State):
         # if process failed, notify error
-        session_level = job.recording is None
         if state==process_pool.State.Failed:
             exc = future.exception()    # should not throw exception since CancelledError is already encoded in state and future is done
             tb = gt_gui.utils.get_traceback(type(exc), exc, exc.__traceback__)
-            lbl = f'action "{job.action.displayable_name}" for session "{job.session}"'
-            if not session_level:
-                lbl += f', recording "{job.recording}"'
-            lbl_complete = lbl + f' (work item {job_id}, action {job.action.displayable_name})'
+            lbl, lbl_complete = self._get_job_notification_label(job_id, job)
             gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Processing error", f"An error occurred when processing {lbl}:\n\n{exc}", gt_gui.msg_box.MsgBox.error, more=f'{lbl_complete}\n\n{tb}')
             if job_id in self.job_scheduler.jobs:
                 self.job_scheduler.jobs[job_id].error = tb
