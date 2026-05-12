@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import shutil
 import copy
+import warnings
 
 from glassesTools import annotation, marker as gt_marker, naming as gt_naming, process_pool, timestamps, validation
 
@@ -116,7 +117,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
                     for t in marker_observations_per_target:
                         if marker_observations_per_target[t].empty:
                             missing_str  = '\n- '.join([gt_marker.marker_ID_to_str(m) for m in markers_per_target[t]])
-                            print(f'{cs["name"]}: None of the markers for target {t} were observed during the episode from frame {e[0]} to frame {e[1]}:\n- {missing_str}')
+                            warnings.warn(f'{cs["name"]}: None of the markers for target {t} were observed during the episode from frame {e[0]} to frame {e[1]}:\n- {missing_str}, skipping dynamic splitting of this episode')
                             failed = True
                             break
                     if failed:
@@ -147,7 +148,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
                     target_counts = coding['target'].value_counts().to_dict()
                 counts_set = set(target_counts.values())
                 if len(counts_set)!=1:
-                    print(f'{cs["name"]}: Not all targets were presented equally often during the episode from frame {e[0]} to frame {e[1]}, cannot split consecutive repetitions')
+                    warnings.warn(f'{cs["name"]}: Not all targets were presented equally often during the episode from frame {e[0]} to frame {e[1]}, cannot split consecutive repetitions')
                     continue
                 # check each target is only presented once per consecutive run
                 n_repetitions = counts_set.pop()
@@ -156,7 +157,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
                     si, ei = (rep-1)*n_targets, rep*n_targets
                     targets_in_run = set(t for _,t in target_observation_map[si:ei])
                     if len(targets_in_run)!=n_targets:  # not all targets present in this run
-                        print(f'{cs["name"]}: Not all targets were presented during repetition {rep} in the episode from frame {e[0]} to frame {e[1]}, cannot split consecutive repetitions')
+                        warnings.warn(f'{cs["name"]}: Not all targets were presented during repetition {rep} in the episode from frame {e[0]} to frame {e[1]}, cannot split consecutive repetitions')
                         failed = True
                         break
                 # find break points between consecutive runs
