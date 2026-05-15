@@ -104,38 +104,43 @@ def apply_sync(rec: str,
         dt_start, dt_end    = None, None
     num_reference_episodes      = sync.loc[rec].shape[0]
     if do_time_stretch:
+        rec_sync = sync.loc[rec]
         for ival in range(num_reference_episodes-1):
             # set up the problem - piecewise linear scale
             # 1. get known good location for this interval, and the stretch factor
-            pivot       = (sync.loc[(rec,ival),'t_ref'] if stretch_which=='ref' else sync.loc[(rec,ival),'t_this'])*1000.   # s -> ms
-            stretch_fac = sync.loc[(rec,ival),'stretch_fac']
-            # 2. determine data range to apply stretch for this interval to
+            t_ref_start  = rec_sync.loc[ival,'t_ref' ]*1000.   # s -> ms
+            t_ref_end    = rec_sync.loc[ival+1,'t_ref' ]*1000. # s -> ms
+            t_this_start = rec_sync.loc[ival,'t_this']*1000.   # s -> ms
+            t_this_end   = rec_sync.loc[ival+1,'t_this']*1000. # s -> ms
+            stretch_fac  = rec_sync.loc[ival,'stretch_fac']
+            # 2. determine the timeline ranges for this interval
             if ival==0:
-                # first interval, apply all the way from start of data
+                # first interval, apply all the way from start of data/reference
                 d_start = dt_start
                 r_start = rt_start
             else:
-                d_start = r_start = sync.loc[(rec,ival),'t_ref']
+                d_start = t_this_start
+                r_start = t_ref_start
             if ival==num_reference_episodes-2:  # NB: zero-based indexing
-                # last interval, apply all the way to end of data
+                # last interval, apply all the way to end of data/reference
                 d_end = dt_end
                 r_end = rt_end
             else:
-                d_end = r_end = sync.loc[(rec,ival+1),'t_ref']
+                d_end = t_this_end
+                r_end = t_ref_end
             # calculate new timestamps
             if stretch_which=='ref':
                 # 1. first translate gaze ts to reference timestamps
                 if has_data_ts:
                     data_sel = (data_timestamps >= d_start) & (data_timestamps <= d_end)
-                    new_data_timestamps[data_sel] += sync.loc[(rec,ival),'offset']*1000.   # s -> ms
+                    new_data_timestamps[data_sel] += rec_sync.loc[ival,'offset']*1000.   # s -> ms
                 # 2. apply scaling
-                data_sel = (reference_video_timestamps >= r_start) & (reference_video_timestamps <= r_end)
-                new_reference_video_timestamps[data_sel] = (reference_video_timestamps[data_sel]-pivot)*(1-stretch_fac)+pivot
+                ref_sel = (reference_video_timestamps >= r_start) & (reference_video_timestamps <= r_end)
+                new_reference_video_timestamps[ref_sel] = (reference_video_timestamps[ref_sel]-t_ref_start)*(1-stretch_fac)+t_ref_start
             elif stretch_which=='other':
                 if has_data_ts:
                     data_sel = (data_timestamps >= d_start) & (data_timestamps <= d_end)
-                    new_data_timestamps[data_sel] = (data_timestamps[data_sel]-pivot)*(1+stretch_fac)+pivot
-                    new_data_timestamps[data_sel] += sync.loc[(rec,ival),'offset']*1000.   # s -> ms
+                    new_data_timestamps[data_sel] = t_ref_start+(data_timestamps[data_sel]-t_this_start)/(1-stretch_fac)
                 # else nothing to do...
     else:
         if has_data_ts:
