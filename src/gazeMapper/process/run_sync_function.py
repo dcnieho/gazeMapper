@@ -138,7 +138,9 @@ def _get_sync_function(study_config: config.Study,
 
     return sync_target_function, analyze_frames
 
-def _sync_function_output_drawer(proc_name: str, frame: np.ndarray, frame_info: dict[str, typing.Any], frame_idx: int, t: tuple[float,float], sub_pixel_fac=8):
+def _sync_function_output_drawer(proc_name: str, frame: np.ndarray, frame_info: dict[str, typing.Any], frame_idx: int, t: tuple[float,float]|None, sub_pixel_fac=8):
+    if t is None:
+        return
     # input is tx, ty pixel positions on the camera image
     ll = 20
     tx,ty = t
