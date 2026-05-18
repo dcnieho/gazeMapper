@@ -242,6 +242,7 @@ def video_frames_to_reference(rec: str, sync: pd.DataFrame, fr_idxs: list[int]|l
     # (fr_idx contains this video's frame_idxs corresponding to this reference's frames, video_ts)
     fr_idx = video_utils.timestamps_to_frame_number(this_video_ts_ref, video_ts_ref, trim=True)['frame_idx'].to_numpy(copy=True)
     fr_idx[this_video_ts_ref<video_ts_ref[0]] = -1
+    # NB: no need to check for timestamps beyond the reference video's end here; trim=True already ensures that these are marked as invalid.
 
     return fr_idx[fr_idxs].tolist()
 
