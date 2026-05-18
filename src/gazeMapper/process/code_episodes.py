@@ -57,7 +57,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
 
     # get previous interval coding, if available
     if val_coding_event is None:
-        episodes, episodes_to_code = episode.load_episodes_from_all_recordings(study_config, working_dir, error_if_unwanted_found=False, missing_other_coding_ok=True)
+        episodes, episodes_to_code, _, imported_episodes = episode.load_episodes_from_all_recordings_with_info(study_config, working_dir, error_if_unwanted_found=False, missing_other_coding_ok=True)
+        # for display, add coding streams from other recordings (will be read only as not included in episodes_to_code)
+        episodes = episode.get_source_labeled_episodes(episodes, imported_episodes)
         hotkeys = {cs['name']:cs['hotkey'] for cs in study_config.coding_setup if cs['hotkey'] is not None}
         descriptions = {cs['name']:cs['description'] for cs in study_config.coding_setup if cs['description'] is not None}
         plane_points = {0: np.zeros((1,2))}
