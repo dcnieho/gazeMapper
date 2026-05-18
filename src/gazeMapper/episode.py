@@ -60,6 +60,7 @@ def load_episodes_from_all_recordings(study_config: config.Study, recording_dir:
     from . import synchronization
     # loads episodes for both the current recording, and optionally also from other synced recordings in the session as set up in the study config
     recording_dir = pathlib.Path(recording_dir)
+    rec_name = recording_dir.name
     coding_file = recording_dir / naming.coding_file
     if coding_file.is_file():
         episodes = list_to_marker_dict(read_list_from_file(coding_file))
@@ -81,7 +82,7 @@ def load_episodes_from_all_recordings(study_config: config.Study, recording_dir:
                 to_code.add(cs['name'])
                 continue
             which_recs = cs.get('which_recordings')
-            if recording_dir.name in which_recs:
+            if which_recs is None or rec_name in which_recs:
                 to_code.add(cs['name'])
     if episode_subset is not None:
         to_code = to_code.intersection(episode_subset)
