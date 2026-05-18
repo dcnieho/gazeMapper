@@ -202,6 +202,23 @@ def get_episode_frame_indices_from_other_video(working_dir: str|pathlib.Path, ev
     frame_idx = _check_bounds(frame_idx, video_ts.indices[-1])
     return [[i+e for i,e in zip(ifs, [-extra_fr, extra_fr])] for ifs in frame_idx]   # expand by extra_fr frames on each edge
 
+
+def video_episode_dict_to_reference(rec: str,
+                                    sync: pd.DataFrame,
+                                    episodes: episode.EpisodeMap,
+                                    this_video_ts: list[float] | np.ndarray,
+                                    video_ts_ref: list[float] | np.ndarray,
+                                    do_time_stretch: bool,
+                                    stretch_which: str) -> episode.EpisodeMap:
+    return {
+        event: (
+            episodes[event][0],
+            video_frames_to_reference(rec, sync, episodes[event][1], this_video_ts, video_ts_ref, do_time_stretch, stretch_which),
+        )
+        for event in episodes
+    }
+
+
 @overload
 def reference_frames_to_video(rec: str, sync: pd.DataFrame, fr_idxs: list[int], video_ts: list[float]|np.ndarray, video_ts_ref: list[float]|np.ndarray, do_time_stretch: bool, stretch_which: str) -> list[int]: ...
 @overload
