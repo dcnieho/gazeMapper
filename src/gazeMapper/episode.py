@@ -69,7 +69,7 @@ def load_episodes_from_all_recordings(study_config: config.Study, recording_dir:
     else:
         if not empty_if_no_coding:
             raise FileNotFoundError(f'No coding file found at {coding_file}')
-        episodes = get_empty_marker_dict([(cs['name'],cs['event_type']) for cs in study_config.coding_setup])
+        episodes = get_empty_marker_dict([(cs['name'],cs['event_type']) for cs in study_config.coding_setup if episode_subset is None or cs['name'] in episode_subset])
 
     # check what coding we expect for this file
     if len(study_config.session_def.recordings)==1:
