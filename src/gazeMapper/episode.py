@@ -8,6 +8,13 @@ from glassesTools import annotation
 from . import config, naming
 
 
+EpisodeIntervals = tuple[annotation.EventType, list[list[int]]]
+EpisodeMap = dict[str, EpisodeIntervals]
+EpisodeSourceRef = tuple[str|None, int]
+EpisodeSourceRefs = dict[str, list[EpisodeSourceRef]]
+EpisodeImportedMap = dict[str, dict[str, list[list[int]]]]
+
+
 class Episode:
     def __init__(self, event:str, event_type:annotation.EventType, start_frame:int, end_frame:int|None=None):
         self.event          = event
@@ -56,7 +63,31 @@ def write_list_to_file(episodes: list[Episode],
     df = df[['event','event_type','start_frame','end_frame']]
     df.to_csv(str(fileName), index=False, sep='\t', na_rep='nan')
 
-def load_episodes_from_all_recordings(study_config: config.Study, recording_dir: str|pathlib.Path, episode_subset: set[str]|None=None, load_from_other_recordings=True, empty_if_no_coding=True, error_if_unwanted_found=True, missing_other_coding_ok=False) -> tuple[dict[str, tuple[annotation.EventType, list[list[int]]]], set[str]]:
+def _copy_intervals(intervals: list[list[int]]) -> list[list[int]]:
+    return [iv.copy() for iv in intervals]
+
+def copy_episode_map(episodes: EpisodeMap) -> EpisodeMap:
+    return {nm: (episodes[nm][0], _copy_intervals(episodes[nm][1])) for nm in episodes}
+
+def copy_episode_source_refs(source_refs: EpisodeSourceRefs) -> EpisodeSourceRefs:
+    return {nm: refs.copy() for nm, refs in source_refs.items()}
+
+def _get_local_episode_sources(episodes: EpisodeMap) -> EpisodeSourceRefs:
+    return typing.cast(EpisodeSourceRefs, {nm: [(None, i) for i in range(len(episodes[nm][1]))] for nm in episodes})
+
+def _get_empty_imported_episodes(episodes: EpisodeMap) -> EpisodeImportedMap:
+    return typing.cast(EpisodeImportedMap, {nm: {} for nm in episodes})
+
+def get_source_labeled_episodes(episodes: EpisodeMap, imported_episodes: EpisodeImportedMap) -> EpisodeMap:
+    labeled = copy_episode_map(episodes)
+    for nm in imported_episodes:
+        if nm not in episodes:
+            continue
+        for other_rec in imported_episodes[nm]:
+            labeled[f'{nm} (from recording {other_rec})'] = (episodes[nm][0], _copy_intervals(imported_episodes[nm][other_rec]))
+    return labeled
+
+def load_episodes_from_all_recordings_with_info(study_config: config.Study, recording_dir: str|pathlib.Path, episode_subset: set[str]|None=None, load_from_other_recordings=True, empty_if_no_coding=True, error_if_unwanted_found=True, missing_other_coding_ok=False) -> tuple[EpisodeMap, set[str], EpisodeSourceRefs, EpisodeImportedMap]:
     from . import synchronization
     # loads episodes for both the current recording, and optionally also from other synced recordings in the session as set up in the study config
     recording_dir = pathlib.Path(recording_dir)
@@ -88,17 +119,20 @@ def load_episodes_from_all_recordings(study_config: config.Study, recording_dir:
         to_code = to_code.intersection(episode_subset)
 
     # add missing fields
-    for evt in to_code:
+    wanted_events = {cs['name'] for cs in study_config.coding_setup if episode_subset is None or cs['name'] in episode_subset}
+    for evt in wanted_events:
         if evt not in episodes:
             cs = [cs for cs in study_config.coding_setup if cs['name']==evt][0]
             episodes[evt] = (cs['event_type'], [])
 
+    episode_sources = _get_local_episode_sources(episodes)
+    imported_episodes = _get_empty_imported_episodes(episodes)
+
     if not load_from_other_recordings:
-        return episodes, to_code
+        return episodes, to_code, episode_sources, imported_episodes
 
     # now check if there is coding to get from other recordings, or if there is coding that should not be there
     # checking for coding from other recordings is done using the study config setup, it can be switched off for specific events
-    rec_name = recording_dir.name
     # check for unwanted coding
     to_remove = []
     for nm in episodes:
@@ -110,8 +144,19 @@ def load_episodes_from_all_recordings(study_config: config.Study, recording_dir:
                 to_remove.append(nm)
     for nm in to_remove:
         del episodes[nm]
+    for evt in wanted_events:
+        if evt not in episodes:
+            cs = [cs for cs in study_config.coding_setup if cs['name']==evt][0]
+            episodes[evt] = (cs['event_type'], [])
+    episode_sources = _get_local_episode_sources(episodes)
+    imported_episodes = _get_empty_imported_episodes(episodes)
+
+    ref_rec = study_config.sync_ref_recording
+    if ref_rec is None:
+        return episodes, to_code, episode_sources, imported_episodes
+    all_recs = [r.name for r in study_config.session_def.recordings if r.name!=ref_rec]
+
     # check for coding to get from other recordings
-    all_recs = [r.name for r in study_config.session_def.recordings if r.name!=study_config.sync_ref_recording]
     for cs in study_config.coding_setup:
         nm = cs['name']
         if episode_subset is not None and nm not in episode_subset:
@@ -119,36 +164,41 @@ def load_episodes_from_all_recordings(study_config: config.Study, recording_dir:
         which_recs = cs.get('which_recordings')
         if which_recs is None:
             continue
-        which_recs = which_recs.copy()  # make sure we operate on a copy, as we will be modifying it
-        which_recs.discard(rec_name)    # skip this recording
-        if not which_recs:
+        candidate_recs = [r.name for r in study_config.session_def.recordings if r.name in which_recs and r.name!=rec_name]
+        if not candidate_recs:
             continue
-        # get coding from other recordings
         should_get_from_other = cs.get('load_from_other_recordings')
-        gotten_from_other = False
-        for other_rec in which_recs:
-            # NB: don't error if we don't need trial episodes for coding.
-            eps = synchronization.get_episode_frame_indices_from_other_video(recording_dir, nm, rec_name, other_rec, study_config.sync_ref_recording, all_recs, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings, study_config.sync_ref_stretch_which, missing_other_coding_ok=True)
-            if eps:
-                episodes[f'{nm} (from recording {other_rec})'] = (cs['event_type'], eps)
-                if should_get_from_other and not gotten_from_other:
-                    episodes[nm] = (cs['event_type'], eps)
-                gotten_from_other = True
+        should_use_other_for_base = should_get_from_other and not episodes[nm][1]
+        gotten_from_other = not should_use_other_for_base
+        for other_rec in candidate_recs:
+            eps = synchronization.get_episode_frame_indices_from_other_video(recording_dir, nm, rec_name, other_rec, ref_rec, all_recs, bool(study_config.sync_ref_do_time_stretch), list(study_config.sync_ref_average_recordings or []), study_config.sync_ref_stretch_which or 'other', missing_other_coding_ok=True)
+            if not eps:
+                continue
+            imported_episodes[nm][other_rec] = _copy_intervals(eps)
+            if not should_use_other_for_base or gotten_from_other:
+                continue
+            episodes[nm] = (cs['event_type'], _copy_intervals(eps))
+            episode_sources[nm] = [(other_rec, i) for i in range(len(eps))]
+            gotten_from_other = True
         if not gotten_from_other and should_get_from_other and not missing_other_coding_ok:
-            other_recs = ', '.join(sorted(which_recs))
-            if rec_name in cs.get('which_recordings'):
+            other_recs = ', '.join(sorted(candidate_recs))
+            if which_recs is not None and rec_name in which_recs:
                 msg_part = f'Coding for {nm} is expected to be coded for this recording ({rec_name}), but not found in this or any other recording that it may be found in ({other_recs}).'
             else:
                 msg_part = f'Coding for {nm} (not expected for this recording, {rec_name}) was not found in any other recording for which it may be expected ({other_recs}).'
             raise ValueError(f'{msg_part} Please ensure coding for {nm} is present.')
 
+    return episodes, to_code, episode_sources, imported_episodes
+
+def load_episodes_from_all_recordings(study_config: config.Study, recording_dir: str|pathlib.Path, episode_subset: set[str]|None=None, load_from_other_recordings=True, empty_if_no_coding=True, error_if_unwanted_found=True, missing_other_coding_ok=False) -> tuple[EpisodeMap, set[str]]:
+    episodes, to_code, _, _ = load_episodes_from_all_recordings_with_info(study_config, recording_dir, episode_subset, load_from_other_recordings, empty_if_no_coding, error_if_unwanted_found, missing_other_coding_ok)
     return episodes, to_code
 
 
-def get_empty_marker_dict(episodes: list[tuple[str, annotation.EventType]]) -> dict[str, tuple[annotation.EventType, list[list[int]]]]:
+def get_empty_marker_dict(episodes: list[tuple[str, annotation.EventType]]) -> EpisodeMap:
     return {e:(et, []) for e,et in sorted(episodes)}
 
-def list_to_marker_dict(episodes: list[Episode], expected_events: list[tuple[str, annotation.EventType]]|None=None) -> dict[str, tuple[annotation.EventType, list[list[int]]]]:
+def list_to_marker_dict(episodes: list[Episode], expected_events: list[tuple[str, annotation.EventType]]|None=None) -> EpisodeMap:
     e_dict = get_empty_marker_dict(expected_events or list(set((e.event, e.event_type) for e in episodes)))
     for e in episodes:
         if e.event not in e_dict:
