@@ -883,6 +883,12 @@ class Study:
         # get kwds
         kwds = json.load(d_path)
 
+        # get session def
+        s_path = path / 'session_def.json'
+        if not s_path.is_file():
+            return None
+        sess_def = session.SessionDefinition.load_from_json(s_path)
+
         # backwards compatibility for version 1 project setups
         if 'coding_setup' not in kwds:
             # fix up 'video_' parameters for backwards compatibility
@@ -1006,6 +1012,16 @@ class Study:
                         kwds['coding_setup'][-1]['validation_setup']['data_types'] = kwds.pop('validate_dq_types')
                     if 'validate_allow_dq_fallback' in kwds:
                         kwds['coding_setup'][-1]['validation_setup']['allow_data_type_fallback'] = kwds.pop('validate_allow_dq_fallback')
+                # check sync_ref specific setups for trial events (in v1, if there is a sync ref, these always came from the sync_ref recording)
+                if 'sync_ref_recording' in kwds:
+                    if e==annotation.EventType.Sync_Camera:
+                        # nothing to do
+                        pass
+                    elif e==annotation.EventType.Trial:
+                        kwds['coding_setup'][-1]['which_recordings'] = {kwds['sync_ref_recording']}
+                        kwds['coding_setup'][-1]['load_from_other_recordings'] = True
+                    else:
+                        kwds['coding_setup'][-1]['which_recordings'] = set([r.name for r in sess_def.recordings if r.type==session.RecordingType.Eye_Tracker])
             # dump some now unused keys
             kwds.pop('episodes_to_code', None)
             kwds.pop('planes_per_episode', None)
@@ -1024,24 +1040,20 @@ class Study:
             if 'mapped_video_which_gaze_type_on_plane' in kwds:
                 kwds['mapped_video_which_gaze_type_on_plane'] = gaze_worldref.Type(kwds['mapped_video_which_gaze_type_on_plane'])
 
-        # get session def
-        s_path = path / 'session_def.json'
-        if not s_path.is_file():
-            return None
-        sess_def = session.SessionDefinition.load_from_json(s_path)
-
-        # one more backwards compatibility fix: if there is a sync ref recording, and multiple recordings, ensure that coding setups have which_recordings set
-        # set according to the behavior of v1
-        if len(sess_def.recordings)>1 and 'sync_ref_recording' in kwds:
-            for cs in kwds['coding_setup']:
-                if 'which_recordings' not in cs or cs['which_recordings'] is None:
-                    if cs['event_type']==annotation.EventType.Sync_Camera:
-                        continue
-                    elif cs['event_type']==annotation.EventType.Trial:
-                        cs['which_recordings'] = {kwds['sync_ref_recording']}
-                        cs['load_from_other_recordings'] = True
-                    else:
-                        cs['which_recordings'] = set([r.name for r in sess_def.recordings if r.name!=kwds['sync_ref_recording']])
+            # if there is a sync ref recording, and multiple recordings, ensure that coding setups have which_recordings set
+            # set according to the behavior before which_recordings and load_from_other_recordings were introduced:
+            # sync camera events are coded on all recordings (which_recordings is None), trial events are coded on the sync ref recording and loaded for other
+            # recordings, and other events (ET Sync and Validate) are coded on all eye tracking recordings regardless of whether they are the sync ref recording or not
+            if len(sess_def.recordings)>1 and 'sync_ref_recording' in kwds:
+                for cs in kwds['coding_setup']:
+                    if 'which_recordings' not in cs or cs['which_recordings'] is None:
+                        if cs['event_type']==annotation.EventType.Sync_Camera:
+                            continue
+                        elif cs['event_type']==annotation.EventType.Trial:
+                            cs['which_recordings'] = {kwds['sync_ref_recording']}
+                            cs['load_from_other_recordings'] = True
+                        else:
+                            cs['which_recordings'] = set([r.name for r in sess_def.recordings if r.type==session.RecordingType.Eye_Tracker])
 
         # get planes
         planes: list[plane.Definition] = []
