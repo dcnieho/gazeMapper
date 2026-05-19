@@ -376,6 +376,12 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
                 if frame[v] is None:
                     # we don't have a valid frame, use a fully black frame
                     frame[v] = np.zeros((vid_info[v][1],vid_info[v][0],3), np.uint8)   # black image
+            ROI_offsets = {
+                v: (frame_info[v]['offset_x'], frame_info[v]['offset_y'])
+                if frame_info[v] is not None and 'offset_x' in frame_info[v] and 'offset_y' in frame_info[v]
+                else (0,0)
+                for v in write_vids
+            }
 
             # draw gaze on the video
             for v in proc_vids:
@@ -414,12 +420,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
 
                         # draw on current video
                         if study_config.mapped_video_show_gaze_on_plane_in_which is not None and v in study_config.mapped_video_show_gaze_on_plane_in_which:
-                            this_frame_info = typing.cast(dict[str, typing.Any], frame_info[v])
-                            if 'offset_x' in this_frame_info and 'offset_y' in this_frame_info:
-                                ROI_offset = (this_frame_info['offset_x'], this_frame_info['offset_y'])
-                            else:
-                                ROI_offset = (0,0)
-                            plane_gazes[best[0]][2].draw_on_world_video(frame[v], camera_params[v], ROI_offset, sub_pixel_fac, poses_this[best[0]], study_config.mapped_video_projected_vidPos_color, study_config.mapped_video_projected_world_pos_color, study_config.mapped_video_projected_left_ray_color, study_config.mapped_video_projected_right_ray_color, study_config.mapped_video_projected_average_ray_color)
+                            plane_gazes[best[0]][2].draw_on_world_video(frame[v], camera_params[v], ROI_offsets[v], sub_pixel_fac, poses_this[best[0]], study_config.mapped_video_projected_vidPos_color, study_config.mapped_video_projected_world_pos_color, study_config.mapped_video_projected_left_ray_color, study_config.mapped_video_projected_right_ray_color, study_config.mapped_video_projected_average_ray_color)
 
                         # also draw on other recordings, if so configured
                         # depending on configuration also includes gaze vector with origin at the camera
@@ -433,7 +434,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
                             # draw gaze point, camera position, and gaze vector between them on the other video, as configured
                             # and as possible (camera position and gaze vector require pose, not only homography)
                             draw_gaze_on_other_video(frame[vo],
-                                                     frame_info[vo],
+                                                     ROI_offsets[vo],
                                                      poses_this[matched_plane], poses_other[matched_plane],
                                                      plane_gazes[matched_plane][2],
                                                      camera_params[vo], clr,
@@ -453,7 +454,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
                     matched_plane = next((pl for pl in poses_this if pl in poses_other and poses_this[pl].pose_successful() and poses_other[pl].pose_successful()), None)
                     if matched_plane is None:
                         continue
-                    draw_camera_on_other_video(frame[vo], frame_info[vo], poses_this[matched_plane], poses_other[matched_plane], camera_params[vo], clr, sub_pixel_fac)
+                    draw_camera_on_other_video(frame[vo], ROI_offsets[vo], poses_this[matched_plane], poses_other[matched_plane], camera_params[vo], clr, sub_pixel_fac)
 
 
             # print info on frame and submit to to be encoded
@@ -571,7 +572,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
     # update state
     session.update_action_states(working_dir, process.Action.MAKE_MAPPED_GAZE_VIDEO, process_pool.State.Completed, study_config)
 
-def draw_gaze_on_other_video(frame_other, frame_info_other, pose_this: pose.Pose, pose_other: pose.Pose, plane_gaze: gaze_worldref.Gaze, camera_params_other, clr, which_gaze_on_plane, which_gaze_on_plane_allow_fallback, do_draw_gaze, do_draw_gaze_vec, sub_pixel_fac):
+def draw_gaze_on_other_video(frame_other, ROI_offset, pose_this: pose.Pose, pose_other: pose.Pose, plane_gaze: gaze_worldref.Gaze, camera_params_other, clr, which_gaze_on_plane, which_gaze_on_plane_allow_fallback, do_draw_gaze, do_draw_gaze_vec, sub_pixel_fac):
     if not do_draw_gaze and not do_draw_gaze_vec:
         # nothing to do
         return
@@ -584,11 +585,6 @@ def draw_gaze_on_other_video(frame_other, frame_info_other, pose_this: pose.Pose
             raise RuntimeError(f'Gaze of type {which_gaze_on_plane.value} was requested, but is not available. Select a different gaze type or set allow_fallback to True.')
     if gaze_point_plane is None:
         return
-
-    if 'offset_x' in frame_info_other and 'offset_y' in frame_info_other:
-        ROI_offset = (frame_info_other['offset_x'], frame_info_other['offset_y'])
-    else:
-        ROI_offset = (0,0)
 
     if not pose_this.pose_successful() or not pose_other.pose_successful():
         if not do_draw_gaze:
@@ -626,14 +622,9 @@ def draw_gaze_on_other_video(frame_other, frame_info_other, pose_this: pose.Pose
 
 
 
-def draw_camera_on_other_video(frame_other, frame_info_other, pose_this: pose.Pose, pose_other: pose.Pose, camera_params_other, clr, sub_pixel_fac):
+def draw_camera_on_other_video(frame_other, ROI_offset, pose_this: pose.Pose, pose_other: pose.Pose, camera_params_other, clr, sub_pixel_fac):
     if not pose_this.pose_successful() or not pose_other.pose_successful():
         return
-
-    if 'offset_x' in frame_info_other and 'offset_y' in frame_info_other:
-        ROI_offset = (frame_info_other['offset_x'], frame_info_other['offset_y'])
-    else:
-        ROI_offset = (0,0)
 
     cam_pos_world_this = pose_this.cam_frame_to_world(np.zeros((1,3)))
     if pose_other.world_frame_to_cam(cam_pos_world_this)[2] <= 0:
