@@ -101,7 +101,7 @@ def prep_export(project_dir: str|pathlib.Path, session_names: list[str], config_
     for s_name in session_names:
         ss = [s for s in sessions if s.name==s_name]
         if not ss:
-            warnings.warn(f'Session {s_name} not found in project, skipping...')
+            warnings.warn(f'Session {s_name} not found in project, skipping...', process_pool.ProcessingWarning)
             continue
         s = ss[0]
         got_any = True
@@ -207,13 +207,13 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
     for r in recs:
         # check if files needed for export are present, else skip
         if not all((working_dir / r / f'{naming.world_gaze_prefix}{p}.tsv').is_file() for p in planes):
-            warnings.warn(f'Not all plane gaze files found for recording {r} in session {working_dir.name}. Skipping...')
+            warnings.warn(f'Not all plane gaze files found for recording {r} in session {working_dir.name}. Skipping...', process_pool.ProcessingWarning)
             continue
         # get trial coding
         # trial episodes are gotten from the reference recording if there is one and this is not the reference recording
         episodes = episode.load_episodes_from_all_recordings(study_config, working_dir/r, {cs['name'] for cs in cs_plane_gaze})[0]
         if not any(episodes[e][1] for e in episodes):
-            warnings.warn(f'No {annotation.tooltip_map[annotation.EventType.Trial]} events found in the coding file for recording {r} in session {working_dir.name}. Skipping...')
+            warnings.warn(f'No {annotation.tooltip_map[annotation.EventType.Trial]} events found in the coding file for recording {r} in session {working_dir.name}. Skipping...', process_pool.ProcessingWarning)
             continue
 
         # keep track of units or other descriptions for each column
@@ -432,12 +432,12 @@ def export_gaze_offsets(export_path: pathlib.Path, working_dir: pathlib.Path, st
     for r in recs:
         # check if files needed for export are present, else skip
         if not all((working_dir / r / f'{naming.gaze_offset_prefix}{p}.tsv').is_file() for p in planes):
-            warnings.warn(f'Not all plane gaze files found for recording {r} in session {working_dir.name}. Skipping...')
+            warnings.warn(f'Not all plane gaze files found for recording {r} in session {working_dir.name}. Skipping...', process_pool.ProcessingWarning)
             continue
         # get episode coding
         episodes = episode.load_episodes_from_all_recordings(study_config, working_dir/r, {cs['name'] for cs in episodes_to_proc})[0]
         if not any(episodes[e][1] for e in episodes):
-            warnings.warn(f'No coding for any of the events with gaze offset setup was found in the coding file for recording {r} in session {working_dir.name}. Skipping...')
+            warnings.warn(f'No coding for any of the events with gaze offset setup was found in the coding file for recording {r} in session {working_dir.name}. Skipping...', process_pool.ProcessingWarning)
             continue
 
         # get gaze offset data per plane

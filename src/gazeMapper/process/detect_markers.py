@@ -151,7 +151,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
                 # store to file
                 pose.write_list_to_file(replaced_poses, working_dir.parent/to_replace/f'{naming.plane_pose_prefix}{pl}.tsv', skip_failed=True)
         else:
-            warnings.warn(f'Cannot replace eye tracker scene camera poses with head-attached camera poses: missing camera synchronization between head-attached camera recording "{rec_name}" and eye tracker scene camera recording "{to_replace}". Run Auto Coding if you have this set up, or manually code at least one sync point for both recordings, and then run the Detect Markers action again.')
+            warnings.warn(f'Cannot replace eye tracker scene camera poses with head-attached camera poses: missing camera synchronization between head-attached camera recording "{rec_name}" and eye tracker scene camera recording "{to_replace}". Run Auto Coding if you have this set up, or manually code at least one sync point for both recordings, and then run the Detect Markers action again.', process_pool.ProcessingWarning)
 
 
     # update state
