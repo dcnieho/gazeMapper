@@ -43,6 +43,7 @@ class GUI:
         self.plane_configs    : dict[str,gt_plane.Plane|Exception|None] = {}
         self.cam_calibrations : dict[str,ocv.CameraParams|Exception]    = {}
         self._dict_type_rec   : dict[str, typing.Type]|None             = None
+        self._coding_setup_dict_type_rec: dict[str, dict[typing.Any, typing.Type]] = {}
 
         self.sessions                   : dict[str, session.Session]        = {}
         self.session_config_overrides   : dict[str, tuple[config.StudyOverride, dict[str,config.StudyOverride]]] = {}
@@ -1565,13 +1566,13 @@ class GUI:
             if imgui.tree_node_ex(f'{extra}{lbl}###{i}', imgui.TreeNodeFlags_.framed):
                 if has_error:
                     imgui.pop_style_color()
-                changed, new_coding_config, _ = settings_editor.draw(
+                changed, new_coding_config, self._coding_setup_dict_type_rec[cs['name']] = settings_editor.draw(
                     copy.deepcopy(self.study_config.coding_setup[i]),
                     fields,
                     config.EventSetup.__annotations__ | {'auto_code': typing.Union[config.AutoCodeEpisodes if annotation.type_map[cs['event_type']]==annotation.Type.Interval else config.AutoCodeSyncPoints,None]},
                     config.EventSetup._field_defaults,
                     self._possible_value_getters|self._get_possible_value_getter_for_event(cs['name']),
-                    problems=problem_fields, fixed=fixed_fields, documentation=config.event_setup_doc)
+                    actual_types=self._coding_setup_dict_type_rec.setdefault(cs['name'], {}), problems=problem_fields, fixed=fixed_fields, documentation=config.event_setup_doc)
                 if changed:
                     try:
                         new_config = copy.deepcopy(self.study_config)
@@ -1593,6 +1594,7 @@ class GUI:
                     imgui.pop_style_color()
         if marked_for_deletion:
             for idx in sorted(marked_for_deletion, reverse=True):
+                self._coding_setup_dict_type_rec.pop(self.study_config.coding_setup[idx]['name'], None)
                 del self.study_config.coding_setup[idx]
             self.study_config.store_as_json()
             self._update_shown_actions_for_config()
