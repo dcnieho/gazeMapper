@@ -71,7 +71,7 @@ def _get_base_type(f_type: typing.Type) -> typing.Type:
 
 def _get_runtime_type(value: typing.Any) -> typing.Type:
     if isinstance(value, list) and value:
-        return list[type(value[0])]
+        return list[_get_runtime_type(value[0])]
     return type(value)
 
 def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_getter: typing.Callable[[],set[_T]]|None) -> tuple[bool, typing.Type, typing.Type, bool]:
