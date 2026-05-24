@@ -1,7 +1,9 @@
 import enum
+import pathlib
 import typing
+import warnings
 
-from glassesTools import annotation, json, process_pool, utils
+from glassesTools import annotation, json, marker as gt_marker, process_pool, utils
 
 from gazeMapper import config, marker_assembly
 
@@ -61,6 +63,31 @@ class Action(enum.IntEnum):
 def action_str_to_enum_val(x: str) -> Action:
     return utils.str_int_2_enum_val(x, Action, {'MAKE_VIDEO':'MAKE_MAPPED_GAZE_VIDEO', 'RUN_VALIDATION':'VALIDATE', 'AUTO_CODE_TRIALS': 'AUTO_CODE_EPISODES'})
 json.register_type(json.TypeEntry(Action, '__enum.process.Action__', utils.enum_val_2_str, action_str_to_enum_val))
+
+
+def _filter_marker_sequences_with_marker_files(event_name: str, working_dir: str | pathlib.Path, sequence_sets: dict[str, 'config.MarkerSequenceList']) -> tuple[dict[str, 'config.MarkerSequenceList'], set[gt_marker.MarkerID]]:
+    working_dir = pathlib.Path(working_dir)
+    field_display_names = {
+        'markers': 'marker',
+        'start_markers': 'start marker',
+        'end_markers': 'end marker',
+    }
+
+    valid_sequence_sets: dict[str, config.MarkerSequenceList] = {}
+    all_marker_ids: set[gt_marker.MarkerID] = set()
+    for field, sequences in sequence_sets.items():
+        valid_sequence_sets[field] = []
+        for sequence in sequences:
+            missing_markers = [marker_id for marker_id in sequence if not gt_marker.get_file_name(marker_id.m_id, marker_id.aruco_dict_id, working_dir).is_file()]
+            if missing_markers:
+                sequence_str = ' -> '.join(gt_marker.marker_ID_to_str(marker_id) for marker_id in sequence)
+                missing_str = '\n- '.join(str(gt_marker.get_file_name(marker_id.m_id, marker_id.aruco_dict_id, None)) for marker_id in missing_markers)
+                warnings.warn(f'{event_name}: Missing marker file(s) for {field_display_names.get(field, field.replace("_", " "))} sequence {sequence_str}:\n- {missing_str}\nSkipping this sequence for auto coding.', process_pool.ProcessingWarning)
+                continue
+            valid_sequence_sets[field].append(sequence)
+            all_marker_ids.update(sequence)
+
+    return valid_sequence_sets, all_marker_ids
 
 def action_to_func(action: Action) -> typing.Callable[..., None]|None:
     # Returns function to perform the provided action. NB: not for Action.IMPORT,
