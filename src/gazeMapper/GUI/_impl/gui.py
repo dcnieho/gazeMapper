@@ -2078,7 +2078,7 @@ class GUI:
         top_override, coding_overrides = overrides
         return top_override.get_dump(), {name: coding_overrides[name].get_dump() for name in coding_overrides}
 
-    def _recreate_override_state(self, overrides: tuple[config.StudyOverride, dict[str,config.StudyOverride]], level: config.OverrideLevel, parent_config: config.Study, recording_type: session.RecordingType|None = None) -> tuple[config.StudyOverride, dict[str,config.StudyOverride]]:
+    def _recreate_override_state(self, overrides: tuple[config.StudyOverride, dict[str,config.StudyOverride]], level: config.OverrideLevel, parent_config: config.Study, recording_type: session.RecordingType|None = None, recording_name: str|None = None) -> tuple[config.StudyOverride, dict[str,config.StudyOverride]]:
         top_override, coding_overrides = overrides
 
         allowed_fields = set(config.StudyOverride.get_allowed_parameters(level, recording_type, False)[0])
@@ -2088,6 +2088,8 @@ class GUI:
         event_allowed_fields = config.StudyOverride.get_allowed_parameters(level, recording_type, True)[0]
         rebuilt_coding_overrides: dict[str, config.StudyOverride] = {}
         for cs in parent_config.coding_setup:
+            if level == config.OverrideLevel.Recording and cs['which_recordings'] and recording_name and recording_name not in cs['which_recordings']:
+                continue
             relevant_fields = [f for f in event_allowed_fields if cs[f] is not None]
             if not relevant_fields:
                 continue
@@ -2130,7 +2132,7 @@ class GUI:
                 self.recording_config_overrides[sess.name][r] = config.load_or_create_override(config.OverrideLevel.Recording, sess.recordings[r].info.working_directory, sess.recordings[r].definition.type)
 
             previous = self.recording_config_overrides[sess.name][r]
-            refreshed = self._recreate_override_state(previous, config.OverrideLevel.Recording, parent_config, sess.recordings[r].definition.type)
+            refreshed = self._recreate_override_state(previous, config.OverrideLevel.Recording, parent_config, sess.recordings[r].definition.type, r)
             self.recording_config_overrides[sess.name][r] = refreshed
             self._recording_dict_type_rec[sess.name][r] = self._sync_override_type_rec(self._recording_dict_type_rec[sess.name].get(r, {}), refreshed[1])
 
