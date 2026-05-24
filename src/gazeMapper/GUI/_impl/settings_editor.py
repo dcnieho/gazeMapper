@@ -663,7 +663,7 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, o_type_ar
     n_lines = 1+len(line_break_idxs)
     bb = imgui.internal.ImRect(pos, pos+(item_w, 2*imgui.get_style().frame_padding.y+tsx.y*n_lines+imgui.get_style().item_spacing.y*(n_lines-1)))
     if imgui.internal.item_add(bb, imgui.get_id('##set_list_editor')):
-        imgui.push_clip_rect(bb.min, bb.max, False)
+        imgui.push_clip_rect(bb.min, bb.max, True)
 
         # draw background rect
         frame_col = imgui.get_color_u32(imgui.Col_.frame_bg)
