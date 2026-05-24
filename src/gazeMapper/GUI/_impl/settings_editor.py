@@ -768,13 +768,19 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, o_type_ar
             if not same_line:   # NB: also true when no values
                 imgui.set_cursor_screen_pos(imgui.get_cursor_screen_pos()+(h_edge_spacing, 0))
             imgui.set_next_item_width(inputter_width)
+            if draw_list_set_editor.should_focus_field==field_lbl:
+                imgui.set_keyboard_focus_here()
             active_id = imgui.get_current_context().active_id
             _,draw_list_set_editor.inputter_temp[field_lbl] = fun(f'##inputter_{field_lbl}', draw_list_set_editor.inputter_temp[field_lbl], flags=flags, **kwargs)
+            if draw_list_set_editor.should_focus_field==field_lbl:
+                draw_list_set_editor.should_focus_field = None
             item_id = imgui.get_item_id()
             validated = item_id==active_id and imgui.is_key_pressed(imgui.Key.enter) or imgui.is_key_pressed(imgui.Key.keypad_enter)
             if validated or imgui.is_item_deactivated_after_edit():
                 to_add = draw_list_set_editor.inputter_temp[field_lbl]
                 draw_list_set_editor.inputter_temp.pop(field_lbl)
+                if validated:
+                    draw_list_set_editor.should_focus_field = field_lbl
 
         # deal with drag-drop
         if has_order and len(val)>1:
@@ -820,3 +826,4 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, o_type_ar
 
     return val
 draw_list_set_editor.inputter_temp: dict[str,typing.Any] = {}
+draw_list_set_editor.should_focus_field = None
