@@ -15,6 +15,7 @@ from ... import config, type_utils, typed_dict_defaults
 
 
 TYPE_TO_STR_REGISTRY: dict[typing.Type, dict[typing.Any, str]|typing.Callable[[typing.Any], str]] = {}
+FLOAT_DISPLAY_DECIMALS = 6
 def register_formatter(ttype: typing.Type, formatter: dict[typing.Any, str]|typing.Callable[[typing.Any], str]):
     TYPE_TO_STR_REGISTRY[ttype] = formatter
 register_formatter(type_utils.ArucoDictType, glassesTools.aruco.dict_id_to_str)
@@ -582,7 +583,7 @@ def _get_str_values(values: list[typing.Any], f_type: typing.Type, o_type_args: 
         key = f_type if f_type in TYPE_TO_STR_REGISTRY else o_type_args[0]
         str_values = ['' if v is None else TYPE_TO_STR_REGISTRY[key][v] if isinstance(TYPE_TO_STR_REGISTRY[key],dict) else TYPE_TO_STR_REGISTRY[key](v) for v in values]
     else:
-        str_values = ['' if v is None else str(documentation[v].display_string if v in documentation else v.value if issubclass(type(v), enum.Enum) and isinstance(v.value,str) else v) for v in values]
+        str_values = ['' if v is None else str(documentation[v].display_string if v in documentation else f'{v:.{FLOAT_DISPLAY_DECIMALS}f}' if isinstance(v, float) else v.value if issubclass(type(v), enum.Enum) and isinstance(v.value,str) else v) for v in values]
     tooltips = [documentation[v].doc_str if v in documentation else None for v in values]
     return str_values, tooltips
 
