@@ -226,7 +226,6 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, actual_types: dic
         obj = o_type()
 
     has_add = has_remove = False
-    missing_fields = None
     if typing.is_typeddict(o_type):
         types = o_type.__annotations__.copy()
         fields = list(types.keys())
@@ -264,19 +263,13 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, actual_types: dic
                 else:
                     all_type = kv_type[1]
 
-        has_add = has_remove = fields is None
+        has_remove = fields is None
+        has_add = fields is None and all_fields is None
         if fields is None:
-            fields = list(obj.keys())
-            if all_fields is not None:
-                missing_fields = set(all_fields)-set(fields)
-                missing_fields = [f for f in all_fields if f in missing_fields] # preserve order
-                if not missing_fields:
-                    # nothing more to add, all possible keys exhausted
-                    has_add = False
-                    # but keep has_remove to True, if it was
+            fields = list(all_fields) if all_fields is not None else list(obj.keys())
             if not types:
                 if all_type:
-                    types = {k:all_type for k in obj}
+                    types = {k:all_type for k in fields}
                 else:
                     types = {k:type(obj[k]) for k in obj}
                     if not actual_types:
@@ -302,7 +295,7 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, actual_types: dic
         return False, made_or_replaced_obj, obj, False
     table_is_started, changed, ret_new_obj, obj, removed_field, actual_types = _draw_impl(obj, fields, types, defaults, possible_value_getters if isinstance(possible_value_getters,dict) else None, parent_obj, problems if isinstance(problems,dict) else {}, documentation or {}, fixed or {}, actual_types, level, table_is_started, has_remove=has_remove)
     if removed_field:
-        obj.pop(removed_field)
+        obj.pop(removed_field, None)
         changed = True
     made_or_replaced_obj |= ret_new_obj
     if table_is_started:
@@ -322,28 +315,20 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, actual_types: dic
             def _do_add_item():
                 nonlocal obj
                 nonlocal iid
-                nonlocal missing_fields
-                nonlocal types
                 nonlocal new_item_name
                 nonlocal new_item_type
-                if missing_fields:
-                    obj[new_item_name] = types[new_item_name]()
-                    t = types[new_item_name]
+                if new_item_type.startswith('list'):
+                    t = getattr(builtins,'list')
+                    t2= getattr(builtins,new_item_type[5:-1])
+                    t = t[t2]
                 else:
-                    if new_item_type.startswith('list'):
-                        t = getattr(builtins,'list')
-                        t2= getattr(builtins,new_item_type[5:-1])
-                        t = t[t2]
-                    else:
-                        t = getattr(builtins,new_item_type)
-                    obj[new_item_name] = t()
+                    t = getattr(builtins,new_item_type)
+                obj[new_item_name] = t()
                 draw_dict_editor.new_item = (iid,obj,new_item_name,t)
             def _valid_item_name():
-                nonlocal missing_fields
                 nonlocal new_item_name
-                return True if missing_fields else new_item_name and not new_item_name in obj
+                return new_item_name and not new_item_name in obj
             def _add_item_popup():
-                nonlocal missing_fields
                 nonlocal new_item_name
                 nonlocal new_item_type
                 imgui.dummy((30*imgui.calc_text_size('x').x,0))
@@ -361,33 +346,26 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, actual_types: dic
                         imgui.pop_style_color()
                     imgui.table_next_column()
                     imgui.set_next_item_width(-1)
-                    if missing_fields:
-                        items = sorted(list(missing_fields), key=lambda x: x.value if isinstance(x, enum.Enum) else x)
-                        items_str, tooltips = _get_str_values(items, type(items[0]), tuple(), documentation)
-                        idx = items.index(new_item_name) if new_item_name else -1
-                        _,idx = glassesTools.gui.utils.tooltip_combo("##item_selector", idx, items_str, tooltips)
-                        new_item_name = None if idx==-1 else items[idx]
-                    else:
-                        _,new_item_name = imgui.input_text("##new_item_name",new_item_name)
-                        imgui.table_next_row()
-                        imgui.table_next_column()
-                        imgui.align_text_to_frame_padding()
-                        invalid = new_item_type is None
-                        if invalid:
-                            imgui.push_style_color(imgui.Col_.text, glassesTools.gui.colors.error)
-                        imgui.text("Item type")
-                        if invalid:
-                            imgui.pop_style_color()
-                        imgui.table_next_column()
-                        imgui.set_next_item_width(-1)
-                        types = ['bool','str','int','float','list[str]','list[float]','list[int]']
-                        t_idx = types.index(new_item_type) if new_item_type is not None else -1
-                        _,t_idx = imgui.combo("##item_type_selector", t_idx, types)
-                        new_item_type = None if t_idx==-1 else types[t_idx]
+                    _,new_item_name = imgui.input_text("##new_item_name",new_item_name)
+                    imgui.table_next_row()
+                    imgui.table_next_column()
+                    imgui.align_text_to_frame_padding()
+                    invalid = new_item_type is None
+                    if invalid:
+                        imgui.push_style_color(imgui.Col_.text, glassesTools.gui.colors.error)
+                    imgui.text("Item type")
+                    if invalid:
+                        imgui.pop_style_color()
+                    imgui.table_next_column()
+                    imgui.set_next_item_width(-1)
+                    types = ['bool','str','int','float','list[str]','list[float]','list[int]']
+                    t_idx = types.index(new_item_type) if new_item_type is not None else -1
+                    _,t_idx = imgui.combo("##item_type_selector", t_idx, types)
+                    new_item_type = None if t_idx==-1 else types[t_idx]
                     imgui.end_table()
 
             buttons = {
-                ifa6.ICON_FA_CHECK+f" {'Add' if missing_fields else 'Create'} item": (_do_add_item, lambda: not _valid_item_name() or (not missing_fields and new_item_type is None)),
+                ifa6.ICON_FA_CHECK+" Create item": (_do_add_item, lambda: not _valid_item_name() or new_item_type is None),
                 ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
             }
             glassesTools.gui.utils.push_popup(_gui_instance, lambda: glassesTools.gui.utils.popup("Add item", _add_item_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, outside=False))
@@ -432,21 +410,18 @@ def _start_table(level, first_column_width):
 def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type, o_type_args: tuple[typing.Type], nullable: bool, default: typing.Any|None, parent_obj: _T2|None, problem: tuple[type_utils.ProblemLevel,str], documentation: type_utils.GUIDocInfo|None, fixed: bool, has_remove: bool) -> bool:
     imgui.table_next_row()
     imgui.table_next_column()
-    special_val = '**special_val_when_not_found'
-    val = obj.get(field,special_val) if isinstance(obj,dict) else getattr(obj,field)
+    missing_value = object()
+    val = obj.get(field,missing_value) if isinstance(obj,dict) else getattr(obj,field)
     parent_val = None
     if parent_obj is not None:
         if isinstance(parent_obj,dict) and field in parent_obj:
             parent_val = parent_obj.get(field,None)
         elif hasattr(parent_obj,field):
             parent_val = getattr(parent_obj,field)
-    is_none = val is None
-    if val==special_val:
-        try:
-            val = f_type()
-        except:
-            # cannot get or construct val, fall back to None (e.g. happens when type is a literal)
-            val = None
+    is_missing = val is missing_value
+    is_none = is_missing or val is None
+    if is_missing:
+        val = None
     if documentation and documentation.display_string:
         field_lbl = documentation.display_string
     else:
@@ -482,7 +457,7 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
         glassesTools.gui.utils.draw_hover_text(documentation.doc_str, text='')
     imgui.table_next_column()
     value_documentation = documentation.children.get(None,{}) or documentation.children if documentation is not None else {}
-    new_val, new_edit, removed = draw_value(field_lbl, val, f_type, o_type_args, nullable, default, parent_val, fixed, value_documentation, has_remove, is_none, base_type)
+    new_val, new_edit, removed = draw_value(field_lbl, val, f_type, o_type_args, nullable, default, parent_val, fixed, value_documentation, has_remove and not is_missing, is_none, base_type)
 
     new_obj = None
     if (changed := new_val!=val or new_edit):
