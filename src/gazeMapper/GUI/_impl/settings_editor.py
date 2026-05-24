@@ -69,6 +69,11 @@ def _replace_type_arg(f_type: typing.Type, base_type: typing.Type, v_type, n_typ
 def _get_base_type(f_type: typing.Type) -> typing.Type:
     return typing.get_origin(f_type) or f_type  # for instance str[int]->str, and str->str
 
+def _get_runtime_type(value: typing.Any) -> typing.Type:
+    if isinstance(value, list) and value:
+        return list[type(value[0])]
+    return type(value)
+
 def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_getter: typing.Callable[[],set[_T]]|None) -> tuple[bool, typing.Type, typing.Type, bool]:
     # peel off union with None, if any
     f_type, nullable = glassesTools.utils.unpack_none_union(f_type)
@@ -271,7 +276,7 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, actual_types: dic
                 if all_type:
                     types = {k:all_type for k in fields}
                 else:
-                    types = {k:type(obj[k]) for k in obj}
+                    types = {k:_get_runtime_type(obj[k]) for k in obj}
                     if not actual_types:
                         actual_types = copy.deepcopy(types)
     if defaults is None:
