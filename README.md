@@ -2,7 +2,7 @@
 [![PyPI Latest Release](https://img.shields.io/pypi/v/gazeMapper.svg)](https://pypi.org/project/gazeMapper/)
 [![image](https://img.shields.io/pypi/pyversions/gazeMapper.svg)](https://pypi.org/project/gazeMapper/)
 [![Citation Badge](https://img.shields.io/endpoint?url=https%3A%2F%2Fapi.juleskreuer.eu%2Fcitation-badge.php%3Fshield%26doi%3D10.3758%2Fs13428-025-02704-4&color=blue)](https://scholar.google.com/citations?view_op=view_citation&citation_for_view=uRUYoVgAAAAJ:wbdj-CoPYUoC)
-[![DOI](https://zenodo.org/badge/DOI/10.3758/s13428-025-02704-4.svg)](https://doi.org/10.3758/s13428-025-02704-4)
+[![DOI](https://img.shields.io/badge/DOI-10.3758%2Fs13428--025--02704--4-blue.svg)](https://doi.org/10.3758/s13428-025-02704-4)
 
 # gazeMapper v1.8.4
 Tool for automated world-based analysis of wearable eye tracker data.
