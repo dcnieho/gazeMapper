@@ -491,7 +491,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
                 for t,f,ts,b in zip(texts,frame_colors,text_sizes,baselines):
                     x_advance = ts[0]+margin
                     cv2.rectangle(out_frame,(x_end,out_frame.shape[0]),(x_end+x_advance,out_frame.shape[0]-max_height-b-margin), f, -1)
-                    cv2.putText(out_frame, (t), (x_end+margin, out_frame.shape[0]-margin), cv2.FONT_HERSHEY_PLAIN, 2, (0,255,255), 2)
+                    cv2.putText(out_frame, t, (x_end+margin, out_frame.shape[0]-margin), cv2.FONT_HERSHEY_PLAIN, 2, (0,255,255), 2)
                     x_end += x_advance
 
                 # submit frame to be encoded
