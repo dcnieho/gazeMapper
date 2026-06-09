@@ -15,6 +15,7 @@ class Action(enum.IntEnum):
     AUTO_CODE_SYNC = enum.auto()
     AUTO_CODE_EPISODES = enum.auto()
     SYNC_ET_TO_CAM = enum.auto()
+    INTERPOLATE_PLANE_POSE = enum.auto()
     SYNC_TO_REFERENCE = enum.auto()
     COMPUTE_GAZE_OFFSETS = enum.auto()
     VALIDATE = enum.auto()
@@ -31,7 +32,7 @@ class Action(enum.IntEnum):
         return self in [Action.MAKE_GAZE_OVERLAY_VIDEO, Action.DETECT_MARKERS, Action.RUN_SYNC_FUNCTION, Action.GAZE_TO_PLANE, Action.MAKE_MAPPED_GAZE_VIDEO]
     @property
     def has_progress_indication(self):
-        return self in [Action.MAKE_GAZE_OVERLAY_VIDEO, Action.DETECT_MARKERS, Action.GAZE_TO_PLANE, Action.COMPUTE_GAZE_OFFSETS, Action.VALIDATE, Action.MAKE_MAPPED_GAZE_VIDEO]
+        return self in [Action.MAKE_GAZE_OVERLAY_VIDEO, Action.DETECT_MARKERS, Action.INTERPOLATE_PLANE_POSE, Action.GAZE_TO_PLANE, Action.COMPUTE_GAZE_OFFSETS, Action.VALIDATE, Action.MAKE_MAPPED_GAZE_VIDEO]
     def next(self):
         v = self.value+1
         if v > Action.MAKE_MAPPED_GAZE_VIDEO.value:
@@ -66,6 +67,7 @@ def action_to_func(action: Action) -> typing.Callable[..., None]|None:
     from .detect_markers import run as detect_markers
     from .run_sync_function import run as run_sync_function
     from .sync_et_to_cam import run as sync_et_to_cam
+    from .interpolate_plane_pose import run as interpolate_plane_pose
     from .sync_to_ref import run as sync_to_ref
     from .gaze_to_plane import run as gaze_to_plane
     from .export_trials import run as export_trials
@@ -94,6 +96,8 @@ def action_to_func(action: Action) -> typing.Callable[..., None]|None:
             return auto_code_episodes
         case Action.SYNC_ET_TO_CAM:
             return sync_et_to_cam
+        case Action.INTERPOLATE_PLANE_POSE:
+            return interpolate_plane_pose
         case Action.SYNC_TO_REFERENCE:
             return sync_to_ref
         case Action.COMPUTE_GAZE_OFFSETS:
@@ -135,6 +139,11 @@ def get_specific_event_types(study_config: 'config.Study', specific_event_type: 
 def _config_has_et_sync(study_config: 'config.Study') -> bool:
     return not not get_specific_event_types(study_config, annotation.EventType.Sync_ET_Data, ['sync_setup'])
 
+def config_has_plane_pose_interpolation(study_config: 'config.Study', rec: str|None=None) -> bool:
+    if not study_config.interpolate_plane_pose_recordings:
+        return False
+    return rec is None or rec in study_config.interpolate_plane_pose_recordings
+
 def is_action_possible_given_config(action: Action, study_config: 'config.Study') -> bool:
     match action:
         case Action.CODE_EPISODES | Action.DETECT_MARKERS | Action.GAZE_TO_PLANE:
@@ -149,6 +158,8 @@ def is_action_possible_given_config(action: Action, study_config: 'config.Study'
             return config_has_auto_coding(study_config, specific_episode_type=annotation.Type.Interval)
         case Action.SYNC_ET_TO_CAM:
             return _config_has_et_sync(study_config)
+        case Action.INTERPOLATE_PLANE_POSE:
+            return config_has_plane_pose_interpolation(study_config)
         case Action.SYNC_TO_REFERENCE:
             return not not study_config.sync_ref_recording
         case Action.COMPUTE_GAZE_OFFSETS:
@@ -167,8 +178,10 @@ def is_action_possible_given_config(action: Action, study_config: 'config.Study'
 
 def is_action_possible_for_recording(rec: str, rec_type: 'session.RecordingType', action: Action, study_config: 'config.Study') -> bool:
     from .. import session
-    if rec_type==session.RecordingType.Camera and action in [Action.MAKE_GAZE_OVERLAY_VIDEO, Action.GAZE_TO_PLANE, Action.SYNC_ET_TO_CAM, Action.COMPUTE_GAZE_OFFSETS, Action.VALIDATE]:
+    if rec_type==session.RecordingType.Camera and action in [Action.MAKE_GAZE_OVERLAY_VIDEO, Action.GAZE_TO_PLANE, Action.SYNC_ET_TO_CAM, Action.INTERPOLATE_PLANE_POSE, Action.COMPUTE_GAZE_OFFSETS, Action.VALIDATE]:
         return False
+    elif action==Action.INTERPOLATE_PLANE_POSE:
+        return config_has_plane_pose_interpolation(study_config, rec)
     elif action in [Action.SYNC_ET_TO_CAM, Action.GAZE_TO_PLANE, Action.VALIDATE]:
         # check there are any events of the relevant type configured for this recording
         if action==Action.SYNC_ET_TO_CAM:
@@ -240,15 +253,17 @@ def _determine_to_invalidate(action: Action, study_config: 'config.Study') -> se
             states_to_invalidate = {a for a in action.next_values() if a not in [Action.AUTO_CODE_SYNC, Action.AUTO_CODE_EPISODES]}
         case Action.GAZE_TO_PLANE:
             # NB: SYNC_ET_TO_CAM and SYNC_TO_REFERENCE operate on gazeData not gaze on plane data, and MAKE_MAPPED_GAZE_VIDEO does the job itself/doesn't use this file
-            states_to_invalidate = {a for a in action.next_values() if a not in [Action.AUTO_CODE_SYNC, Action.AUTO_CODE_EPISODES, Action.SYNC_ET_TO_CAM, Action.SYNC_TO_REFERENCE, Action.MAKE_MAPPED_GAZE_VIDEO]}
+            states_to_invalidate = {a for a in action.next_values() if a not in [Action.AUTO_CODE_SYNC, Action.AUTO_CODE_EPISODES, Action.SYNC_ET_TO_CAM, Action.INTERPOLATE_PLANE_POSE, Action.SYNC_TO_REFERENCE, Action.MAKE_MAPPED_GAZE_VIDEO]}
         case Action.AUTO_CODE_SYNC:
             states_to_invalidate = {Action.CODE_EPISODES, Action.GAZE_TO_PLANE, Action.SYNC_TO_REFERENCE, Action.EXPORT_TRIALS, Action.MAKE_MAPPED_GAZE_VIDEO}
         case Action.AUTO_CODE_EPISODES:
             states_to_invalidate = {a for a in Action.CODE_EPISODES.next_values(inclusive=True) if a not in [Action.DETECT_MARKERS, Action.AUTO_CODE_EPISODES, Action.AUTO_CODE_SYNC, Action.SYNC_TO_REFERENCE]}
         case Action.SYNC_ET_TO_CAM:
             states_to_invalidate = {a for a in Action.GAZE_TO_PLANE.next_values(inclusive=True) if a not in [Action.AUTO_CODE_EPISODES, Action.AUTO_CODE_SYNC, Action.SYNC_ET_TO_CAM]}
+        case Action.INTERPOLATE_PLANE_POSE:
+            states_to_invalidate = {a for a in Action.GAZE_TO_PLANE.next_values(inclusive=True) if a not in [Action.AUTO_CODE_EPISODES, Action.AUTO_CODE_SYNC, Action.SYNC_ET_TO_CAM, Action.INTERPOLATE_PLANE_POSE, Action.SYNC_TO_REFERENCE, Action.MAKE_MAPPED_GAZE_VIDEO]}
         case Action.SYNC_TO_REFERENCE:
-            states_to_invalidate = {a for a in Action.GAZE_TO_PLANE.next_values(inclusive=True) if a not in [Action.AUTO_CODE_EPISODES, Action.AUTO_CODE_SYNC, Action.SYNC_ET_TO_CAM, Action.SYNC_TO_REFERENCE]}
+            states_to_invalidate = {a for a in Action.GAZE_TO_PLANE.next_values(inclusive=True) if a not in [Action.AUTO_CODE_EPISODES, Action.AUTO_CODE_SYNC, Action.SYNC_ET_TO_CAM, Action.INTERPOLATE_PLANE_POSE, Action.SYNC_TO_REFERENCE]}
         case Action.COMPUTE_GAZE_OFFSETS:
             states_to_invalidate = {Action.EXPORT_TRIALS}
         case Action.VALIDATE:
@@ -298,6 +313,8 @@ def _is_recording_action_possible(rec: str, action_states: dict[Action, process_
                 preconditions.add(Action.SYNC_TO_REFERENCE)
             if _config_has_et_sync(study_config):
                 preconditions.add(Action.SYNC_ET_TO_CAM)
+            if config_has_plane_pose_interpolation(study_config, rec):
+                preconditions.add(Action.INTERPOLATE_PLANE_POSE)
         case Action.AUTO_CODE_SYNC:
             preconditions.update([Action.DETECT_MARKERS])
         case Action.AUTO_CODE_EPISODES:
@@ -309,10 +326,18 @@ def _is_recording_action_possible(rec: str, action_states: dict[Action, process_
                 preconditions.add(Action.DETECT_MARKERS)
             if any(cs['sync_setup']['get_cam_movement_method']=='function' and (cs['which_recordings'] is None or rec in cs['which_recordings']) for cs in cs):
                 preconditions.add(Action.RUN_SYNC_FUNCTION)
+        case Action.INTERPOLATE_PLANE_POSE:
+            preconditions.add(Action.DETECT_MARKERS)
+            if _config_has_et_sync(study_config):
+                preconditions.add(Action.SYNC_ET_TO_CAM)
         case Action.COMPUTE_GAZE_OFFSETS:
             preconditions.update([Action.CODE_EPISODES, Action.GAZE_TO_PLANE])
+            if config_has_plane_pose_interpolation(study_config, rec):
+                preconditions.add(Action.INTERPOLATE_PLANE_POSE)
         case Action.VALIDATE:
             preconditions.update([Action.CODE_EPISODES, Action.GAZE_TO_PLANE])
+            if config_has_plane_pose_interpolation(study_config, rec):
+                preconditions.add(Action.INTERPOLATE_PLANE_POSE)
         case _:
             raise NotImplementedError(f'Logic is not implemented for {action.displayable_name} ({action}), major developer oversight! Let him know.')
 

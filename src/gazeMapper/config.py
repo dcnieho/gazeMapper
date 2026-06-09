@@ -122,6 +122,8 @@ class Study:
                  import_known_custom_eye_trackers           : list[str]|None                = None,
 
                  head_attached_recordings_replace_et_scene  : set[str]|None                 = None,
+                 interpolate_plane_pose_recordings          : set[str]|None                 = None,
+                 interpolate_plane_pose_max_missing_frames  : int                           = 0,
 
                  overlay_video_gaze_vid_pos_color           : RgbColor                      = RgbColor(  0,255,  0),
                  overlay_video_gaze_world_pos_color         : RgbColor|None                 = RgbColor(255,  0,255),
@@ -181,6 +183,8 @@ class Study:
         self.import_known_custom_eye_trackers           = import_known_custom_eye_trackers
 
         self.head_attached_recordings_replace_et_scene  = head_attached_recordings_replace_et_scene
+        self.interpolate_plane_pose_recordings          = interpolate_plane_pose_recordings
+        self.interpolate_plane_pose_max_missing_frames  = interpolate_plane_pose_max_missing_frames
 
         self.overlay_video_gaze_vid_pos_color           = overlay_video_gaze_vid_pos_color
         self.overlay_video_gaze_world_pos_color         = overlay_video_gaze_world_pos_color
@@ -266,6 +270,7 @@ class Study:
             self._check_auto_markers(strict_check)
             self._check_individual_markers(strict_check)
             self._check_head_attached_recordings(strict_check)
+            self._check_interpolate_plane_pose(strict_check)
             self._check_sync_ref(strict_check)
             self._check_make_video(strict_check)
 
@@ -734,6 +739,25 @@ class Study:
                         type_utils.merge_problem_dicts(problems, {'session_def': {r: (type_utils.ProblemLevel.Error, f'{r} is listed as overriding the scene camera of the "{d}" recording but there is more than one override for that recording. Only a single override is allowed per eye tracker recording.')}})
         return problems
 
+    def _check_interpolate_plane_pose(self, strict_check):
+        problems: type_utils.ProblemDict = {}
+        type_utils.merge_problem_dicts(problems, self._check_recordings(self.interpolate_plane_pose_recordings, 'interpolate_plane_pose_recordings', strict_check))
+        if self.interpolate_plane_pose_recordings:
+            wrong = [r for r in self.interpolate_plane_pose_recordings if any(r==rec.name and rec.type==session.RecordingType.Camera for rec in self.session_def.recordings)]
+            if wrong:
+                msg = f'interpolate_plane_pose_recordings should only contain eye tracker recordings. Offending recording(s): {wrong[0] if len(wrong)==1 else wrong}'
+                if strict_check:
+                    raise ValueError(msg)
+                else:
+                    type_utils.merge_problem_dicts(problems, {'interpolate_plane_pose_recordings': (type_utils.ProblemLevel.Error, msg)})
+        if self.interpolate_plane_pose_max_missing_frames < 0:
+            msg = 'interpolate_plane_pose_max_missing_frames should be >= 0'
+            if strict_check:
+                raise ValueError(msg)
+            else:
+                type_utils.merge_problem_dicts(problems, {'interpolate_plane_pose_max_missing_frames': (type_utils.ProblemLevel.Error, msg)})
+        return problems
+
     def _check_sync_ref(self, strict_check):
         problems: type_utils.ProblemDict = {}
         if self.sync_ref_recording is None:
@@ -809,6 +833,7 @@ class Study:
         type_utils.merge_problem_dicts(problems, self._check_auto_markers(False))
         type_utils.merge_problem_dicts(problems, self._check_individual_markers(False))
         type_utils.merge_problem_dicts(problems, self._check_head_attached_recordings(False))
+        type_utils.merge_problem_dicts(problems, self._check_interpolate_plane_pose(False))
         type_utils.merge_problem_dicts(problems, self._check_sync_ref(False))
         type_utils.merge_problem_dicts(problems, self._check_make_video(False))
         return problems
@@ -1055,6 +1080,9 @@ class Study:
                         else:
                             cs['which_recordings'] = set([r.name for r in sess_def.recordings if r.type==session.RecordingType.Eye_Tracker])
 
+        if 'interpolate_plane_pose_recordings' in kwds and kwds['interpolate_plane_pose_recordings'] is not None and not isinstance(kwds['interpolate_plane_pose_recordings'], set):
+            kwds['interpolate_plane_pose_recordings'] = set(kwds['interpolate_plane_pose_recordings'])
+
         # get planes
         planes: list[plane.Definition] = []
         for p_dir in path.iterdir():
@@ -1098,6 +1126,8 @@ study_parameter_doc = {
     'import_source_dir_as_relative_path': type_utils.GUIDocInfo('Store source directory as relative path?', 'Specifies whether the path to the source directory stored in the recording info file is an absolute path (this option is not enabled) or a relative path (enabled). If a relative path is used, the imported recording and the source directory can be moved to another location, and the source directory can still be found as long as the relative path (e.g., one folder up and in the directory "original recordings": "../original recordings") doesn\'t change.'),
     'import_known_custom_eye_trackers': type_utils.GUIDocInfo('Registered custom eye trackers', 'gazeMapper allows importing generic eye trackers for which no specific support is implemented, if their recording data is preprocessed to conform to glassesTools\' generic data format. Here you can define specific known generic eye tracker names that you may import.'),
     'head_attached_recordings_replace_et_scene': type_utils.GUIDocInfo('Head-attached recording: override scene camera', 'gazeMapper allows using recordings from a head-attached camera to replace pose determination done from the scene camera image. It might make sense to enable this when the image quality of the scene camera is not good enough. Requires instrinsics and extrinsics (transformation from the head-attached camera to the scene camera) of the head-attached camera to be known.'),
+    'interpolate_plane_pose_recordings': type_utils.GUIDocInfo('Plane pose interpolation: recordings', 'Eye tracker recordings for which detected plane poses should be interpolated or resampled to the eye tracking sample rate.'),
+    'interpolate_plane_pose_max_missing_frames': type_utils.GUIDocInfo('Plane pose interpolation: max missing frames', 'Maximum number of missing detected video frames allowed between two detected plane poses for interpolation. A value of 0 only interpolates between adjacent detected video frames.'),
     'overlay_video_gaze_vid_pos_color': type_utils.GUIDocInfo('Gaze overlay video: Color for gaze position on video', 'Color used for drawing the recorded gaze position on the scene video.'),
     'overlay_video_gaze_world_pos_color': type_utils.GUIDocInfo('Gaze overlay video: Color for 3D gaze position', 'Color used for drawing the recorded 3D gaze position in the world. Not drawn if value is not set.'),
     'overlay_video_gaze_vid_pos_radius': type_utils.GUIDocInfo('Gaze overlay video: Radius for gaze position on video', 'Radius of circle used for drawing the recorded gaze position on the scene video.'),

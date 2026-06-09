@@ -1,5 +1,6 @@
 
 plane_pose_prefix   = 'planePose_'
+plane_pose_interpolated_prefix = 'planePoseInterpolated_'
 world_gaze_prefix   = 'planeGaze_'
 coding_file         = 'coding.tsv'
 target_sync_prefix  = 'et_sync_target_'

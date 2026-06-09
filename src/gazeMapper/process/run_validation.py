@@ -6,6 +6,7 @@ from glassesTools import annotation, fixation_classification, naming as gt_namin
 from glassesTools.validation import assign_intervals, compute_offsets
 
 from .. import config, episode, naming, plane, process, session
+from . import _pose_files
 
 
 stopAllProcessing = False
@@ -129,7 +130,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None=None, p
             progress_indicator.update()
 
         compute_offsets.compute(working_dir/f'{naming.world_gaze_prefix}{p}.tsv',
-                                working_dir/f'{naming.plane_pose_prefix}{p}.tsv',
+                                _pose_files.get_preferred_plane_pose_file(working_dir, p)[0],
                                 working_dir/f'{naming.validation_prefix}{e}_fixation_assignment{("_override" if has_override else "")}.tsv',
                                 episodes[e][1],
                                 targets,

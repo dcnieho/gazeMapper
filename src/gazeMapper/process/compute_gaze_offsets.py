@@ -3,11 +3,12 @@ import numpy as np
 import pandas as pd
 import polars as pl
 
-from glassesTools import data_types, gaze_worldref, naming as gt_naming, plane as gt_plane, pose as gt_pose, process_pool
+from glassesTools import data_types, gaze_worldref, naming as gt_naming, plane as gt_plane, process_pool
 from glassesTools.validation import Plane as val_Plane
 from glassesTools.validation.config import get_validation_setup
 
 from .. import config, episode, naming, plane, process, session
+from . import _pose_files
 
 
 def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None, progress_indicator: process_pool.JobProgress|None=None, **study_settings):
@@ -78,7 +79,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
             all_episodes_per_plane[p].extend(episodes_per_plane[nm][p])
     all_episodes_per_plane = {p: sorted(all_episodes_per_plane[p]) for p in all_episodes_per_plane}
     plane_gazes = {p: gaze_worldref.read_dict_from_file(working_dir / f'{naming.world_gaze_prefix}{p}.tsv', episodes=all_episodes_per_plane[p], ts_column_suffixes=['VOR','']) for p in all_planes}
-    poses = {p:gt_pose.read_dict_from_file(working_dir/f'{naming.plane_pose_prefix}{p}.tsv', all_episodes_per_plane[p]) for p in all_planes}
+    poses = {p:_pose_files.read_preferred_plane_pose(working_dir, p, all_episodes_per_plane[p]) for p in all_planes}
     head_gaze = pd.read_csv(working_dir/gt_naming.gaze_data_fname, delimiter='\t', index_col=False)
 
 

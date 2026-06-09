@@ -5,6 +5,7 @@ from glassesTools.gui import worldgaze as worldgaze_gui
 from glassesTools.gui.video_player import GUI
 
 from .. import config, episode, naming, plane, process, session
+from . import _pose_files
 
 
 def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None, show_visualization=False, show_planes=True, show_only_intervals=True, progress_indicator: process_pool.JobProgress|None=None, **study_settings):
@@ -79,7 +80,10 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
     processing_intervals = [e for p in mapping_setup for e in mapping_setup[p]] # NB: doesn't need to be sorted
     should_load_part = not gui or show_only_intervals
     head_gazes = gaze_headref.read_dict_from_file(working_dir / gt_naming.gaze_data_fname, processing_intervals if should_load_part else None, ts_column_suffixes=['VOR', ''])[0]
-    poses = {p:gt_pose.read_dict_from_file(working_dir/f'{naming.plane_pose_prefix}{p}.tsv', mapping_setup[p] if should_load_part else None) for p in mapping_setup}
+    poses = {p:_pose_files.read_preferred_plane_pose(working_dir, p, mapping_setup[p] if should_load_part else None) for p in mapping_setup}
+    visualization_poses = poses
+    if gui is not None:
+        visualization_poses = {p:gt_pose.read_dict_from_file(working_dir/f'{naming.plane_pose_prefix}{p}.tsv', mapping_setup[p] if should_load_part else None) for p in mapping_setup}
 
     # prep progress indicator
     total = sum(len(head_gazes[f]) for p in poses for f in poses[p] if f in head_gazes)
@@ -104,7 +108,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
     in_video = session.read_recording_info(working_dir, rec_def.type)[1]
     worldgaze_gui.show_visualization(
         in_video, working_dir / gt_naming.frame_timestamps_fname, working_dir / gt_naming.scene_camera_calibration_fname,
-        planes, poses, head_gazes, plane_gazes,
+        planes, visualization_poses, head_gazes, plane_gazes,
         {n:episodes[n] for cs in episodes_to_proc if (n:=cs['name']) in episodes},
         gui, show_planes, show_only_intervals, 8
     )

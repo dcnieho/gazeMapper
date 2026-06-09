@@ -704,6 +704,7 @@ class GUI:
             'sync_ref_recording': _get_known_recordings,
             'sync_ref_average_recordings': _get_known_recordings_no_ref,
             'head_attached_recordings_replace_et_scene': _get_known_recordings_only_camera_head_attached,
+            'interpolate_plane_pose_recordings': _get_known_recordings_only_eye_tracker,
             'session_def_et_recordings': _get_known_recordings_only_eye_tracker,
             'planes': _get_known_planes,
             'auto_code': {'markers': _get_known_individual_markers, 'start_markers': _get_known_individual_markers, 'end_markers': _get_known_individual_markers},

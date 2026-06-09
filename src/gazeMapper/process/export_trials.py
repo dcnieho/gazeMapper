@@ -15,6 +15,7 @@ from glassesTools import annotation, data_types, gaze_headref, gaze_worldref, ma
 from glassesTools.validation import export as val_export
 
 from .. import config, episode, naming, process, session
+from . import _pose_files
 
 
 @dataclasses.dataclass
@@ -30,7 +31,7 @@ class PlaneGaze(OptionBase):
     include_head_ref_gaze: bool = True
     include_head_ref_gaze_Fick_angles: bool = False
     include_head_pose: bool = False
-    #include_head_pose_Fick_angles: bool = False
+    include_head_pose_Fick_angles: bool = False
     include_2D: bool = True
     include_3D: bool = False
     # TODO: something about specific fields/data types
@@ -314,7 +315,7 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
 
         # if head pose is wanted, load it so it can be added later
         if export_config.include_head_pose:
-            head_pose = {pl: pd.read_csv(working_dir / r / f'{naming.plane_pose_prefix}{pl}.tsv', sep='\t') for pl in planes}
+            head_pose = {pl: pd.read_csv(_pose_files.get_preferred_plane_pose_file(working_dir / r, pl)[0], sep='\t') for pl in planes}
             column_info.update({f: 'rotation vector component' for f in ('pose_R_vec_x','pose_R_vec_y','pose_R_vec_z')})
             column_info.update({f: 'mm' for f in ('pose_T_vec_x','pose_T_vec_y','pose_T_vec_z')})
             if export_config.include_head_pose_Fick_angles:
@@ -372,7 +373,10 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
             # merge in head pose
             if export_config.include_head_pose:
                 for pln in planes:
-                    plane_gazes = plane_gazes.merge(head_pose[pln], how='left', on='frame_idx')
+                    merge_cols = [c for c in ('timestamp','timestamp_VOR','frame_idx','frame_idx_VOR') if c in plane_gazes.columns and c in head_pose[pln].columns]
+                    if not merge_cols:
+                        merge_cols = ['frame_idx']
+                    plane_gazes = plane_gazes.merge(head_pose[pln], how='left', on=merge_cols)
 
             # add scene and reference camera timestamp info, if present
             ts = pd.read_csv(working_dir / r / gt_naming.frame_timestamps_fname,sep='\t').rename(columns={'timestamp':'frame_ts'})
