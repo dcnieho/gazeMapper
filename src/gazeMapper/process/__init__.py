@@ -8,19 +8,19 @@ from gazeMapper import config
 class Action(enum.IntEnum):
     IMPORT = enum.auto()
     MAKE_GAZE_OVERLAY_VIDEO = enum.auto()
-    CODE_EPISODES = enum.auto()
     DETECT_MARKERS = enum.auto()
-    RUN_SYNC_FUNCTION = enum.auto()
-    GAZE_TO_PLANE = enum.auto()
     AUTO_CODE_SYNC = enum.auto()
     AUTO_CODE_EPISODES = enum.auto()
+    CODE_EPISODES = enum.auto()
+    RUN_SYNC_FUNCTION = enum.auto()
     SYNC_ET_TO_CAM = enum.auto()
     INTERPOLATE_PLANE_POSE = enum.auto()
     SYNC_TO_REFERENCE = enum.auto()
+    GAZE_TO_PLANE = enum.auto()
     COMPUTE_GAZE_OFFSETS = enum.auto()
     VALIDATE = enum.auto()
-    EXPORT_TRIALS = enum.auto()
     MAKE_MAPPED_GAZE_VIDEO = enum.auto()
+    EXPORT_TRIALS = enum.auto()
     @property
     def displayable_name(self):
         return self.name.replace("_", " ").title()
@@ -35,7 +35,7 @@ class Action(enum.IntEnum):
         return self in [Action.MAKE_GAZE_OVERLAY_VIDEO, Action.DETECT_MARKERS, Action.INTERPOLATE_PLANE_POSE, Action.GAZE_TO_PLANE, Action.COMPUTE_GAZE_OFFSETS, Action.VALIDATE, Action.MAKE_MAPPED_GAZE_VIDEO]
     def next(self):
         v = self.value+1
-        if v > Action.MAKE_MAPPED_GAZE_VIDEO.value:
+        if v > Action.EXPORT_TRIALS.value:
             raise StopIteration('Enumeration ended')
         return Action(v)
     def prev(self):
@@ -63,56 +63,56 @@ def action_to_func(action: Action) -> typing.Callable[..., None]|None:
     # Returns function to perform the provided action. NB: not for Action.IMPORT,
     # needs its own special handling by caller instead
     from .make_gaze_overlay_video import run as make_gaze_overlay_video
-    from .code_episodes import run as do_coding
     from .detect_markers import run as detect_markers
+    from .auto_code_sync_points import run as auto_code_sync_points
+    from .auto_code_episodes import run as auto_code_episodes
+    from .code_episodes import run as do_coding
     from .run_sync_function import run as run_sync_function
     from .sync_et_to_cam import run as sync_et_to_cam
     from .interpolate_plane_pose import run as interpolate_plane_pose
     from .sync_to_ref import run as sync_to_ref
     from .gaze_to_plane import run as gaze_to_plane
-    from .export_trials import run as export_trials
     from .compute_gaze_offsets import run as compute_gaze_offsets
     from .run_validation import run as run_validation
-    from .auto_code_sync_points import run as auto_code_sync_points
-    from .auto_code_episodes import run as auto_code_episodes
     from .make_mapped_gaze_video import run as make_mapped_gaze_video
+    from .export_trials import run as export_trials
 
     match action:
         case Action.IMPORT:
             return None # Needs a special case handled by the caller
         case Action.MAKE_GAZE_OVERLAY_VIDEO:
             return make_gaze_overlay_video
-        case Action.CODE_EPISODES:
-            return do_coding
         case Action.DETECT_MARKERS:
             return detect_markers
-        case Action.RUN_SYNC_FUNCTION:
-            return run_sync_function
-        case Action.GAZE_TO_PLANE:
-            return gaze_to_plane
         case Action.AUTO_CODE_SYNC:
             return auto_code_sync_points
         case Action.AUTO_CODE_EPISODES:
             return auto_code_episodes
+        case Action.CODE_EPISODES:
+            return do_coding
+        case Action.RUN_SYNC_FUNCTION:
+            return run_sync_function
         case Action.SYNC_ET_TO_CAM:
             return sync_et_to_cam
         case Action.INTERPOLATE_PLANE_POSE:
             return interpolate_plane_pose
         case Action.SYNC_TO_REFERENCE:
             return sync_to_ref
+        case Action.GAZE_TO_PLANE:
+            return gaze_to_plane
         case Action.COMPUTE_GAZE_OFFSETS:
             return compute_gaze_offsets
         case Action.VALIDATE:
             return run_validation
-        case Action.EXPORT_TRIALS:
-            return export_trials
         case Action.MAKE_MAPPED_GAZE_VIDEO:
             return make_mapped_gaze_video
+        case Action.EXPORT_TRIALS:
+            return export_trials
         case _:
             raise NotImplementedError(f'Logic is not implemented for {action.displayable_name} ({action}), major developer oversight! Let him know.')
 
 def is_session_level_action(action: Action) -> bool:
-    return action in [Action.SYNC_TO_REFERENCE, Action.EXPORT_TRIALS, Action.MAKE_MAPPED_GAZE_VIDEO]
+    return action in [Action.SYNC_TO_REFERENCE, Action.MAKE_MAPPED_GAZE_VIDEO, Action.EXPORT_TRIALS]
 
 def config_has_auto_coding(study_config: 'config.Study', specific_event_type: annotation.EventType|None=None, specific_episode_type: annotation.Type|None=None) -> bool:
     if not study_config.coding_setup:
@@ -235,12 +235,10 @@ def _determine_to_invalidate(action: Action, study_config: 'config.Study') -> se
             states_to_invalidate = action.next_values()
         case Action.MAKE_GAZE_OVERLAY_VIDEO:
             states_to_invalidate = {Action.EXPORT_TRIALS}
-        case Action.CODE_EPISODES:
-            states_to_invalidate = {a for a in action.next_values() if a not in [Action.DETECT_MARKERS, Action.AUTO_CODE_SYNC, Action.AUTO_CODE_EPISODES]}
         case Action.DETECT_MARKERS:
-            # N.B.: don't invalidate auto code sync and auto code episodes as the individual markers used for these
-            # automated coding actions are always detected throughout the whole video
-            actions = {a for a in action.next_values() if a not in [Action.RUN_SYNC_FUNCTION]}
+            # N.B.: don't directly invalidate manually coded episodes. If auto-coding is run again based on
+            # the new marker detections, that action will invalidate CODE_EPISODES.
+            actions = {a for a in action.next_values() if a not in [Action.CODE_EPISODES, Action.RUN_SYNC_FUNCTION]}
             if (study_config.mapped_video_process_planes_for_all_frames or
                 study_config.mapped_video_plane_marker_color is not None or # NB: no need to check mapped_video_recovered_plane_marker_color as it only overrides colors for some plane markers
                 study_config.mapped_video_individual_marker_color is not None or
@@ -249,28 +247,30 @@ def _determine_to_invalidate(action: Action, study_config: 'config.Study') -> se
                 # in this case MAKE_MAPPED_GAZE_VIDEO processes each frame itself, so output of DETECT_MARKERS is not used
                 actions.discard(Action.MAKE_MAPPED_GAZE_VIDEO)
             states_to_invalidate = actions
-        case Action.RUN_SYNC_FUNCTION:
-            states_to_invalidate = {a for a in action.next_values() if a not in [Action.AUTO_CODE_SYNC, Action.AUTO_CODE_EPISODES]}
-        case Action.GAZE_TO_PLANE:
-            # NB: SYNC_ET_TO_CAM and SYNC_TO_REFERENCE operate on gazeData not gaze on plane data, and MAKE_MAPPED_GAZE_VIDEO does the job itself/doesn't use this file
-            states_to_invalidate = {a for a in action.next_values() if a not in [Action.AUTO_CODE_SYNC, Action.AUTO_CODE_EPISODES, Action.SYNC_ET_TO_CAM, Action.INTERPOLATE_PLANE_POSE, Action.SYNC_TO_REFERENCE, Action.MAKE_MAPPED_GAZE_VIDEO]}
         case Action.AUTO_CODE_SYNC:
-            states_to_invalidate = {Action.CODE_EPISODES, Action.GAZE_TO_PLANE, Action.SYNC_TO_REFERENCE, Action.EXPORT_TRIALS, Action.MAKE_MAPPED_GAZE_VIDEO}
+            states_to_invalidate = {Action.CODE_EPISODES, Action.SYNC_TO_REFERENCE} | Action.GAZE_TO_PLANE.next_values(inclusive=True)
         case Action.AUTO_CODE_EPISODES:
-            states_to_invalidate = {a for a in Action.CODE_EPISODES.next_values(inclusive=True) if a not in [Action.DETECT_MARKERS, Action.AUTO_CODE_EPISODES, Action.AUTO_CODE_SYNC, Action.SYNC_TO_REFERENCE]}
+            states_to_invalidate = {a for a in Action.CODE_EPISODES.next_values(inclusive=True) if a not in [Action.SYNC_TO_REFERENCE]}
+        case Action.CODE_EPISODES:
+            states_to_invalidate = action.next_values()
+        case Action.RUN_SYNC_FUNCTION:
+            states_to_invalidate = action.next_values()
         case Action.SYNC_ET_TO_CAM:
-            states_to_invalidate = {a for a in Action.GAZE_TO_PLANE.next_values(inclusive=True) if a not in [Action.AUTO_CODE_EPISODES, Action.AUTO_CODE_SYNC, Action.SYNC_ET_TO_CAM]}
+            states_to_invalidate = action.next_values()
         case Action.INTERPOLATE_PLANE_POSE:
-            states_to_invalidate = {a for a in Action.GAZE_TO_PLANE.next_values(inclusive=True) if a not in [Action.AUTO_CODE_EPISODES, Action.AUTO_CODE_SYNC, Action.SYNC_ET_TO_CAM, Action.INTERPOLATE_PLANE_POSE, Action.SYNC_TO_REFERENCE, Action.MAKE_MAPPED_GAZE_VIDEO]}
+            states_to_invalidate = {a for a in Action.GAZE_TO_PLANE.next_values(inclusive=True) if a not in [Action.MAKE_MAPPED_GAZE_VIDEO]}
         case Action.SYNC_TO_REFERENCE:
-            states_to_invalidate = {a for a in Action.GAZE_TO_PLANE.next_values(inclusive=True) if a not in [Action.AUTO_CODE_EPISODES, Action.AUTO_CODE_SYNC, Action.SYNC_ET_TO_CAM, Action.INTERPOLATE_PLANE_POSE, Action.SYNC_TO_REFERENCE]}
+            states_to_invalidate = action.next_values()
+        case Action.GAZE_TO_PLANE:
+            # NB: MAKE_MAPPED_GAZE_VIDEO does the job itself/doesn't use the gaze-to-plane file
+            states_to_invalidate = {a for a in action.next_values() if a not in [Action.MAKE_MAPPED_GAZE_VIDEO]}
         case Action.COMPUTE_GAZE_OFFSETS:
             states_to_invalidate = {Action.EXPORT_TRIALS}
         case Action.VALIDATE:
             states_to_invalidate = {Action.EXPORT_TRIALS}
-        case Action.EXPORT_TRIALS:
-            states_to_invalidate = set()
         case Action.MAKE_MAPPED_GAZE_VIDEO:
+            states_to_invalidate = {Action.EXPORT_TRIALS}
+        case Action.EXPORT_TRIALS:
             states_to_invalidate = set()
         case _:
             raise NotImplementedError(f'Logic is not implemented for {action.displayable_name} ({action}), major developer oversight! Let him know.')
