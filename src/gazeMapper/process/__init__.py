@@ -346,12 +346,19 @@ def _is_recording_action_possible(rec: str, action_states: dict[Action, process_
     missing = [p for p,s in zip(preconditions,states) if not s]
     return all(states), [p for p in Action if p in missing] # NB: ensure stable order
 
+def _get_preconditions_test(action: Action) -> str:
+    match action:
+        case Action.EXPORT_TRIALS:
+            return 'or'
+        case _:
+            return 'and'
+
 def _is_session_action_possible(session_action_states: dict[Action, process_pool.State], recording_action_states: dict[str,dict[Action, process_pool.State]], study_config: 'config.Study', rec_types: dict[str,'session.RecordingType'], action: Action) -> tuple[bool, list[Action]]:
     if not is_action_possible_given_config(action, study_config):
         return False, None
 
     preconditions = set()
-    preconditions_test = 'and'
+    preconditions_test = _get_preconditions_test(action)
     match action:
         case Action.SYNC_TO_REFERENCE:
             preconditions.update([Action.CODE_EPISODES])
@@ -360,7 +367,6 @@ def _is_session_action_possible(session_action_states: dict[Action, process_pool
                 preconditions.add(Action.SYNC_ET_TO_CAM)
         case Action.EXPORT_TRIALS:
             preconditions.update([Action.MAKE_GAZE_OVERLAY_VIDEO, Action.GAZE_TO_PLANE, Action.VALIDATE, Action.MAKE_MAPPED_GAZE_VIDEO])
-            preconditions_test = 'or'
         case Action.MAKE_MAPPED_GAZE_VIDEO:
             preconditions.update([Action.CODE_EPISODES])
             # NB: even if automatic coding of sync points is defined, user may decide to code sync manually. So don't add Action.AUTO_CODE_SYNC to preconditions
@@ -428,7 +434,10 @@ def _get_precond_fails_for_rec(states: dict[str,tuple[bool,list[Action]]]) -> di
     return out
 
 def get_impossible_reason_text(action: Action, states: dict[str, dict[Action,tuple[bool|list[str],dict[Action,list[str]]]]], study_config: 'config.Study', for_recording=False, for_single=False) -> str:
-    reason = f'Cannot run {action.displayable_name} because required actions have not yet been run'
+    if _get_preconditions_test(action)=='and':
+        reason = f'Cannot run {action.displayable_name} because required actions have not yet been run'
+    else:
+        reason = f'Cannot run {action.displayable_name} because none of the required actions have yet been run'
     if for_single:
         reason += f':\n{_get_impossible_reason_text_impl(states[action][1], "", study_config)}'
     else:
