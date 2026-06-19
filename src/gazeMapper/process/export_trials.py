@@ -112,7 +112,7 @@ def prep_export(project_dir: str|pathlib.Path, session_names: list[str], config_
             return list(sess), list(recs)
 
         # plane gaze
-        for cs,a,out in zip((cs_plane_gaze, cs_gaze_offset, cs_et_sync, None), (process.Action.GAZE_TO_PLANE, process.Action.COMPUTE_GAZE_OFFSETS, process.Action.SYNC_ET_TO_CAM, process.Action.MAKE_GAZE_OVERLAY_VIDEO), (export_config.plane_gaze, export_config.gaze_offsets, export_config.eye_tracker_sync, export_config.gaze_offsets)):
+        for cs,a,out in zip((cs_plane_gaze, cs_gaze_offset, cs_et_sync, None), (process.Action.GAZE_TO_PLANE, process.Action.COMPUTE_GAZE_OFFSETS, process.Action.SYNC_ET_TO_CAM, process.Action.MAKE_GAZE_OVERLAY_VIDEO), (export_config.plane_gaze, export_config.gaze_offsets, export_config.eye_tracker_sync, export_config.gaze_overlay_video)):
             if (cs is None or cs) and any((s.recordings[r].state[a]==process_pool.State.Completed for r in s.recordings)):
                 out.available = True
                 out.do_it = True
