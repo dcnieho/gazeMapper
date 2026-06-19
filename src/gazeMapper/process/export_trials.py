@@ -182,22 +182,22 @@ def run(working_dir: str|pathlib.Path, export_path: str|pathlib.Path, export_con
 
     # now all the actual exports (NB: validation and et_sync are done once for a whole selection, so not handled here as this function is called per session)
     if export_config.plane_gaze.do_it:
-        export_plane_gaze(export_path, working_dir, study_config, export_config.plane_gaze, export_config.plane_gaze.recs)
+        export_plane_gaze(export_path, working_dir, study_config, export_config.plane_gaze)
 
     if export_config.gaze_offsets.do_it:
-        export_gaze_offsets(export_path, working_dir, study_config, export_config.gaze_offsets, export_config.gaze_offsets.recs)
+        export_gaze_offsets(export_path, working_dir, study_config, export_config.gaze_offsets)
 
     if export_config.gaze_overlay_video.do_it:
-        export_gazeOverlay_video(export_path, working_dir, export_config.gaze_overlay_video, export_config.gaze_overlay_video.recs)
+        export_gazeOverlay_video(export_path, working_dir, export_config.gaze_overlay_video)
 
     if export_config.mapped_gaze_video.do_it:
-        export_mappedGaze_video(export_path, working_dir, export_config.mapped_gaze_video, export_config.mapped_gaze_video.recs)
+        export_mappedGaze_video(export_path, working_dir, export_config.mapped_gaze_video)
 
     # update state
     session.update_action_states(working_dir, process.Action.EXPORT_TRIALS, process_pool.State.Completed, study_config)
 
 
-def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, study_config: config.Study, export_config: PlaneGaze, recs: list[str]):
+def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, study_config: config.Study, export_config: PlaneGaze):
     cs_plane_gaze = [cs for cs in study_config.coding_setup if cs['planes']]
     if not cs_plane_gaze:
         raise ValueError('No events where gaze is mapped to a plane are configured for the study, nothing to process')
@@ -205,7 +205,7 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
     planes = {v for cs in cs_plane_gaze for v in cs['planes']}
 
     # per recording, read the relevant files and put them all together
-    for r in recs:
+    for r in export_config.recs:
         # check if files needed for export are present, else skip
         if not all((working_dir / r / f'{naming.world_gaze_prefix}{p}.tsv').is_file() for p in planes):
             warnings.warn(f'Not all plane gaze files found for recording {r} in session {working_dir.name}. Skipping...', process_pool.ProcessingWarning)
@@ -421,7 +421,7 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
                     w.writerow(h)
                 plane_gazes.write_csv(f, separator='\t', null_value='nan', float_precision=8, include_header=False)
 
-def export_gaze_offsets(export_path: pathlib.Path, working_dir: pathlib.Path, study_config: config.Study, recs: list[str]):
+def export_gaze_offsets(export_path: pathlib.Path, working_dir: pathlib.Path, study_config: config.Study, export_config: GazeOffset):
     episodes_to_proc = process.get_specific_event_types(study_config, check_specific_fields=['gaze_offset_setup'])
     if not episodes_to_proc:
         raise ValueError('No episodes configured for gaze offset computation (need at least one episode with planes defined)')
@@ -433,7 +433,7 @@ def export_gaze_offsets(export_path: pathlib.Path, working_dir: pathlib.Path, st
         planes.update(cs['gaze_offset_setup'])
 
     # per recording, read the relevant files and put them all together
-    for r in recs:
+    for r in export_config.recs:
         # check if files needed for export are present, else skip
         if not all((working_dir / r / f'{naming.gaze_offset_prefix}{p}.tsv').is_file() for p in planes):
             warnings.warn(f'Not all plane gaze files found for recording {r} in session {working_dir.name}. Skipping...', process_pool.ProcessingWarning)
@@ -514,15 +514,15 @@ def export_gaze_offsets(export_path: pathlib.Path, working_dir: pathlib.Path, st
             gaze_offsets = pl.from_pandas(gaze_offsets)
             gaze_offsets.write_csv(export_path / f'{naming.offset_export_prefix}{working_dir.name}_{r}_{nm}.tsv', separator='\t', null_value='nan', float_precision=8)
 
-def export_gazeOverlay_video(export_path: pathlib.Path, working_dir: pathlib.Path, recs: list[str]):
-    for r in recs:
+def export_gazeOverlay_video(export_path: pathlib.Path, working_dir: pathlib.Path, export_config: GazeOverlayVideo):
+    for r in export_config.recs:
         inFile = working_dir/r/gt_naming.gaze_overlay_video_file
         if not inFile.is_file():
             continue
         shutil.copy2(inFile, export_path / f'gazeOverlay_{working_dir.name}_{r}.mp4')
 
-def export_mappedGaze_video(export_path: pathlib.Path, working_dir: pathlib.Path, recs: list[str]):
-    for r in recs:
+def export_mappedGaze_video(export_path: pathlib.Path, working_dir: pathlib.Path, export_config: OptionBase):
+    for r in export_config.recs:
         inFile = working_dir/r/naming.mapped_gaze_video
         if not inFile.is_file():
             continue
