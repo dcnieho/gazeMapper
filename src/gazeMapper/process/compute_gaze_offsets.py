@@ -130,7 +130,6 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
                     )
                 # prepare output data frame
                 new_rows = pd.DataFrame({'frame_idx'+extra_suffix: frame_idxs}, index=pd.Index(timestamps, name='timestamp'+extra_suffix))
-                new_rows['episode'] = nm
                 if df is None:
                     df = new_rows
                 else:
@@ -144,24 +143,41 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
 
         # merge with original timestamps so that we have nan in the signal for missing gaze timestamps
         # select all coded intervals that are configured for this plane
+        frame_idx_col = 'frame_idx'+extra_suffix
         selector = np.zeros(len(head_gaze), dtype=bool)
         for nm in episodes_per_plane:
             if p in episodes_per_plane[nm]:
-                selector |= (head_gaze['frame_idx'+extra_suffix]>=episodes_per_plane[nm][p][0][0]) & (head_gaze['frame_idx'+extra_suffix]<=episodes_per_plane[nm][p][-1][1])
+                for e in episodes_per_plane[nm][p]:
+                    selector |= (head_gaze[frame_idx_col]>=e[0]) & (head_gaze[frame_idx_col]<=e[1])
         hg = head_gaze.loc[selector]
         # combine to add missing rows
+        frame_idx = df.pop(frame_idx_col).combine_first(hg[frame_idx_col])
         if has_VOR:
             # also add non-VOR timestamps and frame_idxs, plus need some special handling to preserve integer type
-            frame_idx_VOR = df.pop('frame_idx_VOR').combine_first(hg.pop('frame_idx_VOR'))
             # merge in the original timestamps and frame indexes (and adds missing rows)
             df = df.merge(hg[['timestamp', 'frame_idx']], how='outer', left_index=True, right_index=True)
-            # Combine back in the VOR column
-            df['frame_idx_VOR'] = frame_idx_VOR
         else:
             df = df.merge(pd.DataFrame(index=hg.index), how='outer', left_index=True, right_index=True)
+        # Combine back in the frame_idx column
+        df[frame_idx_col] = frame_idx
+
+        # Add in episode column
+        df['episode'] = pd.NA
+        for nm in episodes_per_plane:
+            if p in episodes_per_plane[nm]:
+                for e in episodes_per_plane[nm][p]:
+                    df.loc[(df[frame_idx_col]>=e[0]) & (df[frame_idx_col]<=e[1]), 'episode'] = nm
+
+        # Order columns as timestamps, frame indices, episode, then offsets
+        df = df.reset_index()
+        timestamp_cols = [c for c in ('timestamp', 'timestamp_VOR') if c in df.columns]
+        frame_idx_cols = [c for c in ('frame_idx', 'frame_idx_VOR') if c in df.columns]
+        offset_cols = [c for c in df.columns if c.startswith('offset')]
+        leading_cols = timestamp_cols + frame_idx_cols + ['episode']
+        df = df[leading_cols + offset_cols]
 
         # store to file
-        df = pl.from_pandas(df, include_index=True)
+        df = pl.from_pandas(df)
         df.write_csv(working_dir / f'{naming.gaze_offset_prefix}{p}.tsv', separator='\t', null_value='nan', float_precision=8)
 
     # update state
