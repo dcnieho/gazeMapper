@@ -657,7 +657,7 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
                 exp.recs = [r for ss,r in zip(exp.sess, exp.recs) if ss==s]
                 exp.sess = s
                 exp.do_it = not not exp.recs
-                do_it = do_it or exp.do_it
+                do_it = do_it and exp.do_it
             if do_it:
                 g.launch_task(s, None, process.Action.EXPORT_TRIALS, export_path=path, export_config=this_config)
 
