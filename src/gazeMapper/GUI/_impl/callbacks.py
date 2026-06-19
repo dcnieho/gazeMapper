@@ -654,10 +654,11 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
             do_it = False
             for f in fields:
                 exp = getattr(this_config, f.name)
-                exp.recs = [r for ss,r in zip(exp.sess, exp.recs) if ss==s]
-                exp.sess = s
-                exp.do_it = not not exp.recs
-                do_it = do_it and exp.do_it
+                if (this_do_it:=exp.do_it):
+                    exp.recs = [r for ss,r in zip(exp.sess, exp.recs) if ss==s]
+                    exp.sess = s
+                this_do_it = this_do_it and bool(exp.recs)
+                do_it = do_it or this_do_it
             if do_it:
                 g.launch_task(s, None, process.Action.EXPORT_TRIALS, export_path=path, export_config=this_config)
 
