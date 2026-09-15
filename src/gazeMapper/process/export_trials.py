@@ -339,13 +339,13 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
                 continue
 
             # now merge
-            planes = list(cs['planes'])
-            plane_gazes = {p:ori_plane_gazes[p].copy() for p in planes}
+            this_planes = list(cs['planes'])
+            plane_gazes = {p:ori_plane_gazes[p].copy() for p in this_planes}
             keys = list(plane_gazes.keys())
             if export_config.include_head_ref_gaze:
                 # get all frame_idxs that occur in plane gazes
                 frame_idxs = set()
-                for p in planes:
+                for p in this_planes:
                     frame_idxs.update(plane_gazes[p]['frame_idx'].values)
                 # get head ref gaze for those frame_idxs only
                 plane_gazes['__xxhead_refxx__'] = head_ref_gaze[head_ref_gaze['frame_idx'].isin(frame_idxs)].copy()
@@ -372,7 +372,7 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
 
             # merge in head pose
             if export_config.include_head_pose:
-                for pln in planes:
+                for pln in this_planes:
                     merge_cols = [c for c in ('timestamp','timestamp_VOR','frame_idx','frame_idx_VOR') if c in plane_gazes.columns and c in head_pose[pln].columns]
                     if not merge_cols:
                         merge_cols = ['frame_idx']
