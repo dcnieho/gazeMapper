@@ -277,7 +277,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
 
     video_sets: list[tuple[str, set[str], set[str]]] = []
     if study_config.sync_ref_recording:
-        video_sets.append((study_config.sync_ref_recording,{r for r in study_config.mapped_video_make_which if r!=study_config.sync_ref_recording}, recs))
+        video_sets.append((study_config.sync_ref_recording,{r for r in study_config.mapped_video_make_which if r!=study_config.sync_ref_recording}, estimator_recs))
     else:
         video_sets.extend((r, set(), {r}) for r in study_config.mapped_video_make_which)
 
