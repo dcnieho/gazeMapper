@@ -227,6 +227,7 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
     return table_is_started, changed, ret_new_obj, obj, removed_field, actual_types
 
 def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, actual_types: dict[typing.Any, typing.Type], fields: list=None, types: dict[typing.Any, typing.Type]=None, defaults:dict[typing.Any, typing.Any]=None, possible_value_getters: typing.Callable[[_T], set[typing.Any]]|list[typing.Callable[[_T], set[typing.Any]]]|dict[str,typing.Callable[[_T], set[typing.Any]]]=None, parent_obj: _C2|None=None, problems: type_utils.ProblemDict=None, documentation: dict[str,type_utils.GUIDocInfo]=None, fixed: type_utils.NestedDict=None, nullable=False, removable=False) -> tuple[bool,bool,_T,bool,dict[typing.Any, typing.Type]|None]:
+    documentation = documentation or {}
     made_or_replaced_obj = False
     if (made_or_replaced_obj := obj is None):
         obj = o_type()
@@ -298,8 +299,8 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, actual_types: dic
     first_column_width = max([get_fields_text_width(fields, documentation, backup_str='xadd itemx'), get_fields_text_width(['xadd itemx'],{})])*1.08    # little bit of extra space for bold font
     table_is_started = _start_table(level, first_column_width)
     if not table_is_started:
-        return False, made_or_replaced_obj, obj, False
-    table_is_started, changed, ret_new_obj, obj, removed_field, actual_types = _draw_impl(obj, fields, types, defaults, possible_value_getters if isinstance(possible_value_getters,dict) else None, parent_obj, problems if isinstance(problems,dict) else {}, documentation or {}, fixed or {}, actual_types, level, table_is_started, has_remove=has_remove)
+        return False, made_or_replaced_obj, obj, False, actual_types
+    table_is_started, changed, ret_new_obj, obj, removed_field, actual_types = _draw_impl(obj, fields, types, defaults, possible_value_getters if isinstance(possible_value_getters,dict) else None, parent_obj, problems if isinstance(problems,dict) else {}, documentation, fixed or {}, actual_types, level, table_is_started, has_remove=has_remove)
     if removed_field:
         obj.pop(removed_field, None)
         changed = True
