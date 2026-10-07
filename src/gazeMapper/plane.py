@@ -245,38 +245,40 @@ def get_plane_from_path(path: str|pathlib.Path) -> plane.Plane:
 def get_plane_from_definition(plane_def: Definition, path: str|pathlib.Path) -> plane.Plane:
     # for loading a plane from a directory that doesn't contain a plane definition json file
     # use the provided definition instead
+    path = pathlib.Path(path)
     if plane_def.type==Type.GlassesValidator:
+        plane_def = typing.cast(Definition_GlassesValidator, plane_def)
         validator_config_dir = None # use glassesValidator built-in/default
         if not plane_def.use_default or plane_def.is_dynamic:
             validator_config_dir = path
         validation_config = validation.config.get_validation_setup(validator_config_dir)
-        return validation.Plane(validator_config_dir, validation_config, is_dynamic=plane_def.is_dynamic, ref_image_store_path=path/plane.Plane.default_ref_image_name)
-    else:
+        return validation.Plane(validator_config_dir, validation_config, is_dynamic=plane_def.is_dynamic, aruco_settings=config.aruco_settings_with_border(plane_def.aruco_settings, plane_def.marker_border_bits), ref_image_store_path=path/plane.Plane.default_ref_image_name)
+
+    elif plane_def.type in (Type.Plane_2D, Type.Target_Plane_2D):
+        plane_def = typing.cast(Definition_Plane_2D, plane_def)
+        if plane_def.marker_file is None or plane_def.marker_size is None:
+            raise ValueError(f'Plane "{plane_def.name}" requires a marker file and marker size')
+        aruco_settings = config.aruco_settings_with_border(plane_def.aruco_settings, plane_def.marker_border_bits)
+        plane_kwargs: dict[str, typing.Any] = dict(
+            markers             = path/plane_def.marker_file,
+            marker_size         = plane_def.marker_size,
+            plane_size          = plane_def.plane_size,
+            aruco_dict_id       = plane_def.aruco_dict_id,
+            marker_border_bits  = plane_def.marker_border_bits,
+            min_num_markers     = plane_def.min_num_markers,
+            unit                = plane_def.unit,
+            ref_image_store_path= path/plane.Plane.default_ref_image_name,
+            ref_image_size      = plane_def.ref_image_size
+        )
         if plane_def.type==Type.Plane_2D:
-            pl = plane.Plane(
-                markers             = path/plane_def.marker_file,
-                marker_size         = plane_def.marker_size,
-                plane_size          = plane_def.plane_size,
-                aruco_dict_id       = plane_def.aruco_dict_id,
-                marker_border_bits  = plane_def.marker_border_bits,
-                min_num_markers     = plane_def.min_num_markers,
-                unit                = plane_def.unit,
-                ref_image_store_path= path/plane.Plane.default_ref_image_name,
-                ref_image_size      = plane_def.ref_image_size
-            )
-        elif plane_def.type==Type.Target_Plane_2D:
-            pl = plane.TargetPlane(
-                markers             = path/plane_def.marker_file,
-                targets             = path/plane_def.target_file,
-                marker_size         = plane_def.marker_size,
-                plane_size          = plane_def.plane_size,
-                aruco_dict_id       = plane_def.aruco_dict_id,
-                marker_border_bits  = plane_def.marker_border_bits,
-                min_num_markers     = plane_def.min_num_markers,
-                unit                = plane_def.unit,
-                ref_image_store_path= path/plane.Plane.default_ref_image_name,
-                ref_image_size      = plane_def.ref_image_size
-            )
+            pl = plane.Plane(**plane_kwargs)
+        else:
+            plane_def = typing.cast(Definition_Target_Plane_2D, plane_def)
+            if plane_def.target_file is None:
+                raise ValueError(f'Plane "{plane_def.name}" requires a target file')
+            pl = plane.TargetPlane(targets=path/plane_def.target_file, **plane_kwargs)
         if plane_def.origin is not None:
             pl.set_origin(plane_def.origin)
         return pl
+    else:
+        raise ValueError(f'Unsupported plane type: {plane_def.type}')
