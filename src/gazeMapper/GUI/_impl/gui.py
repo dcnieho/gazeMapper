@@ -1341,8 +1341,13 @@ class GUI:
             new_rec_name = ''
             new_rec_type: session.RecordingType = None
             def _valid_rec_name():
-                nonlocal new_rec_name
-                return new_rec_name and pathvalidate.is_valid_filename(new_rec_name, "auto") and not any((r.name==new_rec_name for r in self.study_config.session_def.recordings))
+                if not new_rec_name:
+                    return False, 'Recording name cannot be empty'
+                if not pathvalidate.is_valid_filename(new_rec_name, "auto"):
+                    return False, 'Recording name is not a valid filename'
+                if any(r.name==new_rec_name for r in self.study_config.session_def.recordings):
+                    return False, 'A recording with this name already exists, choose a unique name'
+                return True, ''
             def _add_rec_popup():
                 nonlocal new_rec_name
                 nonlocal new_rec_type
@@ -1353,11 +1358,11 @@ class GUI:
                     imgui.table_next_row()
                     imgui.table_next_column()
                     imgui.align_text_to_frame_padding()
-                    invalid = not _valid_rec_name()
-                    if invalid:
+                    valid = _valid_rec_name()[0]
+                    if not valid:
                         imgui.push_style_color(imgui.Col_.text, colors.error)
                     imgui.text("Recording name")
-                    if invalid:
+                    if not valid:
                         imgui.pop_style_color()
                     imgui.table_next_column()
                     imgui.set_next_item_width(-1)
@@ -1377,9 +1382,14 @@ class GUI:
                     _,r_idx = imgui.combo("##rec_type_selector", r_idx, [r.value for r in session.RecordingType])
                     new_rec_type = None if r_idx==-1 else session.recording_types[r_idx]
                     imgui.end_table()
+                valid, reason = _valid_rec_name()
+                if not valid:
+                    imgui.text_colored(colors.error, reason)
+                if new_rec_type is None:
+                    imgui.text_colored(colors.error, 'Select a recording type')
 
             buttons = {
-                ifa6.ICON_FA_CHECK+" Create recording": (lambda: (callbacks.make_recording_definition(self.study_config, new_rec_type, new_rec_name), self._reload_sessions()), lambda: not _valid_rec_name() or new_rec_type is None),
+                ifa6.ICON_FA_CHECK+" Create recording": (lambda: (callbacks.make_recording_definition(self.study_config, new_rec_type, new_rec_name), self._reload_sessions()), lambda: not _valid_rec_name()[0] or new_rec_type is None),
                 ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
             }
             gt_gui.utils.push_popup(self, lambda: gt_gui.utils.popup("Add recording", _add_rec_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, outside=False))
@@ -1463,9 +1473,22 @@ class GUI:
             new_plane_is_dyn = False
             new_plane_dyn_config_file: str = ''
             def _valid_plane_name():
-                return new_plane_name and pathvalidate.is_valid_filename(new_plane_name, "auto") and not any((p.name==new_plane_name for p in self.study_config.planes))
+                if not new_plane_name:
+                    return False, 'Plane name cannot be empty'
+                if not pathvalidate.is_valid_filename(new_plane_name, "auto"):
+                    return False, 'Plane name is not a valid filename'
+                if any(p.name==new_plane_name for p in self.study_config.planes):
+                    return False, 'A plane with this name already exists, choose a unique name'
+                return True, ''
             def _valid_config_file():
-                return new_plane_dyn_config_file=='' or ((p:=pathlib.Path(new_plane_dyn_config_file)).suffix=='.json' and p.is_file())
+                if new_plane_type != plane.Type.GlassesValidator or not new_plane_is_dyn or not new_plane_dyn_config_file:
+                    return True, ''
+                path = pathlib.Path(new_plane_dyn_config_file)
+                if path.suffix != '.json':
+                    return False, 'Dynamic validation config file must have a .json extension'
+                if not path.is_file():
+                    return False, 'Dynamic validation config file does not exist or is not a file'
+                return True, ''
             def _add_plane_popup():
                 nonlocal new_plane_name
                 nonlocal new_plane_type
@@ -1478,7 +1501,7 @@ class GUI:
                     imgui.table_next_row()
                     imgui.table_next_column()
                     imgui.align_text_to_frame_padding()
-                    invalid = not _valid_plane_name()
+                    invalid = not _valid_plane_name()[0]
                     if invalid:
                         imgui.push_style_color(imgui.Col_.text, colors.error)
                     imgui.text("Plane name")
@@ -1513,7 +1536,7 @@ class GUI:
                             imgui.table_next_row()
                             imgui.table_next_column()
                             imgui.align_text_to_frame_padding()
-                            invalid = not _valid_config_file()
+                            invalid = not _valid_config_file()[0]
                             if invalid:
                                 imgui.push_style_color(imgui.Col_.text, colors.error)
                             imgui.text('Config file')
@@ -1531,9 +1554,17 @@ class GUI:
                                     new_plane_dyn_config_file = str(path)
                                 gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self,'new_plane_dyn_dir', callback=sel_callback))
                     imgui.end_table()
+                valid, reason = _valid_plane_name()
+                if not valid:
+                    imgui.text_colored(colors.error, reason)
+                if new_plane_type is None:
+                    imgui.text_colored(colors.error, 'Select a plane type')
+                valid, reason = _valid_config_file()
+                if not valid:
+                    imgui.text_colored(colors.error, reason)
 
             buttons = {
-                ifa6.ICON_FA_CHECK+" Create plane": (lambda: callbacks.make_plane(self, new_plane_type, new_plane_name, new_plane_is_dyn, new_plane_dyn_config_file), lambda: not _valid_plane_name() or new_plane_type is None or (new_plane_is_dyn and not _valid_config_file())),
+                ifa6.ICON_FA_CHECK+" Create plane": (lambda: callbacks.make_plane(self, new_plane_type, new_plane_name, new_plane_is_dyn, new_plane_dyn_config_file), lambda: not _valid_plane_name()[0] or new_plane_type is None or not _valid_config_file()[0]),
                 ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
             }
             gt_gui.utils.push_popup(self, lambda: gt_gui.utils.popup("Add plane", _add_plane_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, outside=False))
@@ -1604,7 +1635,13 @@ class GUI:
             new_coding_name = ''
             new_coding_type: annotation.EventType|None = None
             def _valid_coding_name():
-                return new_coding_name and pathvalidate.is_valid_filename(new_coding_name, "auto") and not any((cs['name']==new_coding_name for cs in self.study_config.coding_setup))
+                if not new_coding_name:
+                    return False, 'Coding name cannot be empty'
+                if not pathvalidate.is_valid_filename(new_coding_name, "auto"):
+                    return False, 'Coding name is not a valid filename'
+                if any(cs['name']==new_coding_name for cs in self.study_config.coding_setup):
+                    return False, 'A coding with this name already exists, choose a unique name'
+                return True, ''
             def _add_coding_popup():
                 nonlocal new_coding_name
                 nonlocal new_coding_type
@@ -1615,7 +1652,7 @@ class GUI:
                     imgui.table_next_row()
                     imgui.table_next_column()
                     imgui.align_text_to_frame_padding()
-                    invalid = not _valid_coding_name()
+                    invalid = not _valid_coding_name()[0]
                     if invalid:
                         imgui.push_style_color(imgui.Col_.text, colors.error)
                     imgui.text("Coding name")
@@ -1639,9 +1676,14 @@ class GUI:
                     _,c_idx = imgui.combo("##coding_type_selector", c_idx, [c.name for c in annotation.event_types if c not in annotation.internal_types])
                     new_coding_type = None if c_idx==-1 else annotation.event_types[c_idx]
                     imgui.end_table()
+                valid, reason = _valid_coding_name()
+                if not valid:
+                    imgui.text_colored(colors.error, reason)
+                if new_coding_type is None:
+                    imgui.text_colored(colors.error, 'Select a coding type')
 
             buttons = {
-                ifa6.ICON_FA_CHECK+" Create coding": (lambda: callbacks.make_coding_setup(self, new_coding_name, new_coding_type), lambda: not _valid_coding_name() or new_coding_type is None),
+                ifa6.ICON_FA_CHECK+" Create coding": (lambda: callbacks.make_coding_setup(self, new_coding_name, new_coding_type), lambda: not _valid_coding_name()[0] or new_coding_type is None),
                 ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
             }
             gt_gui.utils.push_popup(self, lambda: gt_gui.utils.popup("Add coding", _add_coding_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, outside=False))
@@ -1723,9 +1765,17 @@ class GUI:
             new_mark_det_only = False
             new_mark_size = -1.
             def _valid_mark_id_dict():
-                return new_mark_id>=0 and new_mark_id<aruco.get_dict_size(new_aruco_dict_id) and not any((m.id==new_mark_id and aruco.dict_id_to_family[m.aruco_dict_id]==aruco.dict_id_to_family[new_aruco_dict_id] for m in self.study_config.individual_markers))
+                if new_mark_id < 0:
+                    return False, 'Marker ID must be zero or greater'
+                if new_mark_id >= aruco.get_dict_size(new_aruco_dict_id):
+                    return False, f'Marker ID must be less than {aruco.get_dict_size(new_aruco_dict_id)} for the selected dictionary'
+                if any(m.id==new_mark_id and aruco.dict_id_to_family[m.aruco_dict_id]==aruco.dict_id_to_family[new_aruco_dict_id] for m in self.study_config.individual_markers):
+                    return False, 'An individual marker with this ID already exists in the selected dictionary family'
+                return True, ''
             def _valid_mark_size():
-                return new_mark_det_only or new_mark_size>0.
+                if not new_mark_det_only and not new_mark_size > 0.:
+                    return False, 'Marker size must be greater than zero unless Detect only is enabled'
+                return True, ''
             def _add_marker_popup():
                 nonlocal new_mark_id
                 nonlocal new_mark_det_only
@@ -1738,7 +1788,7 @@ class GUI:
                     imgui.table_next_row()
                     imgui.table_next_column()
                     imgui.align_text_to_frame_padding()
-                    invalid = not _valid_mark_id_dict()
+                    invalid = not _valid_mark_id_dict()[0]
                     if invalid:
                         imgui.push_style_color(imgui.Col_.text, colors.error)
                     imgui.text("Marker ID")
@@ -1750,7 +1800,7 @@ class GUI:
                     imgui.table_next_row()
                     imgui.table_next_column()
                     imgui.align_text_to_frame_padding()
-                    invalid = not _valid_mark_id_dict()
+                    invalid = not _valid_mark_id_dict()[0]
                     if invalid:
                         imgui.push_style_color(imgui.Col_.text, colors.error)
                     imgui.text("ArUco dictionary")
@@ -1771,7 +1821,7 @@ class GUI:
                         imgui.table_next_row()
                         imgui.table_next_column()
                         imgui.align_text_to_frame_padding()
-                        invalid = not _valid_mark_size()
+                        invalid = not _valid_mark_size()[0]
                         if invalid:
                             imgui.push_style_color(imgui.Col_.text, colors.error)
                         imgui.text("Marker size")
@@ -1780,9 +1830,12 @@ class GUI:
                         imgui.table_next_column()
                         _,new_mark_size = imgui.input_float("##new_mark_size",new_mark_size)
                     imgui.end_table()
+                for valid, reason in (_valid_mark_id_dict(), _valid_mark_size()):
+                    if not valid:
+                        imgui.text_colored(colors.error, reason)
 
             buttons = {
-                ifa6.ICON_FA_CHECK+" Create marker": (lambda: callbacks.make_individual_marker(self.study_config, new_mark_id, new_aruco_dict_id, new_mark_det_only, new_mark_size), lambda: not _valid_mark_id_dict() or not _valid_mark_size()),
+                ifa6.ICON_FA_CHECK+" Create marker": (lambda: callbacks.make_individual_marker(self.study_config, new_mark_id, new_aruco_dict_id, new_mark_det_only, new_mark_size), lambda: not _valid_mark_id_dict()[0] or not _valid_mark_size()[0]),
                 ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
             }
             gt_gui.utils.push_popup(self, lambda: gt_gui.utils.popup("Add marker", _add_marker_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, outside=False))
