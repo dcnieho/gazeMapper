@@ -763,10 +763,9 @@ class Study:
         if self.sync_ref_recording is None:
             if len(self.session_def.recordings)>1:
                 problems['sync_ref_recording'] = (type_utils.ProblemLevel.Error, f'sync_ref_recording must be set when sessions consist of more than one recording')
-            # nothing to do
-            return problems
         elif len(self.session_def.recordings)==1:
-            return {'sync_ref_recording': (type_utils.ProblemLevel.Error, f'sync_ref_recording must not be set when sessions consist of only one recording')}
+            problems['sync_ref_recording'] = (type_utils.ProblemLevel.Error, f'sync_ref_recording must not be set when sessions consist of only one recording')
+        return problems
 
         type_utils.merge_problem_dicts(problems, self._check_recordings([self.sync_ref_recording], 'sync_ref_recording', strict_check))
         type_utils.merge_problem_dicts(problems, self._check_recordings(self.sync_ref_average_recordings, 'sync_average_recordings', strict_check))
