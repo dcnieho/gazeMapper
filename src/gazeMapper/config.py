@@ -1285,12 +1285,16 @@ class StudyOverride:
         # NB: list instead of set as want to keep ordering
         if for_event_setup:
             all_params = event_setup_field_order
-            if level==OverrideLevel.Recording and recording_type==session.RecordingType.Camera:
-                # if for a camera recording, almost no parameters make sense to set
-                allowed_params = ['auto_code']
+            if level==OverrideLevel.Recording:
+                if recording_type==session.RecordingType.Camera:
+                    # if for a camera recording, almost no parameters make sense to set
+                    allowed_params = ['auto_code']
+                else:
+                    # eye tracker recording
+                    allowed_params = ['auto_code', 'sync_setup', 'validation_setup', 'gaze_offset_setup']
             else:
-                # same allowed parameters for a session- or eye-tracker recording-level override
-                allowed_params = ['auto_code', 'sync_setup', 'validation_setup', 'gaze_offset_setup']
+                # session-level overrides
+                allowed_params = ['which_recordings', 'load_from_other_recordings', 'auto_code', 'sync_setup', 'validation_setup', 'gaze_offset_setup']
             exclude = set(all_params)-set(allowed_params)
         else:
             all_params = list(study_parameter_types.keys())
