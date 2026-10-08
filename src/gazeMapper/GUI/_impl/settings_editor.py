@@ -75,7 +75,7 @@ def _get_runtime_type(value: typing.Any) -> typing.Type:
         return list[_get_runtime_type(value[0])]
     return type(value)
 
-def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_getter: typing.Callable[[],set[_T]]|None) -> tuple[bool, typing.Type, typing.Type, bool]:
+def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_getter: typing.Callable[[],set[_T]]|None) -> tuple[bool, typing.Type, tuple[typing.Any, ...], typing.Type, bool]:
     # peel off union with None, if any
     f_type, nullable = glassesTools.utils.unpack_none_union(f_type)
     base_type = _get_base_type(f_type)
@@ -414,7 +414,7 @@ def _start_table(level, first_column_width):
     imgui.table_setup_column("value", imgui.TableColumnFlags_.width_stretch)
     return table_is_started
 
-def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type, o_type_args: tuple[typing.Type], nullable: bool, default: typing.Any|None, parent_obj: _T2|None, problem: tuple[type_utils.ProblemLevel,str], documentation: type_utils.GUIDocInfo|None, fixed: bool, has_remove: bool) -> bool:
+def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type, o_type_args: tuple[typing.Any, ...], nullable: bool, default: typing.Any|None, parent_obj: _T2|None, problem: tuple[type_utils.ProblemLevel,str], documentation: type_utils.GUIDocInfo|None, fixed: bool, has_remove: bool) -> bool:
     imgui.table_next_row()
     imgui.table_next_column()
     missing_value = object()
@@ -478,7 +478,7 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
 
     return changed, new_obj, removed
 
-def draw_value(field_lbl: str, val: _T, f_type: typing.Type, o_type_args: tuple[typing.Type], nullable: bool, default: _T|None, parent_val: _T|None, fixed: bool, documentation: dict[typing.Any,type_utils.GUIDocInfo], has_remove: bool, is_none=False, base_type: typing.Type=None) -> tuple[_T|None, bool, bool]:
+def draw_value(field_lbl: str, val: _T, f_type: typing.Type, o_type_args: tuple[typing.Any, ...], nullable: bool, default: _T|None, parent_val: _T|None, fixed: bool, documentation: dict[typing.Any,type_utils.GUIDocInfo], has_remove: bool, is_none=False, base_type: typing.Type|None=None) -> tuple[_T|None, bool, bool]:
     if base_type is None:
         base_type = _get_base_type(f_type)
     is_default = val==default
@@ -579,7 +579,7 @@ def draw_value(field_lbl: str, val: _T, f_type: typing.Type, o_type_args: tuple[
     return new_val, new_edit, removed
 draw_value.should_edit_id = None
 
-def _get_str_values(values: list[typing.Any], f_type: typing.Type, o_type_args: tuple[typing.Type], documentation: dict[typing.Any,type_utils.GUIDocInfo]):
+def _get_str_values(values: list[typing.Any], f_type: typing.Type, o_type_args: tuple[typing.Any, ...], documentation: dict[typing.Any,type_utils.GUIDocInfo]):
     if f_type in TYPE_TO_STR_REGISTRY or (len(o_type_args)==1 and o_type_args[0] in TYPE_TO_STR_REGISTRY):
         key = f_type if f_type in TYPE_TO_STR_REGISTRY else o_type_args[0]
         str_values = ['' if v is None else TYPE_TO_STR_REGISTRY[key][v] if isinstance(TYPE_TO_STR_REGISTRY[key],dict) else TYPE_TO_STR_REGISTRY[key](v) for v in values]
@@ -588,7 +588,7 @@ def _get_str_values(values: list[typing.Any], f_type: typing.Type, o_type_args: 
     tooltips = [documentation[v].doc_str if v in documentation else None for v in values]
     return str_values, tooltips
 
-def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, o_type_args: tuple[typing.Type], documentation: dict[typing.Any,type_utils.GUIDocInfo]):
+def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, o_type_args: tuple[typing.Any, ...], documentation: dict[typing.Any,type_utils.GUIDocInfo]):
     val = val.copy()
     win = imgui.internal.get_current_window()
     if win.skip_items:
