@@ -22,22 +22,19 @@ ProblemDict     = dict[ProblemKey, ProblemEntry]
 
 NestedDict = dict[str,typing.Union[None,'NestedDict']]
 
-def get_error_level(problem: ProblemDict|ProblemMessage) -> ProblemLevel:
-    problem_level = None
-    # check if any error, then return error immediately. Recurse if needed
+def get_error_level(problem: ProblemDict|ProblemMessage) -> ProblemLevel|None:
+    """Return the highest severity present, or None when there are no messages."""
     if isinstance(problem, tuple):
         return problem[0]
-    for key in problem:
-        if isinstance(problem[key], dict):
-            problem_level = get_error_level(problem[key])
-            if problem_level==ProblemLevel.Error:
-                return problem_level
-        else:
-            if problem[key][0]==ProblemLevel.Error:
-                return ProblemLevel.Error
-            elif problem[key][0]==ProblemLevel.Warning and problem_level!=ProblemLevel.Error:
-                problem_level = ProblemLevel.Warning
-    return problem_level or ProblemLevel.Error   # default to error
+    problem_level = None
+    for entry in problem.values():
+        level = get_error_level(entry)
+        if level == ProblemLevel.Error:
+            return level
+        if level is not None and (problem_level is None or level.value > problem_level.value):
+            problem_level = level
+    return problem_level
+
 
 @dataclasses.dataclass
 class GUIDocInfo:

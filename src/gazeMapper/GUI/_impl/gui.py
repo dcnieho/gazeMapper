@@ -787,10 +787,22 @@ class GUI:
         self.cam_calibrations.pop(r_def.name, None)
 
     def _check_project_setup_state(self):
-        if self.study_config is not None:
-            self._problems_cache = self.study_config.field_problems()
-            self._check_markers()
-            self._check_camera_calibrations()
+        if self.study_config is None:
+            self._problems_cache = {}
+            self.setup_recordings_error_level = type_utils.ProblemLevel.Error
+            self.setup_plane_error_level = self.setup_coding_error_level = self.setup_individual_markers_error_level = None
+            self.can_accept_sessions = False
+            return
+
+        self._problems_cache = self.study_config.field_problems()
+        self._check_markers()
+        self._check_camera_calibrations()
+
+        def setup_error_level(*keys, invalid=False):
+            if invalid:
+                return type_utils.ProblemLevel.Error
+            return type_utils.get_error_level({k: self._problems_cache[k] for k in keys if k in self._problems_cache})
+
         # need to have:
         #   1. at least one recording defined in the session
         # if you want to do more than only export gaze overlay videos, you also need to:
@@ -798,33 +810,26 @@ class GUI:
         #   3. one episode to code
         #   4. one plane linked to one episode
         #   5. no individual marker problems
-        self.setup_recordings_error_level = type_utils.ProblemLevel.Error if not self.study_config or not self.study_config.session_def.recordings or 'session_def' in self._problems_cache or any((r.name in self.cam_calibrations and isinstance(self.cam_calibrations[r.name],Exception) for r in self.study_config.session_def.recordings)) else None
-        has_any_plane_setup = not not self.study_config and not not self.study_config.planes
-        has_coding_setup = not not self.study_config and not not self.study_config.coding_setup
-        has_any_indiv_marker_setup = not not self.study_config and not not self.study_config.individual_markers
-        if self.setup_recordings_error_level or has_any_plane_setup or has_coding_setup or has_any_indiv_marker_setup:
-            self.setup_plane_error_level = type_utils.ProblemLevel.Error if not self.study_config or not self.study_config.planes or any((not p.has_complete_setup() for p in self.study_config.planes)) or any((p.name not in self.plane_configs or isinstance(self.plane_configs[p.name],Exception) for p in self.study_config.planes)) else None
-            if self.setup_plane_error_level is None and 'planes' in self._problems_cache:
-                self.setup_plane_error_level = type_utils.get_error_level(self._problems_cache['planes'])
-            self.setup_coding_error_level = type_utils.ProblemLevel.Error if not self.study_config or not self.study_config.coding_setup else None
-            if self.setup_coding_error_level is None and 'coding_setup' in self._problems_cache:
-                self.setup_coding_error_level = type_utils.get_error_level(self._problems_cache['coding_setup'])
-            self.setup_individual_markers_error_level = type_utils.ProblemLevel.Error if not self.study_config or 'individual_markers' in self._problems_cache else None
-            if self.setup_individual_markers_error_level is None and 'individual_markers' in self._problems_cache:
-                self.setup_individual_markers_error_level = type_utils.get_error_level(self._problems_cache['individual_markers'])
-        else:
-            self.setup_plane_error_level = self.setup_coding_error_level = self.setup_individual_markers_error_level = None
-            # remove all problems related to unused setup
-            self._problems_cache.pop('planes',None)
-            self._problems_cache.pop('coding_setup',None)
-            self._problems_cache.pop('individual_markers',None)
 
-        self.can_accept_sessions = \
-            (not self._problems_cache or type_utils.get_error_level(self._problems_cache)!=type_utils.ProblemLevel.Error) and \
-            self.setup_recordings_error_level!=type_utils.ProblemLevel.Error and \
-            self.setup_plane_error_level!=type_utils.ProblemLevel.Error and \
-            self.setup_coding_error_level!=type_utils.ProblemLevel.Error and \
-            self.setup_individual_markers_error_level!=type_utils.ProblemLevel.Error
+        # First check recording definition problems, which cannot be allowed in any case.
+        # Check for a missing recording setup or trouble with the camera calibrations if any are defined.
+        self.setup_recordings_error_level = setup_error_level('session_def', invalid=any(
+            isinstance(self.cam_calibrations.get(r.name), Exception) for r in self.study_config.session_def.recordings))
+        if any((self.study_config.planes, self.study_config.coding_setup, self.study_config.individual_markers)):
+            # This is not overlay-only, perform relevant checks.
+            self.setup_plane_error_level = setup_error_level('planes', invalid=not self.study_config.planes or any(
+                not isinstance(self.plane_configs.get(p.name), gt_plane.Plane) for p in self.study_config.planes))
+            self.setup_coding_error_level = setup_error_level('coding_setup', invalid=not self.study_config.coding_setup)
+            self.setup_individual_markers_error_level = setup_error_level('individual_markers')
+        else:
+            # setup for only exporting gaze overlay videos. Clear any problems that may have been cached for the other setup types, since they are not relevant in this case.
+            self.setup_plane_error_level = self.setup_coding_error_level = self.setup_individual_markers_error_level = None
+            for key in ('planes', 'coding_setup', 'individual_markers'):
+                self._problems_cache.pop(key, None)
+
+        self.can_accept_sessions = type_utils.ProblemLevel.Error not in (
+            type_utils.get_error_level(self._problems_cache), self.setup_recordings_error_level,
+            self.setup_plane_error_level, self.setup_coding_error_level, self.setup_individual_markers_error_level)
 
     def _get_markers(self, use_family=False):
         markers: dict[str,dict[str,list[tuple[int,int]]]] = {}
@@ -1427,7 +1432,7 @@ class GUI:
             load_error     = self.plane_configs[p.name] if p.name in self.plane_configs and isinstance(self.plane_configs[p.name], Exception) else None
             extra = ''
             lbl = f'{p.name} ({p.type.value})'
-            if (has_error:=problem_fields or load_error):
+            if (has_error:=type_utils.get_error_level(problem_fields) is not None or load_error is not None):
                 extra = '*'
                 imgui.push_style_color(imgui.Col_.text, colors.error if type_utils.get_error_level(problem_fields)==type_utils.ProblemLevel.Error or (load_error is not None) else colors.warning)
             if imgui.tree_node_ex(f'{extra}{lbl}###{lbl}', imgui.TreeNodeFlags_.framed):
@@ -1593,7 +1598,7 @@ class GUI:
                 problem_fields = self._problems_cache['coding_setup'][i]
             extra = ''
             lbl = f"{cs['name']} ({annotation.tooltip_map[cs['event_type']]})"
-            if (has_error:=problem_fields):
+            if (has_error:=type_utils.get_error_level(problem_fields or {}) is not None):
                 extra = '*'
                 imgui.push_style_color(imgui.Col_.text, colors.error if type_utils.get_error_level(problem_fields)==type_utils.ProblemLevel.Error else colors.warning)
             if imgui.tree_node_ex(f'{extra}{lbl}###{i}', imgui.TreeNodeFlags_.framed):
@@ -2313,7 +2318,7 @@ class GUI:
                     problem_fields = field_problems['coding_setup'][i]
                 extra = ''
                 lbl = f"{cs['name']} ({annotation.tooltip_map[cs['event_type']]})"
-                if (has_error:=problem_fields):
+                if (has_error:=type_utils.get_error_level(problem_fields or {}) is not None):
                     extra = '*'
                     imgui.push_style_color(imgui.Col_.text, colors.error if type_utils.get_error_level(problem_fields)==type_utils.ProblemLevel.Error else colors.warning)
                 if imgui.tree_node_ex(f'{extra}{lbl}###{i}', imgui.TreeNodeFlags_.framed):
@@ -2367,7 +2372,7 @@ class GUI:
                             problem_fields = field_problems['coding_setup'][i]
                         extra = ''
                         lbl = f"{cs['name']} ({annotation.tooltip_map[cs['event_type']]})"
-                        if (has_error:=problem_fields):
+                        if (has_error:=type_utils.get_error_level(problem_fields or {}) is not None):
                             extra = '*'
                             imgui.push_style_color(imgui.Col_.text, colors.error if type_utils.get_error_level(problem_fields)==type_utils.ProblemLevel.Error else colors.warning)
                         if imgui.tree_node_ex(f'{extra}{lbl}###{i}', imgui.TreeNodeFlags_.framed):
