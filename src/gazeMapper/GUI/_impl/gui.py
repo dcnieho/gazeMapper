@@ -1428,9 +1428,8 @@ class GUI:
                     self._plane_preview_cache[p_def.name].render(largest=400*hello_imgui.dpi_window_size_factor())
                 imgui.end_tooltip()
         for p in self.study_config.planes:
-            problem_fields = p.field_problems()
-            if 'planes' in self._problems_cache and p.name in self._problems_cache['planes']:
-                problem_fields = type_utils.merge_problem_dicts(problem_fields, self._problems_cache['planes'][p.name])
+            plane_problems = self._problems_cache.get('planes', {})
+            problem_fields = plane_problems.get(p.name, {}) if isinstance(plane_problems, dict) else {}
             fixed_fields   = p.fixed_fields()
             load_error     = self.plane_configs[p.name] if p.name in self.plane_configs and isinstance(self.plane_configs[p.name], Exception) else None
             extra = ''
