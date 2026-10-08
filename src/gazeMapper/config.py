@@ -1338,11 +1338,11 @@ class StudyOverride:
 
     def __setattr__(self, name, value):
         if name.startswith('_') or name in {'override_level', 'recording_type', 'for_event_setup'}:
-            super(StudyOverride, self).__setattr__(name, value)
+            super().__setattr__(name, value)
             return
 
         self._check_parameter(name)
-        super(StudyOverride, self).__setattr__(name, value)
+        super().__setattr__(name, value)
         if name not in self._overridden_params and (name!='name' or not self.for_event_setup):
             self._overridden_params.append(name)
 
