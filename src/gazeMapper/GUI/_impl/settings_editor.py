@@ -7,9 +7,8 @@ import copy
 
 from imgui_bundle import imgui, imgui_md, icons_fontawesome_6 as ifa6
 
-import glassesTools
-import glassesTools.gui
-from glassesTools.gui.timeline import color_darken
+from glassesTools import aruco, utils as gt_utils
+from glassesTools.gui import colors, utils as gui_utils
 
 from ... import config, type_utils, typed_dict_defaults
 
@@ -18,7 +17,7 @@ TYPE_TO_STR_REGISTRY: dict[typing.Type, dict[typing.Any, str]|typing.Callable[[t
 FLOAT_DISPLAY_DECIMALS = 6
 def register_formatter(ttype: typing.Type, formatter: dict[typing.Any, str]|typing.Callable[[typing.Any], str]):
     TYPE_TO_STR_REGISTRY[ttype] = formatter
-register_formatter(type_utils.ArucoDictType, glassesTools.aruco.dict_id_to_str)
+register_formatter(type_utils.ArucoDictType, aruco.dict_id_to_str)
 
 _C  = typing.TypeVar("_C")
 _C2 = typing.TypeVar("_C2")
@@ -77,7 +76,7 @@ def _get_runtime_type(value: typing.Any) -> typing.Type:
 
 def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_getter: typing.Callable[[],set[_T]]|None) -> tuple[bool, typing.Type, tuple[typing.Any, ...], typing.Type, bool]:
     # peel off union with None, if any
-    f_type, nullable = glassesTools.utils.unpack_none_union(f_type)
+    f_type, nullable = gt_utils.unpack_none_union(f_type)
     base_type = _get_base_type(f_type)
     o_types = typing.get_args(f_type)   # get arguments of the type annotation, e.g. for list[int], it will be (int,), but for typing.Literal[1,2,3] this will be (1,2,3)
     if callable(possible_value_getter) or (isinstance(possible_value_getter, list) and all([callable(c) for c in possible_value_getter])):
@@ -173,20 +172,20 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
                 table_is_started = False
             error_level = type_utils.get_error_level(problems.get(f, {}))
             if (has_problem := error_level is not None):
-                imgui.push_style_color(imgui.Col_.text, glassesTools.gui.colors.error if error_level==type_utils.ProblemLevel.Error else glassesTools.gui.colors.warning)
+                imgui.push_style_color(imgui.Col_.text, colors.error if error_level==type_utils.ProblemLevel.Error else colors.warning)
                 def _hover_draw_fun():
                     if (isinstance(problems[f],tuple) and isinstance(problems[f][1],str)) or (isinstance(problems[f],dict) and 'problem_with_this_key' in problems[f]):
                         msg = problems[f] if isinstance(problems[f],tuple) else problems[f]['problem_with_this_key']
                         error_level = type_utils.get_error_level(msg)
-                        imgui.push_style_color(imgui.Col_.text, glassesTools.gui.colors.error if error_level==type_utils.ProblemLevel.Error else glassesTools.gui.colors.warning)
-                        glassesTools.gui.utils.draw_hover_text(msg[1], text='')
+                        imgui.push_style_color(imgui.Col_.text, colors.error if error_level==type_utils.ProblemLevel.Error else colors.warning)
+                        gui_utils.draw_hover_text(msg[1], text='')
                         imgui.pop_style_color()
             if imgui.tree_node_ex(this_lbl,imgui.TreeNodeFlags_.framed):
                 if has_problem:
                     _hover_draw_fun()
                     imgui.pop_style_color()
                 if this_explanation:
-                    glassesTools.gui.utils.draw_hover_text(this_explanation, text='')
+                    gui_utils.draw_hover_text(this_explanation, text='')
                 this_changed, made_obj, new_sub_obj, removed, actual_types_ = draw_dict_editor(this_obj, f_type, level+1, actual_types.get(f,{}), defaults=defaults.get(f,None) if defaults else None, possible_value_getters=possible_value_getter, parent_obj=this_parent, problems=problems.get(f,None) if isinstance(problems, dict) else {}, documentation=this_child_doc, fixed=fixed.get(f,None), nullable=nullable, removable=has_remove)
                 if actual_types_:
                     actual_types[f] = actual_types_
@@ -205,7 +204,7 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
                     _hover_draw_fun()
                     imgui.pop_style_color()
                 if this_explanation:
-                    glassesTools.gui.utils.draw_hover_text(this_explanation, text='')
+                    gui_utils.draw_hover_text(this_explanation, text='')
             continue
 
         # simple field, set up for drawing
@@ -347,7 +346,7 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, actual_types: dic
                     imgui.align_text_to_frame_padding()
                     invalid = not _valid_item_name()
                     if invalid:
-                        imgui.push_style_color(imgui.Col_.text, glassesTools.gui.colors.error)
+                        imgui.push_style_color(imgui.Col_.text, colors.error)
                     imgui.text("Item name")
                     if invalid:
                         imgui.pop_style_color()
@@ -359,7 +358,7 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, actual_types: dic
                     imgui.align_text_to_frame_padding()
                     invalid = new_item_type is None
                     if invalid:
-                        imgui.push_style_color(imgui.Col_.text, glassesTools.gui.colors.error)
+                        imgui.push_style_color(imgui.Col_.text, colors.error)
                     imgui.text("Item type")
                     if invalid:
                         imgui.pop_style_color()
@@ -375,7 +374,7 @@ def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, actual_types: dic
                 ifa6.ICON_FA_CHECK+" Create item": (_do_add_item, lambda: not _valid_item_name() or new_item_type is None),
                 ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
             }
-            glassesTools.gui.utils.push_popup(_gui_instance, lambda: glassesTools.gui.utils.popup("Add item", _add_item_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, outside=False))
+            gui_utils.push_popup(_gui_instance, lambda: gui_utils.popup("Add item", _add_item_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, outside=False))
     if nullable and not made_or_replaced_obj:
         if has_add:
             imgui.same_line()
@@ -450,7 +449,7 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
         if not (is_default or is_none or fixed):
             draw_bold = True
     if problem:
-        imgui.push_style_color(imgui.Col_.text, glassesTools.gui.colors.error if problem[0]==type_utils.ProblemLevel.Error else glassesTools.gui.colors.warning)
+        imgui.push_style_color(imgui.Col_.text, colors.error if problem[0]==type_utils.ProblemLevel.Error else colors.warning)
     if draw_bold:
         imgui_md.render(f'**{field_lbl}**')
     else:
@@ -458,10 +457,10 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
         imgui.text(field_lbl)
     if problem:
         if isinstance(problem[1],str):
-            glassesTools.gui.utils.draw_hover_text(problem[1],text='')
+            gui_utils.draw_hover_text(problem[1],text='')
         imgui.pop_style_color()
     if documentation and documentation.doc_str:
-        glassesTools.gui.utils.draw_hover_text(documentation.doc_str, text='')
+        gui_utils.draw_hover_text(documentation.doc_str, text='')
     imgui.table_next_column()
     value_documentation = documentation.children.get(None,{}) or documentation.children if documentation is not None else {}
     new_val, new_edit, removed = draw_value(field_lbl, val, f_type, o_type_args, nullable, default, parent_val, fixed, value_documentation, has_remove and not is_missing, is_none, base_type)
@@ -540,9 +539,9 @@ def draw_value(field_lbl: str, val: _T, f_type: typing.Type, o_type_args: tuple[
                 values.insert(0,f'*unknown value: {val}*')
             str_values, tooltips = _get_str_values(values, f_type, o_type_args, documentation)
             imgui.set_next_item_width(get_fields_text_width(str_values,{})+imgui.get_frame_height()+2*imgui.get_style().frame_padding.x)
-            changed,p_idx = glassesTools.gui.utils.tooltip_combo(f"##{field_lbl}", p_idx, str_values, tooltips, popup_max_height_in_items=min(10,len(values)))
+            changed,p_idx = gui_utils.tooltip_combo(f"##{field_lbl}", p_idx, str_values, tooltips, popup_max_height_in_items=min(10,len(values)))
             if tooltips[p_idx]:
-                glassesTools.gui.utils.draw_hover_text(tooltips[p_idx],'')
+                gui_utils.draw_hover_text(tooltips[p_idx],'')
             if is_known_value or (changed and p_idx>0):
                 new_val = values[p_idx]
             else:
@@ -700,7 +699,7 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, o_type_ar
                 if (has_order and len(val)>1) or val_tooltips[i]:
                     _, hovered, held = imgui.internal.button_behavior(t_bb, iid, False, False, imgui.ButtonFlags_.allow_overlap)
                 if val_tooltips[i]:
-                    glassesTools.gui.utils.draw_hover_text(val_tooltips[i],'')
+                    gui_utils.draw_hover_text(val_tooltips[i],'')
                 if has_order and len(val)>1:
                     if held and hovered:
                         clr = imgui.get_color_u32(imgui.Col_.button_active)
@@ -716,7 +715,7 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, o_type_ar
                 imgui.get_current_context().current_window.draw_list.add_text(
                     imgui.get_current_context().font, 0., (t_bb.min.x+x_padding, t_bb.min.y), imgui.get_color_u32(imgui.Col_.text), val_txt[i], None, 0., t_bb.to_vec4())
                 if has_order and len(val)>1:
-                    glassesTools.gui.utils.draw_hover_text("Drag to reorder",'')
+                    gui_utils.draw_hover_text("Drag to reorder",'')
                     if imgui.begin_drag_drop_source(imgui.DragDropFlags_.payload_auto_expire):
                         # Set payload to carry the index of our item
                         imgui.set_drag_drop_payload_py_id(field_lbl, i)
@@ -745,7 +744,7 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, o_type_ar
             if not same_line:   # NB: also true when no values
                 imgui.set_cursor_screen_pos(imgui.get_cursor_screen_pos()+(h_edge_spacing, 0))
             imgui.set_next_item_width(adder_width)
-            selected,p_idx = glassesTools.gui.utils.tooltip_combo(f"##{field_lbl}", -1, str_values, tooltips, popup_max_height_in_items=min(10,len(str_values)))
+            selected,p_idx = gui_utils.tooltip_combo(f"##{field_lbl}", -1, str_values, tooltips, popup_max_height_in_items=min(10,len(str_values)))
             if selected:
                 to_add = miss_values[p_idx]
         if not fixed_value_set:
