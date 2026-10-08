@@ -751,15 +751,22 @@ class Study:
 
     def _check_sync_ref(self, strict_check):
         problems: type_utils.ProblemDict = {}
+        msg = None
         if self.sync_ref_recording is None:
             if len(self.session_def.recordings)>1:
-                problems['sync_ref_recording'] = (type_utils.ProblemLevel.Error, f'sync_ref_recording must be set when sessions consist of more than one recording')
+                msg = 'sync_ref_recording must be set when sessions consist of more than one recording'
         elif len(self.session_def.recordings)==1:
-            problems['sync_ref_recording'] = (type_utils.ProblemLevel.Error, f'sync_ref_recording must not be set when sessions consist of only one recording')
-        return problems
+            msg = 'sync_ref_recording must not be set when sessions consist of only one recording'
+        if msg is not None:
+            if strict_check:
+                raise ValueError(msg)
+            problems['sync_ref_recording'] = (type_utils.ProblemLevel.Error, msg)
+        # Further sync checks only apply when a reference is set for multiple recordings.
+        if self.sync_ref_recording is None or len(self.session_def.recordings)==1:
+            return problems
 
         type_utils.merge_problem_dicts(problems, self._check_recordings([self.sync_ref_recording], 'sync_ref_recording', strict_check))
-        type_utils.merge_problem_dicts(problems, self._check_recordings(self.sync_ref_average_recordings, 'sync_average_recordings', strict_check))
+        type_utils.merge_problem_dicts(problems, self._check_recordings(self.sync_ref_average_recordings, 'sync_ref_average_recordings', strict_check))
         # check if sync_ref_recording is a replaced recording
         if self.head_attached_recordings_replace_et_scene is not None and any(r.associated_recording==self.sync_ref_recording for r in self.session_def.recordings if r.name in self.head_attached_recordings_replace_et_scene):
             if strict_check:
@@ -780,9 +787,9 @@ class Study:
                         problems[a] = (type_utils.ProblemLevel.Error, f'{a} should be set when sync_ref_recording is set and sync_ref_do_time_stretch is enabled')
         if self.sync_ref_average_recordings and self.sync_ref_recording in self.sync_ref_average_recordings:
             if strict_check:
-                raise ValueError(f'Recording {self.sync_ref_recording} is the reference recording for sync, should not be specified in sync_average_recordings')
+                raise ValueError(f'Recording {self.sync_ref_recording} is the reference recording for sync, should not be specified in sync_ref_average_recordings')
             else:
-                problems['sync_ref_average_recordings'] = (type_utils.ProblemLevel.Error, f'Recording {self.sync_ref_recording} is the reference recording for sync, cannot be specified in sync_average_recordings')
+                problems['sync_ref_average_recordings'] = (type_utils.ProblemLevel.Error, f'Recording {self.sync_ref_recording} is the reference recording for sync, cannot be specified in sync_ref_average_recordings')
         if not any(cs['event_type']==annotation.EventType.Sync_Camera for cs in self.coding_setup):
             if strict_check:
                 raise ValueError('When sync_ref_recording is set, coding of camera sync points should be set up in coding_setup')
