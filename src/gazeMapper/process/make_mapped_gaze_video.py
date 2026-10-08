@@ -233,8 +233,10 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
         pose_estimators[rec].set_allow_early_exit(False)    # make sure we run through the whole video
         # first, register all ArUco planes and individual markers with ArUco manager, which
         # will then wrap their detection and register them with the pose estimator
+        recording_config = config.apply_study_config_overrides(study_config,
+            {config.OverrideLevel.Recording: working_dir / rec}, rec_def.type, **study_settings)
         aruco_manager = aruco.Manager()
-        planes_setup, analyze_frames = _get_plane_setup(study_config, config_dir, episodes[rec])
+        planes_setup, analyze_frames = _get_plane_setup(recording_config, config_dir, episodes[rec])
         for p in planes_setup:
             planes[p] = planes_setup[p]['plane']
             aruco_manager.add_plane(p, planes_setup[p], None if study_config.mapped_video_process_planes_for_all_frames else analyze_frames[p])
@@ -246,12 +248,12 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
                         continue
                     for m in markers[c]:
                         aruco_manager.add_individual_marker(m, marker_setup, None if study_config.mapped_video_process_planes_for_all_frames else analyze_frames[p])
-        for m in (markers:=marker.get_setup_for_markers(study_config.individual_markers)):
+        for m in (markers:=marker.get_setup_for_markers(recording_config.individual_markers)):
             aruco_manager.add_individual_marker(m, markers[m])
         aruco_manager.consolidate_setup(study_config.allow_duplicated_markers)
         aruco_manager.register_with_estimator(pose_estimators[rec])
         # other setup of estimator
-        sync_target_functions, function_frames  = _get_sync_function(study_config, rec_def, episodes[rec])
+        sync_target_functions, function_frames  = _get_sync_function(recording_config, rec_def, episodes[rec])
         if sync_target_functions:
             for sfe in sync_target_functions:
                 pose_estimators[rec].register_extra_processing_fun(f'sync_{sfe}', function_frames[sfe], *sync_target_functions[sfe])
