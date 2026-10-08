@@ -171,8 +171,8 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
             if table_is_started:
                 imgui.end_table()
                 table_is_started = False
-            if (has_problem:=problems and f in problems):
-                error_level = type_utils.get_error_level(problems[f])
+            error_level = type_utils.get_error_level(problems.get(f, {}))
+            if (has_problem := error_level is not None):
                 imgui.push_style_color(imgui.Col_.text, glassesTools.gui.colors.error if error_level==type_utils.ProblemLevel.Error else glassesTools.gui.colors.warning)
                 def _hover_draw_fun():
                     if (isinstance(problems[f],tuple) and isinstance(problems[f][1],str)) or (isinstance(problems[f],dict) and 'problem_with_this_key' in problems[f]):
