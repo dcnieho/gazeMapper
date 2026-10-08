@@ -640,14 +640,14 @@ class Study:
         # 1. marker used for auto_code_sync_points cannot appear anywhere else
         # 2. marker sequences used for auto_code_episodes must be unique (markers can be reused)
         # first transform marker dict IDs to family so we can properly detect clashes
-        used_markers_fam  : dict[tuple[str,int,annotation.EventType,str],list[tuple[int,int]]] = {k:[(m.m_id, aruco.dict_id_to_family[m.aruco_dict_id]) for m in used_markers[k]] for k in used_markers}
-        seen_markers      : set[tuple[int,int]] = set()
-        seen_markers_sets : set[tuple[tuple[int,int]]] = set()
+        used_markers_fam  : dict[tuple[str,int,annotation.EventType,str],list[gt_marker.MarkerFamilyID]] = {k:[m.to_family() for m in used_markers[k]] for k in used_markers}
+        seen_markers      : set[gt_marker.MarkerFamilyID] = set()
+        seen_markers_sets : set[tuple[gt_marker.MarkerFamilyID, ...]] = set()
         def _format_key(key: tuple[str,int,annotation.EventType,str]):
             return f'coding_setup[{key[1]}].auto_code' if key[3]=='markers' else f'coding_setup[{key[1]}].auto_code.{key[3]}'
         for s in used_markers_fam:
             # first check if used markers are unique at the family level
-            seen: set[tuple[int,int]] = set()
+            seen: set[gt_marker.MarkerFamilyID] = set()
             if (duplicates := {x for x in used_markers_fam[s] if x in seen or seen.add(x)}):
                 msg = f'The markers defined for {_format_key(s)} are not unique. ' +('Please resolve' if not self.allow_duplicated_markers else 'There are') + f' the following duplicates: {gt_marker.format_duplicate_markers_msg(duplicates)}'
                 if strict_check:
@@ -705,7 +705,7 @@ class Study:
                 if strict_check:
                     raise ValueError(f'individual_markers marker {m.id} ({aruco.dict_id_to_str[m.aruco_dict_id]}): {problem}')
                 else:
-                    problems = type_utils.merge_problem_dicts(problems, {'individual_markers': {(m.id, aruco.dict_id_to_family[m.aruco_dict_id]): (type_utils.ProblemLevel.Error, problem)}})
+                    problems = type_utils.merge_problem_dicts(problems, {'individual_markers': {gt_marker.MarkerID(m.id, m.aruco_dict_id).to_family(): (type_utils.ProblemLevel.Error, problem)}})
         return problems
 
     def _check_head_attached_recordings(self, strict_check):

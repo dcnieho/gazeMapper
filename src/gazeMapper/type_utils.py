@@ -3,7 +3,7 @@ import inspect
 import dataclasses
 import enum
 
-from glassesTools import aruco
+from glassesTools import aruco, marker as gt_marker
 
 from . import typed_dict_defaults
 
@@ -12,7 +12,7 @@ class ProblemLevel(enum.Enum):
     Warning     = enum.auto()
     Error       = enum.auto()
 
-ProblemKey      = str | int
+ProblemKey      = str | int | gt_marker.MarkerFamilyID
 # A leaf message: level + optional text
 ProblemMessage  = tuple[ProblemLevel, str | None]
 # A node is either a nested dict (branch) or a leaf tuple

@@ -831,24 +831,27 @@ class GUI:
             type_utils.get_error_level(self._problems_cache), self.setup_recordings_error_level,
             self.setup_plane_error_level, self.setup_coding_error_level, self.setup_individual_markers_error_level)
 
-    def _get_markers(self, use_family=False):
-        markers: dict[str,dict[str,list[tuple[int,int]]]] = {}
+    @typing.overload
+    def _get_markers(self, use_family: typing.Literal[False] = False) -> dict[str,dict[str|int,list[gt_marker.MarkerID]]]: ...
+    @typing.overload
+    def _get_markers(self, use_family: typing.Literal[True]) -> dict[str,dict[str|int,list[gt_marker.MarkerFamilyID]]]: ...
+    def _get_markers(self, use_family: bool = False) -> dict[str,dict[str|int,list[gt_marker.MarkerID]]] | dict[str,dict[str|int,list[gt_marker.MarkerFamilyID]]]:
+        markers: dict[str,dict[str|int,list[gt_marker.MarkerID]]] = {}
         for p in self.plane_configs:
             if isinstance(self.plane_configs[p], gt_plane.Plane):
                 markers[p] = self.plane_configs[p].get_marker_IDs()
-        markers['xx_individual_markers_xx'] = {'markers': [(m.id, m.aruco_dict_id) for m in self.study_config.individual_markers]}
+        markers['xx_individual_markers_xx'] = {'markers': [gt_marker.MarkerID(m.id, m.aruco_dict_id) for m in self.study_config.individual_markers]}
         if use_family:
-            for s in markers:
-                markers[s] = {m: [(i, aruco.dict_id_to_family[d]) for i,d in markers[s][m]] for m in markers[s]}
+            return {name: {group: [m.to_family() for m in ids] for group, ids in groups.items()} for name, groups in markers.items()}
         return markers
 
     def _check_markers(self):
-        seen_markers: set[tuple[int,int]] = set()
+        seen_markers: set[gt_marker.MarkerFamilyID] = set()
         used_markers = self._get_markers(True)
         for s in used_markers:
             for m in used_markers[s]:
                 # check unique
-                seen: set[tuple[int,int]] = set()
+                seen: set[gt_marker.MarkerFamilyID] = set()
                 if (duplicates := {x for x in used_markers[s][m] if x in seen or seen.add(x)}):
                     if s=='xx_individual_markers_xx':
                         msg = f'The individual markers contain'
@@ -1710,7 +1713,7 @@ class GUI:
         imgui.table_headers_row()
         changed = False
         for i,m in enumerate(self.study_config.individual_markers):
-            p_key = (m.id, aruco.dict_id_to_family[m.aruco_dict_id])
+            p_key = gt_marker.MarkerID(m.id, m.aruco_dict_id).to_family()
             problem = self._problems_cache['individual_markers'][p_key] if 'individual_markers' in self._problems_cache and p_key in self._problems_cache['individual_markers'] else None
             imgui.table_next_row()
             imgui.table_next_column()
@@ -1774,7 +1777,8 @@ class GUI:
                     return False, 'Marker ID must be zero or greater'
                 if new_mark_id >= aruco.get_dict_size(new_aruco_dict_id):
                     return False, f'Marker ID must be less than {aruco.get_dict_size(new_aruco_dict_id)} for the selected dictionary'
-                if any(m.id==new_mark_id and aruco.dict_id_to_family[m.aruco_dict_id]==aruco.dict_id_to_family[new_aruco_dict_id] for m in self.study_config.individual_markers):
+                new_family_id = gt_marker.MarkerID(new_mark_id, new_aruco_dict_id).to_family()
+                if any(gt_marker.MarkerID(m.id, m.aruco_dict_id).to_family() == new_family_id for m in self.study_config.individual_markers):
                     return False, 'An individual marker with this ID already exists in the selected dictionary family'
                 return True, ''
             def _valid_mark_size():
