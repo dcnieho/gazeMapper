@@ -285,25 +285,42 @@ class Study:
             ))
 
 
-    def _check_recordings(self, which: list[str]|set[str]|dict[str,Any]|None, field: str, strict_check, full_field:str|None=None) -> type_utils.ProblemDict:
+    def _check_recordings(self, field: str, strict_check: bool, *, owner: 'Study|dict[str,Any]|None' = None, context: str|None = None) -> type_utils.ProblemDict:
+        owner = self if owner is None else owner
+        label = f'{context}.{field}' if context else field
+        if isinstance(owner, dict):
+            assert field in owner, f'Unknown recording field: {label}'
+            which = owner[field]
+        else:
+            assert hasattr(owner, field), f'Unknown recording field: {label}'
+            which = getattr(owner, field)
+
         problems: type_utils.ProblemDict = {}
         if which is None:
             return problems
+        msg = None
+        if not isinstance(which, (str, list, set, dict)):
+            msg = f'{label} must be a recording name, a list/set of names, a dictionary keyed by names, or None; got {type(which).__name__}'
+        elif not isinstance(which, str) and any(not isinstance(name, str) for name in which):
+            msg = f'{label} must contain only recording names (strings)' if not isinstance(which, dict) else f'{label} must have only recording names (strings) as keys'
+        if msg is not None:
+            if strict_check:
+                raise ValueError(msg)
+            return {field: (type_utils.ProblemLevel.Error, msg)}
+
+        # A scalar name represents one recording; dictionaries supply their keys.
+        names = [which] if isinstance(which, str) else which
         missing_recs: list[str] = []
-        for w in which:
-            if not self._check_recording(w):
+        for name in names:
+            if not any(r.name==name for r in self.session_def.recordings):
                 if strict_check:
-                    raise ValueError(f'Recording "{w}" not known, check {full_field or field} in the study configuration')
-                else:
-                    missing_recs.append(w)
+                    raise ValueError(f'Recording "{name}" not known, check {label} in the study configuration')
+                missing_recs.append(name)
         if missing_recs:
             problems[field] = (type_utils.ProblemLevel.Error, f'Recording(s) {missing_recs[0] if len(missing_recs)==1 else missing_recs} not known')
-            if hasattr(self,field) and isinstance(getattr(self,field),dict):
-                type_utils.merge_problem_dicts(problems,{field: {r:(type_utils.ProblemLevel.Error, f'Recording {r} not known') for r in missing_recs}})
+            if isinstance(which, dict):
+                type_utils.merge_problem_dicts(problems, {field: {name: (type_utils.ProblemLevel.Error, f'Recording {name} not known') for name in missing_recs}})
         return problems
-
-    def _check_recording(self, rec: str) -> bool:
-        return any([r.name==rec for r in self.session_def.recordings])
 
     def _check_session_def(self, strict_check) -> type_utils.ProblemDict:
         problems: type_utils.ProblemDict = {}
@@ -579,7 +596,7 @@ class Study:
                         else:
                             type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'which_recordings': (type_utils.ProblemLevel.Error, msg)}}})
                     # check the defined recording exists
-                    this_problems = self._check_recordings(cs['which_recordings'], 'which_recordings', strict_check, full_field=f'coding_setup[{i}].which_recordings')
+                    this_problems = self._check_recordings('which_recordings', strict_check, owner=cs, context=f'coding_setup[{i}]')
                     if this_problems:
                         type_utils.merge_problem_dicts(problems, {'coding_setup': {i: this_problems}})
                     # check it makes sense to be defined for a given episode type
@@ -703,7 +720,7 @@ class Study:
         problems: type_utils.ProblemDict = {}
         if self.head_attached_recordings_replace_et_scene:
             # check listed recordings exist
-            type_utils.merge_problem_dicts(problems, self._check_recordings(self.head_attached_recordings_replace_et_scene, 'head_attached_recordings_replace_et_scene', strict_check))
+            type_utils.merge_problem_dicts(problems, self._check_recordings('head_attached_recordings_replace_et_scene', strict_check))
             # check listed recordings are head-attached camera recordings
             wrong = [r for r in self.head_attached_recordings_replace_et_scene if not any(r2.name==r and r2.type==session.RecordingType.Camera and r2.camera_recording_type==camera_recording.Type.Head_attached for r2 in self.session_def.recordings)]
             if wrong:
@@ -732,7 +749,7 @@ class Study:
 
     def _check_interpolate_plane_pose(self, strict_check):
         problems: type_utils.ProblemDict = {}
-        type_utils.merge_problem_dicts(problems, self._check_recordings(self.interpolate_plane_pose_recordings, 'interpolate_plane_pose_recordings', strict_check))
+        type_utils.merge_problem_dicts(problems, self._check_recordings('interpolate_plane_pose_recordings', strict_check))
         if self.interpolate_plane_pose_recordings:
             wrong = [r for r in self.interpolate_plane_pose_recordings if any(r==rec.name and rec.type==session.RecordingType.Camera for rec in self.session_def.recordings)]
             if wrong:
@@ -765,8 +782,8 @@ class Study:
         if self.sync_ref_recording is None or len(self.session_def.recordings)==1:
             return problems
 
-        type_utils.merge_problem_dicts(problems, self._check_recordings([self.sync_ref_recording], 'sync_ref_recording', strict_check))
-        type_utils.merge_problem_dicts(problems, self._check_recordings(self.sync_ref_average_recordings, 'sync_ref_average_recordings', strict_check))
+        type_utils.merge_problem_dicts(problems, self._check_recordings('sync_ref_recording', strict_check))
+        type_utils.merge_problem_dicts(problems, self._check_recordings('sync_ref_average_recordings', strict_check))
         # check if sync_ref_recording is a replaced recording
         if self.head_attached_recordings_replace_et_scene is not None and any(r.associated_recording==self.sync_ref_recording for r in self.session_def.recordings if r.name in self.head_attached_recordings_replace_et_scene):
             if strict_check:
@@ -799,15 +816,15 @@ class Study:
         return problems
 
     def _check_make_video(self, strict_check) -> type_utils.ProblemDict:
-        problems = self._check_recordings(self.mapped_video_make_which, 'mapped_video_make_which', strict_check)
+        problems = self._check_recordings('mapped_video_make_which', strict_check)
         type_utils.merge_problem_dicts(problems,
-                   self._check_recordings(self.mapped_video_recording_colors, 'mapped_video_recording_colors', strict_check))
+                   self._check_recordings('mapped_video_recording_colors', strict_check))
         type_utils.merge_problem_dicts(problems,
-                   self._check_recordings(self.mapped_video_show_gaze_on_plane_in_which, 'mapped_video_show_gaze_on_plane_in_which', strict_check))
+                   self._check_recordings('mapped_video_show_gaze_on_plane_in_which', strict_check))
         type_utils.merge_problem_dicts(problems,
-                   self._check_recordings(self.mapped_video_show_camera_in_which, 'mapped_video_show_camera_in_which', strict_check))
+                   self._check_recordings('mapped_video_show_camera_in_which', strict_check))
         type_utils.merge_problem_dicts(problems,
-                   self._check_recordings(self.mapped_video_show_gaze_vec_in_which, 'mapped_video_show_gaze_vec_in_which', strict_check))
+                   self._check_recordings('mapped_video_show_gaze_vec_in_which', strict_check))
         if self.mapped_video_make_which:
             # check have colors for all eye tracker recordings
             all_recs = {r.name for r in self.session_def.recordings if r.type==session.RecordingType.Eye_Tracker}
