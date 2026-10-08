@@ -30,9 +30,9 @@ def set_gui_instance(gui):
     global _gui_instance
     _gui_instance = gui
 
-def draw(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[], set[typing.Any]]], parent_obj: _C2|None=None, actual_types: dict[typing.Any, typing.Type]=None, problems: type_utils.ProblemDict|None=None, documentation: dict[str,type_utils.GUIDocInfo]|None=None, fixed: type_utils.NestedDict|None=None) -> tuple[bool,_C,dict[typing.Any, typing.Type]|None]:
+def draw(obj: _C, fields: list[str], types: dict[str, typing.Type], defaults: dict[str, typing.Any], possible_value_getters: dict[str, typing.Callable[[], set[typing.Any]]], parent_obj: _C2|None=None, actual_types: dict[typing.Any, typing.Type]|None=None, problems: type_utils.ProblemDict|None=None, documentation: dict[str,type_utils.GUIDocInfo]|None=None, fixed: type_utils.NestedDict|None=None) -> tuple[bool,_C,dict[typing.Any, typing.Type]|None]:
     if not fields:
-        return
+        return False, obj, actual_types
 
     table_is_started, changed, _, obj, _, actual_types = _draw_impl(obj, fields, types, defaults, possible_value_getters, parent_obj, problems or {}, documentation or {}, fixed or {}, actual_types or {})
     if table_is_started:
@@ -79,7 +79,7 @@ def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_get
     # peel off union with None, if any
     f_type, nullable = glassesTools.utils.unpack_none_union(f_type)
     base_type = _get_base_type(f_type)
-    o_types = typing.get_args(f_type)
+    o_types = typing.get_args(f_type)   # get arguments of the type annotation, e.g. for list[int], it will be (int,), but for typing.Literal[1,2,3] this will be (1,2,3)
     if callable(possible_value_getter) or (isinstance(possible_value_getter, list) and all([callable(c) for c in possible_value_getter])):
         if not isinstance(possible_value_getter,list):
             possible_value_getter = [possible_value_getter]
