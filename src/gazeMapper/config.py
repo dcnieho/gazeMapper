@@ -506,13 +506,13 @@ class Study:
                             else:
                                 type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'sync_setup': (type_utils.ProblemLevel.Error, msg)}}})
                         else:
-                            keys = CamMovementForEtSyncFunction.__required_keys__
+                            keys = ('module_or_file', 'function')
                             this_problems = {k:f'sync_setup.get_cam_movement_function.{k} should be set when sync_setup.get_cam_movement_method is set to "function"' for k in keys if k not in cs['sync_setup'].get('get_cam_movement_function') or not cs['sync_setup'].get('get_cam_movement_function')[k]}
                             if this_problems:
                                 if strict_check:
                                     raise ValueError('\n'.join(this_problems.values()))
                                 else:
-                                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'sync_setup': {'get_cam_movement_function': (type_utils.ProblemLevel.Error, this_problems)}}}})
+                                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'sync_setup': {'get_cam_movement_function': {k: (type_utils.ProblemLevel.Error, msg) for k, msg in this_problems.items()}}}}})
                         if cs['planes']:
                             msg = f'No planes should be defined for a {annotation.tooltip_map[e]} episode unless the get_cam_movement_method is set to "plane".'
                             if strict_check:
@@ -530,37 +530,28 @@ class Study:
             # check auto coding setup
             if cs.get('auto_code') is not None:
                 if annotation.type_map[cs['event_type']]==annotation.Type.Point:
-                    keys = AutoCodeSyncPoints.__required_keys__
                     fields = ['markers']
                 else:
-                    keys = AutoCodeEpisodes.__required_keys__
                     fields = ['start_markers','end_markers']
 
-                this_problems = {k:f'auto_code.{k} should be set for a {annotation.tooltip_map[cs["event_type"]]} episode.' for k in keys if k not in cs['auto_code'] or not cs['auto_code'][k]}
+                this_problems = {k:f'auto_code.{k} should be set for a {annotation.tooltip_map[cs["event_type"]]} episode.' for k in fields if k not in cs['auto_code'] or not cs['auto_code'][k]}
                 if this_problems:
                     if strict_check:
                         raise ValueError('\n'.join(this_problems.values()))
                     else:
-                        type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'auto_code': (type_utils.ProblemLevel.Error, this_problems)}}})
+                        type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'auto_code': {k: (type_utils.ProblemLevel.Error, msg) for k, msg in this_problems.items()}}}})
                 else:
                     for f in fields:
-                        if f not in cs['auto_code'] or not cs['auto_code'][f]:
-                            msg = f'auto_code.{f} cannot be empty for a {annotation.tooltip_map[cs["event_type"]]} episode.'
+                        missing_markers: list[gt_marker.MarkerID] = []
+                        for m in cs['auto_code'][f]:
+                            if not any([m.m_id==im.id and m.aruco_dict_id==im.aruco_dict_id for im in self.individual_markers]):
+                                missing_markers.append(m)
+                        if missing_markers:
+                            msg = f'Markers "{", ".join([gt_marker.marker_ID_to_str(m) for m in missing_markers])}" specified in auto_code.{f}, but unknown because not present in individual_markers.'
                             if strict_check:
                                 raise ValueError(msg)
                             else:
                                 type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'auto_code': {f: (type_utils.ProblemLevel.Error, msg)}}}})
-                        else:
-                            missing_markers: list[gt_marker.MarkerID] = []
-                            for m in cs['auto_code'][f]:
-                                if not any([m.m_id==im.id and m.aruco_dict_id==im.aruco_dict_id for im in self.individual_markers]):
-                                    missing_markers.append(m)
-                            if missing_markers:
-                                msg = f'Markers "{", ".join([gt_marker.marker_ID_to_str(m) for m in missing_markers])}" specified in auto_code.{f}, but unknown because not present in individual_markers.'
-                                if strict_check:
-                                    raise ValueError(msg)
-                                else:
-                                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'auto_code': {f: (type_utils.ProblemLevel.Error, msg)}}}})
 
             # check which_recordings settings
             if cs['event_type']==annotation.EventType.Sync_Camera:

@@ -49,35 +49,45 @@ else:
     ArucoDictType = typing.Literal[tuple(aruco.dict_id_to_str.keys())]
 
 
+def merge_problem_messages(a: ProblemMessage, b: ProblemMessage) -> ProblemMessage:
+    level = max(a[0], b[0], key=lambda level: level.value)
+    texts = [text for text in (a[1], b[1]) if text is not None]
+    return level, '\n'.join(texts) if texts else None
+
+
+def _merge_problem_message_into_dict(branch: ProblemDict, message: ProblemMessage):
+    # Store a problem about the group itself alongside its child-field problems.
+    key = 'problem_with_this_key'
+    if key in branch:
+        current = branch[key]
+        if not isinstance(current, tuple):
+            raise TypeError('problem_with_this_key must contain a problem message')
+        message = merge_problem_messages(current, message)
+    branch[key] = message
+
+
 def merge_problem_dicts(a: ProblemDict, b: ProblemDict) -> ProblemDict:
-    for key in b:
-        if key in a:
-            if isinstance(a[key], dict) and isinstance(b[key], dict):
-                merge_problem_dicts(a[key], b[key])
-            elif isinstance(a[key], dict) or isinstance(b[key], dict):
-                if isinstance(a[key], dict):
-                    if 'problem_with_this_key' in a[key]:
-                        level = ProblemLevel.Error if ProblemLevel.Error in (a[key]['problem_with_this_key'][0], b[key][0]) else ProblemLevel.Warning
-                        a[key]['problem_with_this_key'] = (level, '\n'.join([a[key]['problem_with_this_key'][1], b[key][1]]))
-                    else:
-                        a[key]['problem_with_this_key'] = b[key]
-                else:
-                    temp = a[key]
-                    a[key] = b[key].copy()
-                    if 'problem_with_this_key' in a[key]:
-                        level = ProblemLevel.Error if ProblemLevel.Error in (a[key]['problem_with_this_key'][0], temp[0]) else ProblemLevel.Warning
-                        a[key]['problem_with_this_key'] = (level, '\n'.join([a[key]['problem_with_this_key'][1], temp[1]]))
-                    else:
-                        a[key]['problem_with_this_key'] = temp
-            elif a[key] is None:
-                a[key] = b[key]
-            elif b[key] is None:
-                pass    # do nothing
+    for key, incoming in b.items():
+        if key not in a:
+            # New field: retain its incoming message or subtree.
+            a[key] = incoming
+            continue
+        current = a[key]
+        if isinstance(current, dict):
+            if isinstance(incoming, dict):
+                # Two subtrees: merge their child-field problems recursively.
+                merge_problem_dicts(current, incoming)
             else:
-                level = ProblemLevel.Error if ProblemLevel.Error in (a[key][0], b[key][0]) else ProblemLevel.Warning
-                a[key] = (level, '\n'.join([a[key][1], b[key][1]]))
+                # Existing subtree plus a new problem about the whole group.
+                _merge_problem_message_into_dict(current, incoming)
+        elif isinstance(incoming, dict):
+            # Existing group problem plus a new subtree; don't modify b's root.
+            branch = incoming.copy()
+            _merge_problem_message_into_dict(branch, current)
+            a[key] = branch
         else:
-            a[key] = b[key]
+            # Two messages for the same field: keep both texts and highest severity.
+            a[key] = merge_problem_messages(current, incoming)
     return a
 
 

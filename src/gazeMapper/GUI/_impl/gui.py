@@ -1280,10 +1280,11 @@ class GUI:
             problem = None if 'session_def' not in self._problems_cache or not isinstance(self._problems_cache['session_def'],dict) else self._problems_cache['session_def'].get(r.name,None)
             if has_cal_error := r.name in self.cam_calibrations and isinstance(self.cam_calibrations[r.name],Exception):
                 msg = 'There is a problem with the configured calibration'
-                if not problem:
+                if problem is None:
                     problem = (type_utils.ProblemLevel.Error, msg)
                 else:
-                    problem[1] += '\n'+msg
+                    assert isinstance(problem, tuple)
+                    problem = type_utils.merge_problem_messages(problem, (type_utils.ProblemLevel.Error, msg))
             imgui.table_next_row()
             imgui.table_next_column()
             if imgui.button(ifa6.ICON_FA_TRASH_CAN+f'##{r.name}'):
