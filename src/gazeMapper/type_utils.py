@@ -82,10 +82,10 @@ def merge_problem_dicts(a: ProblemDict, b: ProblemDict) -> ProblemDict:
 
 
 def is_NamedTuple_type(x):
-  return (inspect.isclass(x) and issubclass(x, tuple) and
-          hasattr(x, '_asdict') and callable(x._asdict) and
-          hasattr(x, '__annotations__') and
-          getattr(x, '_fields', None) is not None)
+    return (inspect.isclass(x) and issubclass(x, tuple) and
+            hasattr(x, '_asdict') and callable(x._asdict) and
+            hasattr(x, '__annotations__') and
+            getattr(x, '_fields', None) is not None)
 
 def get_fields(obj) -> list[str]|None:
     if not isinstance(obj, typing.Type):
