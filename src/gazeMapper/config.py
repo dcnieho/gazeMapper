@@ -285,7 +285,7 @@ class Study:
             ))
 
 
-    def _check_recordings(self, which: list[str]|None, field: str, strict_check, full_field:str|None=None) -> type_utils.ProblemDict:
+    def _check_recordings(self, which: list[str]|set[str]|dict[str,Any]|None, field: str, strict_check, full_field:str|None=None) -> type_utils.ProblemDict:
         problems: type_utils.ProblemDict = {}
         if which is None:
             return problems
