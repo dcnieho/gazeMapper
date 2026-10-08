@@ -1712,9 +1712,10 @@ class GUI:
         imgui.table_setup_column("Marker border bits", imgui.TableColumnFlags_.width_stretch)
         imgui.table_headers_row()
         changed = False
+        marker_problems = self._problems_cache.get('individual_markers', {})
         for i,m in enumerate(self.study_config.individual_markers):
             p_key = gt_marker.MarkerID(m.id, m.aruco_dict_id).to_family()
-            problem = self._problems_cache['individual_markers'][p_key] if 'individual_markers' in self._problems_cache and p_key in self._problems_cache['individual_markers'] else None
+            problem = marker_problems.get(p_key) if isinstance(marker_problems, dict) else None
             imgui.table_next_row()
             imgui.table_next_column()
             imgui.align_text_to_frame_padding()
@@ -1730,7 +1731,9 @@ class GUI:
             if imgui.is_item_hovered(imgui.HoveredFlags_.for_tooltip|imgui.HoveredFlags_.delay_normal):
                 imgui.begin_tooltip()
                 if problem:
-                    imgui.text_colored(gt_gui.colors.error, problem)
+                    problem_text = problem[1] if isinstance(problem, tuple) else str(problem)
+                    if problem_text is not None:
+                        imgui.text_colored(gt_gui.colors.error, problem_text)
                 key = m.id,m.aruco_dict_id,m.marker_border_bits
                 sz = int(200*hello_imgui.dpi_window_size_factor())
                 if key not in self._marker_preview_cache and not problem:
