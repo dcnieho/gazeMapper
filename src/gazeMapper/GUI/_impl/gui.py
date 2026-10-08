@@ -820,11 +820,11 @@ class GUI:
             self.setup_plane_error_level = setup_error_level('planes', invalid=not self.study_config.planes or any(
                 not isinstance(self.plane_configs.get(p.name), gt_plane.Plane) for p in self.study_config.planes))
             self.setup_coding_error_level = setup_error_level('coding_setup', invalid=not self.study_config.coding_setup)
-            self.setup_individual_markers_error_level = setup_error_level('individual_markers')
+            self.setup_individual_markers_error_level = setup_error_level('individual_markers', 'individual_marker_settings')
         else:
             # setup for only exporting gaze overlay videos. Clear any problems that may have been cached for the other setup types, since they are not relevant in this case.
             self.setup_plane_error_level = self.setup_coding_error_level = self.setup_individual_markers_error_level = None
-            for key in ('planes', 'coding_setup', 'individual_markers'):
+            for key in ('planes', 'coding_setup', 'individual_markers', 'individual_marker_settings'):
                 self._problems_cache.pop(key, None)
 
         self.can_accept_sessions = type_utils.ProblemLevel.Error not in (
@@ -1142,7 +1142,7 @@ class GUI:
         if any((k not in ['session_def', 'planes', 'coding_setup', 'individual_markers'] for k in self._problems_cache)):
             imgui.text_colored(colors.error,'*There are problems in the below setup that need to be resolved.\nHover over red text to get information about the error')
 
-        fields = [k for k in config.study_parameter_types.keys() if k in config.study_defaults]
+        fields = [k for k in config.study_parameter_types.keys() if k in config.study_defaults and k != 'individual_marker_settings']
         changed, new_config, self._dict_type_rec = settings_editor.draw(copy.deepcopy(self.study_config), fields, config.study_parameter_types, config.study_defaults, self._possible_value_getters, None, self._dict_type_rec, self._problems_cache, config.study_parameter_doc)
         if changed:
             try:
@@ -1702,14 +1702,15 @@ class GUI:
                 imgui.text_colored(colors.error,'*There are problems in the below setup that need to be resolved.\nHover over red text to get information about the error')
             else:
                 imgui.text_colored(colors.warning,'*There are potential problems in the below setup.\nHover over yellow text to get information about the warning.')
-        table_is_started = imgui.begin_table(f"##markers_def_list", 5)
+        table_is_started = imgui.begin_table(f"##markers_def_list", 6)
         if not table_is_started:
             return
         imgui.table_setup_column("Marker ID", imgui.TableColumnFlags_.width_fixed)
         imgui.table_setup_column("Detect only", imgui.TableColumnFlags_.width_fixed)
         imgui.table_setup_column("Size", imgui.TableColumnFlags_.width_fixed)
         imgui.table_setup_column("ArUco dictionary", imgui.TableColumnFlags_.width_fixed)
-        imgui.table_setup_column("Marker border bits", imgui.TableColumnFlags_.width_stretch)
+        imgui.table_setup_column("Marker border bits", imgui.TableColumnFlags_.width_fixed)
+        imgui.table_setup_column("Detection settings", imgui.TableColumnFlags_.width_stretch)
         imgui.table_headers_row()
         changed = False
         marker_problems = self._problems_cache.get('individual_markers', {})
@@ -1759,10 +1760,23 @@ class GUI:
                 m.aruco_dict_id = new_val
                 changed |= this_changed
             imgui.table_next_column()
-            new_val = settings_editor.draw_value(f'marker_border_bits_{m.id}##{i}', m.marker_border_bits, marker.marker_parameter_types['marker_border_bits'], tuple(), False, marker.marker_defaults.get('marker_border_bits',None), None, False, {}, False)[0]
+            new_val = settings_editor.draw_value(f'marker_border_bits_{m.id}##{i}', m.marker_border_bits, int, tuple(), False, marker.marker_defaults['marker_border_bits'], None, False, {}, False)[0]
+            gt_gui.utils.draw_hover_text(config.aruco_marker_border_doc.doc_str, text='')
             if (this_changed:=m.marker_border_bits!=new_val):
                 m.marker_border_bits = new_val
                 changed |= this_changed
+            imgui.table_next_column()
+            names = list(self.study_config.individual_marker_settings)
+            selected = names.index(m.detection_settings) if m.detection_settings in names else -1
+            if selected < 0:
+                imgui.push_style_color(imgui.Col_.text, colors.error)
+            picked, index = imgui.combo(f'##marker_detection_settings_{i}', selected, names)
+            if selected < 0:
+                imgui.pop_style_color()
+                gt_gui.utils.draw_hover_text(f'Unknown settings group: {m.detection_settings}', text='')
+            if picked and index >= 0:
+                m.detection_settings = names[index]
+                changed = True
             imgui.same_line()
             if imgui.button(ifa6.ICON_FA_TRASH_CAN+f' delete marker##{m.id}##{i}'):
                 callbacks.delete_individual_marker(self.study_config, None, i)
@@ -1851,6 +1865,132 @@ class GUI:
                 ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
             }
             gt_gui.utils.push_popup(self, lambda: gt_gui.utils.popup("Add marker", _add_marker_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, outside=False))
+
+        self._marker_detection_settings_drawer()
+
+    def _marker_detection_settings_drawer(self):
+        imgui.separator()
+        imgui.text('Marker detection settings')
+        changed = False
+        all_problems = self.study_config._check_individual_marker_settings(False).get('individual_marker_settings', {})
+        for name, params in list(self.study_config.individual_marker_settings.items()):
+            problems = all_problems.get(name, {})
+            if problems:
+                imgui.push_style_color(imgui.Col_.text, colors.error)
+            expanded = imgui.collapsing_header(f'{name}##marker_detection_group_{name}')
+            if problems:
+                imgui.pop_style_color()
+                gt_gui.utils.draw_hover_text('\n'.join(message[1] for message in problems.values() if message[1]), text='')
+            if expanded:
+                imgui.push_id(name)
+                if name != 'default':
+                    delete = imgui.button(ifa6.ICON_FA_TRASH_CAN+' delete settings')
+                    if delete:
+                        del self.study_config.individual_marker_settings[name]
+                        changed = True
+                        imgui.pop_id()
+                        continue
+                edited, _, new_params, _, _ = settings_editor.draw_dict_editor(
+                    params, config.ArucoDetectorParameters, 0, {}, problems=problems, documentation=config.aruco_detector_parameter_doc)
+                if edited:
+                    self.study_config.individual_marker_settings[name] = new_params
+                    changed = True
+                imgui.pop_id()
+        if changed:
+            self.study_config.store_as_json()
+            self._update_shown_actions_for_config()
+        if imgui.button('+ new marker detection settings'):
+            new_name = ''
+            def valid_name():
+                if not new_name.strip():
+                    return False, 'Settings group name cannot be empty or contain only whitespace'
+                if new_name.strip() in self.study_config.individual_marker_settings:
+                    return False, 'A settings group with this name already exists, choose a unique name'
+                return True, ''
+            def draw_new_group():
+                nonlocal new_name
+                imgui.dummy((30*imgui.calc_text_size('x').x, 0))
+                if imgui.begin_table('##new_marker_settings_info', 2):
+                    imgui.table_setup_column('##new_marker_settings_label', imgui.TableColumnFlags_.width_fixed)
+                    imgui.table_setup_column('##new_marker_settings_value', imgui.TableColumnFlags_.width_stretch)
+                    imgui.table_next_row()
+                    imgui.table_next_column()
+                    imgui.align_text_to_frame_padding()
+                    invalid = not valid_name()[0]
+                    if invalid:
+                        imgui.push_style_color(imgui.Col_.text, colors.error)
+                    imgui.text('Name')
+                    if invalid:
+                        imgui.pop_style_color()
+                    imgui.table_next_column()
+                    imgui.set_next_item_width(-1)
+                    _, new_name = imgui.input_text('##new_marker_settings_name', new_name)
+                    imgui.end_table()
+                valid, reason = valid_name()
+                if not valid:
+                    imgui.text_colored(colors.error, reason)
+            def add_group():
+                self.study_config.add_individual_marker_settings(new_name)
+                self.study_config.store_as_json()
+                self._update_shown_actions_for_config()
+            buttons = {
+                ifa6.ICON_FA_CHECK+' Create': (add_group, lambda: not valid_name()[0]),
+                ifa6.ICON_FA_CIRCLE_XMARK+' Cancel': None
+            }
+            gt_gui.utils.push_popup(self, lambda: gt_gui.utils.popup('Add marker detection settings', draw_new_group,
+                buttons=buttons, button_keymap={0: imgui.Key.enter}, outside=False))
+
+    def _marker_detection_overrides_drawer(self, current: config.Study, parent: config.Study,
+                                          actual_types: dict,
+                                          problems: type_utils.ProblemDict) -> bool:
+        changed = False
+        current_planes = {p.name: p for p in current.planes if isinstance(p, plane.Definition_Plane_Aruco)}
+        parent_planes = {p.name: p for p in parent.planes if isinstance(p, plane.Definition_Plane_Aruco)}
+        sections = {
+            'planes': ('Planes', {name: p.aruco_settings for name, p in current_planes.items()},
+                       {name: p.aruco_settings for name, p in parent_planes.items()},
+                       config.ArucoSettings, config.aruco_settings_doc.children),
+            'individual_marker_settings': ('Individual-marker groups', current.individual_marker_settings,
+                                           parent.individual_marker_settings,
+                                           config.ArucoDetectorParameters, config.aruco_detector_parameter_doc)
+        }
+
+        def node(label, key, errors):
+            if errors:
+                imgui.push_style_color(imgui.Col_.text, colors.error)
+            opened = imgui.tree_node_ex(f'{label}###{key}', imgui.TreeNodeFlags_.framed)
+            if errors:
+                imgui.pop_style_color()
+            return opened
+
+        has_problems = any(problems.get(field) for field in sections)
+        if not node('Marker detection settings', 'marker_detection_overrides', has_problems):
+            return False
+        for field, (label, values, inherited, cls, docs) in sections.items():
+            errors = problems.get(field, {})
+            if not node(label, field, errors):
+                continue
+            for name, params in values.items():
+                field_errors = errors.get(name, {}) if isinstance(errors, dict) else {}
+                if field == 'planes' and isinstance(field_errors, dict):
+                    field_errors = field_errors.get('aruco_settings', {})
+                if not node(name, name, field_errors):
+                    continue
+                # The editor's group reset must not alias the inherited settings.
+                edited, _, new_params, _, field_types = settings_editor.draw_dict_editor(
+                    params, cls, 0, actual_types.setdefault(field, {}).get(name, {}),
+                    parent_obj=copy.deepcopy(inherited[name]), problems=field_errors, documentation=docs)
+                actual_types[field][name] = field_types
+                if edited:
+                    if field == 'planes':
+                        current_planes[name].aruco_settings = new_params
+                    else:
+                        current.individual_marker_settings[name] = new_params
+                    changed = True
+                imgui.tree_pop()
+            imgui.tree_pop()
+        imgui.tree_pop()
+        return changed
 
     def _session_action_status(self, item: session.Session, action: process.Action):
         if not item.has_all_recordings():
@@ -2149,6 +2289,12 @@ class GUI:
 
         allowed_fields = set(config.StudyOverride.get_allowed_parameters(level, recording_type, False)[0])
         top_dump = {k: v for k, v in top_override.get_dump().items() if k in allowed_fields}
+        # Drop overrides whose named targets no longer exist
+        for field in config.StudyOverride.marker_settings_fields.intersection(top_dump):
+            known = {p.name for p in parent_config.planes if isinstance(p, plane.Definition_Plane_Aruco)} if field == 'planes' else parent_config.individual_marker_settings
+            top_dump[field] = {name: params for name, params in top_dump[field].items() if name in known}
+            if not top_dump[field]:
+                del top_dump[field]
         rebuilt_top_override = config.StudyOverride(level, recording_type, **top_dump)
 
         event_allowed_fields = config.StudyOverride.get_allowed_parameters(level, recording_type, True)[0]
@@ -2342,7 +2488,8 @@ class GUI:
                         new_config.coding_setup[i] = new_coding_config
                         sess_changed |= this_changed
                     imgui.tree_pop()
-            fields = config.StudyOverride.get_allowed_parameters(config.OverrideLevel.Session)[0]
+            sess_changed |= self._marker_detection_overrides_drawer(new_config, self.study_config, self._session_dict_type_rec[sess.name][-1], field_problems)
+            fields = [f for f in config.StudyOverride.get_allowed_parameters(config.OverrideLevel.Session)[0] if f not in config.StudyOverride.marker_settings_fields]
             this_changed, new_config, self._session_dict_type_rec[sess.name][-1] = settings_editor.draw(new_config, fields, config.study_parameter_types, config.study_defaults, self._possible_value_getters, self.study_config, self._session_dict_type_rec[sess.name][-1], field_problems, config.study_parameter_doc)
             if sess_changed or this_changed:
                 try:
@@ -2396,7 +2543,8 @@ class GUI:
                                 new_config.coding_setup[i] = new_coding_config
                                 rec_changed |= this_changed
                             imgui.tree_pop()
-                    fields = config.StudyOverride.get_allowed_parameters(config.OverrideLevel.Recording, sess.recordings[r].definition.type)[0]
+                    rec_changed |= self._marker_detection_overrides_drawer(new_config, effective_config_for_session, self._recording_dict_type_rec[sess.name][r][-1], field_problems)
+                    fields = [f for f in config.StudyOverride.get_allowed_parameters(config.OverrideLevel.Recording, sess.recordings[r].definition.type)[0] if f not in config.StudyOverride.marker_settings_fields]
                     if fields:
                         this_changed, new_config, self._recording_dict_type_rec[sess.name][r][-1] = settings_editor.draw(new_config, fields, config.study_parameter_types, config.study_defaults, self._possible_value_getters, effective_config_for_session, self._recording_dict_type_rec[sess.name][r][-1], effective_config.field_problems(), config.study_parameter_doc)
                     if rec_changed or (fields and this_changed): # NB: also need to update file when parent has changed

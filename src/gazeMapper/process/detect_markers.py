@@ -88,7 +88,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
                     continue
                 for m in markers[c]:
                     aruco_manager.add_individual_marker(m, marker_setup)
-    for m in (markers:=marker.get_setup_for_markers(individual_markers_to_process)):
+    for m in (markers:=marker.get_setup_for_markers(individual_markers_to_process, study_config.individual_marker_settings)):
         aruco_manager.add_individual_marker(m, markers[m])
     aruco_manager.consolidate_setup(study_config.allow_duplicated_markers)
     aruco_manager.register_with_estimator(estimator)

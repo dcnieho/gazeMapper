@@ -248,7 +248,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
                         continue
                     for m in markers[c]:
                         aruco_manager.add_individual_marker(m, marker_setup, None if study_config.mapped_video_process_planes_for_all_frames else analyze_frames[p])
-        for m in (markers:=marker.get_setup_for_markers(recording_config.individual_markers)):
+        for m in (markers:=marker.get_setup_for_markers(recording_config.individual_markers, recording_config.individual_marker_settings)):
             aruco_manager.add_individual_marker(m, markers[m])
         aruco_manager.consolidate_setup(study_config.allow_duplicated_markers)
         aruco_manager.register_with_estimator(pose_estimators[rec])

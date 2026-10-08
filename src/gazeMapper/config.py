@@ -7,9 +7,139 @@ import pathvalidate
 import typing
 from typing import Any, Literal
 
+import cv2
+
 from glassesTools import annotation, aruco, camera_recording, data_types as _data_types, gaze_worldref, json, marker as gt_marker, utils as gt_utils
 
-from . import marker, plane, session, typed_dict_defaults, type_utils
+from . import typed_dict_defaults, type_utils
+
+
+def aruco_detector_defaults() -> dict:
+    # filter out Marker border width, its not user facing through this interface, and is set separately in the study configuration
+    return {k: v for k, v in aruco.parameter_defaults('detector').items() if k != 'markerBorderBits'}
+
+
+class ArucoDetectorParameters(typed_dict_defaults.TypedDictDefault, total=False):
+    __annotations__ = {k: type(v) for k, v in aruco_detector_defaults().items()}
+    __annotations__['cornerRefinementMethod'] = aruco.corner_refinement_methods
+    locals().update(aruco_detector_defaults())
+
+
+class ArucoRefineParameters(typed_dict_defaults.TypedDictDefault, total=False):
+    __annotations__ = {k: type(v) for k, v in aruco.parameter_defaults('refine').items()}
+    locals().update(aruco.parameter_defaults('refine'))
+
+
+class ArucoSettings(typed_dict_defaults.TypedDictDefault, total=False):
+    detector_params  : ArucoDetectorParameters = typed_dict_defaults.Field(default_factory=ArucoDetectorParameters)
+    refine_params    : ArucoRefineParameters   = typed_dict_defaults.Field(default_factory=ArucoRefineParameters)
+    refine           : bool                    = True
+    undistort        : bool                    = False
+
+
+def aruco_settings_with_defaults(value: dict | None) -> ArucoSettings:
+    settings = ArucoSettings(copy.deepcopy(value or {}))
+    for name, cls in [('detector_params', ArucoDetectorParameters), ('refine_params', ArucoRefineParameters)]:
+        if isinstance(settings[name], dict):
+            values = settings[name]
+            if name == 'detector_params':
+                values = {k: v for k, v in values.items() if k != 'markerBorderBits'}
+            settings[name] = cls(values)
+    return settings
+
+
+def aruco_settings_with_border(value: dict | None, marker_border_bits: int) -> dict:
+    """Combine visible settings and the authoritative border width for internal use."""
+    settings = dict(value or {})
+    settings['detector_params'] = dict(settings.get('detector_params') or {}) | {'markerBorderBits': marker_border_bits}
+    return settings
+
+
+def merge_aruco_settings(parent: dict, overrides: dict) -> dict:
+    """Apply only supplied leaves; inherit all other values from the parent."""
+    result = copy.deepcopy(parent)
+    for key, value in overrides.items():
+        result[key] = merge_aruco_settings(result[key], value) if isinstance(value, dict) and isinstance(result.get(key), dict) else copy.deepcopy(value)
+    return result
+
+
+def remove_defaults(value: dict, defaults: dict | None = None) -> dict:
+    """Return plain dictionaries with default-valued fields omitted."""
+    if defaults is None:
+        defaults = type(value)._field_defaults if typed_dict_defaults.is_typeddictdefault(type(value)) else {}
+    defaults = {k: v.default_factory() if isinstance(v, typed_dict_defaults.Field) else v for k, v in defaults.items()}
+
+    def compact(item):
+        if isinstance(item, dict):
+            return remove_defaults(item)
+        if isinstance(item, list):
+            return [compact(v) for v in item]
+        return copy.deepcopy(item)
+
+    result = {}
+    for name, item in value.items():
+        if name in defaults and item == defaults[name]:
+            continue
+        if isinstance(item, dict):
+            parent = defaults.get(name)
+            filtered = remove_defaults(item, parent if isinstance(parent, dict) else None)
+            if not filtered and item and isinstance(parent, dict):
+                # A nonempty group reduced entirely to defaults; an explicitly empty
+                # group differing from its default still needs to be stored.
+                continue
+            result[name] = filtered
+        else:
+            result[name] = compact(item)
+    return result
+
+
+def aruco_settings_problems(value: dict | None) -> type_utils.ProblemDict:
+    problems = {}
+    for path, message in aruco.settings_problems(value).items():
+        if not path:
+            return {'aruco_settings': (type_utils.ProblemLevel.Error, message)}
+        node = problems
+        for name in path[:-1]:
+            node = node.setdefault(name, {})
+        node[path[-1]] = (type_utils.ProblemLevel.Error, message)
+    return {'aruco_settings': problems} if problems else {}
+
+
+def aruco_detector_problems(value: dict | None) -> type_utils.ProblemDict:
+    problems = aruco_settings_problems({'detector_params': value})
+    problems = problems.get('aruco_settings', {}).get('detector_params', {})
+    return {'problem_with_this_key': problems} if isinstance(problems, tuple) else problems
+
+
+aruco_corner_refinement_doc = {method: type_utils.GUIDocInfo(*doc) for method, doc in aruco.corner_refinement_doc.items()}
+
+
+def _aruco_parameter_doc(name, label, description, children=None):
+    return type_utils.GUIDocInfo(label, f'{description}\n\nOpenCV parameter name: {name}', children or {})
+
+
+aruco_detector_parameter_doc = {
+    name: _aruco_parameter_doc(name, *aruco.detector_parameter_doc.get(name, (name, '')),
+                              children=aruco_corner_refinement_doc if name == 'cornerRefinementMethod' else None)
+    for name in aruco_detector_defaults()
+}
+aruco_refine_parameter_doc = {
+    name: _aruco_parameter_doc(name, *aruco.refine_parameter_doc.get(name, (name, '')))
+    for name in aruco.parameter_defaults('refine')
+}
+aruco_marker_border_doc = _aruco_parameter_doc('markerBorderBits', *aruco.detector_parameter_doc['markerBorderBits'])
+
+
+aruco_settings_doc = type_utils.GUIDocInfo('ArUco detection',
+    'Detection settings for markers on this plane.', {
+    'detector_params': type_utils.GUIDocInfo('Detector parameters', 'Parameters for OpenCV\'s ArUco detector.', aruco_detector_parameter_doc),
+    'refine_params': type_utils.GUIDocInfo('Board refinement parameters', 'Parameters for OpenCV\'s board refinement process to recover missing markers on planes.', aruco_refine_parameter_doc),
+    'refine': type_utils.GUIDocInfo('Refine board detections', 'Recover missing markers on planes.')
+})
+
+
+# Define ArUco settings before importing the plane definitions that use them.
+from . import marker, plane, session
 from .GUI._impl import utils as gui_utils
 
 
@@ -116,6 +246,7 @@ class Study:
 
                  # setup with defaults
                  allow_duplicated_markers                   : bool                          = False,
+                 individual_marker_settings                 : dict[str,ArucoDetectorParameters]|None = None,
 
                  import_do_copy_video                       : bool                          = True,
                  import_source_dir_as_relative_path         : bool                          = False,
@@ -177,6 +308,7 @@ class Study:
         self.working_directory                          = working_directory
 
         self.allow_duplicated_markers                   = allow_duplicated_markers
+        self.individual_marker_settings                 = individual_marker_settings or {}
 
         self.import_do_copy_video                       = import_do_copy_video
         self.import_source_dir_as_relative_path         = import_source_dir_as_relative_path
@@ -232,6 +364,7 @@ class Study:
         self._register_annotations()
 
     def check_valid(self, strict_check=True):
+        self._prepare_individual_marker_settings()
         # ensure typed dicts with defaults members are of the right class, and apply defaults
         cs_type = typing.get_args(gt_utils.unpack_none_union(study_parameter_types['coding_setup'])[0])[0]
         for i in range(len(self.coding_setup)):
@@ -265,9 +398,11 @@ class Study:
                     cs['gaze_offset_setup'][p] = GazeOffsetSetup(cs['gaze_offset_setup'][p])
 
         if strict_check:
+            self._check_plane_aruco_settings(strict_check)
             self._check_session_def(strict_check)
             self._check_coding_setup(strict_check)
             self._check_auto_markers(strict_check)
+            self._check_individual_marker_settings(strict_check)
             self._check_individual_markers(strict_check)
             self._check_head_attached_recordings(strict_check)
             self._check_interpolate_plane_pose(strict_check)
@@ -697,6 +832,35 @@ class Study:
             seen_markers_sets.add(tuple(used_markers_fam[s]))
         return problems
 
+    def _prepare_individual_marker_settings(self):
+        groups = {'default': self.individual_marker_settings.get('default', {})} | self.individual_marker_settings
+        self.individual_marker_settings = {
+            name: ArucoDetectorParameters({k: v for k, v in params.items() if k != 'markerBorderBits'})
+                  if isinstance(params, dict) else params
+            for name, params in groups.items()}
+
+    def add_individual_marker_settings(self, name: str):
+        name = name.strip()
+        if not name:
+            raise ValueError('A marker detection settings group must have a name')
+        if name in self.individual_marker_settings:
+            raise ValueError(f'Marker detection settings group "{name}" already exists')
+        self.individual_marker_settings[name] = ArucoDetectorParameters(
+            copy.deepcopy(self.individual_marker_settings['default']))
+
+    def _check_individual_marker_settings(self, strict_check) -> type_utils.ProblemDict:
+        groups = {}
+        for name, params in self.individual_marker_settings.items():
+            problems = aruco_detector_problems(params)
+            if not name.strip():
+                problems = {'problem_with_this_key': (type_utils.ProblemLevel.Error, 'A settings group must have a name')}
+            if problems:
+                if strict_check:
+                    aruco.resolve_settings({'detector_params': params})
+                    raise ValueError('A marker detection settings group must have a name')
+                groups[name] = problems
+        return {'individual_marker_settings': groups} if groups else {}
+
     def _check_individual_markers(self, strict_check):
         problems: type_utils.ProblemDict = {}
         for m in self.individual_markers:
@@ -707,8 +871,10 @@ class Study:
                 problem = f'size should not be set for detect only markers'
             elif not m.detect_only and (m.size is None or m.size<=0):
                 problem = f'size should be set to a value larger than 0'
-            elif m.marker_border_bits<1:
-                problem = 'marker_border_bits must be at least 1'
+            if m.detection_settings not in self.individual_marker_settings:
+                problem = '; '.join(p for p in (problem, f'Unknown detection settings group: {m.detection_settings}') if p)
+            if settings_problem := m.field_problems():
+                problem = '; '.join(p for p in [problem] + [message[1] for message in settings_problem.values()] if p)
             if problem:
                 if strict_check:
                     raise ValueError(f'individual_markers marker {m.id} ({aruco.dict_id_to_str[m.aruco_dict_id]}): {problem}')
@@ -840,11 +1006,29 @@ class Study:
                     type_utils.merge_problem_dicts(problems,{'mapped_video_recording_colors': (type_utils.ProblemLevel.Error, msg)})
         return problems
 
+    def _check_plane_aruco_settings(self, strict_check) -> type_utils.ProblemDict:
+        problems = {}
+        for p in self.planes:
+            if not isinstance(p, plane.Definition_Plane_Aruco):
+                continue
+            if strict_check:
+                try:
+                    aruco.resolve_settings(p.aruco_settings)
+                except ValueError as exc:
+                    raise ValueError(f'ArUco settings for plane "{p.name}": {exc}') from exc
+            elif errors := aruco_settings_problems(p.aruco_settings):
+                problems[p.name] = errors
+        return {'planes': problems} if problems else {}
+
     def field_problems(self) -> type_utils.ProblemDict:
         problems: type_utils.ProblemDict = {}
+        plane_problems = {p.name: errors for p in self.planes if (errors := p.field_problems())}
+        if plane_problems:
+            type_utils.merge_problem_dicts(problems, {'planes': plane_problems})
         type_utils.merge_problem_dicts(problems, self._check_session_def(False))
         type_utils.merge_problem_dicts(problems, self._check_coding_setup(False))
         type_utils.merge_problem_dicts(problems, self._check_auto_markers(False))
+        type_utils.merge_problem_dicts(problems, self._check_individual_marker_settings(False))
         type_utils.merge_problem_dicts(problems, self._check_individual_markers(False))
         type_utils.merge_problem_dicts(problems, self._check_head_attached_recordings(False))
         type_utils.merge_problem_dicts(problems, self._check_interpolate_plane_pose(False))
@@ -862,36 +1046,12 @@ class Study:
         else:
             path = f_path.parent
             # prep for dump to file
-        to_dump = {k:copy.deepcopy(getattr(self,k)) for k in vars(self) if not k.startswith('_') and k not in ['session_def','planes','working_directory']}    # session_def and planes will be populated from contents in the provided folder, and working_directory as the provided path
-        # filter out defaulted
-        to_dump = {k:to_dump[k] for k in to_dump if k not in study_defaults or study_defaults[k]!=to_dump[k]}
-        # also filter out defaults in some subfields, and ensure they are not typeddicts (json encoder balks over that)
-        def _remove_defaults_recursive(d: dict) -> dict:
-            # get defaults
-            defaults = {}
-            if typed_dict_defaults.is_typeddictdefault(type(d)):
-                defaults = type(d)._field_defaults
-
-            # check defaults
-            for k in defaults:
-                if isinstance(defaults[k], typed_dict_defaults.Field):
-                    defaults[k] = defaults[k].default_factory()
-
-            # NB: this also converts to plain dict, so json encoder can handle it
-            out = {}
-            for k in d:
-                if isinstance(d[k], dict):
-                    d[k] = _remove_defaults_recursive(d[k])
-                    if not d[k] and k in defaults and not defaults[k] is None:
-                        # all defaulted, skip
-                        continue
-
-                # now check if not equal to default. If not equal, store
-                if k not in defaults or d[k]!=defaults[k]:
-                    out[k] = d[k]
-            return out
-
-        to_dump['coding_setup'] = [_remove_defaults_recursive(cs) for cs in to_dump['coding_setup']]
+        to_dump = {k:getattr(self,k) for k in vars(self) if not k.startswith('_') and k not in ['session_def','planes','working_directory']}    # session_def and planes are stored separately; working_directory comes from the path
+        # Border width is stored per marker, never inside a detector settings group.
+        to_dump['individual_marker_settings'] = {
+            name: remove_defaults({k:v for k,v in params.items() if k != 'markerBorderBits'}, aruco_detector_defaults())
+            for name, params in self.individual_marker_settings.items()}
+        to_dump = remove_defaults(to_dump, study_defaults)
 
         # dump to file
         json.dump(to_dump, f_path)
@@ -1135,6 +1295,7 @@ _gaze_type_doc = {
     gaze_worldref.Type.Average_Gaze_Vector  : type_utils.GUIDocInfo('Average of gaze vectors', 'Average of the projections of the left and right eyes\' gaze vectors to the plane.'),
 }
 study_parameter_doc = {
+    'individual_marker_settings': type_utils.GUIDocInfo('Marker detection settings', 'Named detector parameter groups managed in the individual-marker setup pane.'),
     'allow_duplicated_markers': type_utils.GUIDocInfo('Allow duplicated markers?', 'If enabled, the same marker can be used in multiple places in the coding setup (e.g. for auto coding and/or in planes). If disabled, each marker can only be used once. Enabling this may be ok, if the duplicate markers never occur at the same time. Still, use at your own risk.'),
     'import_do_copy_video': type_utils.GUIDocInfo('Copy video during import?', 'If not enabled, the scene video of an eye tracker recording, or the video of an external camera is not copied to the gazeMapper recording directory during import. Instead, the video will be loaded from the recording\'s source directory (so do not move it). Ignored when the video must be transcoded to be processed with gazeMapper.'),
     'import_source_dir_as_relative_path': type_utils.GUIDocInfo('Store source directory as relative path?', 'Specifies whether the path to the source directory stored in the recording info file is an absolute path (this option is not enabled) or a relative path (enabled). If a relative path is used, the imported recording and the source directory can be moved to another location, and the source directory can still be found as long as the relative path (e.g., one folder up and in the directory "original recordings": "../original recordings") doesn\'t change.'),
@@ -1294,6 +1455,7 @@ class OverrideLevel(enum.Enum):
 
 class StudyOverride:
     default_json_file_name = 'study_def_override.json'
+    marker_settings_fields = {'planes', 'individual_marker_settings'}
 
     @staticmethod
     def get_allowed_parameters(level: OverrideLevel, recording_type: session.RecordingType|None = None, for_event_setup: bool = False) -> tuple[list[str],set[str]]:
@@ -1319,10 +1481,10 @@ class StudyOverride:
                 # arguments they may make sense depending on the processing function that
                 # is being called, but we cannot differentiate, so reject to be conservative
                 # use whitelist
-                exclude = set(all_params)
+                exclude = set(all_params) - StudyOverride.marker_settings_fields
             else:
                 # Session-level disallowed parameters
-                exclude = {'self', 'session_def', 'planes', 'individual_markers', 'coding_setup', 'working_directory', 'import_known_custom_eye_trackers'}
+                exclude = {'self', 'session_def', 'individual_markers', 'coding_setup', 'working_directory', 'import_known_custom_eye_trackers'}
             allowed_params = [a for a in all_params if a not in exclude]
         return allowed_params, exclude
 
@@ -1343,6 +1505,10 @@ class StudyOverride:
         types = EventSetup.__annotations__ if self.for_event_setup else study_parameter_types
         for p in kwargs:
             self._check_parameter(p, f"{StudyOverride.__name__}.__init__(): ")
+            if not self.for_event_setup and p in self.marker_settings_fields:
+                self._check_marker_settings_structure(p, kwargs[p])
+                setattr(self, p, copy.deepcopy(kwargs[p]))
+                continue
             # special case: for dict-like object we can unset specific fields, so allow those by skipping check for them
             check_val = kwargs[p]
             if isinstance(check_val,dict) or typing.is_typeddict(check_val) or typed_dict_defaults.is_typeddictdefault(check_val) or type_utils.is_NamedTuple_type(check_val):
@@ -1382,6 +1548,23 @@ class StudyOverride:
             err_text += f' for a {self.recording_type.value} recording'
         return err_text
 
+    @staticmethod
+    def _check_marker_settings_structure(field, value):
+        # Validate sparse patches without filling defaults or allowing project structure changes.
+        template = {'aruco_settings': aruco_settings_with_defaults(None)} if field == 'planes' else aruco_detector_defaults()
+        def check(patch, schema, path):
+            if not isinstance(patch, dict):
+                raise ValueError(f'{path} must be a dictionary of parameter overrides')
+            for key, val in patch.items():
+                if key not in schema:
+                    raise ValueError(f'{path}.{key} cannot be overridden here')
+                if isinstance(schema[key], dict):
+                    check(val, schema[key], f'{path}.{key}')
+        if not isinstance(value, dict) or any(not isinstance(name, str) for name in value):
+            raise ValueError(f'{field} overrides must be keyed by name')
+        for name, patch in value.items():
+            check(patch, template, f'{field}.{name}')
+
     def apply(self, obj: Study, strict_check=True) -> Study:
         obj = copy.deepcopy(obj)
         if self.for_event_setup:
@@ -1392,7 +1575,18 @@ class StudyOverride:
             the_obj = _apply_impl(the_obj, {p: getattr(self,p) for p in self._overridden_params}, EventSetup.__annotations__)
             obj.coding_setup[idx] = the_obj
         else:
-            obj = _apply_impl(obj, {p: getattr(self,p) for p in self._overridden_params}, study_parameter_types)
+            obj = _apply_impl(obj, {p: getattr(self,p) for p in self._overridden_params if p not in self.marker_settings_fields}, study_parameter_types)
+            for field in self.marker_settings_fields.intersection(self._overridden_params):
+                self._check_marker_settings_structure(field, getattr(self, field))
+                targets = {p.name: p for p in obj.planes if isinstance(p, plane.Definition_Plane_Aruco)} if field == 'planes' else obj.individual_marker_settings
+                for name, patch in getattr(self, field).items():
+                    if name not in targets:
+                        kind = 'ArUco plane' if field == 'planes' else 'marker settings group'
+                        raise ValueError(f'Could not find {kind} with name "{name}" to apply overrides to {self._get_err_msg()}')
+                    if field == 'planes':
+                        targets[name].aruco_settings = merge_aruco_settings(targets[name].aruco_settings, patch.get('aruco_settings', {}))
+                    else:
+                        targets[name] = merge_aruco_settings(targets[name], patch)
         # check resulting study is valid
         try:
             obj.check_valid(strict_check)
@@ -1401,7 +1595,11 @@ class StudyOverride:
         return obj
 
     def get_dump(self) -> dict[str,Any]:
-        kwds = {p:getattr(self,p) for p in self._overridden_params}
+        def plain(value):
+            if isinstance(value, dict):
+                return {k: plain(v) for k, v in value.items()}
+            return value
+        kwds = {p:plain(getattr(self,p)) for p in self._overridden_params}
         if self.for_event_setup and not not kwds:
             kwds['name'] = getattr(self,'name')
         return kwds
@@ -1540,6 +1738,13 @@ def _apply_impl(obj, overrides: dict[str,Any], annotations: dict[str,typing.Type
 def _study_diff_impl(config: Study, parent_config: Study, fields: tuple[list[str],tuple[list[str]|None,list[str]]|None]) -> dict[str,Any]:
     kwds: dict[str,Any] = {}
     for f in fields[0]:
+        if f == 'planes' and isinstance(config, Study):
+            parents = {p.name: p for p in parent_config.planes if isinstance(p, plane.Definition_Plane_Aruco)}
+            changes = {p.name: diff for p in config.planes if isinstance(p, plane.Definition_Plane_Aruco) and p.name in parents and
+                       (diff := _study_diff_impl(p, parents[p.name], (['aruco_settings'], None)))}
+            if changes:
+                kwds[f] = changes
+            continue
         if f=='coding_setup' and fields[1] and fields[1][0] is not None:
             # special case: coding setup is a list of dict-like objects, need to diff per event setup
             val = getattr(config,f)
@@ -1623,6 +1828,10 @@ def apply_kwarg_overrides(study: Study, strict_check=True, **kwargs) -> Study:
 
 def read_study_config_with_overrides(config_path: str|pathlib.Path, overrides: dict[OverrideLevel, str|pathlib.Path]|None=None, recording_type: session.RecordingType|None = None, strict_check=True, **kwargs) -> Study:
     study = Study.load_from_json(config_path)
+    return apply_study_config_overrides(study, overrides, recording_type, strict_check, **kwargs)
+
+def apply_study_config_overrides(study: Study, overrides: dict[OverrideLevel, str|pathlib.Path]|None=None, recording_type: session.RecordingType|None = None, strict_check=True, **kwargs) -> Study:
+    """Apply session, recording, and then keyword overrides to a configuration."""
     if overrides:
         for l in [OverrideLevel.Session, OverrideLevel.Recording]:
             if l in overrides:

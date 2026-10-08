@@ -14,19 +14,27 @@ class Marker:
                  detect_only        : bool,         # if true, pose will not be determined and only marker presence is detected. That means marker size is not needed
                  size               : float|None                = None,
                  aruco_dict_id      : type_utils.ArucoDictType  = aruco.default_dict,
-                 marker_border_bits : int                       = 1
+                 marker_border_bits : int                       = 1,
+                 detection_settings : str                       = 'default'
                  ):
         self.id                 = m_id
         self.detect_only        = detect_only
         self.size               = size
         self.aruco_dict_id      = aruco_dict_id
         self.marker_border_bits = marker_border_bits
+        self.detection_settings = detection_settings
+
+    def field_problems(self) -> type_utils.ProblemDict:
+        problems = {}
+        if type(self.marker_border_bits) is not int or self.marker_border_bits < 1:
+            problems['marker_border_bits'] = (type_utils.ProblemLevel.Error, 'marker_border_bits must be a positive integer')
+        return problems
 
     def _to_dict(self) -> dict[str,typing.Any]:
         # N.B.: print dictionary names for markers instead of hard to understand integer id
         # always store dictionary even if its the default, so its easier to read the config file by eye
         out = {'id': self.id, 'aruco_dict': aruco.dict_id_to_str[self.aruco_dict_id], 'detect_only': self.detect_only}
-        for f in ['size', 'marker_border_bits']:
+        for f in ('size', 'marker_border_bits', 'detection_settings'):
             if (val:=getattr(self,f))!=marker_defaults[f]:
                 out[f] = val
         return out
@@ -53,16 +61,12 @@ marker_defaults = {k:d for k in _params if (d:=_params[k].default)!=inspect._emp
 marker_parameter_types = {k:_params[k].annotation for k in _params if k!='self'}
 del _params
 
-def get_marker_setup(marker: Marker) -> aruco.MarkerSetup:
-    return aruco.MarkerSetup(aruco_detector_params = {
-                                    'markerBorderBits': marker.marker_border_bits
-                                },
-                                detect_only = marker.detect_only,
-                                size = marker.size
-                            )
+def get_marker_setup(marker: Marker, settings_groups: dict[str, dict]) -> aruco.MarkerSetup:
+    from . import config
+    settings = config.aruco_settings_with_border({'detector_params': settings_groups[marker.detection_settings]}, marker.marker_border_bits)
+    return aruco.MarkerSetup(detector_params = aruco.resolve_settings(settings)['detector_params'],
+                             detect_only = marker.detect_only,
+                             size = marker.size)
 
-def get_setup_for_markers(markers: list[Marker]) -> dict[gt_marker.MarkerID,aruco.MarkerSetup]:
-    out = {}
-    for m in markers:
-        out[gt_marker.MarkerID(m.id, m.aruco_dict_id)] = get_marker_setup(m)
-    return out
+def get_setup_for_markers(markers: list[Marker], settings_groups: dict[str, dict]|None = None) -> dict[gt_marker.MarkerID,aruco.MarkerSetup]:
+    return {gt_marker.MarkerID(m.id, m.aruco_dict_id): get_marker_setup(m, settings_groups) for m in markers}
