@@ -81,6 +81,10 @@ class Definition_Plane_Aruco(Definition):
 
     def field_problems(self) -> type_utils.ProblemDict:
         problems = config.aruco_settings_problems(self.aruco_settings)
+        consistency = self.aruco_settings['pose_consistency']
+        unit = getattr(self, 'unit', '').strip().lower()
+        if consistency['enabled'] and consistency['temporal_enabled'] and unit not in ('m', 'cm', 'mm'):
+            problems = type_utils.merge_problem_dicts(problems, {'aruco_settings': {'pose_consistency': {'temporal_enabled': (type_utils.ProblemLevel.Error, 'Temporal translation checking requires plane unit m, cm, or mm')}}})
         if type(self.marker_border_bits) is not int or self.marker_border_bits < 1:
             problems['marker_border_bits'] = (type_utils.ProblemLevel.Error, 'marker_border_bits must be a positive integer')
         return problems

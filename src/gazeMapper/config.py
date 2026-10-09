@@ -30,16 +30,31 @@ class ArucoRefineParameters(typed_dict_defaults.TypedDictDefault, total=False):
     locals().update(aruco.parameter_defaults('refine'))
 
 
+class ArucoPoseConsistency(typed_dict_defaults.TypedDictDefault, total=False):
+    enabled                         : bool  = False
+    max_reprojection_error_fraction : float = .10
+    min_reprojection_error_px       : float = 2.
+    max_reprojection_error_px       : float = 6.
+    fast_path_min_spread_fraction   : float = .05
+    max_subsets                     : int   = 500
+    max_marker_tilt_angle_deg       : float = 80.
+    temporal_enabled                : bool  = True
+    temporal_history_size           : int   = 5
+    max_translation_speed_m_s       : float = 3.
+    max_rotation_speed_deg_s        : float = 400.
+
+
 class ArucoSettings(typed_dict_defaults.TypedDictDefault, total=False):
     detector_params  : ArucoDetectorParameters = typed_dict_defaults.Field(default_factory=ArucoDetectorParameters)
     refine_params    : ArucoRefineParameters   = typed_dict_defaults.Field(default_factory=ArucoRefineParameters)
     refine           : bool                    = True
     undistort        : bool                    = False
+    pose_consistency : ArucoPoseConsistency    = typed_dict_defaults.Field(default_factory=ArucoPoseConsistency)
 
 
 def aruco_settings_with_defaults(value: dict | None) -> ArucoSettings:
     settings = ArucoSettings(copy.deepcopy(value or {}))
-    for name, cls in [('detector_params', ArucoDetectorParameters), ('refine_params', ArucoRefineParameters)]:
+    for name, cls in [('detector_params', ArucoDetectorParameters), ('refine_params', ArucoRefineParameters), ('pose_consistency', ArucoPoseConsistency)]:
         if isinstance(settings[name], dict):
             values = settings[name]
             if name == 'detector_params':
@@ -134,7 +149,21 @@ aruco_settings_doc = type_utils.GUIDocInfo('ArUco detection',
     'Detection settings for markers on this plane.', {
     'detector_params': type_utils.GUIDocInfo('Detector parameters', 'Parameters for OpenCV\'s ArUco detector.', aruco_detector_parameter_doc),
     'refine_params': type_utils.GUIDocInfo('Board refinement parameters', 'Parameters for OpenCV\'s board refinement process to recover missing markers on planes.', aruco_refine_parameter_doc),
-    'refine': type_utils.GUIDocInfo('Refine board detections', 'Recover missing markers on planes.')
+    'refine': type_utils.GUIDocInfo('Refine board detections', 'Recover missing markers on planes.'),
+    'undistort': type_utils.GUIDocInfo('Undistort before detection', 'Undistort images before ArUco marker detection. Requires camera calibration.'),
+    'pose_consistency': type_utils.GUIDocInfo('Pose consistency', 'Try to robustly determine a plane pose by rejecting detected markers that are behind the camera, face away from it or are too tilted with respect to the camera, or disagree with the plane pose beyond a corner reprojection limit. Optionally also checks temporal pose consistency with previous poses.', {
+        'enabled': type_utils.GUIDocInfo('Enabled', 'Filter detected markers by checking whether they are in front of the camera, facing the camera, are not too tilted, and have a small corner reprojection error. Requires camera calibration.'),
+        'max_reprojection_error_fraction': type_utils.GUIDocInfo('Corner reprojection limit (fraction)', 'For each marker, the reprojection error is the largest 2D Euclidean distance, in pixels, between any detected corner and its expected projected position given the fitted plane pose. The marker passes the reprojection check when this error is no greater than this fraction of its median detected edge length, clamped to the minimum and maximum pixel limits below.'),
+        'min_reprojection_error_px': type_utils.GUIDocInfo('Minimum corner error limit (pixels)', 'Lower clamp for the per-corner reprojection limit.'),
+        'max_reprojection_error_px': type_utils.GUIDocInfo('Maximum corner error limit (pixels)', 'Upper clamp for the per-corner reprojection limit.'),
+        'fast_path_min_spread_fraction': type_utils.GUIDocInfo('Fast-path minimum board spread', 'Require selected marker centers to span at least this fraction of the known board layout area to accept the initial fit without a robust search. Since this is an area, 0.05 means about 22% of the board\'s width and height (0.224 x 0.224 ≈ 0.05).'),
+        'max_subsets': type_utils.GUIDocInfo('Maximum detection subsets', 'Maximum number of detection subsets evaluated in one pose-consistency search. Larger combinatorial searches use deterministic sampling within this limit.'),
+        'max_marker_tilt_angle_deg': type_utils.GUIDocInfo('Maximum marker tilt (degrees)', 'Maximum angle between the marker front-face normal (as determined from the plane pose) and the direction from the marker center toward the camera. 0 degrees is face-on; 90 degrees is edge-on; angles above 90 degrees are back-facing. Must be in [0, 90), so edge-on and back-facing markers are rejected.'),
+        'temporal_enabled': type_utils.GUIDocInfo('Enable temporal pose check', 'Reject poses whose camera motion relative to the plane exceeds the configured translation or rotation speed. Requires a plane unit of m, cm, or mm for translation checking and frame timestamps.'),
+        'temporal_history_size': type_utils.GUIDocInfo('Temporal history size', 'Number of previous accepted poses retained for speed checks.'),
+        'max_translation_speed_m_s': type_utils.GUIDocInfo('Maximum translation speed (m/s)', 'Maximum camera translation speed relative to the plane.'),
+        'max_rotation_speed_deg_s': type_utils.GUIDocInfo('Maximum rotation speed (degrees/s)', 'Maximum camera-orientation change relative to the plane per second.')
+    })
 })
 
 
