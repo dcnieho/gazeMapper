@@ -111,6 +111,10 @@ class List:
                     self._require_sort = True
                 self._sort_items(sort_specs)
 
+                if (imgui.is_window_focused(imgui.FocusedFlags_.root_and_child_windows | imgui.FocusedFlags_.dock_hierarchy) and not imgui.get_io().want_text_input and imgui.get_io().key_ctrl and imgui.is_key_pressed(imgui.Key.a, repeat=False)):
+                    # ctrl+A pressed, select all visible sessions
+                    glassesTools.utils.set_all(self.selected_items, True, subset = self.sorted_ids)
+
                 # Headers
                 imgui.table_angled_headers_row()
                 imgui.table_next_row(imgui.TableRowFlags_.headers)
