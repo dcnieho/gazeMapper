@@ -1,3 +1,6 @@
 {
-    "explorer.excludeGitIgnore": true
+    "explorer.excludeGitIgnore": true,
+    "chat.tools.terminal.autoApprove": {
+        "&": true
+    }
 }
