@@ -111,9 +111,9 @@ def _get_sync_function(study_config: config.Study,
     et_sync_events = process.get_specific_event_types(study_config, annotation.EventType.Sync_ET_Data, ['sync_setup'])
     for cs in et_sync_events:
         match cs['sync_setup']['get_cam_movement_method']:
-            case 'plane':
-                if not cs['planes']:
-                    raise ValueError(f'The method for synchronizing eye tracker data to the scene camera (get_cam_movement_method) is set to "plane" for the "{cs["name"]}" event but no plane is configured for this event. Cannot continue.')
+            case 'assembly':
+                if not cs['marker_assemblies']:
+                    raise ValueError(f'The method for synchronizing eye tracker data to the scene camera (get_cam_movement_method) is set to "assembly" for the "{cs["name"]}" event but no marker assembly (e.g., plane) is configured for this event. Cannot continue.')
                 # NB: no extra_funcs to run
             case 'function':
                 import importlib

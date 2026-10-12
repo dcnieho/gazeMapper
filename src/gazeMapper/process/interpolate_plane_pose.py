@@ -42,7 +42,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
 
     for pose_file in pose_files:
         plane_name = pose_file.stem[len(naming.plane_pose_prefix):]
-        poses = gt_pose.read_dict_from_file(pose_file)
+        poses = gt_pose.read_plane_dict_from_file(pose_file)
         sampled_poses = gt_pose.interpolate_plane_poses_to_gaze_samples(
             poses,
             gazes,
@@ -53,7 +53,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
 
         out_file = working_dir / f'{naming.plane_pose_interpolated_prefix}{plane_name}.tsv'
         if sampled_poses:
-            gt_pose.write_list_to_file(sampled_poses, out_file, skip_failed=True)
+            gt_pose.write_plane_list_to_file(sampled_poses, out_file, skip_failed=True)
         else:
             out_file.unlink(missing_ok=True)
 

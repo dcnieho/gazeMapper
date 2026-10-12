@@ -148,7 +148,7 @@ def is_action_possible_given_config(action: Action, study_config: 'config.Study'
     match action:
         case Action.CODE_EPISODES | Action.DETECT_MARKERS | Action.GAZE_TO_PLANE:
             # if there is any form of config beyond a session definition, these will be possible (whether config is complete is handled by error messages so no need to worry about that here)
-            return not not study_config.planes or not not study_config.coding_setup or not not study_config.individual_markers
+            return not not study_config.marker_assemblies or not not study_config.coding_setup or not not study_config.individual_markers
         case Action.RUN_SYNC_FUNCTION:
             cs = get_specific_event_types(study_config, check_specific_fields=['sync_setup'])
             return any(cs['sync_setup']['get_cam_movement_method']=='function' for cs in cs)
@@ -239,8 +239,8 @@ def _determine_to_invalidate(action: Action, study_config: 'config.Study') -> se
             # N.B.: don't directly invalidate manually coded episodes. If auto-coding is run again based on
             # the new marker detections, that action will invalidate CODE_EPISODES.
             actions = {a for a in action.next_values() if a not in [Action.CODE_EPISODES, Action.RUN_SYNC_FUNCTION]}
-            if (study_config.mapped_video_process_planes_for_all_frames or
-                study_config.mapped_video_plane_marker_color is not None or # NB: no need to check mapped_video_recovered_plane_marker_color as it only overrides colors for some plane markers
+            if (study_config.mapped_video_process_marker_assemblies_for_all_frames or
+                study_config.mapped_video_assembly_marker_color is not None or # NB: no need to check mapped_video_recovered_assembly_marker_color as it only overrides colors for some assembly markers
                 study_config.mapped_video_individual_marker_color is not None or
                 study_config.mapped_video_unexpected_marker_color is not None or
                 study_config.mapped_video_rejected_marker_color is not None):
@@ -322,7 +322,7 @@ def _is_recording_action_possible(rec: str, action_states: dict[Action, process_
         case Action.SYNC_ET_TO_CAM:
             preconditions.update([Action.CODE_EPISODES])
             cs = get_specific_event_types(study_config, check_specific_fields=['sync_setup'])
-            if any(cs['sync_setup']['get_cam_movement_method']=='plane' and (cs['which_recordings'] is None or rec in cs['which_recordings']) for cs in cs):
+            if any(cs['sync_setup']['get_cam_movement_method']=='assembly' and (cs['which_recordings'] is None or rec in cs['which_recordings']) for cs in cs):
                 preconditions.add(Action.DETECT_MARKERS)
             if any(cs['sync_setup']['get_cam_movement_method']=='function' and (cs['which_recordings'] is None or rec in cs['which_recordings']) for cs in cs):
                 preconditions.add(Action.RUN_SYNC_FUNCTION)

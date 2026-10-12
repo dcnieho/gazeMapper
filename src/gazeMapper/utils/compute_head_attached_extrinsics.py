@@ -23,7 +23,7 @@ from glassesTools.camera_recording import Type as CameraRecordingType
 session_dir = pathlib.Path(r'C:\dat\projects\SEL\station 1\camera_clip\v2\cameraclip\gazeMapper project\rec_full')
 et_rec_name = 'et'
 ha_rec_name = 'clip'
-plane_name = 'val'
+assembly_name = 'val'
 
 
 def compute_relative_pose(R_A, t_A, R_B, t_B):
@@ -108,8 +108,8 @@ study_config = config.read_study_config_with_overrides(config_dir, {config.Overr
 session_info = session.Session.from_definition(study_config.session_def, session_dir)
 
 # check plane is defined
-if not any(plane.name==plane_name for plane in study_config.planes):
-    raise ValueError(f'Plane "{plane_name}" is not defined in the study config, cannot proceed')
+if not any(assembly.name==assembly_name for assembly in study_config.marker_assemblies):
+    raise ValueError(f'Assembly "{assembly_name}" is not defined in the study config, cannot proceed')
 # check recordings are defined and are indeed a scene camera and head-attached recording
 for r in [et_rec_name, ha_rec_name]:
     rec_def = study_config.session_def.get_recording_def(r)
@@ -123,12 +123,12 @@ for r in [et_rec_name, ha_rec_name]:
         raise ValueError(f'Recording "{r}" is not a head-attached camera recording, cannot proceed')
 
 # load plane pose for both recordings
-poses = {r:gt_pose.read_dict_from_file(session_dir/r/f'{naming.plane_pose_prefix}{plane_name}.tsv') for r in [et_rec_name, ha_rec_name]}
+poses = {r:gt_pose.read_plane_dict_from_file(session_dir/r/f'{naming.plane_pose_prefix}{assembly_name}.tsv') for r in [et_rec_name, ha_rec_name]}
 # load camera calibrations for both recordings
 camera_calibs = {r:ocv.CameraParams.read_from_file(session_dir/r/gt_naming.scene_camera_calibration_fname) for r in [et_rec_name, ha_rec_name]}
 
 # get episodes involving the plane
-codings = {cs['name']:cs for cs in study_config.coding_setup if plane_name in cs.get('planes',[])}
+codings = {cs['name']:cs for cs in study_config.coding_setup if assembly_name in cs.get('marker_assemblies',[])}
 ref_episodes = episode.list_to_marker_dict(episode.read_list_from_file(session_dir/study_config.sync_ref_recording/naming.coding_file), list(codings.keys()))
 videos_ts = {r:timestamps.VideoTimestamps(session_dir / r / gt_naming.frame_timestamps_fname) for r in [et_rec_name, ha_rec_name]}
 to_sync = ha_rec_name if et_rec_name==study_config.sync_ref_recording else et_rec_name

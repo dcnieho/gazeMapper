@@ -2,11 +2,11 @@ import pathlib
 import cv2
 import warnings
 
-from glassesTools import annotation, aruco, marker as gt_marker, naming as gt_naming, pose, process_pool, propagating_thread, ocv, timestamps
+from glassesTools import annotation, aruco, marker as gt_marker, marker_assembly as gt_marker_assembly, naming as gt_naming, pose, process_pool, propagating_thread, ocv, timestamps
 from glassesTools.camera_recording import Type as CameraRecordingType
 from glassesTools.gui.video_player import GUI
 
-from .. import config, episode, marker, naming, plane, process, session, synchronization
+from .. import config, episode, marker, naming, marker_assembly, process, session, synchronization
 
 
 def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None=None, show_visualization=False, visualization_show_rejected_markers=False, progress_indicator: process_pool.JobProgress|None=None, **study_settings):
@@ -61,33 +61,31 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
 
         sync_markers = {m for e in sync_events for m in e['auto_code'].get('markers', [])}
         individual_markers_to_process = [m for m in study_config.individual_markers if (m.id,m.aruco_dict_id) in sync_markers]
-        planes_setup, plane_frames, episodes = {}, {}, {}
+        assemblies_setup, _, episodes = {}, {}, {}
     else:
         # get coded interval(s) with planes, if any. Just to show in GUI, if attached
-        wanted_episodes = {cs['name'] for cs in study_config.coding_setup if cs.get('planes',[])}
+        wanted_episodes = {cs['name'] for cs in study_config.coding_setup if cs.get('marker_assemblies',[])}
         episodes = episode.load_episodes_from_all_recordings(study_config, working_dir, wanted_episodes, missing_other_coding_ok=True)[0]
 
-        planes_setup, _ = _get_plane_setup(study_config, config_dir)  # we don't need to know for which frames to run the detection, we always process all frames
+        assemblies_setup, _, _ = _get_assembly_setup(study_config, config_dir)  # we don't need to know for which frames to run the detection, we always process all frames
 
-        if not planes_setup and not study_config.individual_markers:
+        if not assemblies_setup and not study_config.individual_markers:
             raise RuntimeError(f'No planes or individual markers are configured for detection for the "{rec_name}" recording (a {rec_def.type.value} recording), cannot run Detect Markers')
         individual_markers_to_process = study_config.individual_markers
 
     # set up pose estimator
     estimator = pose.Estimator(in_video, working_dir / gt_naming.frame_timestamps_fname, working_dir / gt_naming.scene_camera_calibration_fname)
-    # first, register all ArUco planes and individual markers with ArUco manager, which
+    # first, register all ArUco assemblies and individual markers with ArUco manager, which
     # will then wrap their detection and register them with the pose estimator
     aruco_manager = aruco.Manager()
-    for p in planes_setup:
-        aruco_manager.add_plane(p, planes_setup[p])
-        if hasattr(planes_setup[p]['plane'],'is_dynamic') and planes_setup[p]['plane'].is_dynamic():
-            markers = planes_setup[p]['plane'].get_marker_IDs()
-            marker_setup = planes_setup[p]['plane'].get_dynamic_marker_setup()
-            for c in markers:
-                if c=='plane':
-                    continue
-                for m in markers[c]:
-                    aruco_manager.add_individual_marker(m, marker_setup)
+    for a in assemblies_setup:
+        setup = assemblies_setup[a]
+        aruco_manager.add_assembly(a, setup)
+        if setup.is_dynamic:
+            if setup.dynamic_marker_setup is None:
+                raise ValueError(f'Dynamic marker setup is missing for assembly "{a}"')
+            for marker_id in setup.dynamic_marker_ids:
+                aruco_manager.add_individual_marker(marker_id, setup.dynamic_marker_setup)
     for m in (markers:=marker.get_setup_for_markers(individual_markers_to_process, study_config.individual_marker_settings)):
         aruco_manager.add_individual_marker(m, markers[m])
     aruco_manager.consolidate_setup(study_config.allow_duplicated_markers)
@@ -97,7 +95,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
         gui.set_show_timeline(True, timestamps.VideoTimestamps(working_dir / gt_naming.frame_timestamps_fname), annotation.flatten_annotation_dict(episodes), window_id=gui.main_window_id)
         # override colors with settings, but do not disable drawing ones that settings disable
         colors = {}
-        for c in ('mapped_video_plane_marker_color','mapped_video_recovered_plane_marker_color','mapped_video_individual_marker_color','mapped_video_unexpected_marker_color'):
+        for c in ('mapped_video_assembly_marker_color','mapped_video_recovered_assembly_marker_color','mapped_video_individual_marker_color','mapped_video_unexpected_marker_color'):
             clr = getattr(study_config,c) if getattr(study_config,c) is not None else config.study_defaults[c]
             colors[c.removeprefix('mapped_video_')] = clr
         if visualization_show_rejected_markers:
@@ -111,8 +109,12 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
 
     poses, individual_markers, _ = estimator.process_video()
 
-    for p in poses:
-        pose.write_list_to_file(poses[p], working_dir/f'{naming.plane_pose_prefix}{p}.tsv', skip_failed=True)
+    assembly_definitions = {definition.name: definition for definition in study_config.marker_assemblies}
+    for a in poses:
+        if isinstance(assembly_definitions[a], marker_assembly.Definition_MarkerAssembly_3D):
+            pose.write_list_to_file(poses[a], working_dir/f'{naming.pose_prefix}{a}.tsv', skip_failed=True)
+        else:
+            pose.write_plane_list_to_file(poses[a], working_dir/f'{naming.plane_pose_prefix}{a}.tsv', skip_failed=True)
     for m in individual_markers:
         gt_marker.write_list_to_file(individual_markers[m], gt_marker.get_file_name(m.m_id, m.aruco_dict_id, working_dir), skip_failed=False)
 
@@ -138,6 +140,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
             # now, per plane, transform head-attached camera poses into eye tracker scene camera poses and store
             for pl in poses:
                 # get poses
+                is_3d_assembly = isinstance(assembly_definitions[pl], marker_assembly.Definition_MarkerAssembly_3D)
+                pose_type = pose.Pose if is_3d_assembly else pose.PlanePose
                 replaced_poses: list[pose.Pose] = []
                 for frep in frame_map:
                     if frame_map[frep] in poses[pl]:
@@ -147,9 +151,12 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
                         R_et = Rmat @ R_ha
                         t_et = (Rmat @ t_ha).flatten() + cam_params.position
                         rvec_et = cv2.Rodrigues(R_et)[0].flatten()
-                        replaced_poses.append(pose.Pose(frame_idx=frep, pose_R_vec=rvec_et, pose_T_vec=t_et, pose_N_points=ha_pose.pose_N_points))
+                        replaced_poses.append(pose_type(frame_idx=frep, pose_R_vec=rvec_et, pose_T_vec=t_et, pose_N_points=ha_pose.pose_N_points))
                 # store to file
-                pose.write_list_to_file(replaced_poses, working_dir.parent/to_replace/f'{naming.plane_pose_prefix}{pl}.tsv', skip_failed=True)
+                if is_3d_assembly:
+                    pose.write_list_to_file(replaced_poses, working_dir.parent/to_replace/f'{naming.pose_prefix}{pl}.tsv', skip_failed=True)
+                else:
+                    pose.write_plane_list_to_file(replaced_poses, working_dir.parent/to_replace/f'{naming.plane_pose_prefix}{pl}.tsv', skip_failed=True)
         else:
             warnings.warn(f'Cannot replace eye tracker scene camera poses with head-attached camera poses: missing camera synchronization between head-attached camera recording "{rec_name}" and eye tracker scene camera recording "{to_replace}". Run Auto Coding if you have this set up, or manually code at least one sync point for both recordings, and then run the Detect Markers action again.', process_pool.ProcessingWarning)
 
@@ -158,25 +165,26 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
     session.update_action_states(working_dir, process.Action.DETECT_MARKERS, process_pool.State.Completed, study_config)
 
 
-def _get_plane_setup(study_config: config.Study,
+def _get_assembly_setup(study_config: config.Study,
                      config_dir: pathlib.Path,
-                     episodes: dict[str, tuple[annotation.EventType, list[list[int]]]]|None = None) -> tuple[dict[str, aruco.PlaneSetup], dict[str, tuple[annotation.EventType, list[list[int]]]|None]]:
+                     episodes: dict[str, tuple[annotation.EventType, list[list[int]]]]|None = None) -> tuple[dict[str, aruco.AssemblySetup], dict[str, tuple[annotation.EventType, list[int]|list[list[int]]]|None], dict[str, gt_marker_assembly.MarkerAssembly]]:
     # process the above into a dict of plane definitions and a dict with frame number intervals for which to use each
-    codings = [e for e in episodes] if episodes else [cs['name'] for cs in study_config.coding_setup if cs.get('planes',[])]
+    codings = [e for e in episodes] if episodes else [cs['name'] for cs in study_config.coding_setup if cs.get('marker_assemblies',[])]
     coding_setups = [cs for cs in study_config.coding_setup if cs['name'] in codings]
-    planes = {v for cs in coding_setups for v in cs['planes']}
-    planes_setup: dict[str, aruco.PlaneSetup] = {}
+    assembly_names = {v for cs in coding_setups for v in cs['marker_assemblies']}
+    assemblies: dict[str, gt_marker_assembly.MarkerAssembly] = {}
+    assemblies_setup: dict[str, aruco.AssemblySetup] = {}
     analyze_frames: dict[str, tuple[annotation.EventType, list[list[int]]]|None] = {}
-    for p in planes:
-        p_def = [pl for pl in study_config.planes if pl.name==p][0]
-        pl = plane.get_plane_from_definition(p_def, config_dir/p)
-        planes_setup[p] = pl.get_plane_setup()
+    for a in assembly_names:
+        a_def = [asbl for asbl in study_config.marker_assemblies if asbl.name==a][0]
+        assemblies[a] = marker_assembly.get_marker_assembly_from_definition(a_def, config_dir/a)
+        assemblies_setup[a] = assemblies[a].get_assembly_setup()
         if episodes:
             # determine for which frames this plane should be used
-            anal_events  = {cs['name']: cs['event_type'] for cs in study_config.coding_setup if p in cs['planes']}
+            anal_events  = {cs['name']: cs['event_type'] for cs in study_config.coding_setup if a in cs['marker_assemblies']}
             all_episodes = [ep for k in anal_events if k in episodes for ep in episodes[k][1] if ep]  # filter out empty
-            analyze_frames[p] = (list(anal_events.values())[0],sorted(all_episodes, key = lambda x: x[1]))
+            analyze_frames[a] = (list(anal_events.values())[0],sorted(all_episodes, key = lambda x: x[1]))
         else:
-            analyze_frames[p] = None
+            analyze_frames[a] = None
 
-    return planes_setup, analyze_frames
+    return assemblies_setup, analyze_frames, assemblies

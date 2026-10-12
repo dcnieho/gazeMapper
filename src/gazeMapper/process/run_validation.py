@@ -5,7 +5,7 @@ import pandas as pd
 from glassesTools import annotation, fixation_classification, naming as gt_naming, process_pool, validation
 from glassesTools.validation import assign_intervals, compute_offsets
 
-from .. import config, episode, naming, plane, process, session
+from .. import config, episode, naming, marker_assembly, process, session
 from . import _pose_files
 
 
@@ -53,13 +53,13 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None=None, p
     for e in episodes:
         # find corresponding coding config
         cs = [cs for cs in val_events if cs['name']==e][0]
-        if len(cs['planes'])!=1:
-            raise ValueError(f'Validation event "{e}" should be coded for exactly one glassesValidator plane, found {len(cs["planes"])}')
-        p = list(cs['planes'])[0]
-        plane_def = [pl for pl in study_config.planes if pl.name==p][0]
-        if plane_def.type!=plane.Type.GlassesValidator:
-            raise ValueError(f'Plane {p} is not a {plane.Type.GlassesValidator.value} plane, cannot be used for validation')
-        validation_plane = plane.get_plane_from_definition(plane_def, config_dir/p)
+        if len(cs['marker_assemblies'])!=1:
+            raise ValueError(f'Validation event "{e}" should be coded for exactly one glassesValidator plane, found {len(cs["marker_assemblies"])}')
+        p = list(cs['marker_assemblies'])[0]
+        plane_def = [pl for pl in study_config.marker_assemblies if pl.name==p][0]
+        if plane_def.type!=marker_assembly.Type.GlassesValidator:
+            raise ValueError(f'Plane {p} is not a {marker_assembly.Type.GlassesValidator.value} plane, cannot be used for validation')
+        validation_plane = marker_assembly.get_marker_assembly_from_definition(plane_def, config_dir/p)
 
         plot_limits = [[validation_plane.bbox[0]-validation_plane.marker_size, validation_plane.bbox[2]+validation_plane.marker_size],
                        [validation_plane.bbox[1]-validation_plane.marker_size, validation_plane.bbox[3]+validation_plane.marker_size]]

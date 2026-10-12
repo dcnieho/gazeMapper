@@ -14,7 +14,7 @@ from ETDQualitizer import vector_to_Fick
 from glassesTools import annotation, data_types, gaze_headref, gaze_worldref, marker as gt_marker, naming as gt_naming, ocv, process_pool, transforms
 from glassesTools.validation import export as val_export
 
-from .. import config, episode, naming, process, session
+from .. import config, episode, naming, marker_assembly, process, session
 from . import _pose_files
 
 
@@ -93,7 +93,8 @@ def prep_export(project_dir: str|pathlib.Path, session_names: list[str], config_
 
     # for the sessions, see what we have to export
     export_config = ExportConfig()
-    cs_plane_gaze = process.get_specific_event_types(study_config, check_specific_fields=['planes'])
+    plane_names = {definition.name for definition in study_config.marker_assemblies if isinstance(definition, marker_assembly.Definition_Plane_Aruco)}
+    cs_plane_gaze = [cs for cs in process.get_specific_event_types(study_config, check_specific_fields=['marker_assemblies']) if any(name in plane_names for name in cs['marker_assemblies'])]
     cs_gaze_offset = process.get_specific_event_types(study_config, check_specific_fields=['gaze_offset_setup'])
     cs_validation = process.get_specific_event_types(study_config, annotation.EventType.Validate)
     cs_et_sync = process.get_specific_event_types(study_config, check_specific_fields=['sync_setup'])
@@ -134,7 +135,7 @@ def prep_export(project_dir: str|pathlib.Path, session_names: list[str], config_
         rec_dirs = [project_dir/s/r for s, r in val_sess_recs]
         for cs in cs_validation:
             nm = cs['name']
-            pl = list(cs['planes'])[0]
+            pl = list(cs['marker_assemblies'])[0]
             dq_df, default_dq_type, dq_targets = val_export.collect_data_quality(rec_dirs, {pl:f'{naming.validation_prefix}{nm}_data_quality.tsv'}, col_for_parent='session')
             if dq_df is not None:
                 export_config.validation.episodes[nm] = ValidationEpisode(True,True,[],[],dq_df)
@@ -198,11 +199,12 @@ def run(working_dir: str|pathlib.Path, export_path: str|pathlib.Path, export_con
 
 
 def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, study_config: config.Study, export_config: PlaneGaze):
-    cs_plane_gaze = [cs for cs in study_config.coding_setup if cs['planes']]
+    plane_names = {definition.name for definition in study_config.marker_assemblies if isinstance(definition, marker_assembly.Definition_Plane_Aruco)}
+    cs_plane_gaze = [cs for cs in study_config.coding_setup if any(name in plane_names for name in cs['marker_assemblies'])]
     if not cs_plane_gaze:
         raise ValueError('No events where gaze is mapped to a plane are configured for the study, nothing to process')
 
-    planes = {v for cs in cs_plane_gaze for v in cs['planes']}
+    planes = {v for cs in cs_plane_gaze for v in cs['marker_assemblies'] if v in plane_names}
 
     # per recording, read the relevant files and put them all together
     for r in export_config.recs:
@@ -339,7 +341,7 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
                 continue
 
             # now merge
-            this_planes = list(cs['planes'])
+            this_planes = list(cs['marker_assemblies'])
             plane_gazes = {p:ori_plane_gazes[p].copy() for p in this_planes}
             keys = list(plane_gazes.keys())
             if export_config.include_head_ref_gaze:

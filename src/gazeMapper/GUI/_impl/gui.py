@@ -21,10 +21,10 @@ import OpenGL
 import OpenGL.GL as gl
 
 import glassesTools
-from glassesTools import annotation, aruco, camera_recording, gui as gt_gui, naming as gt_naming, marker as gt_marker, ocv, plane as gt_plane, platform as gt_platform, process_pool, utils as gt_utils
+from glassesTools import annotation, aruco, camera_recording, gui as gt_gui, naming as gt_naming, marker as gt_marker, marker_assembly as gt_marker_assembly, ocv, plane as gt_plane, platform as gt_platform, process_pool, utils as gt_utils
 from glassesTools.gui import colors
 
-from ... import config, marker, plane, process, project_watcher, session, type_utils, version
+from ... import config, marker, marker_assembly, process, project_watcher, session, type_utils, version
 from .. import async_thread
 from . import callbacks, image_helper, session_lister, settings_editor, utils
 
@@ -40,7 +40,7 @@ class GUI:
 
         self.project_dir      : pathlib.Path|None                       = None
         self.study_config     : config.Study|None                       = None
-        self.plane_configs    : dict[str,gt_plane.Plane|Exception|None] = {}
+        self.assembly_configs : dict[str,gt_marker_assembly.MarkerAssembly|Exception|None] = {}
         self.cam_calibrations : dict[str,ocv.CameraParams|Exception]    = {}
         self._dict_type_rec   : dict[str, typing.Type]|None             = None
         self._coding_setup_dict_type_rec: dict[str, dict[typing.Any, typing.Type]] = {}
@@ -61,7 +61,7 @@ class GUI:
         self._possible_value_getters    : dict[str, typing.Callable]                        = {}
 
         self.setup_recordings_error_level           : type_utils.ProblemLevel|None  = None
-        self.setup_plane_error_level                : type_utils.ProblemLevel|None  = None
+        self.setup_assembly_error_level                : type_utils.ProblemLevel|None  = None
         self.setup_coding_error_level               : type_utils.ProblemLevel|None  = None
         self.setup_individual_markers_error_level   : type_utils.ProblemLevel|None  = None
         self.can_accept_sessions                                                    = False
@@ -367,35 +367,35 @@ class GUI:
             return
 
         # if we got here, we're dealing with a plane directory
-        plane_name = change_path.parent.name
+        assembly_name = change_path.parent.name
         if change_type=='deleted':
-            if change_path.name==plane.Definition.default_json_file_name:
+            if change_path.name in (marker_assembly.Definition_Plane_Aruco.default_json_file_name, marker_assembly.Definition_MarkerAssembly_3D.default_json_file_name):
                 # plane removed
-                pls = [pl for pl in self.study_config.planes if pl.name==plane_name]
+                pls = [pl for pl in self.study_config.marker_assemblies if pl.name==assembly_name]
                 if pls: # may already have been removed
                     self._remove_plane(pls[0])
             return
 
         # for all addition or change events, reload the concerned plane
-        i = [i for i in range(len(self.study_config.planes)) if self.study_config.planes[i].name==plane_name]
+        i = [i for i in range(len(self.study_config.marker_assemblies)) if self.study_config.marker_assemblies[i].name==assembly_name]
         try:
-            p_def = plane.Definition.load_from_json(change_path.parent)
+            p_def = marker_assembly.Definition.load_from_json(change_path.parent)
         except:
             # failed, just abort
             return
         if not i:
-            if change_type=='added' and change_path.name==plane.Definition.default_json_file_name:
+            if change_type=='added' and change_path.name in (marker_assembly.Definition_Plane_Aruco.default_json_file_name, marker_assembly.Definition_MarkerAssembly_3D.default_json_file_name):
                 # new plane
-                self.study_config.planes.append(p_def)
-                i = len(self.study_config.planes)-1
+                self.study_config.marker_assemblies.append(p_def)
+                i = len(self.study_config.marker_assemblies)-1
             else:
                 # unknown plane, ignore
                 return
         else:
             i = i[0]
-            self.study_config.planes[i] = p_def
+            self.study_config.marker_assemblies[i] = p_def
         # try to load plane
-        self._load_plane(self.study_config.planes[i], defer_image_upload=True)
+        self._load_plane(self.study_config.marker_assemblies[i], defer_image_upload=True)
 
     def _session_change_callback(self, change_path: pathlib.Path, change_type: str):
         # NB watcher filter is configured such that all adds and deletes are folder and all modifies are files of interest
@@ -693,8 +693,8 @@ class GUI:
             return _get_known_recordings(dev_types=[session.RecordingType.Camera], dev_sub_types=[camera_recording.Type.Head_attached])
         def _get_known_individual_markers() -> list[gt_marker.MarkerID]:
             return sorted([gt_marker.MarkerID(m.id, m.aruco_dict_id) for m in self.study_config.individual_markers])
-        def _get_known_planes() -> list[str]:
-            return sorted([p.name for p in self.study_config.planes])
+        def _get_known_assemblies() -> list[str]:
+            return sorted([p.name for p in self.study_config.marker_assemblies])
         self._possible_value_getters = {
             'mapped_video_make_which': _get_known_recordings,
             'mapped_video_recording_colors': _get_known_recordings_only_eye_tracker,
@@ -706,7 +706,7 @@ class GUI:
             'head_attached_recordings_replace_et_scene': _get_known_recordings_only_camera_head_attached,
             'interpolate_plane_pose_recordings': _get_known_recordings_only_eye_tracker,
             'session_def_et_recordings': _get_known_recordings_only_eye_tracker,
-            'planes': _get_known_planes,
+            'marker_assemblies': _get_known_assemblies,
             'auto_code': {'markers': _get_known_individual_markers, 'start_markers': _get_known_individual_markers, 'end_markers': _get_known_individual_markers},
             'which_recordings': _get_known_recordings
         }
@@ -723,8 +723,8 @@ class GUI:
         if len(cs)!=1:
             return {}
         cs = cs[0]
-        # get target planes
-        planes = {p:pc for p in cs['planes'] if p in self.plane_configs and isinstance((pc:=self.plane_configs[p]),gt_plane.TargetPlane)}
+        # get target assemblies
+        planes = {p:pc for p in cs['marker_assemblies'] if p in self.assembly_configs and isinstance((pc:=self.assembly_configs[p]),gt_plane.TargetPlane)}
         if not planes:
             return {}
         # NB: use immediately invoked lambda to capture p correctly (avoid late binding issues)
@@ -742,32 +742,33 @@ class GUI:
         self._session_lister_set_extra_columns_to_show()    # only place we have to add this. Adding or deleting a session def from the study config triggers the current function
 
     def _reload_planes(self):
-        self.plane_configs.clear()
+        self.assembly_configs.clear()
         self._plane_preview_cache.clear()
-        for p_def in self.study_config.planes:
+        for p_def in self.study_config.marker_assemblies:
             self._load_plane(p_def)
-    def _load_plane(self, p_def: plane.Definition, defer_image_upload=False):
+    def _load_plane(self, p_def: marker_assembly.Definition, defer_image_upload=False):
         config_dir = config.guess_config_dir(self.study_config.working_directory)
-        if not p_def.has_complete_setup():
-            self.plane_configs[p_def.name] = None
+        if not p_def.has_complete_setup(config_dir / p_def.name):
+            self.assembly_configs[p_def.name] = None
             self._plane_preview_cache.pop(p_def.name,None)
             return
 
         try:
-            self.plane_configs[p_def.name] = plane.get_plane_from_definition(p_def, config_dir/p_def.name)
+            self.assembly_configs[p_def.name] = marker_assembly.get_marker_assembly_from_definition(p_def, config_dir/p_def.name)
         except Exception as exc:
-            self.plane_configs[p_def.name] = exc
+            self.assembly_configs[p_def.name] = exc
         else:
-            if defer_image_upload:
-                self._plane_preview_cache[p_def.name] = 'needs_upload'
-            else:
-                self._plane_preview_cache[p_def.name] = utils.load_image_with_helper(self.plane_configs[p_def.name].get_ref_image(as_RGB=True))
-    def _upload_plane_image(self, p_def: plane.Definition):
-        self._plane_preview_cache[p_def.name] = utils.load_image_with_helper(self.plane_configs[p_def.name].get_ref_image(as_RGB=True))
-    def _remove_plane(self, p_def: plane.Definition):
+            if isinstance(self.assembly_configs[p_def.name], gt_plane.Plane):
+                if defer_image_upload:
+                    self._plane_preview_cache[p_def.name] = 'needs_upload'
+                else:
+                    self._plane_preview_cache[p_def.name] = utils.load_image_with_helper(self.assembly_configs[p_def.name].get_ref_image(as_RGB=True))
+    def _upload_plane_image(self, p_def: marker_assembly.Definition):
+        self._plane_preview_cache[p_def.name] = utils.load_image_with_helper(self.assembly_configs[p_def.name].get_ref_image(as_RGB=True))
+    def _remove_plane(self, p_def: marker_assembly.Definition):
         callbacks.delete_plane(self.study_config, p_def)
-        self.study_config.planes = [p for p in self.study_config.planes if p.name!=p_def.name]
-        self.plane_configs.pop(p_def.name, None)
+        self.study_config.marker_assemblies = [p for p in self.study_config.marker_assemblies if p.name!=p_def.name]
+        self.assembly_configs.pop(p_def.name, None)
         self._plane_preview_cache.pop(p_def.name, None)
 
     def _reload_calibrations(self):
@@ -790,7 +791,7 @@ class GUI:
         if self.study_config is None:
             self._problems_cache = {}
             self.setup_recordings_error_level = type_utils.ProblemLevel.Error
-            self.setup_plane_error_level = self.setup_coding_error_level = self.setup_individual_markers_error_level = None
+            self.setup_assembly_error_level = self.setup_coding_error_level = self.setup_individual_markers_error_level = None
             self.can_accept_sessions = False
             return
 
@@ -815,21 +816,21 @@ class GUI:
         # Check for a missing recording setup or trouble with the camera calibrations if any are defined.
         self.setup_recordings_error_level = setup_error_level('session_def', invalid=any(
             isinstance(self.cam_calibrations.get(r.name), Exception) for r in self.study_config.session_def.recordings))
-        if any((self.study_config.planes, self.study_config.coding_setup, self.study_config.individual_markers)):
+        if any((self.study_config.marker_assemblies, self.study_config.coding_setup, self.study_config.individual_markers)):
             # This is not overlay-only, perform relevant checks.
-            self.setup_plane_error_level = setup_error_level('planes', invalid=not self.study_config.planes or any(
-                not isinstance(self.plane_configs.get(p.name), gt_plane.Plane) for p in self.study_config.planes))
+            self.setup_assembly_error_level = setup_error_level('marker_assemblies', invalid=not self.study_config.marker_assemblies or any(
+                not isinstance(self.assembly_configs.get(p.name), (gt_plane.Plane, gt_marker_assembly.MarkerAssembly)) for p in self.study_config.marker_assemblies))
             self.setup_coding_error_level = setup_error_level('coding_setup', invalid=not self.study_config.coding_setup)
             self.setup_individual_markers_error_level = setup_error_level('individual_markers', 'individual_marker_settings')
         else:
             # setup for only exporting gaze overlay videos. Clear any problems that may have been cached for the other setup types, since they are not relevant in this case.
-            self.setup_plane_error_level = self.setup_coding_error_level = self.setup_individual_markers_error_level = None
-            for key in ('planes', 'coding_setup', 'individual_markers', 'individual_marker_settings'):
+            self.setup_assembly_error_level = self.setup_coding_error_level = self.setup_individual_markers_error_level = None
+            for key in ('marker_assemblies', 'coding_setup', 'individual_markers', 'individual_marker_settings'):
                 self._problems_cache.pop(key, None)
 
         self.can_accept_sessions = type_utils.ProblemLevel.Error not in (
             type_utils.get_error_level(self._problems_cache), self.setup_recordings_error_level,
-            self.setup_plane_error_level, self.setup_coding_error_level, self.setup_individual_markers_error_level)
+            self.setup_assembly_error_level, self.setup_coding_error_level, self.setup_individual_markers_error_level)
 
     @typing.overload
     def _get_markers(self, use_family: typing.Literal[False] = False) -> dict[str,dict[str|int,list[gt_marker.MarkerID]]]: ...
@@ -837,9 +838,9 @@ class GUI:
     def _get_markers(self, use_family: typing.Literal[True]) -> dict[str,dict[str|int,list[gt_marker.MarkerFamilyID]]]: ...
     def _get_markers(self, use_family: bool = False) -> dict[str,dict[str|int,list[gt_marker.MarkerID]]] | dict[str,dict[str|int,list[gt_marker.MarkerFamilyID]]]:
         markers: dict[str,dict[str|int,list[gt_marker.MarkerID]]] = {}
-        for p in self.plane_configs:
-            if isinstance(self.plane_configs[p], gt_plane.Plane):
-                markers[p] = self.plane_configs[p].get_marker_IDs()
+        for p in self.assembly_configs:
+            if isinstance(self.assembly_configs[p], gt_marker_assembly.MarkerAssembly):
+                markers[p] = self.assembly_configs[p].get_marker_IDs()
         markers['xx_individual_markers_xx'] = {'markers': [gt_marker.MarkerID(m.id, m.aruco_dict_id) for m in self.study_config.individual_markers]}
         if use_family:
             return {name: {group: [m.to_family() for m in ids] for group, ids in groups.items()} for name, groups in markers.items()}
@@ -856,12 +857,12 @@ class GUI:
                     if s=='xx_individual_markers_xx':
                         msg = f'The individual markers contain'
                     else:
-                        msg = f'The set of {m} markers of the {s} "plane" contains'
+                        msg = f'The set of {m} markers of the {s} "assembly" contains'
                     msg += (f'{msg} duplicates: {gt_marker.format_duplicate_markers_msg(duplicates)}.' + (' Markers must be unique, fix this duplication.' if not self.study_config.allow_duplicated_markers else ''))
                     if s=='xx_individual_markers_xx':
                         type_utils.merge_problem_dicts(self._problems_cache, {'individual_markers': {d: (type_utils.ProblemLevel.Warning if self.study_config.allow_duplicated_markers else type_utils.ProblemLevel.Error, msg) for d in duplicates}})
                     else:
-                        type_utils.merge_problem_dicts(self._problems_cache, {'planes': {s: {'marker_file' if m=='plane' else 'target_file': (type_utils.ProblemLevel.Warning if self.study_config.allow_duplicated_markers else type_utils.ProblemLevel.Error, msg)}}})
+                        type_utils.merge_problem_dicts(self._problems_cache, {'marker_assemblies': {s: {'marker_file' if m in ('plane', 'assembly') else 'target_file': (type_utils.ProblemLevel.Warning if self.study_config.allow_duplicated_markers else type_utils.ProblemLevel.Error, msg)}}})
                 # check no collisions
                 if seen_markers.intersection(used_markers[s][m]):
                     # markers not unique, make error. Find exactly where the overlap is
@@ -878,14 +879,14 @@ class GUI:
                                         mark_msgs.append(f'individual markers')
                                     else:
                                         lbl = f'{mx} markers' if isinstance(mx,str) else f'dynamic validation target markers (column {mx})'
-                                        mark_msgs.append(f'{lbl} of the "{sx}" plane')
+                                        mark_msgs.append(f'{lbl} of the "{sx}" assembly')
                                 msg = f'The following markers are encountered in the setup both as {mark_msgs[0]} and as {mark_msgs[1]}: {gt_marker.format_duplicate_markers_msg(overlap)}.' + (' Markers must be unique, fix this duplication.' if not self.study_config.allow_duplicated_markers else '')
                                 # add error message to problem dict
                                 if 'xx_individual_markers_xx' in (s,s2):
                                     type_utils.merge_problem_dicts(self._problems_cache, {'individual_markers': {d: (type_utils.ProblemLevel.Warning if self.study_config.allow_duplicated_markers else type_utils.ProblemLevel.Error, msg) for d in overlap if d in used_markers['xx_individual_markers_xx']['markers']}})
                                 for sx,mx in zip((s,s2),(m,m2)):
                                     if sx!='xx_individual_markers_xx':
-                                        type_utils.merge_problem_dicts(self._problems_cache, {'planes': {sx: {'marker_file' if mx=='plane' else 'target_file': (type_utils.ProblemLevel.Warning if self.study_config.allow_duplicated_markers else type_utils.ProblemLevel.Error, msg)}}})
+                                        type_utils.merge_problem_dicts(self._problems_cache, {'marker_assemblies': {sx: {'marker_file' if mx in ('plane', 'assembly') else 'target_file': (type_utils.ProblemLevel.Warning if self.study_config.allow_duplicated_markers else type_utils.ProblemLevel.Error, msg)}}})
                 seen_markers.update(used_markers[s][m])
 
     def _check_camera_calibrations(self):
@@ -1020,7 +1021,7 @@ class GUI:
         self.project_dir = None
         self._possible_value_getters = {}
         self.study_config = None
-        self.plane_configs.clear()
+        self.assembly_configs.clear()
         self.sessions.clear()
         self._selected_sessions.clear()
         self._need_set_window_title = True
@@ -1106,11 +1107,11 @@ class GUI:
             imgui.pop_style_color(3)
         imgui.same_line()
 
-        if self.setup_plane_error_level is not None:
-            _indicate_needs_attention(self.setup_plane_error_level)
-        if imgui.button("Edit planes"):
-            new_win_params = ('Plane editor', self._plane_editor_pane_drawer)
-        if self.setup_plane_error_level is not None:
+        if self.setup_assembly_error_level is not None:
+            _indicate_needs_attention(self.setup_assembly_error_level)
+        if imgui.button("Edit planes & 3D Assemblies"):
+            new_win_params = ('Plane & 3D Assembly editor', self._plane_editor_pane_drawer)
+        if self.setup_assembly_error_level is not None:
             imgui.pop_style_color(3)
         imgui.same_line()
 
@@ -1139,7 +1140,7 @@ class GUI:
             self._to_focus = new_win_params[0]
 
         # rest of settings handled here in a settings tree
-        if any((k not in ['session_def', 'planes', 'coding_setup', 'individual_markers'] for k in self._problems_cache)):
+        if any((k not in ['session_def', 'marker_assemblies', 'coding_setup', 'individual_markers'] for k in self._problems_cache)):
             imgui.text_colored(colors.error,'*There are problems in the below setup that need to be resolved.\nHover over red text to get information about the error')
 
         fields = [k for k in config.study_parameter_types.keys() if k in config.study_defaults and k != 'individual_marker_settings']
@@ -1404,13 +1405,13 @@ class GUI:
             gt_gui.utils.push_popup(self, lambda: gt_gui.utils.popup("Add recording", _add_rec_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, outside=False))
 
     def _plane_editor_pane_drawer(self):
-        if self.setup_plane_error_level is not None:
-            if self.setup_plane_error_level==type_utils.ProblemLevel.Error:
+        if self.setup_assembly_error_level is not None:
+            if self.setup_assembly_error_level==type_utils.ProblemLevel.Error:
                 imgui.text_colored(colors.error,'*There are problems in the below setup that need to be resolved.\nHover over red text to get information about the error.')
             else:
                 imgui.text_colored(colors.warning,'*There are potential problems in the below setup.\nHover over yellow text to get information about the warning.')
-        if self.setup_plane_error_level is not None and (not self.study_config or not self.study_config.planes):
-            has_coding_setup_needing_plane = not not self.study_config.coding_setup and any((cs['event_type'] in (annotation.EventType.Trial, annotation.EventType.Validate) or (cs['event_type']==annotation.EventType.Sync_ET_Data and cs['sync_setup'] and cs['sync_setup']['get_cam_movement_method']=='plane') for cs in self.study_config.coding_setup))
+        if self.setup_assembly_error_level is not None and (not self.study_config or not self.study_config.marker_assemblies):
+            has_coding_setup_needing_plane = not not self.study_config.coding_setup and any((cs['event_type'] in (annotation.EventType.Trial, annotation.EventType.Validate) or (cs['event_type']==annotation.EventType.Sync_ET_Data and cs['sync_setup'] and cs['sync_setup']['get_cam_movement_method']=='assembly') for cs in self.study_config.coding_setup))
             has_individual_markers = not not self.study_config.individual_markers
             if has_coding_setup_needing_plane and has_individual_markers:
                 imgui.text_colored(colors.error,'*At minimum one plane should be defined when a coding setup needing a plane and individual markers are defined')
@@ -1418,21 +1419,21 @@ class GUI:
                 imgui.text_colored(colors.error,'*At minimum one plane should be defined when a coding setup needing a plane is defined')
             elif has_individual_markers:
                 imgui.text_colored(colors.error,'*At minimum one plane should be defined when individual markers are defined')
-        def _hover_img_error_popup(p_def: plane.Definition, load_error: Exception):
+        def _hover_img_error_popup(p_def: marker_assembly.Definition, load_error: Exception):
             if imgui.is_item_hovered(imgui.HoveredFlags_.for_tooltip|imgui.HoveredFlags_.delay_normal):
                 imgui.begin_tooltip()
                 if load_error:
                     imgui.text(str(load_error))
-                elif p.name in self._plane_preview_cache:
+                elif isinstance(self.assembly_configs.get(p.name), gt_plane.Plane) and p.name in self._plane_preview_cache:
                     if isinstance(self._plane_preview_cache[p_def.name],str) and self._plane_preview_cache[p_def.name]=='needs_upload':
                         self._upload_plane_image(p_def)
                     self._plane_preview_cache[p_def.name].render(largest=400*hello_imgui.dpi_window_size_factor())
                 imgui.end_tooltip()
-        for p in self.study_config.planes:
-            plane_problems = self._problems_cache.get('planes', {})
+        for p in self.study_config.marker_assemblies:
+            plane_problems = self._problems_cache.get('marker_assemblies', {})
             problem_fields = plane_problems.get(p.name, {}) if isinstance(plane_problems, dict) else {}
             fixed_fields   = p.fixed_fields()
-            load_error     = self.plane_configs[p.name] if p.name in self.plane_configs and isinstance(self.plane_configs[p.name], Exception) else None
+            load_error     = self.assembly_configs[p.name] if p.name in self.assembly_configs and isinstance(self.assembly_configs[p.name], Exception) else None
             extra = ''
             lbl = f'{p.name} ({p.type.value})'
             if (has_error:=type_utils.get_error_level(problem_fields) is not None or load_error is not None):
@@ -1443,19 +1444,19 @@ class GUI:
                     imgui.pop_style_color()
                 _hover_img_error_popup(p, load_error)
                 plane_dir = config.guess_config_dir(self.study_config.working_directory)/p.name
-                if p.type in (plane.Type.Plane_2D, plane.Type.Target_Plane_2D) and imgui.button(ifa6.ICON_FA_BARCODE+f' get ArUco markers'):
+                if p.type in (marker_assembly.Type.Plane_2D, marker_assembly.Type.Target_Plane_2D) and imgui.button(ifa6.ICON_FA_BARCODE+f' get ArUco markers'):
                     gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='deploy_aruco', ArUco_dict=p.aruco_dict_id, markerBorderBits=p.marker_border_bits))
-                changed, _, new_p, _, _ = settings_editor.draw_dict_editor(copy.deepcopy(p), type(p), 0, {}, list(plane.definition_parameter_types[p.type].keys()), plane.definition_parameter_types[p.type], plane.definition_defaults[p.type], problems=problem_fields, fixed=fixed_fields, documentation=plane.definition_parameter_doc)
+                changed, _, new_p, _, _ = settings_editor.draw_dict_editor(copy.deepcopy(p), type(p), 0, {}, list(marker_assembly.definition_parameter_types[p.type].keys()), marker_assembly.definition_parameter_types[p.type], marker_assembly.definition_defaults[p.type], problems=problem_fields, fixed=fixed_fields, documentation=marker_assembly.definition_parameter_doc)
                 if changed:
                     # persist changed config
                     new_p.store_as_json(plane_dir)
-                    if new_p.type==plane.Type.GlassesValidator and not new_p.use_default:
+                    if new_p.type==marker_assembly.Type.GlassesValidator and not new_p.use_default:
                         callbacks.glasses_validator_plane_check_or_deploy_config(self.study_config, new_p)
                     # NB: reloading of plane happens in change watcher
-                if imgui.button(ifa6.ICON_FA_FOLDER_OPEN+' open plane configuration folder'):
+                if imgui.button(ifa6.ICON_FA_FOLDER_OPEN+' open marker assembly configuration folder'):
                     callbacks.open_folder(self, plane_dir)
                 imgui.same_line()
-                if p.type==plane.Type.GlassesValidator:
+                if p.type==marker_assembly.Type.GlassesValidator:
                     if p.is_dynamic:
                         if p.use_default and imgui.button(ifa6.ICON_FA_TICKET+f' get glassesValidator dynamic script'):
                             gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='deploy_gv_dynamic_script'))
@@ -1475,21 +1476,21 @@ class GUI:
                 if has_error:
                     imgui.pop_style_color()
                 _hover_img_error_popup(p, load_error)
-        if imgui.button('+ new plane'):
+        if imgui.button('+ new plane or assembly'):
             new_plane_name = ''
-            new_plane_type: plane.Type = None
+            new_plane_type: marker_assembly.Type = None
             new_plane_is_dyn = False
             new_plane_dyn_config_file: str = ''
             def _valid_plane_name():
                 if not new_plane_name:
-                    return False, 'Plane name cannot be empty'
+                    return False, 'Plane or assembly name cannot be empty'
                 if not pathvalidate.is_valid_filename(new_plane_name, "auto"):
-                    return False, 'Plane name is not a valid filename'
-                if any(p.name==new_plane_name for p in self.study_config.planes):
-                    return False, 'A plane with this name already exists, choose a unique name'
+                    return False, 'Plane or assembly name is not a valid filename'
+                if any(p.name==new_plane_name for p in self.study_config.marker_assemblies):
+                    return False, 'A plane or assembly with this name already exists, choose a unique name'
                 return True, ''
             def _valid_config_file():
-                if new_plane_type != plane.Type.GlassesValidator or not new_plane_is_dyn or not new_plane_dyn_config_file:
+                if new_plane_type != marker_assembly.Type.GlassesValidator or not new_plane_is_dyn or not new_plane_dyn_config_file:
                     return True, ''
                 path = pathlib.Path(new_plane_dyn_config_file)
                 if path.suffix != '.json':
@@ -1502,7 +1503,7 @@ class GUI:
                 nonlocal new_plane_type
                 nonlocal new_plane_is_dyn
                 nonlocal new_plane_dyn_config_file
-                imgui.dummy(((30+30*(new_plane_type==plane.Type.GlassesValidator))*imgui.calc_text_size('x').x,0))
+                imgui.dummy(((30+30*(new_plane_type==marker_assembly.Type.GlassesValidator))*imgui.calc_text_size('x').x,0))
                 if imgui.begin_table("##new_plane_info",2):
                     imgui.table_setup_column("##new_plane_infos_left", imgui.TableColumnFlags_.width_fixed)
                     imgui.table_setup_column("##new_plane_infos_right", imgui.TableColumnFlags_.width_stretch)
@@ -1512,7 +1513,7 @@ class GUI:
                     invalid = not _valid_plane_name()[0]
                     if invalid:
                         imgui.push_style_color(imgui.Col_.text, colors.error)
-                    imgui.text("Plane name")
+                    imgui.text("Plane/assembly name")
                     if invalid:
                         imgui.pop_style_color()
                     imgui.table_next_column()
@@ -1524,16 +1525,16 @@ class GUI:
                     invalid = new_plane_type is None
                     if invalid:
                         imgui.push_style_color(imgui.Col_.text, colors.error)
-                    imgui.text("Plane type")
+                    imgui.text("Plane/assembly type")
                     if invalid:
                         imgui.pop_style_color()
                     imgui.table_next_column()
                     imgui.set_next_item_width(-1)
-                    p_idx = plane.types.index(new_plane_type) if new_plane_type is not None else -1
-                    _,p_idx = imgui.combo("##plane_type_selector", p_idx, [p.value for p in plane.types])
-                    new_plane_type = None if p_idx==-1 else plane.types[p_idx]
+                    p_idx = marker_assembly.types.index(new_plane_type) if new_plane_type is not None else -1
+                    _,p_idx = imgui.combo("##plane_type_selector", p_idx, [marker_assembly.type_display_names[p] for p in marker_assembly.types])
+                    new_plane_type = None if p_idx==-1 else marker_assembly.types[p_idx]
 
-                    if new_plane_type==plane.Type.GlassesValidator:
+                    if new_plane_type==marker_assembly.Type.GlassesValidator:
                         imgui.table_next_row()
                         imgui.table_next_column()
                         imgui.align_text_to_frame_padding()
@@ -1566,16 +1567,16 @@ class GUI:
                 if not valid:
                     imgui.text_colored(colors.error, reason)
                 if new_plane_type is None:
-                    imgui.text_colored(colors.error, 'Select a plane type')
+                    imgui.text_colored(colors.error, 'Select a plane/assembly type')
                 valid, reason = _valid_config_file()
                 if not valid:
                     imgui.text_colored(colors.error, reason)
 
             buttons = {
-                ifa6.ICON_FA_CHECK+" Create plane": (lambda: callbacks.make_plane(self, new_plane_type, new_plane_name, new_plane_is_dyn, new_plane_dyn_config_file), lambda: not _valid_plane_name()[0] or new_plane_type is None or not _valid_config_file()[0]),
+                ifa6.ICON_FA_CHECK+" Create plane or assembly": (lambda: callbacks.make_plane(self, new_plane_type, new_plane_name, new_plane_is_dyn, new_plane_dyn_config_file), lambda: not _valid_plane_name()[0] or new_plane_type is None or not _valid_config_file()[0]),
                 ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
             }
-            gt_gui.utils.push_popup(self, lambda: gt_gui.utils.popup("Add plane", _add_plane_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, outside=False))
+            gt_gui.utils.push_popup(self, lambda: gt_gui.utils.popup("Add plane or assembly", _add_plane_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, outside=False))
 
     def _coding_setup_pane_drawer(self):
         if self.setup_coding_error_level is not None:
@@ -1584,7 +1585,7 @@ class GUI:
             else:
                 imgui.text_colored(colors.warning,'*There are potential problems in the below setup.\nHover over yellow text to get information about the warning.')
         if self.setup_coding_error_level is not None and (not self.study_config or not self.study_config.coding_setup):
-            has_plane = not not self.study_config.planes
+            has_plane = not not self.study_config.marker_assemblies
             has_individual_markers = not not self.study_config.individual_markers
             if has_plane and has_individual_markers:
                 imgui.text_colored(colors.error,'*At minimum one coding setup should be defined when planes and individual markers are defined')
@@ -1872,7 +1873,7 @@ class GUI:
         imgui.separator()
         imgui.text('Marker detection settings')
         changed = False
-        all_problems = self.study_config._check_individual_marker_settings(False).get('individual_marker_settings', {})
+        all_problems = self.study_config._check_individual_marker_settings().get('individual_marker_settings', {})
         for name, params in list(self.study_config.individual_marker_settings.items()):
             problems = all_problems.get(name, {})
             if problems:
@@ -1944,10 +1945,10 @@ class GUI:
                                           actual_types: dict,
                                           problems: type_utils.ProblemDict) -> bool:
         changed = False
-        current_planes = {p.name: p for p in current.planes if isinstance(p, plane.Definition_Plane_Aruco)}
-        parent_planes = {p.name: p for p in parent.planes if isinstance(p, plane.Definition_Plane_Aruco)}
+        current_planes = {p.name: p for p in current.marker_assemblies if isinstance(p, marker_assembly.Definition_MarkerAssembly)}
+        parent_planes = {p.name: p for p in parent.marker_assemblies if isinstance(p, marker_assembly.Definition_MarkerAssembly)}
         sections = {
-            'planes': ('Planes', {name: p.aruco_settings for name, p in current_planes.items()},
+            'marker_assemblies': ('Planes & 3D Assemblies', {name: p.aruco_settings for name, p in current_planes.items()},
                        {name: p.aruco_settings for name, p in parent_planes.items()},
                        config.ArucoSettings, config.aruco_settings_doc.children),
             'individual_marker_settings': ('Individual-marker groups', current.individual_marker_settings,
@@ -1972,7 +1973,7 @@ class GUI:
                 continue
             for name, params in values.items():
                 field_errors = errors.get(name, {}) if isinstance(errors, dict) else {}
-                if field == 'planes' and isinstance(field_errors, dict):
+                if field == 'marker_assemblies' and isinstance(field_errors, dict):
                     field_errors = field_errors.get('aruco_settings', {})
                 if not node(name, name, field_errors):
                     continue
@@ -1982,7 +1983,7 @@ class GUI:
                     parent_obj=copy.deepcopy(inherited[name]), problems=field_errors, documentation=docs)
                 actual_types[field][name] = field_types
                 if edited:
-                    if field == 'planes':
+                    if field == 'marker_assemblies':
                         current_planes[name].aruco_settings = new_params
                     else:
                         current.individual_marker_settings[name] = new_params
@@ -2291,7 +2292,7 @@ class GUI:
         top_dump = {k: v for k, v in top_override.get_dump().items() if k in allowed_fields}
         # Drop overrides whose named targets no longer exist
         for field in config.StudyOverride.marker_settings_fields.intersection(top_dump):
-            known = {p.name for p in parent_config.planes if isinstance(p, plane.Definition_Plane_Aruco)} if field == 'planes' else parent_config.individual_marker_settings
+            known = {p.name for p in parent_config.marker_assemblies if isinstance(p, marker_assembly.Definition_MarkerAssembly)} if field == 'marker_assemblies' else parent_config.individual_marker_settings
             top_dump[field] = {name: params for name, params in top_dump[field].items() if name in known}
             if not top_dump[field]:
                 del top_dump[field]

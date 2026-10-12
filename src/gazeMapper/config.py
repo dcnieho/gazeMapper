@@ -147,30 +147,30 @@ aruco_marker_border_doc = _aruco_parameter_doc('markerBorderBits', *aruco.detect
 
 
 aruco_settings_doc = type_utils.GUIDocInfo('ArUco detection',
-    'Detection settings for markers on this plane.', {
+    'Detection settings for markers in this assembly.', {
     'detector_params': type_utils.GUIDocInfo('Detector parameters', 'Parameters for OpenCV\'s ArUco detector.', aruco_detector_parameter_doc),
-    'refine_params': type_utils.GUIDocInfo('Board refinement parameters', 'Parameters for OpenCV\'s board refinement process to recover missing markers on planes.', aruco_refine_parameter_doc),
-    'refine': type_utils.GUIDocInfo('Refine board detections', 'Recover missing markers on planes.'),
+    'refine_params': type_utils.GUIDocInfo('Assembly refinement parameters', 'Parameters for recovering missing markers in an assembly, using OpenCV\'s board refinement process.', aruco_refine_parameter_doc),
+    'refine': type_utils.GUIDocInfo('Refine assembly detections', 'Recover missing markers in an assembly.'),
     'undistort': type_utils.GUIDocInfo('Undistort before detection', 'Undistort images before ArUco marker detection. Requires camera calibration.'),
-    'pose_consistency': type_utils.GUIDocInfo('Pose consistency', 'Try to robustly determine a plane pose by rejecting detected markers that are behind the camera, face away from it or are too tilted with respect to the camera, or disagree with the plane pose beyond a corner reprojection limit. Optionally also checks temporal pose consistency with previous poses.', {
+    'pose_consistency': type_utils.GUIDocInfo('Pose consistency', 'Try to robustly determine an assembly pose by rejecting detected markers that are behind the camera, face away from it or are too tilted with respect to the camera, or disagree with the assembly pose beyond a corner reprojection limit. Optionally also checks temporal pose consistency with previous poses.', {
         'enabled': type_utils.GUIDocInfo('Enabled', 'Filter detected markers by checking whether they are in front of the camera, facing the camera, are not too tilted, and have a small corner reprojection error. Requires camera calibration.'),
-        'max_reprojection_error_fraction': type_utils.GUIDocInfo('Corner reprojection limit (fraction)', 'For each marker, the reprojection error is the largest 2D Euclidean distance, in pixels, between any detected corner and its expected projected position given the fitted plane pose. The marker passes the reprojection check when this error is no greater than this fraction of its median detected edge length, clamped to the minimum and maximum pixel limits below.'),
+        'max_reprojection_error_fraction': type_utils.GUIDocInfo('Corner reprojection limit (fraction)', 'For each marker, the reprojection error is the largest 2D Euclidean distance, in pixels, between any detected corner and its expected projected position given the fitted assembly pose. The marker passes the reprojection check when this error is no greater than this fraction of its median detected edge length, clamped to the minimum and maximum pixel limits below.'),
         'min_reprojection_error_px': type_utils.GUIDocInfo('Minimum corner error limit (pixels)', 'Lower clamp for the per-corner reprojection limit.'),
         'max_reprojection_error_px': type_utils.GUIDocInfo('Maximum corner error limit (pixels)', 'Upper clamp for the per-corner reprojection limit.'),
-        'fast_path_min_spread_fraction': type_utils.GUIDocInfo('Fast-path minimum board spread', 'Require selected marker centers to span at least this fraction of the known board layout area to accept the initial fit without a robust search. Since this is an area, 0.05 means about 22% of the board\'s width and height (0.224 x 0.224 ≈ 0.05).'),
+        'fast_path_min_spread_fraction': type_utils.GUIDocInfo('Fast-path minimum assembly spread', 'Require selected marker centers to span at least this fraction of the known assembly layout area to accept the initial fit without a robust search. Since this is an area, 0.05 means about 22% of the assembly\'s width and height (0.224 x 0.224 ≈ 0.05).'),
         'max_subsets': type_utils.GUIDocInfo('Maximum detection subsets', 'Maximum number of detection subsets evaluated in one pose-consistency search. Larger combinatorial searches use deterministic sampling within this limit.'),
         'max_marker_tilt_angle_deg': type_utils.GUIDocInfo('Maximum marker tilt (degrees)', 'Maximum angle between the marker front-face normal (as determined from the plane pose) and the direction from the marker center toward the camera. 0 degrees is face-on; 90 degrees is edge-on; angles above 90 degrees are back-facing. Must be in [0, 90), so edge-on and back-facing markers are rejected.'),
-        'temporal_enabled': type_utils.GUIDocInfo('Enable temporal pose check', 'Reject poses whose camera motion relative to the plane exceeds the configured translation or rotation speed. Requires a plane unit of m, cm, or mm for translation checking and frame timestamps.'),
-        'temporal_invert_pose': type_utils.GUIDocInfo('Invert pose for temporal check', 'Compare camera pose in the board frame when enabled (default); otherwise compare the raw board pose in the camera frame. This affects temporal filtering only, not saved pose direction.'),
+        'temporal_enabled': type_utils.GUIDocInfo('Enable temporal pose check', 'Reject poses whose camera motion relative to the assembly exceeds the configured translation or rotation speed. Requires an assembly unit of m, cm, or mm for translation checking and frame timestamps.'),
+        'temporal_invert_pose': type_utils.GUIDocInfo('Invert pose for temporal check', 'Check camera movement with respect to the assembly when enabled (default); otherwise check\'s the movement of the assembly with respect to the camera.'),
         'temporal_history_size': type_utils.GUIDocInfo('Temporal history size', 'Number of previous accepted poses retained for speed checks.'),
-        'max_translation_speed_m_s': type_utils.GUIDocInfo('Maximum translation speed (m/s)', 'Maximum camera translation speed relative to the plane.'),
+        'max_translation_speed_m_s': type_utils.GUIDocInfo('Maximum translation speed (m/s)', 'Maximum camera translation speed relative to the assembly.'),
         'max_rotation_speed_deg_s': type_utils.GUIDocInfo('Maximum rotation speed (degrees/s)', 'Maximum camera-orientation change relative to the plane per second.')
     })
 })
 
 
-# Define ArUco settings before importing the plane definitions that use them.
-from . import marker, plane, session
+# Define ArUco settings before importing the assembly definitions that use them.
+from . import marker, marker_assembly, session
 from .GUI._impl import utils as gui_utils
 
 
@@ -210,7 +210,7 @@ class CamMovementForEtSyncFunction(typed_dict_defaults.TypedDictDefault, total=F
     parameters      : dict[str,Any] = typed_dict_defaults.Field(default_factory=lambda: {})
 
 class EtSyncSetup(typed_dict_defaults.TypedDictDefault, total=False):
-    get_cam_movement_method     : Literal['plane','function']       = 'plane'
+    get_cam_movement_method     : Literal['assembly','function']    = 'assembly'
     get_cam_movement_function   : CamMovementForEtSyncFunction|None = None
     use_average                 : bool                              = True
 
@@ -237,19 +237,20 @@ class EventSetup(typed_dict_defaults.TypedDictDefault, total=False):
     name            : str
     description     : str|None = None
     hotkey          : str|None = None
-    planes          : set[str] = typed_dict_defaults.Field(default_factory=lambda: set())
+    marker_assemblies: set[str] = typed_dict_defaults.Field(default_factory=lambda: set())
     which_recordings: set[str]|None = None
     load_from_other_recordings: bool = False
     auto_code       : AutoCodeSyncPoints|AutoCodeEpisodes|None = None
     sync_setup      : EtSyncSetup|None = None
     validation_setup: ValidationSetup|None = None
     gaze_offset_setup: dict[str,GazeOffsetSetup]|None = None
+
 event_setup_field_order = [
     'event_type',
     'name',
     'description',
     'hotkey',
-    'planes',
+    'marker_assemblies',
     'which_recordings',
     'load_from_other_recordings',
     'auto_code',
@@ -270,7 +271,7 @@ class Study:
     @typeguard.typechecked(collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
     def __init__(self,
                  session_def                                : session.SessionDefinition,
-                 planes                                     : list[plane.Definition],
+                 marker_assemblies                          : list[marker_assembly.Definition],
                  individual_markers                         : list[marker.Marker],
                  coding_setup                               : list[EventSetup],
                  working_directory                          : str|pathlib.Path,
@@ -310,11 +311,11 @@ class Study:
                  mapped_video_projected_left_ray_color                 : RgbColor|None                     = RgbColor(  0,  0,255),
                  mapped_video_projected_right_ray_color                : RgbColor|None                     = RgbColor(255,  0,  0),
                  mapped_video_projected_average_ray_color              : RgbColor|None                     = RgbColor(255,  0,255),
-                 mapped_video_process_planes_for_all_frames            : bool                              = False,
+                 mapped_video_process_marker_assemblies_for_all_frames : bool                              = False,
                  mapped_video_process_annotations_for_all_recordings   : bool                              = True,
-                 mapped_video_plane_marker_color                       : RgbColor|None                     = RgbColor(  0,255,  0),
-                 mapped_video_recovered_plane_marker_color             : RgbColor|None                     = RgbColor(  0,255,255),
-                 mapped_video_plane_axis_arm_length                    : float                             = 25.,
+                 mapped_video_assembly_marker_color                    : RgbColor|None                     = RgbColor(  0,255,  0),
+                 mapped_video_recovered_assembly_marker_color          : RgbColor|None                     = RgbColor(  0,255,255),
+                 mapped_video_assembly_axis_arm_length                 : float                             = 25.,
                  mapped_video_individual_marker_color                  : RgbColor|None                     = RgbColor(255,  0,255),
                  mapped_video_individual_marker_axis_arm_length        : float                             = 25.,
                  mapped_video_unexpected_marker_color                  : RgbColor|None                     = RgbColor(255,255,128),
@@ -333,7 +334,7 @@ class Study:
                  strict_check                               : bool                          = True
         ):
         self.session_def                                = session_def
-        self.planes                                     = planes
+        self.marker_assemblies                          = marker_assemblies
         self.individual_markers                         = individual_markers
         self.coding_setup                               = coding_setup
         self.working_directory                          = working_directory
@@ -372,11 +373,11 @@ class Study:
         self.mapped_video_projected_left_ray_color                 = mapped_video_projected_left_ray_color
         self.mapped_video_projected_right_ray_color                = mapped_video_projected_right_ray_color
         self.mapped_video_projected_average_ray_color              = mapped_video_projected_average_ray_color
-        self.mapped_video_process_planes_for_all_frames            = mapped_video_process_planes_for_all_frames             # if True, all planes are processed for all frames, if False, only according to the planes_per_episode setup and the coding
-        self.mapped_video_process_annotations_for_all_recordings   = mapped_video_process_annotations_for_all_recordings    # if True, all coded episodes for all planes of all recordings are processed (so e.g. if validation coded for one recording in the session, that plane is processed for all)
-        self.mapped_video_plane_marker_color                       = mapped_video_plane_marker_color
-        self.mapped_video_recovered_plane_marker_color             = mapped_video_recovered_plane_marker_color
-        self.mapped_video_plane_axis_arm_length                    = mapped_video_plane_axis_arm_length
+        self.mapped_video_process_marker_assemblies_for_all_frames = mapped_video_process_marker_assemblies_for_all_frames  # if True, all marker assemblies are processed for all frames, if False, only according to the marker_assemblies_per_episode setup and the coding
+        self.mapped_video_process_annotations_for_all_recordings   = mapped_video_process_annotations_for_all_recordings    # if True, all coded episodes for all marker assemblies of all recordings are processed
+        self.mapped_video_assembly_marker_color                    = mapped_video_assembly_marker_color
+        self.mapped_video_recovered_assembly_marker_color          = mapped_video_recovered_assembly_marker_color
+        self.mapped_video_assembly_axis_arm_length                 = mapped_video_assembly_axis_arm_length
         self.mapped_video_individual_marker_color                  = mapped_video_individual_marker_color
         self.mapped_video_individual_marker_axis_arm_length        = mapped_video_individual_marker_axis_arm_length
         self.mapped_video_unexpected_marker_color                  = mapped_video_unexpected_marker_color
@@ -428,17 +429,22 @@ class Study:
                 for p in cs['gaze_offset_setup']:
                     cs['gaze_offset_setup'][p] = GazeOffsetSetup(cs['gaze_offset_setup'][p])
 
+        problems = self.field_problems()
         if strict_check:
-            self._check_plane_aruco_settings(strict_check)
-            self._check_session_def(strict_check)
-            self._check_coding_setup(strict_check)
-            self._check_auto_markers(strict_check)
-            self._check_individual_marker_settings(strict_check)
-            self._check_individual_markers(strict_check)
-            self._check_head_attached_recordings(strict_check)
-            self._check_interpolate_plane_pose(strict_check)
-            self._check_sync_ref(strict_check)
-            self._check_make_video(strict_check)
+            messages = self._format_problems(problems)
+            if messages:
+                raise ValueError('\n'.join(messages))
+
+    @staticmethod
+    def _format_problems(problems: type_utils.ProblemDict, prefix: str = '') -> list[str]:
+        messages = []
+        for key, entry in problems.items():
+            path = f'{prefix}.{key}' if prefix else str(key)
+            if isinstance(entry, dict):
+                messages.extend(Study._format_problems(entry, path))
+            elif entry[0] != type_utils.ProblemLevel.Information:
+                messages.append(f'{path}: {entry[1]}' if entry[1] else path)
+        return messages
 
     def _register_annotations(self):
         annotation.unregister_all_annotation_types()
@@ -451,7 +457,7 @@ class Study:
             ))
 
 
-    def _check_recordings(self, field: str, strict_check: bool, *, owner: 'Study|dict[str,Any]|None' = None, context: str|None = None) -> type_utils.ProblemDict:
+    def _check_recordings(self, field: str, *, owner: 'Study|dict[str,Any]|None' = None, context: str|None = None) -> type_utils.ProblemDict:
         owner = self if owner is None else owner
         label = f'{context}.{field}' if context else field
         if isinstance(owner, dict):
@@ -470,8 +476,6 @@ class Study:
         elif not isinstance(which, str) and any(not isinstance(name, str) for name in which):
             msg = f'{label} must contain only recording names (strings)' if not isinstance(which, dict) else f'{label} must have only recording names (strings) as keys'
         if msg is not None:
-            if strict_check:
-                raise ValueError(msg)
             return {field: (type_utils.ProblemLevel.Error, msg)}
 
         # A scalar name represents one recording; dictionaries supply their keys.
@@ -479,8 +483,6 @@ class Study:
         missing_recs: list[str] = []
         for name in names:
             if not any(r.name==name for r in self.session_def.recordings):
-                if strict_check:
-                    raise ValueError(f'Recording "{name}" not known, check {label} in the study configuration')
                 missing_recs.append(name)
         if missing_recs:
             problems[field] = (type_utils.ProblemLevel.Error, f'Recording(s) {missing_recs[0] if len(missing_recs)==1 else missing_recs} not known')
@@ -488,14 +490,11 @@ class Study:
                 type_utils.merge_problem_dicts(problems, {field: {name: (type_utils.ProblemLevel.Error, f'Recording {name} not known') for name in missing_recs}})
         return problems
 
-    def _check_session_def(self, strict_check) -> type_utils.ProblemDict:
+    def _check_session_def(self) -> type_utils.ProblemDict:
         problems: type_utils.ProblemDict = {}
         # require at least one eye tracker recording
         if not any(r.type==session.RecordingType.Eye_Tracker for r in self.session_def.recordings):
-            if strict_check:
-                raise ValueError('At least one recording should be an eye tracker recording')
-            else:
-                problems['session_def'] = (type_utils.ProblemLevel.Error, 'At least one recording should be an eye tracker recording')
+            problems['session_def'] = (type_utils.ProblemLevel.Error, 'At least one recording should be an eye tracker recording')
         # additional checks for camera recordings
         for r in self.session_def.recordings:
             if r.type==session.RecordingType.Camera:
@@ -517,154 +516,105 @@ class Study:
                     elif not any(r2.name==r.associated_recording and r2.type==session.RecordingType.Eye_Tracker for r2 in self.session_def.recordings):
                         msg = f'The defined associated recording, "{r.associated_recording}" should be an eye tracker recording, but it is not'
                 if msg is not None:
-                    if strict_check:
-                        raise ValueError(f'problem with set up of "{r.name}" recording in session_def: {msg}')
-                    else:
-                        type_utils.merge_problem_dicts(problems, {'session_def': {r.name: (type_utils.ProblemLevel.Error, msg)}})
+                    type_utils.merge_problem_dicts(problems, {'session_def': {r.name: (type_utils.ProblemLevel.Error, msg)}})
         return problems
 
-    def _check_coding_setup(self, strict_check) -> type_utils.ProblemDict:
+    def _check_coding_setup(self) -> type_utils.ProblemDict:
         problems: type_utils.ProblemDict = {}
         for i, cs in enumerate(self.coding_setup):
             if not pathvalidate.is_valid_filename(cs['name'], "auto"):
                 msg = f'Coding setup name "{cs["name"]}" is not valid. It should be a valid filename'
-                if strict_check:
-                    raise ValueError(msg)
-                else:
-                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'name': (type_utils.ProblemLevel.Error, msg)}}})
-            missing_planes: list[str] = []
-            for p in cs['planes']:
-                if not any([p==pl.name for pl in self.planes]):
-                    if strict_check:
-                        raise ValueError(f'Plane {p} not known')
-                    else:
-                        missing_planes.append(p)
-            if missing_planes:
-                mp = '", "'.join(missing_planes)
-                type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'planes': (type_utils.ProblemLevel.Error, f'Plane(s) "{mp}" not known.')}}})
+                type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'name': (type_utils.ProblemLevel.Error, msg)}}})
+            missing_assemblies: list[str] = []
+            for p in cs['marker_assemblies']:
+                if not any([p==pl.name for pl in self.marker_assemblies]):
+                    missing_assemblies.append(p)
+            if missing_assemblies:
+                names = '", "'.join(missing_assemblies)
+                lbl = 'Marker assembly' if len(missing_assemblies)==1 else 'Marker assemblies'
+                msg = f'{lbl} "{names}" not known'
+                type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'marker_assemblies': (type_utils.ProblemLevel.Error, msg)}}})
 
-            # check correct number of planes is defined for the episode
-            num_planes_allowed = []    # min, max number of planes allowed. 99 means more than one allowed, 0 means none allowed
+            # Check how many marker assemblies are allowed for the episode.
+            num_assemblies_allowed = []    # min, max; 999 means more than one allowed, 0 means none
             match (e:=cs['event_type']):
                 case annotation.EventType.Sync_Camera:
-                    num_planes_allowed = [0,0]
+                    num_assemblies_allowed = [0,0]
                 case annotation.EventType.Sync_ET_Data:
-                    if cs['sync_setup'] is not None and cs['sync_setup'].get('get_cam_movement_method','')=='plane':
-                        num_planes_allowed = [1,1]
+                    if cs['sync_setup'] is not None and cs['sync_setup'].get('get_cam_movement_method','')=='assembly':
+                        num_assemblies_allowed = [1,1]
                     else:
-                        num_planes_allowed = [0,0]
+                        num_assemblies_allowed = [0,0]
                 case annotation.EventType.Validate:
-                    num_planes_allowed = [1,1]
+                    num_assemblies_allowed = [1,1]
                 case annotation.EventType.Trial:
-                    num_planes_allowed = [0,99]
-            if num_planes_allowed[0]==1 and not cs['planes']:
-                msg = ('At least one' if num_planes_allowed[1]>1 else 'One')+f' plane should be defined for a {annotation.tooltip_map[e]}'
-                if strict_check:
-                    raise ValueError(msg)
-                else:
-                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'planes': (type_utils.ProblemLevel.Error, msg)}}})
-            elif num_planes_allowed[1]==0 and cs['planes']:
-                msg = f'No planes should be defined for a {annotation.tooltip_map[e]} episode.'
+                    num_assemblies_allowed = [0,999]
+            if num_assemblies_allowed[0]==1 and not cs['marker_assemblies']:
+                msg = ('At least one' if num_assemblies_allowed[1]>1 else 'One')+f' marker assembly should be defined for a {annotation.tooltip_map[e]}'
+                type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'marker_assemblies': (type_utils.ProblemLevel.Error, msg)}}})
+            elif num_assemblies_allowed[1]==0 and cs['marker_assemblies']:
+                msg = f'No marker assemblies should be defined for a {annotation.tooltip_map[e]} episode.'
                 if e==annotation.EventType.Sync_ET_Data:
-                    msg += ' Alternatively, you may want to set the sync_setup.get_cam_movement_method for this episode to "plane".'
-                if strict_check:
-                    raise ValueError(msg)
-                else:
-                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'planes': (type_utils.ProblemLevel.Error, msg)}}})
-            elif num_planes_allowed[1]==1 and len(cs['planes'])>1:
-                msg = f'Only one plane should be defined for a {annotation.tooltip_map[e]}'
-                if strict_check:
-                    raise ValueError(msg)
-                else:
-                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'planes': (type_utils.ProblemLevel.Error, msg)}}})
-            if e==annotation.EventType.Validate and cs['planes']:
-                pl_name = list(cs['planes'])[0]
-                pl_def = [pl for pl in self.planes if pl.name==pl_name]
-                if pl_def and pl_def[0].type!=plane.Type.GlassesValidator:
-                    msg = f'Plane {pl_name} is not a {plane.Type.GlassesValidator.value} plane, cannot be used for validation.'
-                    if strict_check:
-                        raise ValueError(msg)
-                    else:
-                        type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'planes': (type_utils.ProblemLevel.Error, msg)}}})
+                    msg += ' Alternatively, you may want to set the sync_setup.get_cam_movement_method for this episode to "assembly".'
+                type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'marker_assemblies': (type_utils.ProblemLevel.Error, msg)}}})
+            elif num_assemblies_allowed[1]==1 and len(cs['marker_assemblies'])>1:
+                msg = f'Only one marker assembly should be defined for a {annotation.tooltip_map[e]}'
+                type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'marker_assemblies': (type_utils.ProblemLevel.Error, msg)}}})
+            if e==annotation.EventType.Validate and cs['marker_assemblies']:
+                pl_name = list(cs['marker_assemblies'])[0]
+                pl_def = [pl for pl in self.marker_assemblies if pl.name==pl_name]
+                if pl_def and pl_def[0].type!=marker_assembly.Type.GlassesValidator:
+                    msg = f'Plane {pl_name} is not a {marker_assembly.Type.GlassesValidator.value} plane, cannot be used for validation.'
+                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'marker_assemblies': (type_utils.ProblemLevel.Error, msg)}}})
             if cs.get('gaze_offset_setup') is not None:
                 # check that this is a trial or validation episode
                 if e not in (annotation.EventType.Trial, annotation.EventType.Validate):
                     msg = f'Gaze offset setup can only be set up for {annotation.EventType.Trial.value} or {annotation.EventType.Validate.value} episodes, but this is a {annotation.tooltip_map[e]} episode.'
-                    if strict_check:
-                        raise ValueError(msg)
-                    else:
+                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'gaze_offset_setup': (type_utils.ProblemLevel.Error, msg)}}})
+                # Check that at least one selected assembly has planar target capability.
+                if cs['marker_assemblies']:
+                    p_types = {p:pl_def.type for p in cs['marker_assemblies'] for pl_def in self.marker_assemblies if pl_def.name==p}
+                    if not any(t in (marker_assembly.Type.Target_Plane_2D, marker_assembly.Type.GlassesValidator) for t in p_types.values()):
+                        msg = f'Gaze offset setup requires a {marker_assembly.Type.Target_Plane_2D.value} or {marker_assembly.Type.GlassesValidator.value} marker assembly.'
                         type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'gaze_offset_setup': (type_utils.ProblemLevel.Error, msg)}}})
-                # check that at least one of the defined planes is a target plane
-                if cs['planes']:
-                    p_types = {p:pl_def.type for p in cs['planes'] for pl_def in self.planes if pl_def.name==p}
-                    if not any(t in (plane.Type.Target_Plane_2D, plane.Type.GlassesValidator) for t in p_types.values()):
-                        msg = f'Gaze offset setup can only be set up if at least one of the planes is a {plane.Type.Target_Plane_2D.value} or {plane.Type.GlassesValidator.value} planes, but the selected planes are not.'
-                        if strict_check:
-                            raise ValueError(msg)
-                        else:
-                            type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'gaze_offset_setup': (type_utils.ProblemLevel.Error, msg)}}})
                 if not cs['gaze_offset_setup']:
                     msg = 'At least one plane should be defined in gaze_offset_setup when using a gaze offset setup.'
-                    if strict_check:
-                        raise ValueError(msg)
-                    else:
-                        type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'gaze_offset_setup': (type_utils.ProblemLevel.Error, msg)}}})
+                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'gaze_offset_setup': (type_utils.ProblemLevel.Error, msg)}}})
                 for p in cs['gaze_offset_setup']:
-                    # check the plane is part of this episode
-                    if p not in cs['planes']:
-                        msg = f'Gaze offset setup plane "{p}" is not among the defined planes for this episode.'
-                        if strict_check:
-                            raise ValueError(msg)
-                        else:
-                            type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'gaze_offset_setup': {p: (type_utils.ProblemLevel.Error, msg)}}}})
-                    # check the plane is a target plane
-                    p_type = [pl_def.type for pl_def in self.planes if pl_def.name==p]
-                    if p_type[0] not in (plane.Type.Target_Plane_2D, plane.Type.GlassesValidator):
-                        msg = f'Gaze offset setup can only be set up for {plane.Type.Target_Plane_2D.value} or {plane.Type.GlassesValidator.value} planes, but the plane {p} is not, its a {p_type[0].value} plane.'
-                        if strict_check:
-                            raise ValueError(msg)
-                        else:
-                            type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'gaze_offset_setup': {p: (type_utils.ProblemLevel.Error, msg)}}}})
+                    # Check that the selected assembly is part of this episode.
+                    if p not in cs['marker_assemblies']:
+                        msg = f'Gaze offset setup marker assembly "{p}" is not selected for this episode.'
+                        type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'gaze_offset_setup': {p: (type_utils.ProblemLevel.Error, msg)}}}})
+                    # Check that this assembly has planar target capability.
+                    p_type = [pl_def.type for pl_def in self.marker_assemblies if pl_def.name==p]
+                    if p_type and p_type[0] not in (marker_assembly.Type.Target_Plane_2D, marker_assembly.Type.GlassesValidator):
+                        msg = f'Gaze offset setup requires a {marker_assembly.Type.Target_Plane_2D.value} or {marker_assembly.Type.GlassesValidator.value} marker assembly, but "{p}" is a {p_type[0].value} assembly.'
+                        type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'gaze_offset_setup': {p: (type_utils.ProblemLevel.Error, msg)}}}})
 
                     gs = cs['gaze_offset_setup'][p]
                     # check that which_targets is set, and that it has at least one entry
                     if gs.get('which_targets') is None:
                         msg = 'Gaze offset setup.which_targets should be defined when using a gaze offset setup.'
-                        if strict_check:
-                            raise ValueError(msg)
-                        else:
-                            type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'gaze_offset_setup': {p: {'which_targets': (type_utils.ProblemLevel.Error, msg)}}}}})
+                        type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'gaze_offset_setup': {p: {'which_targets': (type_utils.ProblemLevel.Error, msg)}}}}})
                     elif not gs['which_targets']:
                         msg = 'At least one target should be defined in Gaze offset setup.which_targets.'
-                        if strict_check:
-                            raise ValueError(msg)
-                        else:
-                            type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'gaze_offset_setup': {p: {'which_targets': (type_utils.ProblemLevel.Error, msg)}}}}})
+                        type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'gaze_offset_setup': {p: {'which_targets': (type_utils.ProblemLevel.Error, msg)}}}}})
                     # check that viewing distance is set if data type viewpos_vidpos_homography is used
                     if gs.get('data_types') is not None and _data_types.DataType.viewpos_vidpos_homography in gs['data_types']:
                         if gs.get('viewing_distance_mm') is None:
                             msg = 'Gaze offset setup.viewing_distance_mm should be defined when using the viewpos_vidpos_homography data type.'
-                            if strict_check:
-                                raise ValueError(msg)
-                            else:
-                                type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'gaze_offset_setup': {p: {'viewing_distance_mm': (type_utils.ProblemLevel.Warning, msg)}}}}})
+                            type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'gaze_offset_setup': {p: {'viewing_distance_mm': (type_utils.ProblemLevel.Warning, msg)}}}}})
 
             # check hotkey
             if cs.get('hotkey') is not None and not gui_utils.is_valid_imgui_key(cs['hotkey']):
                 msg = f'Hotkey "{cs["hotkey"]}" is not a valid ImGui key name'
-                if strict_check:
-                    raise ValueError(msg)
-                else:
-                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'hotkey': (type_utils.ProblemLevel.Error, msg)}}})
+                type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'hotkey': (type_utils.ProblemLevel.Error, msg)}}})
 
             # check sync setup for ET sync episodes
             if e==annotation.EventType.Sync_ET_Data:
                 if cs['sync_setup'] is None:
                     msg = f'Sync setup should be defined for a {annotation.tooltip_map[e]} episode.'
-                    if strict_check:
-                        raise ValueError(msg)
-                    else:
-                        type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'sync_setup': (type_utils.ProblemLevel.Error, msg)}}})
+                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'sync_setup': (type_utils.ProblemLevel.Error, msg)}}})
                 else:
                     cam_mov_possible_values = typing.get_args(EtSyncSetup.__annotations__['get_cam_movement_method'])
                     if cs['sync_setup'].get('get_cam_movement_method') not in cam_mov_possible_values:
@@ -673,42 +623,25 @@ class Study:
                         temp = values_str.partition(f'"{values[-1]}"')
                         values_str = temp[0] + 'or ' + temp[1]
                         msg = f'sync_setup.get_cam_movement_method parameter should be {values_str}'
-                        if strict_check:
-                            raise ValueError(msg)
-                        else:
-                            type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'sync_setup': {'get_cam_movement_method': (type_utils.ProblemLevel.Error, msg)}}}})
-                        # nothing further to check, return
-                        return problems
+                        type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'sync_setup': {'get_cam_movement_method': (type_utils.ProblemLevel.Error, msg)}}}})
 
                     msg = None
                     if cs['sync_setup'].get('get_cam_movement_method')=='function':
                         if cs['sync_setup'].get('get_cam_movement_function') is None:
                             msg = f'Camera movement function should be defined for a {annotation.tooltip_map[e]} episode when the get_cam_movement_method is set to "function".'
-                            if strict_check:
-                                raise ValueError(msg)
-                            else:
-                                type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'sync_setup': (type_utils.ProblemLevel.Error, msg)}}})
+                            type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'sync_setup': (type_utils.ProblemLevel.Error, msg)}}})
                         else:
                             keys = ('module_or_file', 'function')
                             this_problems = {k:f'sync_setup.get_cam_movement_function.{k} should be set when sync_setup.get_cam_movement_method is set to "function"' for k in keys if k not in cs['sync_setup'].get('get_cam_movement_function') or not cs['sync_setup'].get('get_cam_movement_function')[k]}
                             if this_problems:
-                                if strict_check:
-                                    raise ValueError('\n'.join(this_problems.values()))
-                                else:
-                                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'sync_setup': {'get_cam_movement_function': {k: (type_utils.ProblemLevel.Error, msg) for k, msg in this_problems.items()}}}}})
-                        if cs['planes']:
-                            msg = f'No planes should be defined for a {annotation.tooltip_map[e]} episode unless the get_cam_movement_method is set to "plane".'
-                            if strict_check:
-                                raise ValueError(msg)
-                            else:
-                                type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'sync_setup': (type_utils.ProblemLevel.Error, msg)}}})
-                    elif cs['sync_setup'].get('get_cam_movement_method')=='plane':
-                        if not cs['planes']:
-                            msg = f'A plane should be defined for a {annotation.tooltip_map[e]} episode when the get_cam_movement_method is set to "plane".'
-                            if strict_check:
-                                raise ValueError(msg)
-                            else:
-                                type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'sync_setup': (type_utils.ProblemLevel.Error, msg)}}})
+                                type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'sync_setup': {'get_cam_movement_function': {k: (type_utils.ProblemLevel.Error, msg) for k, msg in this_problems.items()}}}}})
+                        if cs['marker_assemblies']:
+                            msg = f'No marker assemblies should be defined for a {annotation.tooltip_map[e]} episode unless the get_cam_movement_method is set to "assembly".'
+                            type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'sync_setup': (type_utils.ProblemLevel.Error, msg)}}})
+                    elif cs['sync_setup'].get('get_cam_movement_method')=='assembly':
+                        if not cs['marker_assemblies']:
+                            msg = f'A marker assembly should be defined for a {annotation.tooltip_map[e]} episode when the get_cam_movement_method is set to "assembly".'
+                            type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'sync_setup': (type_utils.ProblemLevel.Error, msg)}}})
 
             # check auto coding setup
             if cs.get('auto_code') is not None:
@@ -719,10 +652,7 @@ class Study:
 
                 this_problems = {k:f'auto_code.{k} should be set for a {annotation.tooltip_map[cs["event_type"]]} episode.' for k in fields if k not in cs['auto_code'] or not cs['auto_code'][k]}
                 if this_problems:
-                    if strict_check:
-                        raise ValueError('\n'.join(this_problems.values()))
-                    else:
-                        type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'auto_code': {k: (type_utils.ProblemLevel.Error, msg) for k, msg in this_problems.items()}}}})
+                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'auto_code': {k: (type_utils.ProblemLevel.Error, msg) for k, msg in this_problems.items()}}}})
                 else:
                     for f in fields:
                         missing_markers: list[gt_marker.MarkerID] = []
@@ -731,74 +661,50 @@ class Study:
                                 missing_markers.append(m)
                         if missing_markers:
                             msg = f'Markers "{", ".join([gt_marker.marker_ID_to_str(m) for m in missing_markers])}" specified in auto_code.{f}, but unknown because not present in individual_markers.'
-                            if strict_check:
-                                raise ValueError(msg)
-                            else:
-                                type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'auto_code': {f: (type_utils.ProblemLevel.Error, msg)}}}})
+                            type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'auto_code': {f: (type_utils.ProblemLevel.Error, msg)}}}})
 
             # check which_recordings settings
             if cs['event_type']==annotation.EventType.Sync_Camera:
                 # for camera sync episodes, which_recordings should not be set
                 if cs.get('which_recordings') is not None:
                     msg = f'which_recordings should not be set for a {annotation.tooltip_map[cs["event_type"]]} episode.'
-                    if strict_check:
-                        raise ValueError(msg)
-                    else:
-                        type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'which_recordings': (type_utils.ProblemLevel.Error, msg)}}})
+                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'which_recordings': (type_utils.ProblemLevel.Error, msg)}}})
             else:
                 if self.sync_ref_recording is not None and not cs.get('which_recordings'):
                     # NB: this is really because there is more than one recording, in which case sync_ref must be set
                     msg = 'When a sync reference recording is defined for the project, which_recordings should also be defined.'
-                    if strict_check:
-                        raise ValueError(msg)
-                    else:
-                        type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'which_recordings': (type_utils.ProblemLevel.Error, msg)}}})
+                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'which_recordings': (type_utils.ProblemLevel.Error, msg)}}})
                 if cs.get('which_recordings') is not None:
                     if not self.sync_ref_recording:
                         # this is really because there is only one recording, in which case which_recordings should not be set
                         msg = 'When no sync reference recording is defined for the project, which_recordings should not be defined.'
-                        if strict_check:
-                            raise ValueError(msg)
-                        else:
-                            type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'which_recordings': (type_utils.ProblemLevel.Error, msg)}}})
+                        type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'which_recordings': (type_utils.ProblemLevel.Error, msg)}}})
                     # check the defined recording exists
-                    this_problems = self._check_recordings('which_recordings', strict_check, owner=cs, context=f'coding_setup[{i}]')
+                    this_problems = self._check_recordings('which_recordings', owner=cs, context=f'coding_setup[{i}]')
                     if this_problems:
                         type_utils.merge_problem_dicts(problems, {'coding_setup': {i: this_problems}})
                     # check it makes sense to be defined for a given episode type
                     if cs['event_type'] in [annotation.EventType.Validate, annotation.EventType.Sync_ET_Data] and (problem_recs := [r for r in cs['which_recordings'] if any(r==rec.name and rec.type==session.RecordingType.Camera for rec in self.session_def.recordings)]):
                         msg = f'which_recordings should not include camera recordings for a {annotation.tooltip_map[cs["event_type"]]} episode. Offending recording(s): {problem_recs[0] if len(problem_recs)==1 else problem_recs}'
-                        if strict_check:
-                            raise ValueError(msg)
-                        else:
-                            type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'which_recordings': (type_utils.ProblemLevel.Error, msg)}}})
+                        type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'which_recordings': (type_utils.ProblemLevel.Error, msg)}}})
             # check load_from_other_recordings settings
             if cs['event_type']==annotation.EventType.Sync_Camera and  cs.get('load_from_other_recordings'):
                 msg = f'load_from_other_recordings should not be set for a {annotation.tooltip_map[cs["event_type"]]} episode.'
-                if strict_check:
-                    raise ValueError(msg)
-                else:
-                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'load_from_other_recordings': (type_utils.ProblemLevel.Error, msg)}}})
+                type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'load_from_other_recordings': (type_utils.ProblemLevel.Error, msg)}}})
             elif cs.get('load_from_other_recordings') and not self.sync_ref_recording:
                 # this is really because there is only one recording, in which case load_from_other_recordings should not be set
                 msg = 'When no sync reference recording is defined for the project, load_from_other_recordings should not be defined.'
-                if strict_check:
-                    raise ValueError(msg)
-                else:
-                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'load_from_other_recordings': (type_utils.ProblemLevel.Error, msg)}}})
+                type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'load_from_other_recordings': (type_utils.ProblemLevel.Error, msg)}}})
 
         sync_events = [(i, cs) for i, cs in enumerate(self.coding_setup) if cs['event_type']==annotation.EventType.Sync_ET_Data]
         use_average_settings = [cs['sync_setup'].get('use_average', False) for _, cs in sync_events if cs['sync_setup'] is not None]
         if use_average_settings and len(set(use_average_settings))!=1:
             msg = 'The setting "use_average" events is not consistent across configured ET sync events. Please set all to True or all to False.'
-            if strict_check:
-                raise ValueError(msg)
-            else:
-                for i, _ in sync_events:
-                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'sync_setup': {'use_average': (type_utils.ProblemLevel.Error, msg)}}}})
+            for i, _ in sync_events:
+                type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'sync_setup': {'use_average': (type_utils.ProblemLevel.Error, msg)}}}})
         return problems
 
-    def _check_auto_markers(self, strict_check) -> type_utils.ProblemDict:
+    def _check_auto_markers(self) -> type_utils.ProblemDict:
         problems: type_utils.ProblemDict = {}
         used_markers: dict[tuple[str,int,annotation.EventType,str],list[gt_marker.MarkerID]] = {}
         for i, cs in enumerate(self.coding_setup):
@@ -824,10 +730,7 @@ class Study:
             seen: set[gt_marker.MarkerFamilyID] = set()
             if (duplicates := {x for x in used_markers_fam[s] if x in seen or seen.add(x)}):
                 msg = f'The markers defined for {_format_key(s)} are not unique. ' +('Please resolve' if not self.allow_duplicated_markers else 'There are') + f' the following duplicates: {gt_marker.format_duplicate_markers_msg(duplicates)}'
-                if strict_check:
-                    raise ValueError(msg)
-                else:
-                    type_utils.merge_problem_dicts(problems, {'coding_setup': {s[1]: {'auto_code': {s[3]: (type_utils.ProblemLevel.Warning if self.allow_duplicated_markers else type_utils.ProblemLevel.Error, msg)}}}})
+                type_utils.merge_problem_dicts(problems, {'coding_setup': {s[1]: {'auto_code': {s[3]: (type_utils.ProblemLevel.Warning if self.allow_duplicated_markers else type_utils.ProblemLevel.Error, msg)}}}})
             # then check if already used in another setup
             if seen_markers.intersection(used_markers_fam[s]):
                 # markers not unique, make error. Find exactly where the overlap is
@@ -841,11 +744,8 @@ class Study:
                     if (overlap:=set(used_markers_fam[s2]).intersection(used_markers_fam[s])):
                         msg = f'The following markers are encountered in the setup for both {_format_key(s)} and {_format_key(s2)}: {gt_marker.format_duplicate_markers_msg(overlap)}.' +(' Markers cannot be used more than once, fix this collision.' if not self.allow_duplicated_markers else '')
                         # emit error message
-                        if strict_check:
-                            raise ValueError(msg)
-                        else:
-                            for sx in (s,s2):
-                                type_utils.merge_problem_dicts(problems, {'coding_setup': {sx[1]: {'auto_code': {sx[3]: (type_utils.ProblemLevel.Warning if self.allow_duplicated_markers else type_utils.ProblemLevel.Error, msg)}}}})
+                        for sx in (s,s2):
+                            type_utils.merge_problem_dicts(problems, {'coding_setup': {sx[1]: {'auto_code': {sx[3]: (type_utils.ProblemLevel.Warning if self.allow_duplicated_markers else type_utils.ProblemLevel.Error, msg)}}}})
             seen_markers.update(used_markers_fam[s])
             # check if marker sequence is already used
             if seen_markers_sets.intersection((tuple(used_markers_fam[s]),)):
@@ -855,11 +755,8 @@ class Study:
                     if set((tuple(used_markers_fam[s2]),)).intersection((tuple(used_markers_fam[s]),)):
                         msg = f'The marker sequence {gt_marker.format_marker_sequence_msg(used_markers_fam[s])} specified for {_format_key(s)} has already been used for {_format_key(s2)}.' +(' Markers sequences must be unique, please fix this collision.' if not self.allow_duplicated_markers else '')
                         # emit error message
-                        if strict_check:
-                            raise ValueError(msg)
-                        else:
-                            for sx in (s,s2):
-                                type_utils.merge_problem_dicts(problems, {'coding_setup': {sx[1]: {'auto_code': {sx[3]: (type_utils.ProblemLevel.Warning if self.allow_duplicated_markers else type_utils.ProblemLevel.Error, msg)}}}})
+                        for sx in (s,s2):
+                            type_utils.merge_problem_dicts(problems, {'coding_setup': {sx[1]: {'auto_code': {sx[3]: (type_utils.ProblemLevel.Warning if self.allow_duplicated_markers else type_utils.ProblemLevel.Error, msg)}}}})
             seen_markers_sets.add(tuple(used_markers_fam[s]))
         return problems
 
@@ -876,23 +773,18 @@ class Study:
             raise ValueError('A marker detection settings group must have a name')
         if name in self.individual_marker_settings:
             raise ValueError(f'Marker detection settings group "{name}" already exists')
-        self.individual_marker_settings[name] = ArucoDetectorParameters(
-            copy.deepcopy(self.individual_marker_settings['default']))
+        self.individual_marker_settings[name] = ArucoDetectorParameters(copy.deepcopy(self.individual_marker_settings['default']))
 
-    def _check_individual_marker_settings(self, strict_check) -> type_utils.ProblemDict:
-        groups = {}
+    def _check_individual_marker_settings(self) -> type_utils.ProblemDict:
+        problems: type_utils.ProblemDict = {}
         for name, params in self.individual_marker_settings.items():
-            problems = aruco_detector_problems(params)
+            if errors := aruco_detector_problems(params):
+                problems = type_utils.merge_problem_dicts(problems, {name: errors})
             if not name.strip():
-                problems = {'problem_with_this_key': (type_utils.ProblemLevel.Error, 'A settings group must have a name')}
-            if problems:
-                if strict_check:
-                    aruco.resolve_settings({'detector_params': params})
-                    raise ValueError('A marker detection settings group must have a name')
-                groups[name] = problems
-        return {'individual_marker_settings': groups} if groups else {}
+                problems = type_utils.merge_problem_dicts(problems, {name: (type_utils.ProblemLevel.Error, 'A settings group must have a name')})
+        return type_utils.merge_problem_dicts({}, {'individual_marker_settings': problems}) if problems else {}
 
-    def _check_individual_markers(self, strict_check):
+    def _check_individual_markers(self):
         problems: type_utils.ProblemDict = {}
         for m in self.individual_markers:
             problem = ''
@@ -907,27 +799,21 @@ class Study:
             if settings_problem := m.field_problems():
                 problem = '; '.join(p for p in [problem] + [message[1] for message in settings_problem.values()] if p)
             if problem:
-                if strict_check:
-                    raise ValueError(f'individual_markers marker {m.id} ({aruco.dict_id_to_str[m.aruco_dict_id]}): {problem}')
-                else:
-                    problems = type_utils.merge_problem_dicts(problems, {'individual_markers': {gt_marker.MarkerID(m.id, m.aruco_dict_id).to_family(): (type_utils.ProblemLevel.Error, problem)}})
+                problems = type_utils.merge_problem_dicts(problems, {'individual_markers': {gt_marker.MarkerID(m.id, m.aruco_dict_id).to_family(): (type_utils.ProblemLevel.Error, problem)}})
         return problems
 
-    def _check_head_attached_recordings(self, strict_check):
+    def _check_head_attached_recordings(self):
         problems: type_utils.ProblemDict = {}
         if self.head_attached_recordings_replace_et_scene:
             # check listed recordings exist
-            type_utils.merge_problem_dicts(problems, self._check_recordings('head_attached_recordings_replace_et_scene', strict_check))
+            type_utils.merge_problem_dicts(problems, self._check_recordings('head_attached_recordings_replace_et_scene'))
             # check listed recordings are head-attached camera recordings
             wrong = [r for r in self.head_attached_recordings_replace_et_scene if not any(r2.name==r and r2.type==session.RecordingType.Camera and r2.camera_recording_type==camera_recording.Type.Head_attached for r2 in self.session_def.recordings)]
             if wrong:
                 msg = 'the following recordings are not head-attached camera recordings:\n- ' + ('\n- '.join(wrong))
-                if strict_check:
-                    raise ValueError(msg)
-                else:
-                    problems = type_utils.merge_problem_dicts(problems, {'head_attached_recordings_replace_et_scene': (type_utils.ProblemLevel.Error, msg)})
-                    for r in wrong:
-                        type_utils.merge_problem_dicts(problems, {'session_def': {r: (type_utils.ProblemLevel.Error, f'{r} is not a head-attached camera recording but is listed in head_attached_recordings_replace_et_scene')}})
+                problems = type_utils.merge_problem_dicts(problems, {'head_attached_recordings_replace_et_scene': (type_utils.ProblemLevel.Error, msg)})
+                for r in wrong:
+                    type_utils.merge_problem_dicts(problems, {'session_def': {r: (type_utils.ProblemLevel.Error, f'{r} is not a head-attached camera recording but is listed in head_attached_recordings_replace_et_scene')}})
             # check that there is not more than one head-attached recording overriding a given ET recording
             overridden = [(r, r2.associated_recording) for r in self.head_attached_recordings_replace_et_scene for r2 in self.session_def.recordings if r2.name==r]
             # get duplicates
@@ -936,34 +822,25 @@ class Study:
                 for d in duplicates:
                     recs = [r[0] for r in overridden if r[1]==d]
                     msg = 'the recordings:\n- ' + ('\n- '.join(recs)) + f'\nare all listed as overriding the scene camera of the "{d}" recording. That is not possible, only a single override is allowed per eye tracker recording'
-                    if strict_check:
-                        raise ValueError(msg)
-                    else:
-                        problems = type_utils.merge_problem_dicts(problems, {'head_attached_recordings_replace_et_scene': (type_utils.ProblemLevel.Error, msg)})
+                    problems = type_utils.merge_problem_dicts(problems, {'head_attached_recordings_replace_et_scene': (type_utils.ProblemLevel.Error, msg)})
                     for r in recs:
                         type_utils.merge_problem_dicts(problems, {'session_def': {r: (type_utils.ProblemLevel.Error, f'{r} is listed as overriding the scene camera of the "{d}" recording but there is more than one override for that recording. Only a single override is allowed per eye tracker recording.')}})
         return problems
 
-    def _check_interpolate_plane_pose(self, strict_check):
+    def _check_interpolate_plane_pose(self):
         problems: type_utils.ProblemDict = {}
-        type_utils.merge_problem_dicts(problems, self._check_recordings('interpolate_plane_pose_recordings', strict_check))
+        type_utils.merge_problem_dicts(problems, self._check_recordings('interpolate_plane_pose_recordings'))
         if self.interpolate_plane_pose_recordings:
             wrong = [r for r in self.interpolate_plane_pose_recordings if any(r==rec.name and rec.type==session.RecordingType.Camera for rec in self.session_def.recordings)]
             if wrong:
                 msg = f'interpolate_plane_pose_recordings should only contain eye tracker recordings. Offending recording(s): {wrong[0] if len(wrong)==1 else wrong}'
-                if strict_check:
-                    raise ValueError(msg)
-                else:
-                    type_utils.merge_problem_dicts(problems, {'interpolate_plane_pose_recordings': (type_utils.ProblemLevel.Error, msg)})
+                type_utils.merge_problem_dicts(problems, {'interpolate_plane_pose_recordings': (type_utils.ProblemLevel.Error, msg)})
         if self.interpolate_plane_pose_max_missing_frames < 0:
             msg = 'interpolate_plane_pose_max_missing_frames should be >= 0'
-            if strict_check:
-                raise ValueError(msg)
-            else:
-                type_utils.merge_problem_dicts(problems, {'interpolate_plane_pose_max_missing_frames': (type_utils.ProblemLevel.Error, msg)})
+            type_utils.merge_problem_dicts(problems, {'interpolate_plane_pose_max_missing_frames': (type_utils.ProblemLevel.Error, msg)})
         return problems
 
-    def _check_sync_ref(self, strict_check):
+    def _check_sync_ref(self):
         problems: type_utils.ProblemDict = {}
         msg = None
         if self.sync_ref_recording is None:
@@ -972,56 +849,35 @@ class Study:
         elif len(self.session_def.recordings)==1:
             msg = 'sync_ref_recording must not be set when sessions consist of only one recording'
         if msg is not None:
-            if strict_check:
-                raise ValueError(msg)
             problems['sync_ref_recording'] = (type_utils.ProblemLevel.Error, msg)
         # Further sync checks only apply when a reference is set for multiple recordings.
         if self.sync_ref_recording is None or len(self.session_def.recordings)==1:
             return problems
 
-        type_utils.merge_problem_dicts(problems, self._check_recordings('sync_ref_recording', strict_check))
-        type_utils.merge_problem_dicts(problems, self._check_recordings('sync_ref_average_recordings', strict_check))
+        type_utils.merge_problem_dicts(problems, self._check_recordings('sync_ref_recording'))
+        type_utils.merge_problem_dicts(problems, self._check_recordings('sync_ref_average_recordings'))
         # check if sync_ref_recording is a replaced recording
         if self.head_attached_recordings_replace_et_scene is not None and any(r.associated_recording==self.sync_ref_recording for r in self.session_def.recordings if r.name in self.head_attached_recordings_replace_et_scene):
-            if strict_check:
-                raise ValueError(f'sync_ref_recording cannot be a recording that is replaced by a head-attached camera recording')
-            else:
-                problems['sync_ref_recording'] = (type_utils.ProblemLevel.Error, f'sync_ref_recording cannot be a recording that is replaced by a head-attached camera recording')
+            problems['sync_ref_recording'] = (type_utils.ProblemLevel.Error, f'sync_ref_recording cannot be a recording that is replaced by a head-attached camera recording')
         if self.sync_ref_do_time_stretch is None:
-            if strict_check:
-                raise ValueError(f'sync_ref_do_time_stretch should be set in the study setup when sync_ref_recording is set')
-            else:
-                problems['sync_ref_do_time_stretch'] = (type_utils.ProblemLevel.Error, f'sync_ref_do_time_stretch should be set when sync_ref_recording is set')
+            problems['sync_ref_do_time_stretch'] = (type_utils.ProblemLevel.Error, f'sync_ref_do_time_stretch should be set when sync_ref_recording is set')
         if self.sync_ref_do_time_stretch:
             for a in ['sync_ref_stretch_which', 'sync_ref_average_recordings']:
                 if getattr(self,a) is None:
-                    if strict_check:
-                        raise ValueError(f'{a} should be set in the study setup when sync_ref_recording is set and sync_ref_do_time_stretch is enabled')
-                    else:
-                        problems[a] = (type_utils.ProblemLevel.Error, f'{a} should be set when sync_ref_recording is set and sync_ref_do_time_stretch is enabled')
+                    problems[a] = (type_utils.ProblemLevel.Error, f'{a} should be set when sync_ref_recording is set and sync_ref_do_time_stretch is enabled')
         if self.sync_ref_average_recordings and self.sync_ref_recording in self.sync_ref_average_recordings:
-            if strict_check:
-                raise ValueError(f'Recording {self.sync_ref_recording} is the reference recording for sync, should not be specified in sync_ref_average_recordings')
-            else:
-                problems['sync_ref_average_recordings'] = (type_utils.ProblemLevel.Error, f'Recording {self.sync_ref_recording} is the reference recording for sync, cannot be specified in sync_ref_average_recordings')
+            problems['sync_ref_average_recordings'] = (type_utils.ProblemLevel.Error, f'Recording {self.sync_ref_recording} is the reference recording for sync, cannot be specified in sync_ref_average_recordings')
         if not any(cs['event_type']==annotation.EventType.Sync_Camera for cs in self.coding_setup):
-            if strict_check:
-                raise ValueError('When sync_ref_recording is set, coding of camera sync points should be set up in coding_setup')
-            else:
-                problems['coding_setup'] = (type_utils.ProblemLevel.Error, f'if sync_ref_recording is set, a {annotation.tooltip_map[annotation.EventType.Sync_Camera]}s should be set up to be coded')
-                type_utils.merge_problem_dicts(problems, {'sync_ref_recording': (type_utils.ProblemLevel.Error, f'sync_ref_recording is set, but no {annotation.tooltip_map[annotation.EventType.Sync_Camera]}s are not set up to be coded in coding_setup')})
+            problems['coding_setup'] = (type_utils.ProblemLevel.Error, f'if sync_ref_recording is set, a {annotation.tooltip_map[annotation.EventType.Sync_Camera]}s should be set up to be coded')
+            type_utils.merge_problem_dicts(problems, {'sync_ref_recording': (type_utils.ProblemLevel.Error, f'sync_ref_recording is set, but no {annotation.tooltip_map[annotation.EventType.Sync_Camera]}s are not set up to be coded in coding_setup')})
         return problems
 
-    def _check_make_video(self, strict_check) -> type_utils.ProblemDict:
-        problems = self._check_recordings('mapped_video_make_which', strict_check)
-        type_utils.merge_problem_dicts(problems,
-                   self._check_recordings('mapped_video_recording_colors', strict_check))
-        type_utils.merge_problem_dicts(problems,
-                   self._check_recordings('mapped_video_show_gaze_on_plane_in_which', strict_check))
-        type_utils.merge_problem_dicts(problems,
-                   self._check_recordings('mapped_video_show_camera_in_which', strict_check))
-        type_utils.merge_problem_dicts(problems,
-                   self._check_recordings('mapped_video_show_gaze_vec_in_which', strict_check))
+    def _check_make_video(self) -> type_utils.ProblemDict:
+        problems = self._check_recordings('mapped_video_make_which')
+        type_utils.merge_problem_dicts(problems, self._check_recordings('mapped_video_recording_colors'))
+        type_utils.merge_problem_dicts(problems, self._check_recordings('mapped_video_show_gaze_on_plane_in_which'))
+        type_utils.merge_problem_dicts(problems, self._check_recordings('mapped_video_show_camera_in_which'))
+        type_utils.merge_problem_dicts(problems, self._check_recordings('mapped_video_show_gaze_vec_in_which'))
         if self.mapped_video_make_which:
             # check have colors for all eye tracker recordings
             all_recs = {r.name for r in self.session_def.recordings if r.type==session.RecordingType.Eye_Tracker}
@@ -1031,40 +887,33 @@ class Study:
                 missing = list(all_recs)
             if missing:
                 msg = f'Colors need to be defined for all eye tracker recordings. Missing for {missing[0] if len(missing)==1 else missing}'
-                if strict_check:
-                    raise ValueError(msg)
-                else:
-                    type_utils.merge_problem_dicts(problems,{'mapped_video_recording_colors': (type_utils.ProblemLevel.Error, msg)})
+                type_utils.merge_problem_dicts(problems,{'mapped_video_recording_colors': (type_utils.ProblemLevel.Error, msg)})
         return problems
 
-    def _check_plane_aruco_settings(self, strict_check) -> type_utils.ProblemDict:
-        problems = {}
-        for p in self.planes:
-            if not isinstance(p, plane.Definition_Plane_Aruco):
-                continue
-            if strict_check:
-                try:
-                    aruco.resolve_settings(p.aruco_settings)
-                except ValueError as exc:
-                    raise ValueError(f'ArUco settings for plane "{p.name}": {exc}') from exc
-            elif errors := aruco_settings_problems(p.aruco_settings):
-                problems[p.name] = errors
-        return {'planes': problems} if problems else {}
+    def _check_marker_assemblies(self) -> type_utils.ProblemDict:
+        problems: type_utils.ProblemDict = {}
+        config_dir = pathlib.Path(self.working_directory) / 'config'
+        try:
+            config_dir = guess_config_dir(self.working_directory)
+        except RuntimeError:
+            pass
+        for a in self.marker_assemblies:
+            if errors := a.field_problems(config_dir / a.name):
+                problems = type_utils.merge_problem_dicts(problems, {'marker_assemblies': {a.name: errors}})
+        return problems
 
     def field_problems(self) -> type_utils.ProblemDict:
         problems: type_utils.ProblemDict = {}
-        plane_problems = {p.name: errors for p in self.planes if (errors := p.field_problems())}
-        if plane_problems:
-            type_utils.merge_problem_dicts(problems, {'planes': plane_problems})
-        type_utils.merge_problem_dicts(problems, self._check_session_def(False))
-        type_utils.merge_problem_dicts(problems, self._check_coding_setup(False))
-        type_utils.merge_problem_dicts(problems, self._check_auto_markers(False))
-        type_utils.merge_problem_dicts(problems, self._check_individual_marker_settings(False))
-        type_utils.merge_problem_dicts(problems, self._check_individual_markers(False))
-        type_utils.merge_problem_dicts(problems, self._check_head_attached_recordings(False))
-        type_utils.merge_problem_dicts(problems, self._check_interpolate_plane_pose(False))
-        type_utils.merge_problem_dicts(problems, self._check_sync_ref(False))
-        type_utils.merge_problem_dicts(problems, self._check_make_video(False))
+        type_utils.merge_problem_dicts(problems, self._check_session_def())
+        type_utils.merge_problem_dicts(problems, self._check_marker_assemblies())
+        type_utils.merge_problem_dicts(problems, self._check_individual_markers())
+        type_utils.merge_problem_dicts(problems, self._check_individual_marker_settings())
+        type_utils.merge_problem_dicts(problems, self._check_coding_setup())
+        type_utils.merge_problem_dicts(problems, self._check_auto_markers())
+        type_utils.merge_problem_dicts(problems, self._check_head_attached_recordings())
+        type_utils.merge_problem_dicts(problems, self._check_interpolate_plane_pose())
+        type_utils.merge_problem_dicts(problems, self._check_sync_ref())
+        type_utils.merge_problem_dicts(problems, self._check_make_video())
         return problems
 
     def store_as_json(self, path: str|pathlib.Path|None=None):
@@ -1077,7 +926,7 @@ class Study:
         else:
             path = f_path.parent
             # prep for dump to file
-        to_dump = {k:getattr(self,k) for k in vars(self) if not k.startswith('_') and k not in ['session_def','planes','working_directory']}    # session_def and planes are stored separately; working_directory comes from the path
+        to_dump = {k:getattr(self,k) for k in vars(self) if not k.startswith('_') and k not in ['session_def','marker_assemblies','working_directory']}    # session_def and marker assemblies are stored separately; working_directory comes from the path
         # Border width is stored per marker, never inside a detector settings group.
         to_dump['individual_marker_settings'] = {
             name: remove_defaults({k:v for k,v in params.items() if k != 'markerBorderBits'}, aruco_detector_defaults())
@@ -1088,11 +937,11 @@ class Study:
         json.dump(to_dump, f_path)
         # this doesn't store any files itself, but triggers the contained info to be stored
         self.session_def.store_as_json(path)
-        for p in self.planes:
-            p_dir = path / p.name
-            if not p_dir.is_dir():
-                p_dir.mkdir()
-            p.store_as_json(p_dir)
+        for a in self.marker_assemblies:
+            a_dir = path / a.name
+            if not a_dir.is_dir():
+                a_dir.mkdir()
+            a.store_as_json(a_dir)
 
     @staticmethod
     def get_empty(path: str | pathlib.Path) -> 'Study':
@@ -1104,7 +953,7 @@ class Study:
         )
 
     @staticmethod
-    def load_from_json(path: str | pathlib.Path, strict_check: bool=True) -> 'Study':
+    def load_from_json(path: str | pathlib.Path, strict_check: bool=True) -> 'Study|None':
         path = pathlib.Path(path)
         if path.is_dir():
             d_path = path / Study.default_json_file_name
@@ -1190,11 +1039,11 @@ class Study:
             kwds.pop('mapped_video_process_individual_markers_for_all_frames',None) # setting doesn't exist anymore
             if 'mapped_video_show_detected_markers' in kwds:
                 mapped_video_show_detected_markers = kwds.pop('mapped_video_show_detected_markers')
-                kwds['mapped_video_plane_marker_color'] = study_defaults['mapped_video_plane_marker_color'] if mapped_video_show_detected_markers else None
-                kwds['mapped_video_recovered_plane_marker_color'] = study_defaults['mapped_video_recovered_plane_marker_color'] if mapped_video_show_detected_markers else None
+                kwds['mapped_video_assembly_marker_color'] = study_defaults['mapped_video_assembly_marker_color'] if mapped_video_show_detected_markers else None
+                kwds['mapped_video_recovered_assembly_marker_color'] = study_defaults['mapped_video_recovered_assembly_marker_color'] if mapped_video_show_detected_markers else None
             if 'mapped_video_show_plane_axes' in kwds or 'mapped_video_show_board_axes' in kwds:
                 mapped_video_show_plane_axes = kwds.pop('mapped_video_show_plane_axes') if 'mapped_video_show_plane_axes' in kwds else kwds.pop('mapped_video_show_board_axes')
-                kwds['mapped_video_plane_axis_arm_length'] = study_defaults['mapped_video_plane_axis_arm_length'] if mapped_video_show_plane_axes else None
+                kwds['mapped_video_assembly_axis_arm_length'] = study_defaults['mapped_video_assembly_axis_arm_length'] if mapped_video_show_plane_axes else None
             if 'mapped_video_show_individual_marker_axes' in kwds:
                 mapped_video_show_individual_marker_axes = kwds.pop('mapped_video_show_individual_marker_axes')
                 kwds['mapped_video_individual_marker_axis_arm_length'] = study_defaults['mapped_video_individual_marker_axis_arm_length'] if mapped_video_show_individual_marker_axes else None
@@ -1214,7 +1063,7 @@ class Study:
                     name        = e.value,
                     description = annotation.tooltip_map.get(e, ''),
                     hotkey      = annotation.default_hotkeys.get(e, None),
-                    planes      = set(kwds['planes_per_episode'].get(e, set())),
+                    marker_assemblies = set(kwds['planes_per_episode'].get(e, set())),
                 ))
                 # check auto coding setup
                 if annotation.type_map[e]==annotation.Type.Point:
@@ -1224,7 +1073,7 @@ class Study:
                     if kwds.get('auto_code_episodes', None) is not None and e in kwds['auto_code_episodes']:
                         kwds['coding_setup'][-1]['auto_code'] = kwds['auto_code_episodes'].pop(e)
                 # check ET sync setup
-                if e==annotation.EventType.Sync_ET_Data and kwds.get('get_cam_movement_for_et_sync_method','') in ['plane','function']:
+                if e==annotation.EventType.Sync_ET_Data and kwds.get('get_cam_movement_for_et_sync_method','') in ['assembly','function']:
                     kwds['coding_setup'][-1]['sync_setup'] = EtSyncSetup(
                         get_cam_movement_method     = kwds.pop('get_cam_movement_for_et_sync_method', ''),
                         get_cam_movement_function   = kwds.pop('get_cam_movement_for_et_sync_function', None),
@@ -1285,20 +1134,43 @@ class Study:
                         else:
                             cs['which_recordings'] = set([r.name for r in sess_def.recordings if r.type==session.RecordingType.Eye_Tracker])
 
+            # there are already v2 setups out there using planes instead of marker_assemblies. For backwards compatibility, if planes is present, rename to marker_assemblies
+            for event_setup in kwds.get('coding_setup', []):
+                if 'planes' in event_setup:
+                    event_setup['marker_assemblies'] = event_setup.pop('planes')
+            for old_key, new_key in (
+                ('mapped_video_process_planes_for_all_frames', 'mapped_video_process_marker_assemblies_for_all_frames'),
+                ('mapped_video_plane_marker_color', 'mapped_video_assembly_marker_color'),
+                ('mapped_video_recovered_plane_marker_color', 'mapped_video_recovered_assembly_marker_color'),
+                ('mapped_video_plane_axis_arm_length', 'mapped_video_assembly_axis_arm_length'),
+            ):
+                if old_key in kwds:
+                    kwds.setdefault(new_key, kwds[old_key])
+                    del kwds[old_key]
+            if kwds.get('get_cam_movement_for_et_sync_method') == 'plane':
+                kwds['get_cam_movement_for_et_sync_method'] = 'assembly'
+            for event_setup in kwds.get('coding_setup', []):
+                if event_setup.get('sync_setup', {}).get('get_cam_movement_method') == 'plane':
+                    event_setup['sync_setup']['get_cam_movement_method'] = 'assembly'
+
         if 'interpolate_plane_pose_recordings' in kwds and kwds['interpolate_plane_pose_recordings'] is not None and not isinstance(kwds['interpolate_plane_pose_recordings'], set):
             kwds['interpolate_plane_pose_recordings'] = set(kwds['interpolate_plane_pose_recordings'])
 
-        # get planes
-        planes: list[plane.Definition] = []
-        for p_dir in path.iterdir():
-            if not p_dir.is_dir():
+        # Load one marker assembly definition per named folder.
+        marker_assemblies: list[marker_assembly.Definition] = []
+        for assembly_dir in path.iterdir():
+            if not assembly_dir.is_dir():
                 continue
-            p_file = p_dir / plane.Definition.default_json_file_name
-            if not p_file.is_file():
+            definition_files = [assembly_dir / marker_assembly.Definition_Plane_Aruco.default_json_file_name,
+                                assembly_dir / marker_assembly.Definition_MarkerAssembly_3D.default_json_file_name]
+            present = [definition_file for definition_file in definition_files if definition_file.is_file()]
+            if len(present) > 1:
+                raise ValueError(f'Marker assembly folder "{assembly_dir}" contains multiple definition manifests')
+            if not present:
                 continue
-            planes.append(plane.Definition.load_from_json(p_file))
+            marker_assemblies.append(marker_assembly.Definition.load_from_json(present[0]))
 
-        return Study(sess_def, planes, working_directory=path.parent, **kwds, strict_check=strict_check)
+        return Study(sess_def, marker_assemblies, working_directory=path.parent, **kwds, strict_check=strict_check)
 
 # get defaults for default argument of Study constructor
 _params = inspect.signature(Study.__init__).parameters
@@ -1359,11 +1231,11 @@ study_parameter_doc = {
     'mapped_video_projected_left_ray_color': type_utils.GUIDocInfo('Mapped video: Color for left eye gaze vector projected to plane', 'Color used for drawing the projection to a plane of the recorded left eye\'s gaze vector. Not drawn if value is not set.'),
     'mapped_video_projected_right_ray_color': type_utils.GUIDocInfo('Mapped video: Color for right eye gaze vector projected to plane', 'Color used for drawing the projection to a plane of the recorded right eye\'s gaze vector. Not drawn if value is not set.'),
     'mapped_video_projected_average_ray_color': type_utils.GUIDocInfo('Mapped video: Color for average of gaze vectors projected to plane', 'Color used for drawing the average projection to a plane of the recorded left and right eyes\' gaze vectors. Not drawn if value is not set.'),
-    'mapped_video_process_planes_for_all_frames': type_utils.GUIDocInfo('Mapped video: Process all planes for all frames?', 'If enabled, shows detection results for all planes for all frames. If not enabled, detection of each plane is only shown during the episode(s) to which it is assigned.'),
+    'mapped_video_process_marker_assemblies_for_all_frames': type_utils.GUIDocInfo('Mapped video: Process all marker assemblies (e.g., planes) for all frames?', 'If enabled, shows detection results for all marker assemblies for all frames. If not enabled, detection of each assembly is only shown during the episode(s) to which it is assigned.'),
     'mapped_video_process_annotations_for_all_recordings': type_utils.GUIDocInfo('Mapped video: Process all annotations for all recordings?', 'Episode annotations are shown in a bar on the bottom of the screen. If enabled, annotations for not only the recording for which the video is made, but also for the other recordings are shown in this bar.'),
-    'mapped_video_plane_marker_color': type_utils.GUIDocInfo('Mapped video: Plane marker color', 'Color used for drawing the detected markers belonging to planes. Not drawn if value is not set.'),
-    'mapped_video_recovered_plane_marker_color': type_utils.GUIDocInfo('Mapped video: Plane marker color (recovered)', 'Color used for drawing the detected markers belonging to planes that were identified during a second stage in the ArUco pipeline where markers are found based on their expected position extrapolated from identified nearby markers on the plane. Not drawn if value is not set.'),
-    'mapped_video_plane_axis_arm_length': type_utils.GUIDocInfo('Mapped video: Plane axis arm length','Length used for drawing axes that indicate the orientation of a detected plane. In the same unit as the plane (usually mm). Not drawn if value is not set.'),
+    'mapped_video_assembly_marker_color': type_utils.GUIDocInfo('Mapped video: Assembly marker color', 'Color used for drawing detected markers belonging to marker assemblies. Not drawn if value is not set.'),
+    'mapped_video_recovered_assembly_marker_color': type_utils.GUIDocInfo('Mapped video: Assembly marker color (recovered)', 'Color used for drawing detected markers belonging to assemblies that were identified during the second-stage ArUco search. Not drawn if value is not set.'),
+    'mapped_video_assembly_axis_arm_length': type_utils.GUIDocInfo('Mapped video: Assembly axis arm length','Length used for drawing detected assembly axes, in the same unit as the assembly. Not drawn if value is not set.'),
     'mapped_video_individual_marker_color': type_utils.GUIDocInfo('Mapped video: Individual marker color', 'Color used for drawing the detected individual markers. Not drawn if value is not set.'),
     'mapped_video_individual_marker_axis_arm_length': type_utils.GUIDocInfo('Mapped video: Individual marker axis arm length','Length used for drawing axes that indicate the orientation of a detected individual marker (if its size is set). In the same unit as the markers (usually mm). Not drawn if value is not set.'),
     'mapped_video_unexpected_marker_color': type_utils.GUIDocInfo('Mapped video: Unexpected marker color', 'Color used for drawing the detected markers belonging to planes. Not drawn if value is not set.'),
@@ -1385,7 +1257,7 @@ event_setup_doc = {
     'name': type_utils.GUIDocInfo('Event name', 'Name of the event to be shown in the coding GUI.'),
     'description': type_utils.GUIDocInfo('Event description', 'Description of the event to be shown in the coding GUI as tooltip.'),
     'hotkey': type_utils.GUIDocInfo('Event hotkey', 'Hotkey to be used for coding this event in the coding GUI.'),
-    'planes': type_utils.GUIDocInfo('Planes for event', 'Set of planes which will be looked for and gaze mapped to during the episode.'),
+    'marker_assemblies': type_utils.GUIDocInfo('Planes & 3D Assemblies', 'Set of marker assemblies (such as planes) to detect during the episode.'),
     'which_recordings': type_utils.GUIDocInfo('Which recordings', 'Recordings for which you should code this event. If not set, the event is taken from the reference recording.'),
     'load_from_other_recordings': type_utils.GUIDocInfo('Load from other recordings?', 'If enabled, coding for this event is also allowed to come from another recording, if it is not found in the current recording (or even cannot be coded for the current recording because it is not listed in the "Which recordings" setting).'),
     'auto_code': type_utils.GUIDocInfo('Auto-coding setup', 'Setup for automatically coding this event based on individual marker detections.',{
@@ -1399,7 +1271,7 @@ event_setup_doc = {
     'sync_setup': type_utils.GUIDocInfo('Eye tracker synchronization setup', 'Setup for synchronizing eye tracker data to the scene camera.',{
         'get_cam_movement_method': type_utils.GUIDocInfo('Gaze data synchronization: Method to get camera movement', 'Method used to derive the head motion for synchronizing eye tracker data and scene camera.',{
         None: {     # indicates the doc specification applies to the contained values
-            'plane': type_utils.GUIDocInfo('Plane', 'Head movement is represented by the position of the origin of the plane in the scene camera video (the plane that is set up to be used for "Sync ET Data" episodes), as extracted through pose estimation or homography using a gazeMapper plane.'),
+            'assembly': type_utils.GUIDocInfo('Marker assembly', 'Head movement is represented by the position of the origin of the selected marker assembly (e.g., a plane) in the scene camera video during "Sync ET Data" episodes.'),
             'function': type_utils.GUIDocInfo('Function', 'A user-specified function (configured using the "Gaze data synchronization: Function for camera movement" setting) will be called for each frame of the scene video in a "Sync ET Data" episode and is expected to return the location of the target the participant was looking at.')
         }
         }),
@@ -1453,7 +1325,7 @@ event_setup_doc = {
         }
     }),
 }
-if _missing_params:=[k for k in _params if k not in study_parameter_doc and k not in ['self','session_def','planes','individual_markers','working_directory','coding_setup','strict_check']]:
+if _missing_params:=[k for k in _params if k not in study_parameter_doc and k not in ['self','session_def','marker_assemblies','individual_markers','working_directory','coding_setup','strict_check']]:
     raise NotImplementedError('Documentation missing for parameters:\n- '+'\n- '.join(_missing_params))
 del _params
 del _missing_params
@@ -1486,7 +1358,7 @@ class OverrideLevel(enum.Enum):
 
 class StudyOverride:
     default_json_file_name = 'study_def_override.json'
-    marker_settings_fields = {'planes', 'individual_marker_settings'}
+    marker_settings_fields = {'marker_assemblies', 'individual_marker_settings'}
 
     @staticmethod
     def get_allowed_parameters(level: OverrideLevel, recording_type: session.RecordingType|None = None, for_event_setup: bool = False) -> tuple[list[str],set[str]]:
@@ -1582,7 +1454,7 @@ class StudyOverride:
     @staticmethod
     def _check_marker_settings_structure(field, value):
         # Validate sparse patches without filling defaults or allowing project structure changes.
-        template = {'aruco_settings': aruco_settings_with_defaults(None)} if field == 'planes' else aruco_detector_defaults()
+        template = {'aruco_settings': aruco_settings_with_defaults(None)} if field == 'marker_assemblies' else aruco_detector_defaults()
         def check(patch, schema, path):
             if not isinstance(patch, dict):
                 raise ValueError(f'{path} must be a dictionary of parameter overrides')
@@ -1609,12 +1481,12 @@ class StudyOverride:
             obj = _apply_impl(obj, {p: getattr(self,p) for p in self._overridden_params if p not in self.marker_settings_fields}, study_parameter_types)
             for field in self.marker_settings_fields.intersection(self._overridden_params):
                 self._check_marker_settings_structure(field, getattr(self, field))
-                targets = {p.name: p for p in obj.planes if isinstance(p, plane.Definition_Plane_Aruco)} if field == 'planes' else obj.individual_marker_settings
+                targets = {p.name: p for p in obj.marker_assemblies if isinstance(p, marker_assembly.Definition_Plane_Aruco)} if field == 'marker_assemblies' else obj.individual_marker_settings
                 for name, patch in getattr(self, field).items():
                     if name not in targets:
-                        kind = 'ArUco plane' if field == 'planes' else 'marker settings group'
+                        kind = 'marker assembly' if field == 'marker_assemblies' else 'marker settings group'
                         raise ValueError(f'Could not find {kind} with name "{name}" to apply overrides to {self._get_err_msg()}')
-                    if field == 'planes':
+                    if field == 'marker_assemblies':
                         targets[name].aruco_settings = merge_aruco_settings(targets[name].aruco_settings, patch.get('aruco_settings', {}))
                     else:
                         targets[name] = merge_aruco_settings(targets[name], patch)
@@ -1641,6 +1513,7 @@ class StudyOverride:
         if path.is_dir():
             path = path / StudyOverride.default_json_file_name
         kwds = json.load(path)
+
         # help with enum roundtrip
         if 'validate_dq_types' in kwds:
             kwds['validate_dq_types']= {_data_types.data_type_val_to_enum_val(d) for d in kwds['validate_dq_types']}
@@ -1663,8 +1536,9 @@ class StudyOverride:
                     ))
                 kwds.pop('auto_code_episodes')
             if 'get_cam_movement_for_et_sync_method' in kwds or 'get_cam_movement_for_et_sync_function' in kwds or 'sync_et_to_cam_use_average' in kwds:
+                method = kwds.pop('get_cam_movement_for_et_sync_method', '')
                 et_sync_setup = EtSyncSetup(
-                    get_cam_movement_method     = kwds.pop('get_cam_movement_for_et_sync_method', ''),
+                    get_cam_movement_method     = 'assembly' if method=='plane' else method,
                     get_cam_movement_function   = kwds.pop('get_cam_movement_for_et_sync_function', None),
                     use_average                 = kwds.pop('sync_et_to_cam_use_average', False)
                 )
@@ -1698,6 +1572,22 @@ class StudyOverride:
                         name            = annotation.EventType.Validate.value,
                         validation_setup= validation_setup,
                 ))
+        if 'planes' in kwds:
+            kwds['marker_assemblies'] = kwds.pop('planes')
+        for event_setup in kwds.get('coding_setup', []):
+            if 'planes' in event_setup:
+                event_setup['marker_assemblies'] = event_setup.pop('planes')
+            if event_setup.get('sync_setup', {}).get('get_cam_movement_method') == 'plane':
+                event_setup['sync_setup']['get_cam_movement_method'] = 'assembly'
+        for old_key, new_key in (
+            ('mapped_video_process_planes_for_all_frames', 'mapped_video_process_marker_assemblies_for_all_frames'),
+            ('mapped_video_plane_marker_color', 'mapped_video_assembly_marker_color'),
+            ('mapped_video_recovered_plane_marker_color', 'mapped_video_recovered_assembly_marker_color'),
+            ('mapped_video_plane_axis_arm_length', 'mapped_video_assembly_axis_arm_length'),
+        ):
+            if old_key in kwds:
+                kwds.setdefault(new_key, kwds[old_key])
+                del kwds[old_key]
 
         # split off coding setup overrides if present
         coding_setup_overrides: dict[str, StudyOverride] = {}
@@ -1769,9 +1659,9 @@ def _apply_impl(obj, overrides: dict[str,Any], annotations: dict[str,typing.Type
 def _study_diff_impl(config: Study, parent_config: Study, fields: tuple[list[str],tuple[list[str]|None,list[str]]|None]) -> dict[str,Any]:
     kwds: dict[str,Any] = {}
     for f in fields[0]:
-        if f == 'planes' and isinstance(config, Study):
-            parents = {p.name: p for p in parent_config.planes if isinstance(p, plane.Definition_Plane_Aruco)}
-            changes = {p.name: diff for p in config.planes if isinstance(p, plane.Definition_Plane_Aruco) and p.name in parents and
+        if f == 'marker_assemblies' and isinstance(config, Study):
+            parents = {p.name: p for p in parent_config.marker_assemblies if isinstance(p, marker_assembly.Definition_Plane_Aruco)}
+            changes = {p.name: diff for p in config.marker_assemblies if isinstance(p, marker_assembly.Definition_Plane_Aruco) and p.name in parents and
                        (diff := _study_diff_impl(p, parents[p.name], (['aruco_settings'], None)))}
             if changes:
                 kwds[f] = changes

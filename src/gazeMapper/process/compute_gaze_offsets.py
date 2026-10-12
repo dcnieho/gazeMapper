@@ -7,7 +7,7 @@ from glassesTools import data_types, gaze_worldref, naming as gt_naming, plane a
 from glassesTools.validation import Plane as val_Plane
 from glassesTools.validation.config import get_validation_setup
 
-from .. import config, episode, naming, plane, process, session
+from .. import config, episode, naming, marker_assembly, process, session
 from . import _pose_files
 
 
@@ -65,8 +65,8 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
     all_planes = {p for nm in episodes_per_plane for p in episodes_per_plane[nm]}
     planes: dict[str,gt_plane.TargetPlane] = {}
     for p in all_planes:
-        p_def = [pl for pl in study_config.planes if pl.name==p][0]
-        planes[p] = plane.get_plane_from_definition(p_def, config_dir/p)
+        p_def = [pl for pl in study_config.marker_assemblies if pl.name==p][0]
+        planes[p] = marker_assembly.get_marker_assembly_from_definition(p_def, config_dir/p)
         # for validation planes, fall back to viewing distance from config if not specified in the gaze offset setup
         for nm in viewing_distance_per_plane:
             if p in viewing_distance_per_plane[nm] and viewing_distance_per_plane[nm][p] is None and isinstance(planes[p], val_Plane):

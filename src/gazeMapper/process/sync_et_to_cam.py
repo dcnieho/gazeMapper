@@ -74,21 +74,23 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     for cs in sync_events:
         nm = cs['name']
         match cs['sync_setup']['get_cam_movement_method']:
-            case 'plane':
-                if len(cs['planes'])!=1:
-                    raise ValueError(f'ET Sync event "{nm}" should be coded for exactly one plane, found {len(cs["planes"])}')
-                pln = list(cs['planes'])[0]
-
-                # Read pose w.r.t plane
-                pln_file = working_dir/f'{naming.plane_pose_prefix}{pln}.tsv'
-                if not pln_file.is_file():
-                    raise FileNotFoundError(f'A planePose file for the {pln} plane is not found, but is needed. Run detect_markers to create this file.')
-                poses = pose.read_dict_from_file(pln_file, episodes[nm][1])
+            case 'assembly':
+                if len(cs['marker_assemblies'])!=1:
+                    raise ValueError(f'ET Sync event "{nm}" should be coded for exactly one marker assembly, found {len(cs["marker_assemblies"])}')
+                assembly_name = next(iter(cs['marker_assemblies']))
 
                 # get camera calibration info
                 camera_params = ocv.CameraParams.read_from_file(working_dir / gt_naming.scene_camera_calibration_fname)
 
-                # compute target positions on camera frame
+                # read pose file
+                if (fname := working_dir/f'{naming.pose_prefix}{assembly_name}.tsv').is_file():
+                    poses = pose.read_dict_from_file(fname, episodes[nm][1])
+                elif (fname := working_dir/f'{naming.plane_pose_prefix}{assembly_name}.tsv').is_file():
+                    poses = pose.read_plane_dict_from_file(fname, episodes[nm][1])
+                else:
+                    raise FileNotFoundError(f'No pose file for marker assembly "{assembly_name}" is found. Run detect_markers to create it.')
+
+                # project the marker assembly origin into the scene camera image
                 target_positions[nm] = {}
                 for frame_idx in poses:
                     info = frame_info.get_frame_info(frame_idx)

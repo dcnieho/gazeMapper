@@ -7,7 +7,7 @@ import warnings
 
 from glassesTools import annotation, marker as gt_marker, naming as gt_naming, process_pool, timestamps, validation
 
-from .. import config, episode, naming, plane, process, session
+from .. import config, episode, naming, marker_assembly, process, session
 
 
 def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None, **study_settings):
@@ -101,11 +101,11 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
                 coding = pd.read_csv(fname, delimiter='\t', dtype={'target':int, 'marker_interval':int},index_col=None)
                 has_override = True
             else:
-                p = list(cs['planes'])[0]
-                plane_def = [pl for pl in study_config.planes if pl.name==p][0]
-                if plane_def.type!=plane.Type.GlassesValidator:
-                    raise ValueError(f'Plane {p} is not a {plane.Type.GlassesValidator.value} plane')
-                validation_plane = plane.get_plane_from_definition(plane_def, config_dir/p)
+                p = list(cs['marker_assemblies'])[0]
+                plane_def = [pl for pl in study_config.marker_assemblies if pl.name==p][0]
+                if plane_def.type!=marker_assembly.Type.GlassesValidator:
+                    raise ValueError(f'Plane {p} is not a {marker_assembly.Type.GlassesValidator.value} plane')
+                validation_plane = marker_assembly.get_marker_assembly_from_definition(plane_def, config_dir/p)
                 all_marker_observations_per_target, markers_per_target = validation.dynamic.get_marker_observations(validation_plane, working_dir, cs['name'])
                 has_override = False
             for e in intervals.copy():

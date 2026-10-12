@@ -16,5 +16,5 @@ def get_preferred_plane_pose_file(working_dir: str|pathlib.Path, plane_name: str
 def read_preferred_plane_pose(working_dir: str|pathlib.Path, plane_name: str, episodes: list[list[int]]|None=None):
     pose_file, is_interpolated = get_preferred_plane_pose_file(working_dir, plane_name)
     if is_interpolated:
-        return gt_pose.read_list_dict_from_file(pose_file, episodes, ts_column_suffixes=['VOR',''])
-    return gt_pose.read_dict_from_file(pose_file, episodes, ts_column_suffixes=['VOR',''])
+        return gt_pose.read_plane_list_dict_from_file(pose_file, episodes, ts_column_suffixes=['VOR',''])
+    return gt_pose.read_plane_dict_from_file(pose_file, episodes, ts_column_suffixes=['VOR',''])

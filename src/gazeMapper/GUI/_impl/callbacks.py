@@ -16,7 +16,7 @@ from glassesTools.validation import config as val_config, default_poster, dynami
 from glassesTools.gui import colors
 
 from . import utils
-from ... import config, marker, naming, plane, process, session
+from ... import config, marker, marker_assembly, process, session
 from ...process import export_trials
 
 _picker_last_folder = None
@@ -150,7 +150,7 @@ def try_load_project(g, path: str|pathlib.Path, action='loading'):
             }
             gt_gui.utils.push_popup(g, gt_gui.msg_box.msgbox, "Create new project", "The selected folder is empty. Do you want to use it as a new project folder?", gt_gui.msg_box.MsgBox.warn, buttons)
 
-def set_dynamic_validation_plane_config(g, config_file_path: pathlib.Path, p_def: plane.Definition_GlassesValidator):
+def set_dynamic_validation_plane_config(g, config_file_path: pathlib.Path, p_def: marker_assembly.Definition_GlassesValidator):
     from . import gui
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
     path = config.guess_config_dir(g.study_config.working_directory)
@@ -165,7 +165,7 @@ def set_dynamic_validation_plane_config(g, config_file_path: pathlib.Path, p_def
     # N.B.: all we have to do here for the plane. File watcher will catch the change and reload the plane
     set_auto_coding_for_dynamic_validation_plane(g, p_def, auto_coding_setup)
 
-def set_auto_coding_for_dynamic_validation_plane(g, p_def: plane.Definition_GlassesValidator, auto_coding_setup: dict[str,list[gt_marker.MarkerID]]):
+def set_auto_coding_for_dynamic_validation_plane(g, p_def: marker_assembly.Definition_GlassesValidator, auto_coding_setup: dict[str,list[gt_marker.MarkerID]]):
     def _apply_individual_markers_if_needed():
         all_markers = set(auto_coding_setup['start_markers'])
         all_markers.update(auto_coding_setup['end_markers'])
@@ -176,7 +176,7 @@ def set_auto_coding_for_dynamic_validation_plane(g, p_def: plane.Definition_Glas
                 applied = True
         return applied
     def _apply_automatic_val_coding():
-        cs = [cs for cs in g.study_config.coding_setup if cs['event_type']==annotation.EventType.Validate and p_def.name in cs['planes']]
+        cs = [cs for cs in g.study_config.coding_setup if cs['event_type']==annotation.EventType.Validate and p_def.name in cs['marker_assemblies']]
         auto_code  = config.AutoCodeEpisodes(
             start_markers = auto_coding_setup['start_markers'],
             end_markers   = auto_coding_setup['end_markers'],
@@ -193,7 +193,7 @@ def set_auto_coding_for_dynamic_validation_plane(g, p_def: plane.Definition_Glas
                 event_type = annotation.EventType.Validate,
                 name = f'Dynamic validation ({p_def.name})',
                 description = f'Dynamic validation setup for {p_def.name}',
-                planes     = set([p_def.name]),
+                marker_assemblies = set([p_def.name]),
                 auto_code  = auto_code,
                 validation_setup = validation_setup
             ))
@@ -213,7 +213,7 @@ def set_auto_coding_for_dynamic_validation_plane(g, p_def: plane.Definition_Glas
 
     from . import gui
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
-    cs = [cs for cs in g.study_config.coding_setup if cs['event_type']==annotation.EventType.Validate and p_def.name in cs['planes']]
+    cs = [cs for cs in g.study_config.coding_setup if cs['event_type']==annotation.EventType.Validate and p_def.name in cs['marker_assemblies']]
     exists = not not cs
     if exists:
         if len(cs)>1:
@@ -259,7 +259,7 @@ def set_cam_cal(cal_path: str|pathlib.Path, working_directory: str|pathlib.Path)
 def delete_cam_cal(working_directory: str|pathlib.Path):
     (pathlib.Path(working_directory) / gt_naming.scene_camera_calibration_fname).unlink(missing_ok=True)
 
-def make_plane(g, p_type: plane.Type, name: str, is_dynamic: bool, dynamic_config_file: str):
+def make_plane(g, p_type: marker_assembly.Type, name: str, is_dynamic: bool, dynamic_config_file: str):
     from . import gui
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
     path = config.guess_config_dir(g.study_config.working_directory)
@@ -282,13 +282,13 @@ def make_plane(g, p_type: plane.Type, name: str, is_dynamic: bool, dynamic_confi
             shutil.rmtree(p_dir)
             return
     # make plane
-    p_def = plane.make_definition(p_type, name, p_dir, **extra)
+    p_def = marker_assembly.make_definition(p_type, name, p_dir, **extra)
     # store to file
     if not p_dir.is_dir():
         p_dir.mkdir()
     p_def.store_as_json(p_dir)
     # append to known planes
-    g.study_config.planes.append(p_def)
+    g.study_config.marker_assemblies.append(p_def)
     # deal with further setup for dynamic plane
     if is_dynamic:
         set_auto_coding_for_dynamic_validation_plane(g, p_def, auto_coding_setup)
@@ -305,15 +305,15 @@ def make_coding_setup(g, coding_name: str, coding_type: annotation.EventType):
     # store config
     g.study_config.store_as_json()
 
-def delete_plane(study_config: config.Study, plane: plane.Definition):
+def delete_plane(study_config: config.Study, plane: marker_assembly.Definition):
     # remove config directory for the plane
     path = config.guess_config_dir(study_config.working_directory)
     p_dir = path / plane.name
     if p_dir.is_dir():
         shutil.rmtree(p_dir)
 
-def glasses_validator_plane_check_or_deploy_config(study_config: config.Study, pl: plane.Definition_GlassesValidator):
-    if not isinstance(pl, plane.Definition_GlassesValidator) or pl.use_default:
+def glasses_validator_plane_check_or_deploy_config(study_config: config.Study, pl: marker_assembly.Definition_GlassesValidator):
+    if not isinstance(pl, marker_assembly.Definition_GlassesValidator) or pl.use_default:
         return
     # check if there are already are validation setup files
     working_dir = config.guess_config_dir(study_config.working_directory)/pl.name
@@ -326,10 +326,10 @@ def glasses_validator_plane_check_or_deploy_config(study_config: config.Study, p
         # already exists, nothing to do
         pass
 
-def glasses_validator_deploy_config(g, pl: plane.Definition_GlassesValidator):
+def glasses_validator_deploy_config(g, pl: marker_assembly.Definition_GlassesValidator):
     from . import gui
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
-    if not isinstance(pl, plane.Definition_GlassesValidator):
+    if not isinstance(pl, marker_assembly.Definition_GlassesValidator):
         return
     working_dir = config.guess_config_dir(g.study_config.working_directory)/pl.name
     not_deployed = default_poster.deploy_config(working_dir)

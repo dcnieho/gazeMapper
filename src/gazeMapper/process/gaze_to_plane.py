@@ -4,7 +4,7 @@ from glassesTools import gaze_headref, gaze_worldref, naming as gt_naming, ocv, 
 from glassesTools.gui import worldgaze as worldgaze_gui
 from glassesTools.gui.video_player import GUI
 
-from .. import config, episode, naming, plane, process, session
+from .. import config, episode, naming, marker_assembly, process, session
 from . import _pose_files
 
 
@@ -54,15 +54,18 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
     recs_to_check = [working_dir.name]
     if study_config.sync_ref_recording:
         recs_to_check.append(study_config.sync_ref_recording)
-    episodes_to_proc = [cs for cs in study_config.coding_setup if cs.get('planes') and (cs['which_recordings'] is None or any(rec in cs['which_recordings'] for rec in recs_to_check))]
+    episodes_to_proc = [cs for cs in study_config.coding_setup if cs.get('marker_assemblies') and (cs['which_recordings'] is None or any(rec in cs['which_recordings'] for rec in recs_to_check))]
     if not episodes_to_proc:
         raise RuntimeError(f'There are no episodes with planes configured for session "{working_dir.parent.name}", recording "{working_dir.name}", nothing to process')
     episodes = episode.load_episodes_from_all_recordings(study_config, working_dir, {cs['name'] for cs in episodes_to_proc})[0]
 
     # get planes we should process
     mapping_setup: dict[str, list[list[int]]] = {}
+    plane_names = {definition.name for definition in study_config.marker_assemblies if isinstance(definition, marker_assembly.Definition_Plane_Aruco)}
     for cs in episodes_to_proc:
-        for p in cs['planes']:
+        for p in cs['marker_assemblies']:
+            if p not in plane_names:
+                continue
             if p not in mapping_setup:
                 mapping_setup[p] = []
             mapping_setup[p].extend(episodes[cs['name']][1])
@@ -73,8 +76,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
 
     planes: dict[str,gt_plane.Plane] = {}
     for p in mapping_setup:
-        p_def = [pl for pl in study_config.planes if pl.name==p][0]
-        planes[p] = plane.get_plane_from_definition(p_def, config_dir/p)
+        p_def = [pl for pl in study_config.marker_assemblies if pl.name==p][0]
+        planes[p] = marker_assembly.get_marker_assembly_from_definition(p_def, config_dir/p)
 
     # load gaze data and poses
     processing_intervals = [e for p in mapping_setup for e in mapping_setup[p]] # NB: doesn't need to be sorted
@@ -83,7 +86,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
     poses = {p:_pose_files.read_preferred_plane_pose(working_dir, p, mapping_setup[p] if should_load_part else None) for p in mapping_setup}
     visualization_poses = poses
     if gui is not None:
-        visualization_poses = {p:gt_pose.read_dict_from_file(working_dir/f'{naming.plane_pose_prefix}{p}.tsv', mapping_setup[p] if should_load_part else None) for p in mapping_setup}
+        visualization_poses = {p:gt_pose.read_plane_dict_from_file(working_dir/f'{naming.plane_pose_prefix}{p}.tsv', mapping_setup[p] if should_load_part else None) for p in mapping_setup}
 
     # prep progress indicator
     total = sum(len(head_gazes[f]) for p in poses for f in poses[p] if f in head_gazes)

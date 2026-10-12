@@ -18,7 +18,7 @@ from glassesTools.gui.video_player import GUI
 from glassesTools.validation import assign_intervals
 
 
-from .. import config, episode, naming, plane, process, session
+from .. import config, episode, naming, marker_assembly, process, session
 
 # This script shows a video player that is used to indicate the interval(s)
 # during which the poster should be found in the video and in later
@@ -74,8 +74,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
         # get coded episodes, if available:
         e = episode.load_episodes_from_all_recordings(study_config, working_dir, error_if_unwanted_found=False, missing_other_coding_ok=True)[0]
         # get targets to code
-        val_p_def = [pl for pl in study_config.planes if pl.name in cs['planes']][0]    # NB: only one plane for a validation interval
-        pl    = plane.get_plane_from_definition(val_p_def, config_dir/val_p_def.name)
+        val_p_def = [pl for pl in study_config.marker_assemblies if pl.name in cs['marker_assemblies']][0]    # NB: only one plane for a validation interval
+        pl = marker_assembly.get_marker_assembly_from_definition(val_p_def, config_dir/val_p_def.name)
         targets = pl.get_target_IDs()
         plane_points = {t:pl.targets[t].center for t in pl.targets}
         def _get_target_name(t: int) -> str:
@@ -148,7 +148,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
     in_video = session.read_recording_info(working_dir, rec_def.type)[1]
     if not in_video.is_file():
         raise FileNotFoundError(f'Input video file "{in_video}" for recording "{rec_def.name}" not found')
-    planes = {v for cs in study_config.coding_setup for v in cs['planes']}
+    plane_names = {definition.name for definition in study_config.marker_assemblies if isinstance(definition, marker_assembly.Definition_Plane_Aruco)}
+    planes = {v for cs in study_config.coding_setup for v in cs['marker_assemblies'] if v in plane_names}
     if rec_def.type==session.RecordingType.Camera:
         has_gaze, has_plane_gaze = False, False
         # unless head-attached and this is the reference recording, no Sync_ET_Data or Validate events for camera recordings, remove
@@ -167,8 +168,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
         if has_plane_gaze:
             planes_setup: dict[str, gt_plane.Plane] = {}
             for p in planes:
-                p_def = [pl for pl in study_config.planes if pl.name==p][0]
-                planes_setup[p] = plane.get_plane_from_definition(p_def, config_dir/p)
+                p_def = [pl for pl in study_config.marker_assemblies if pl.name==p][0]
+                planes_setup[p] = marker_assembly.get_marker_assembly_from_definition(p_def, config_dir/p)
     else:
         raise ValueError(f'recording type "{rec_def.type}" is not understood')
 
@@ -178,7 +179,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
 
     # Read plane poses, if available
     plane_files = [working_dir/f'{naming.plane_pose_prefix}{p}.tsv' for p in planes]
-    poses = {p:gt_pose.read_dict_from_file(f) for p,f in zip(planes,plane_files) if f.is_file()}
+    poses = {p:gt_pose.read_plane_dict_from_file(f) for p,f in zip(planes,plane_files) if f.is_file()}
     has_plane_pose = not not poses
 
     # get camera calibration info

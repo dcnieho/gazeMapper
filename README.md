@@ -62,9 +62,9 @@ Example where gazeMapper has been used to map head-centered eye tracking data fr
     - [`gazeMapper.config.StudyOverride`](#gazemapperconfigstudyoverride)
   - [`gazeMapper.episode`](#gazemapperepisode)
   - [`gazeMapper.marker`](#gazemappermarker)
-  - [`gazeMapper.plane`](#gazemapperplane)
-    - [`gazeMapper.plane.Type`](#gazemapperplanetype)
-    - [`gazeMapper.plane.Definition` and subclasses](#gazemapperplanedefinition-and-subclasses)
+    - [`gazeMapper.marker_assembly`](#gazemappermarker_assembly)
+        - [`gazeMapper.marker_assembly.Type`](#gazemappermarker_assemblytype)
+        - [`gazeMapper.marker_assembly.Definition` and subclasses](#gazemappermarker_assemblydefinition-and-subclasses)
   - [`gazeMapper.process`](#gazemapperprocess)
   - [`gazeMapper.session`](#gazemappersession)
     - [`gazeMapper.session.RecordingType`](#gazemappersessionrecordingtype)
@@ -629,7 +629,7 @@ To be able to perform this mapping, gazeMapper needs to be able to determine whe
 
 For gazeMapper to be able to do its job, it needs to have precise information about the array of fiducial markers that defines the plane(s). When designing these arrays, it is important to use unique markers (in other words, each marker may only be used once across all planes and other markers that appear in the recording, e.g. for [synchronization](#synchronization) or [automatic episodes coding](#automatic-coding-of-analysis-and-synchronization-episodes)). Any dictionary of fiducial markers understood by OpenCV's ArUco module (cv2.aruco, see [`cv::aruco::PREDEFINED_DICTIONARY_NAME`](https://docs.opencv.org/4.10.0/de/d67/group__objdetect__aruco.html#ga4e13135a118f497c6172311d601ce00d)) is supported (i.e. various ArUco marker dictionaries, as well as April tags), the default is `DICT_4X4_250`.
 
-Planes are configured in the `Plane editor` pane in the GUI or by means of `gazeMapper.plane.Definition` objects. There are two types of planes, either a generic 2D plane (`gazeMapper.plane.Type.Plane_2D`), or a glassesValidator plane (`gazeMapper.plane.Type.GlassesValidator`). The configuration of a plane is stored in a subfolder of the project's configuration folder. The name of the plane is given by the name of this folder. For generic 2D planes, two configuration files are needed: a file providing information about which marker is positioned where and how each marker is oriented; and a settings file containing further information about both the markers and the plane. glassesValidator planes have their own settings and are [discussed below](#validation-glassesvalidator-planes). Here we describe the setup for generic 2D planes. It should be noted that a png render of the defined plane is stored in the plane's configuration folder when running any gazeMapper processing action, or by pressing the `generate reference image` button in the GUI. This can be used to check whether your plane definition is correct.
+Planes and marker assemblies are configured in the `Plane & 3D Assembly editor` pane in the GUI or by means of `gazeMapper.marker_assembly.Definition` objects. Supported types are `gazeMapper.marker_assembly.Type.GlassesValidator`, `Plane_2D`, `Target_Plane_2D`, and `MarkerAssembly_3D`. The configuration is stored in a subfolder of the project's configuration folder. The name of the plane or assembly is given by the name of this folder. For generic 2D planes, two configuration files are needed: a file providing information about which marker is positioned where and how each marker is oriented; and a settings file containing further information about both the markers and the plane. glassesValidator planes have their own settings and are [discussed below](#validation-glassesvalidator-planes). Here we describe the setup for generic 2D planes. It should be noted that a png render of the defined plane is stored in the plane's configuration folder when running any gazeMapper processing action, or by pressing the `generate reference image` button in the GUI. This can be used to check whether your plane definition is correct.
 
 A generic 2D fiducial marker plane is defined by a file with four columns that describes the marker layout on the plane:
 | Column | Description |
@@ -656,7 +656,7 @@ To be able turn the information of the above file into a plane, further settings
 These settings are typically stored in a file `plane_def.json` in the plane's configuration folder inside the project's configuration folder.
 
 ### Validation (glassesValidator planes)
-gazeMapper has built-in support for computing data quality from the gaze data of a participant looking at a validation poster using glassesValidator. To use this functionality, a plane of type GlassesValidator (`gazeMapper.plane.Type.GlassesValidator`) needs to be defined in the project's setup. By default, the default glassesValidator plane is used for a GlassesValidator plane. When the default checkbox is unchecked in the GUI (the `is_default` setting in `plane_def.json` is False), a custom configuration can be used. When unchecking this checkbox in the GUI, files containing the plane setup are deployed to the plane configuration folder, so that the user can edit or replace them. API users are requested to call `glassesValidator.config.deploy_validation_config()` to deploy the glassesValidator configuration files to the plane's configuration folder. The customization options for a glassesValidator plane are [documented here](https://github.com/dcnieho/glassesValidator/blob/master/README.md#customizing-the-poster).
+gazeMapper has built-in support for computing data quality from the gaze data of a participant looking at a validation poster using glassesValidator. To use this functionality, a plane of type GlassesValidator (`gazeMapper.marker_assembly.Type.GlassesValidator`) needs to be defined in the project's setup. By default, the default glassesValidator plane is used for a GlassesValidator plane. When the default checkbox is unchecked in the GUI (the `is_default` setting in `plane_def.json` is False), a custom configuration can be used. When unchecking this checkbox in the GUI, files containing the plane setup are deployed to the plane configuration folder, so that the user can edit or replace them. API users are requested to call `glassesValidator.config.deploy_validation_config()` to deploy the glassesValidator configuration files to the plane's configuration folder. The customization options for a glassesValidator plane are [documented here](https://github.com/dcnieho/glassesValidator/blob/master/README.md#customizing-the-poster).
 
 ## Individual Markers
 Besides planes, gazeMapper can also be configured to detect and report on the appearance of individual markers. This is configured in the `Individual markers editor` pane in the GUI or by means of `gazeMapper.marker.Marker` objects.
@@ -727,7 +727,7 @@ In this section, a full overview of gazeMapper's settings is given. These settin
 |Setting<br>name in GUI|Setting name<br>in settings file|Default<br>value|Description|
 | --- | --- | --- | --- |
 |`Session definition` pane|`session_def`||[gazeMapper session setup](#gazemapper-sessions). Should be a `gazeMapper.session.SessionDefinition` object.|
-|`Plane editor` pane|`planes`||[gazeMapper plane setup](#gazemapper-planes). Should be a list of `gazeMapper.plane.Definition` objects.|
+|`Plane & 3D Assembly editor` pane|`planes`||[gazeMapper plane & 3D Assembly setup](#gazemapper-planes). Should be a list of `gazeMapper.marker_assembly.Definition` objects.|
 |Episodes to code on the `Episode setup` pane|`episodes_to_code`||[gazeMapper coding setup](#coding-analysis-synchronization-and-validation-episodes). Should be a set of `glassesTools.annotation.Event` objects.|
 |Planes per episode on the `Episode setup` pane|`planes_per_episode`||[gazeMapper coding setup](#coding-analysis-synchronization-and-validation-episodes), indicating which plane(s) to detect for each episode. Should be a `dict` with `glassesTools.annotation.Event`s as keys, and a set of plane names as value for each key.|
 |`Individual marker editor`|`individual_markers`||[gazeMapper individual marker setup](#individual-markers). Should be a list of `gazeMapper.marker.Marker` objects.|
@@ -778,11 +778,11 @@ In this section, a full overview of gazeMapper's settings is given. These settin
 |Mapped video: Color for left eye gaze vector projected to plane|`mapped_video_projected_left_ray_color`|`RgbColor(  0,  0,255)`|Color used for drawing the projection to a plane of the recorded left eye's gaze vector. Not drawn if value is not set. The value should be a [`gazeMapper.config.RgbColor`](#gazemapperconfigrgbcolor) object.|
 |Mapped video: Color for right eye gaze vector projected to plane|`mapped_video_projected_right_ray_color`|`RgbColor(255,  0,  0)`|Color used for drawing the projection to a plane of the recorded right eye's gaze vector. Not drawn if value is not set. The value should be a [`gazeMapper.config.RgbColor`](#gazemapperconfigrgbcolor) object.|
 |Mapped video: Color for average of gaze vectors projected to plane|`mapped_video_projected_average_ray_color`|`RgbColor(255,  0,255)`|Color used for drawing the average projection to a plane of the recorded left and right eyes' gaze vectors. Not drawn if value is not set. The value should be a [`gazeMapper.config.RgbColor`](#gazemapperconfigrgbcolor) object.|
-|Mapped video: Process all planes for all frames?|`mapped_video_process_planes_for_all_frames`|`False`|If `True`, shows detection results for all planes for all frames. If `False`, detection of each plane is only shown during the episode(s) to which it is assigned.|
+|Mapped video: Process all marker assemblies for all frames?|`mapped_video_process_marker_assemblies_for_all_frames`|`False`|If `True`, shows detection results for all marker assemblies (e.g., planes) for all frames. If `False`, detection of each assembly is only shown during the episode(s) to which it is assigned.|
 |Mapped video: Process all annotations for all recordings?|`mapped_video_process_annotations_for_all_recordings`|`True`|Episode annotations are shown in a bar on the bottom of the screen. If this setting is `True`, annotations for not only the recording for which the video is made, but also for the other recordings are shown in this bar.|
-|Mapped video: Plane marker color|`mapped_video_plane_marker_color`|`RgbColor(  0,255,  0)`|Color used for drawing the detected markers belonging to planes. Not drawn if value is not set. The value should be a [`gazeMapper.config.RgbColor`](#gazemapperconfigrgbcolor) object.|
-|Mapped video: Plane marker color (recovered)|`mapped_video_recovered_plane_marker_color`|`RgbColor(  0,255,255)`|Color used for drawing the detected markers belonging to planes that were identified during a second stage in the ArUco pipeline where markers are found based on their expected position extrapolated from identified nearby markers on the plane. Not drawn if value is not set. The value should be a [`gazeMapper.config.RgbColor`](#gazemapperconfigrgbcolor) object.|
-|Mapped video: Plane axis arm length|`mapped_video_plane_axis_arm_length`|`25`|Length used for drawing axes that indicate the orientation of a detected plane. In the same unit as the plane (usually mm). Not drawn if value is not set.|
+|Mapped video: Assembly marker color|`mapped_video_assembly_marker_color`|`RgbColor(  0,255,  0)`|Color used for drawing detected markers belonging to marker assemblies. Not drawn if value is not set. The value should be a [`gazeMapper.config.RgbColor`](#gazemapperconfigrgbcolor) object.|
+|Mapped video: Assembly marker color (recovered)|`mapped_video_recovered_assembly_marker_color`|`RgbColor(  0,255,255)`|Color used for drawing recovered markers belonging to marker assemblies. Not drawn if value is not set. The value should be a [`gazeMapper.config.RgbColor`](#gazemapperconfigrgbcolor) object.|
+|Mapped video: Assembly axis arm length|`mapped_video_assembly_axis_arm_length`|`25`|Length used for drawing detected assembly axes, in the same unit as the assembly. Not drawn if value is not set.|
 |Mapped video: Individual marker color|`mapped_video_individual_marker_color`|`RgbColor(255,  0,255)`|Color used for drawing the detected individual markers. Not drawn if value is not set. The value should be a [`gazeMapper.config.RgbColor`](#gazemapperconfigrgbcolor) object.|
 |Mapped video: Individual marker axis arm length|`mapped_video_individual_marker_axis_arm_length`|`25`|Length used for drawing axes that indicate the orientation of a detected individual marker (if its size is set). In the same unit as the markers (usually mm). Not drawn if value is not set.|
 |Mapped video: Unexpected marker color|`mapped_video_unexpected_marker_color`|`RgbColor(255,255,128)`|Color used for drawing the detected markers belonging to planes. Not drawn if value is not set. The value should be a [`gazeMapper.config.RgbColor`](#gazemapperconfigrgbcolor) object.|
@@ -916,31 +916,32 @@ Enum:
 |`code_marker_for_presence`|<ol><li>`markers`: `pandas.DataFrame` or dict of `pandas.DataFrame`s organized by marker ID containing marker detection/pose results for a specific marker.</li></ol>|<ol><li>Input dataframe with a boolean column added (`*_presence`) denoting whether marker was detected or not for the video frame on that row in the dataframe.</li></ol>|Code markers for whether they were detected (present) or not.|
 |`fill_gaps_in_marker_detection`|<ol><li>`markers`: `pandas.DataFrame` containing marker detection/pose results for a specific marker</li><li>`fill_value`: Value to put for missing rows.</li></ol>|<ol><li>Input data frame with missing rows added so that the `frame_idx` column is a contiguous series.</li></ol>|Rows may be missing in a marker detection/pose results file. This function fills those missing rows with the indicated value so that the `frame_idx` column is a contiguous series.|
 
-## `gazeMapper.plane`
+## `gazeMapper.marker_assembly`
 |function|inputs|output|description|
 | --- | --- | --- | --- |
-|`make`|<ol><li>`p_type`: [plane type](#gazemapperplanetype).</li><li>`name`: Name of the plane.</li><li>`path`: Path from which to load information about the plane. Needed for a `GlassesValidator` plane if using a non-default setup.</li><li>`**kwargs`: additional arguments that are passed along to the plane defition object's constructor.</li></ol>|[`GlassesValidator` or `Plane_2D` definition object](#gazemapperplanedefinition-and-subclasses).|Make plane definition object of given type and name.|
-|`get_plane_from_path`|<ol><li>`path`: plane definition folder in the project's configuration folder.</li></ol>|<ol><li>a `glassesTools.plane.Plane` object.</li></ol>|Load plane definition from file and use it to construct a `glassesTools.plane.Plane` object.|
-|`get_plane_from_definition`|<ol><li>`plane_def`: [plane definition object](#gazemapperplanedefinition-and-subclasses).</li><li>`path`: plane definition folder in the project's configuration folder.</li></ol>|<ol><li>a `glassesTools.plane.Plane` object.</li></ol>|Construct a `glassesTools.plane.Plane` object from a plane definition object.|
-|`get_plane_setup`|<ol><li>`plane_def`: [plane definition object](#gazemapperplanedefinition-and-subclasses).</li></ol>|<ol><li>Dict with information about the plane's setup.</li></ol>|Turns a plane definition object into a dict with information about that plane that is needed for `glassesTools.aruco.PoseEstimator.add_plane()`.|
+|`make_definition`|<ol><li>`p_type`: [assembly type](#gazemappermarker_assemblytype).</li><li>`name`: Name of the plane or assembly.</li><li>`path`: Path from which to load information. Needed for a `GlassesValidator` plane if using a non-default setup.</li><li>`**kwargs`: Additional arguments passed to the definition constructor.</li></ol>|A definition object of the requested type.|Create a plane or marker-assembly definition.|
+|`get_marker_assembly_from_path`|<ol><li>`path`: Definition folder in the project's configuration folder.</li></ol>|A `glassesTools.marker_assembly.MarkerAssembly` object.|Load a definition from file and construct its runtime marker assembly.|
+|`get_marker_assembly_from_definition`|<ol><li>`assembly_def`: Definition object.</li><li>`path`: Definition folder in the project's configuration folder.</li></ol>|A `glassesTools.marker_assembly.MarkerAssembly` object.|Construct a runtime marker assembly from a definition object.|
 
-### `gazeMapper.plane.Type`
+### `gazeMapper.marker_assembly.Type`
 Enum:
 | Value | Description |
 | --- | --- |
-|`GlassesValidator`|Plane is a glassesValidator poster.|
-|`Plane_2D`|Plane is a general 2D plane.|
+|`GlassesValidator`|A glassesValidator poster plane.|
+|`Plane_2D`|A general 2D plane.|
+|`Target_Plane_2D`|A 2D target plane.|
+|`MarkerAssembly_3D`|A general 3D marker assembly.|
 
-### `gazeMapper.plane.Definition` and subclasses
-`gazeMapper.plane.Definition_GlassesValidator` and `gazeMapper.plane.Definition_Plane_2D`
+### `gazeMapper.marker_assembly.Definition` and subclasses
+`gazeMapper.marker_assembly.Definition_GlassesValidator`, `Definition_Plane_2D`, `Definition_Target_Plane_2D`, and `Definition_MarkerAssembly_3D`
 |member function|inputs|output|description|
 | --- | --- | --- | --- |
-|`__init__`|<ol><li>`type`: [plane type](#gazemapperplanetype).</li><li>`name`: Name of the plane.</li></ol>|||
+|`__init__`|<ol><li>`type`: [assembly type](#gazemappermarker_assemblytype).</li><li>`name`: Name of the plane or assembly.</li></ol>|||
 |`field_problems`||<ol><li>`gazeMapper.type_utils.ProblemDict`: Nested dict containing fields (if any) with configuration problems, and associated error messages.</li></ol>|Check configuration for errors and returns found problems.|
 |`fixed_fields`||<ol><li>`gazeMapper.type_utils.NestedDict`: Nested dict containing fields (if any) that cannot be edited.</li></ol>|Get list of fields that cannot be edited (should be displayed as such in the GUI).|
 |`has_complete_setup`||<ol><li>Boolean indicating whether plane setup is ok or not.</li></ol>|Check whether plane setup is ok or has problems.|
 |`store_as_json`|<ol><li>`path`: Path to store plane definition JSON file to. Can be a path to a file, or a path to a folder containing such a file (in the latter case, the default filename `'plane_def.json'` will be used).</li></ol>||Store plane definition to JSON file.|
-|`load_from_json` (static)|<ol><li>`path`: path to load plane definition JSON file from. Can be a path to a file, or a path to a folder containing such a file (in the latter case, the default filename `'plane_def.json'` will be used).</li></ol>|<ol><li>[`GlassesValidator` or `Plane_2D` definition object](#gazemapperplanedefinition-and-subclasses).</li></ol>|Load plane definition from JSON file.
+|`load_from_json` (static)|<ol><li>`path`: Path to load definition JSON from.</li></ol>|A `gazeMapper.marker_assembly.Definition` subclass.|Load a plane or marker-assembly definition from JSON.
 
 ## `gazeMapper.process`
 [`gazeMapper.process.Action`](#actions) is described above.
