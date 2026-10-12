@@ -1457,6 +1457,7 @@ class GUI:
                     callbacks.open_folder(self, assembly_dir)
                 imgui.same_line()
                 if p.type==marker_assembly.Type.GlassesValidator:
+                    p = typing.cast(marker_assembly.Definition_GlassesValidator, p)
                     if p.is_dynamic:
                         if p.use_default and imgui.button(ifa6.ICON_FA_TICKET+f' get glassesValidator dynamic script'):
                             gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='deploy_gv_dynamic_script'))
@@ -1469,7 +1470,7 @@ class GUI:
                         elif not p.use_default and imgui.button(ifa6.ICON_FA_CLIPBOARD_LIST+f' deploy default config'):
                             callbacks.glasses_validator_deploy_config(self, p)
                 imgui.same_line()
-                if imgui.button(ifa6.ICON_FA_TRASH_CAN+f' delete marker assembly###{lbl}'):
+                if imgui.button(ifa6.ICON_FA_TRASH_CAN+f' delete plane or 3D marker assembly###{lbl}'):
                     self._remove_marker_assembly(p)
                 imgui.tree_pop()
             else:
