@@ -39,6 +39,7 @@ class ArucoPoseConsistency(typed_dict_defaults.TypedDictDefault, total=False):
     max_subsets                     : int   = 500
     max_marker_tilt_angle_deg       : float = 80.
     temporal_enabled                : bool  = True
+    temporal_invert_pose            : bool  = True
     temporal_history_size           : int   = 5
     max_translation_speed_m_s       : float = 3.
     max_rotation_speed_deg_s        : float = 400.
@@ -160,6 +161,7 @@ aruco_settings_doc = type_utils.GUIDocInfo('ArUco detection',
         'max_subsets': type_utils.GUIDocInfo('Maximum detection subsets', 'Maximum number of detection subsets evaluated in one pose-consistency search. Larger combinatorial searches use deterministic sampling within this limit.'),
         'max_marker_tilt_angle_deg': type_utils.GUIDocInfo('Maximum marker tilt (degrees)', 'Maximum angle between the marker front-face normal (as determined from the plane pose) and the direction from the marker center toward the camera. 0 degrees is face-on; 90 degrees is edge-on; angles above 90 degrees are back-facing. Must be in [0, 90), so edge-on and back-facing markers are rejected.'),
         'temporal_enabled': type_utils.GUIDocInfo('Enable temporal pose check', 'Reject poses whose camera motion relative to the plane exceeds the configured translation or rotation speed. Requires a plane unit of m, cm, or mm for translation checking and frame timestamps.'),
+        'temporal_invert_pose': type_utils.GUIDocInfo('Invert pose for temporal check', 'Compare camera pose in the board frame when enabled (default); otherwise compare the raw board pose in the camera frame. This affects temporal filtering only, not saved pose direction.'),
         'temporal_history_size': type_utils.GUIDocInfo('Temporal history size', 'Number of previous accepted poses retained for speed checks.'),
         'max_translation_speed_m_s': type_utils.GUIDocInfo('Maximum translation speed (m/s)', 'Maximum camera translation speed relative to the plane.'),
         'max_rotation_speed_deg_s': type_utils.GUIDocInfo('Maximum rotation speed (degrees/s)', 'Maximum camera-orientation change relative to the plane per second.')
