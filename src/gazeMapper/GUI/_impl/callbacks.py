@@ -46,7 +46,7 @@ def get_folder_picker(g, reason: str, *args, **kwargs):
                 default_poster.deploy_default_pdf(selected[0])
             case 'export':
                 show_export_config(g, selected[0], *args, **kwargs)
-            case 'new_plane_dyn_dir':
+            case 'new_validation_config_dir':
                 kwargs['callback'](selected[0])
             case 'deploy_gv_dynamic_script':
                 not_copied = val_dynamic.deploy_setup_and_script(selected[0])
@@ -91,7 +91,7 @@ def get_folder_picker(g, reason: str, *args, **kwargs):
             header = "Select folder to store results export"
             allow_multiple = False
             picker_type = gt_gui.file_picker.DirPicker
-        case 'new_plane_dyn_dir' | 'gv_dynamic_import_setup':
+        case 'new_validation_config_dir' | 'gv_dynamic_import_setup':
             header = "Select or drop setup json file for dynamic validation PsychoPy script"
             allow_multiple = False
             picker_type = gt_gui.file_picker.FilePicker
@@ -162,7 +162,7 @@ def set_dynamic_validation_plane_config(g, config_file_path: pathlib.Path, p_def
     except Exception as exc:
         gt_gui.utils.push_popup(g, gt_gui.msg_box.msgbox, "Error converting setup", f"There was an error trying to load the dynamic validation setup:\n{exc}", gt_gui.msg_box.MsgBox.error, more=gt_gui.utils.get_traceback(type(exc), exc, exc.__traceback__))
         return
-    # N.B.: all we have to do here for the plane. File watcher will catch the change and reload the plane
+    # N.B.: all we have to do here for the validator definition. File watcher will catch the change and reload it.
     set_auto_coding_for_dynamic_validation_plane(g, p_def, auto_coding_setup)
 
 def set_auto_coding_for_dynamic_validation_plane(g, p_def: marker_assembly.Definition_GlassesValidator, auto_coding_setup: dict[str,list[gt_marker.MarkerID]]):
@@ -259,37 +259,37 @@ def set_cam_cal(cal_path: str|pathlib.Path, working_directory: str|pathlib.Path)
 def delete_cam_cal(working_directory: str|pathlib.Path):
     (pathlib.Path(working_directory) / gt_naming.scene_camera_calibration_fname).unlink(missing_ok=True)
 
-def make_plane(g, p_type: marker_assembly.Type, name: str, is_dynamic: bool, dynamic_config_file: str):
+def make_marker_assembly(g, assembly_type: marker_assembly.Type, assembly_name: str, is_dynamic: bool, validation_config_file: str):
     from . import gui
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
     path = config.guess_config_dir(g.study_config.working_directory)
-    p_dir = path / name
+    assembly_dir = path / assembly_name
     # deal with dynamic glassesValidator plane
     extra = {}
     if is_dynamic:
-        extra['use_default'] = not dynamic_config_file
+        extra['use_default'] = not validation_config_file
         extra['is_dynamic'] = True
         # deploy converted config files
-        p_dir.mkdir(exist_ok=True)
+        assembly_dir.mkdir(exist_ok=True)
         try:
-            if dynamic_config_file:
-                dcf = pathlib.Path(dynamic_config_file)
-                auto_coding_setup = val_dynamic.setup_to_plane_config(p_dir, dcf.parent, dcf.name)
+            if validation_config_file:
+                dcf = pathlib.Path(validation_config_file)
+                auto_coding_setup = val_dynamic.setup_to_plane_config(assembly_dir, dcf.parent, dcf.name)
             else:
-                auto_coding_setup = val_dynamic.setup_to_plane_config(p_dir)
+                auto_coding_setup = val_dynamic.setup_to_plane_config(assembly_dir)
         except Exception as exc:
             gt_gui.utils.push_popup(g, gt_gui.msg_box.msgbox, "Error converting setup", f"There was an error trying to load the dynamic validation\nsetup when creating the new validation plane:\n{exc}", gt_gui.msg_box.MsgBox.error, more=gt_gui.utils.get_traceback(type(exc), exc, exc.__traceback__))
-            shutil.rmtree(p_dir)
+            shutil.rmtree(assembly_dir)
             return
-    # make plane
-    p_def = marker_assembly.make_definition(p_type, name, p_dir, **extra)
+    # make marker assembly
+    p_def = marker_assembly.make_definition(assembly_type, assembly_name, assembly_dir, **extra)
     # store to file
-    if not p_dir.is_dir():
-        p_dir.mkdir()
-    p_def.store_as_json(p_dir)
-    # append to known planes
+    if not assembly_dir.is_dir():
+        assembly_dir.mkdir()
+    p_def.store_as_json(assembly_dir)
+    # append to known marker assemblies
     g.study_config.marker_assemblies.append(p_def)
-    # deal with further setup for dynamic plane
+    # deal with further setup for dynamic validation
     if is_dynamic:
         set_auto_coding_for_dynamic_validation_plane(g, p_def, auto_coding_setup)
 
@@ -305,12 +305,12 @@ def make_coding_setup(g, coding_name: str, coding_type: annotation.EventType):
     # store config
     g.study_config.store_as_json()
 
-def delete_plane(study_config: config.Study, plane: marker_assembly.Definition):
-    # remove config directory for the plane
+def delete_marker_assembly(study_config: config.Study, assembly: marker_assembly.Definition):
+    # remove config directory for the marker assembly
     path = config.guess_config_dir(study_config.working_directory)
-    p_dir = path / plane.name
-    if p_dir.is_dir():
-        shutil.rmtree(p_dir)
+    assembly_dir = path / assembly.name
+    if assembly_dir.is_dir():
+        shutil.rmtree(assembly_dir)
 
 def glasses_validator_plane_check_or_deploy_config(study_config: config.Study, pl: marker_assembly.Definition_GlassesValidator):
     if not isinstance(pl, marker_assembly.Definition_GlassesValidator) or pl.use_default:
@@ -466,7 +466,7 @@ def show_action_options(session_name: str, rec_name: str|None, action: process.A
                 ]}
         case process.Action.DETECT_MARKERS:
             options = {'show_visualization': [
-                    False, 'Show visualization', 'Show a viewer that allows to follow the processing of the video. Each frame is shown overlaid with info about detected markers and planes.'
+                    False, 'Show visualization', 'Show a viewer that allows to follow the processing of the video. Each frame is shown overlaid with info about detected markers and assemblies.'
                 ], 'visualization_show_rejected_markers': [
                     False, 'Show rejected markers', 'Rejected ArUco marker candidates are also shown in the viewer. Possibly useful for debug.'
                 ]}

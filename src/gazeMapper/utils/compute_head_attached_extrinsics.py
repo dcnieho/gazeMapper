@@ -6,7 +6,7 @@
 # Since gazeMapper checks that extrinsics are available for a head-attached camera, it will error out if you
 # have not determined them yet. You can therefore initialize them to identity transforms (no translation and
 # identity rotation matrix) and then:
-# 1. run the Detect Markers action to get poses of both the eye tracker and the scene camera w.r.t. some plane,
+# 1. run the Detect Markers action to get poses of both the eye tracker and the scene camera w.r.t. some marker assembly,
 #    so that that:
 # 2. You can run this utility to compute the correct extrinsics.
 # 3. Manually edit the camera calibration file to set the to set the extrinsics to the computed values.
@@ -107,7 +107,7 @@ study_config = config.read_study_config_with_overrides(config_dir, {config.Overr
 # get info about session
 session_info = session.Session.from_definition(study_config.session_def, session_dir)
 
-# check plane is defined
+# check marker assembly is defined
 if not any(assembly.name==assembly_name for assembly in study_config.marker_assemblies):
     raise ValueError(f'Assembly "{assembly_name}" is not defined in the study config, cannot proceed')
 # check recordings are defined and are indeed a scene camera and head-attached recording
@@ -122,12 +122,12 @@ for r in [et_rec_name, ha_rec_name]:
     if r==ha_rec_name and (rec_def.type!=session.RecordingType.Camera or rec_def.camera_recording_type!=CameraRecordingType.Head_attached):
         raise ValueError(f'Recording "{r}" is not a head-attached camera recording, cannot proceed')
 
-# load plane pose for both recordings
+# load assembly pose for both recordings
 poses = {r:gt_pose.read_plane_dict_from_file(session_dir/r/f'{naming.plane_pose_prefix}{assembly_name}.tsv') for r in [et_rec_name, ha_rec_name]}
 # load camera calibrations for both recordings
 camera_calibs = {r:ocv.CameraParams.read_from_file(session_dir/r/gt_naming.scene_camera_calibration_fname) for r in [et_rec_name, ha_rec_name]}
 
-# get episodes involving the plane
+# get episodes involving the marker assembly
 codings = {cs['name']:cs for cs in study_config.coding_setup if assembly_name in cs.get('marker_assemblies',[])}
 ref_episodes = episode.list_to_marker_dict(episode.read_list_from_file(session_dir/study_config.sync_ref_recording/naming.coding_file), list(codings.keys()))
 videos_ts = {r:timestamps.VideoTimestamps(session_dir / r / gt_naming.frame_timestamps_fname) for r in [et_rec_name, ha_rec_name]}

@@ -10,7 +10,7 @@ from .. import config, episode, marker, naming, marker_assembly, process, sessio
 
 
 def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None=None, show_visualization=False, visualization_show_rejected_markers=False, progress_indicator: process_pool.JobProgress|None=None, **study_settings):
-    # if show_visualization, each frame is shown in a viewer, overlaid with info about detected markers and planes
+    # if show_visualization, each frame is shown in a viewer, overlaid with info about detected markers and assemblies
     # if show_rejected_markers, rejected ArUco marker candidates are also shown in the viewer. Possibly useful for debug
     working_dir = pathlib.Path(working_dir)
     if config_dir is None:
@@ -63,14 +63,14 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
         individual_markers_to_process = [m for m in study_config.individual_markers if (m.id,m.aruco_dict_id) in sync_markers]
         assemblies_setup, _, episodes = {}, {}, {}
     else:
-        # get coded interval(s) with planes, if any. Just to show in GUI, if attached
+        # get coded interval(s) with assemblies, if any. Just to show in GUI, if attached
         wanted_episodes = {cs['name'] for cs in study_config.coding_setup if cs.get('marker_assemblies',[])}
         episodes = episode.load_episodes_from_all_recordings(study_config, working_dir, wanted_episodes, missing_other_coding_ok=True)[0]
 
         assemblies_setup, _, _ = _get_assembly_setup(study_config, config_dir)  # we don't need to know for which frames to run the detection, we always process all frames
 
         if not assemblies_setup and not study_config.individual_markers:
-            raise RuntimeError(f'No planes or individual markers are configured for detection for the "{rec_name}" recording (a {rec_def.type.value} recording), cannot run Detect Markers')
+            raise RuntimeError(f'No marker assemblies (e.g., planes) or individual markers are configured for detection for the "{rec_name}" recording (a {rec_def.type.value} recording), cannot run Detect Markers')
         individual_markers_to_process = study_config.individual_markers
 
     # set up pose estimator
@@ -137,7 +137,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
             # use camera extrinsics to make new poses for the eye tracker scene camera
             cam_params = ocv.CameraParams.read_from_file(working_dir / gt_naming.scene_camera_calibration_fname)
             Rmat = cv2.Rodrigues(cam_params.rotation_vec)[0]
-            # now, per plane, transform head-attached camera poses into eye tracker scene camera poses and store
+            # now, per assembly, transform head-attached camera poses into eye tracker scene camera poses and store
             for pl in poses:
                 # get poses
                 is_3d_assembly = isinstance(assembly_definitions[pl], marker_assembly.Definition_MarkerAssembly_3D)
@@ -168,7 +168,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
 def _get_assembly_setup(study_config: config.Study,
                      config_dir: pathlib.Path,
                      episodes: dict[str, tuple[annotation.EventType, list[list[int]]]]|None = None) -> tuple[dict[str, aruco.AssemblySetup], dict[str, tuple[annotation.EventType, list[int]|list[list[int]]]|None], dict[str, gt_marker_assembly.MarkerAssembly]]:
-    # process the above into a dict of plane definitions and a dict with frame number intervals for which to use each
+    # process the above into a dict of marker assembly definitions and a dict with frame number intervals for which to use each
     codings = [e for e in episodes] if episodes else [cs['name'] for cs in study_config.coding_setup if cs.get('marker_assemblies',[])]
     coding_setups = [cs for cs in study_config.coding_setup if cs['name'] in codings]
     assembly_names = {v for cs in coding_setups for v in cs['marker_assemblies']}
@@ -180,7 +180,7 @@ def _get_assembly_setup(study_config: config.Study,
         assemblies[a] = marker_assembly.get_marker_assembly_from_definition(a_def, config_dir/a)
         assemblies_setup[a] = assemblies[a].get_assembly_setup()
         if episodes:
-            # determine for which frames this plane should be used
+            # determine for which frames this assembly should be used
             anal_events  = {cs['name']: cs['event_type'] for cs in study_config.coding_setup if a in cs['marker_assemblies']}
             all_episodes = [ep for k in anal_events if k in episodes for ep in episodes[k][1] if ep]  # filter out empty
             analyze_frames[a] = (list(anal_events.values())[0],sorted(all_episodes, key = lambda x: x[1]))

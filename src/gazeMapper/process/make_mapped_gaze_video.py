@@ -232,7 +232,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
         in_videos[rec] = session.read_recording_info(working_dir / rec, rec_def.type)[1]
         pose_estimators[rec] = pose.Estimator(in_videos[rec], videos_ts[rec], camera_params[rec])
         pose_estimators[rec].set_allow_early_exit(False)    # make sure we run through the whole video
-        # first, register all ArUco planes and individual markers with ArUco manager, which
+        # first, register all ArUco marker assemblies and individual markers with ArUco manager, which
         # will then wrap their detection and register them with the pose estimator
         recording_config = config.apply_study_config_overrides(study_config,
             {config.OverrideLevel.Recording: working_dir / rec}, rec_def.type, **study_settings)
@@ -456,10 +456,10 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
                     poses_other = apose[vo]
                     if poses_other is None:
                         continue
-                    matched_plane = next((a for a in poses_this if a in assemblies and a in poses_other and poses_this[a].pose_successful() and poses_other[a].pose_successful()), None)
-                    if matched_plane is None:
+                    matched_assembly = next((a for a in poses_this if a in assemblies and a in poses_other and poses_this[a].pose_successful() and poses_other[a].pose_successful()), None)
+                    if matched_assembly is None:
                         continue
-                    draw_camera_on_other_video(frame[vo], ROI_offsets[vo], poses_this[matched_plane], poses_other[matched_plane], camera_params[vo], clr, sub_pixel_fac)
+                    draw_camera_on_other_video(frame[vo], ROI_offsets[vo], poses_this[matched_assembly], poses_other[matched_assembly], camera_params[vo], clr, sub_pixel_fac)
 
 
             # print info on frame and submit to to be encoded

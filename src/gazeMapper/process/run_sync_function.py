@@ -10,7 +10,7 @@ from .. import config, episode, naming, session
 
 
 def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None=None, show_visualization=False, progress_indicator: process_pool.JobProgress|None=None, **study_settings):
-    # if show_visualization, each frame is shown in a viewer, overlaid with info about detected markers and planes
+    # if show_visualization, each frame is shown in a viewer, overlaid with info about detected markers and assemblies
     working_dir = pathlib.Path(working_dir)
     if config_dir is None:
         config_dir = config.guess_config_dir(working_dir)
