@@ -62,6 +62,13 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
     # time info
     video_ts = timestamps.VideoTimestamps(working_dir / gt_naming.frame_timestamps_fname)
 
+    # get frame info for the scene video, if available
+    in_video = session.read_recording_info(working_dir, rec_def.type)[1]
+    frame_info_file = in_video.parent / (in_video.stem+gt_naming.frame_info_suffix)
+    frame_info = ocv.FrameInfoHandler(frame_info_file)
+    if frame_info.data is not None and not frame_info.single_entry and len(frame_info.data)!=len(video_ts.indices):
+        raise ValueError(f'The number of frames in the frame info file ({len(frame_info.data)}) does not match the number of frames in the video ({len(video_ts.indices)}). Please check your files.')
+
     # Read target positions
     target_positions: dict[str, dict[int, TargetPos]] = {}
     for cs in sync_events:
@@ -84,7 +91,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, *
                 # compute target positions on camera frame
                 target_positions[nm] = {}
                 for frame_idx in poses:
-                    t_pos = poses[frame_idx].get_origin_on_image(camera_params)
+                    info = frame_info.get_frame_info(frame_idx)
+                    ROI_offset = [info['offset_x'], info['offset_y']] if 'offset_x' in info and 'offset_y' in info else [0., 0.]
+                    t_pos = poses[frame_idx].get_origin_on_image(camera_params, ROI_offset)
                     if not np.isnan(t_pos[0]):
                         target_positions[nm][frame_idx] = TargetPos(video_ts.get_timestamp(frame_idx), frame_idx, t_pos)
             case 'function':
