@@ -3,6 +3,7 @@ import builtins
 import inspect
 import pathlib
 import enum
+import types
 import copy
 
 from imgui_bundle import imgui, imgui_md, icons_fontawesome_6 as ifa6
@@ -69,6 +70,12 @@ def _replace_type_arg(f_type: typing.Type, base_type: typing.Type, v_type, n_typ
 def _get_base_type(f_type: typing.Type) -> typing.Type:
     return typing.get_origin(f_type) or f_type  # for instance str[int]->str, and str->str
 
+def _is_union_type(f_type: typing.Type) -> bool:
+    return f_type is typing.Union or typing.get_origin(f_type) in (typing.Union, types.UnionType)
+
+def _is_path_union(f_type: typing.Type) -> bool:
+    return _is_union_type(f_type) and set(typing.get_args(f_type)) == {str, pathlib.Path}
+
 def _get_runtime_type(value: typing.Any) -> typing.Type:
     if isinstance(value, list) and value:
         return list[_get_runtime_type(value[0])]
@@ -126,12 +133,12 @@ def _get_field_type(field: str, obj: _T, f_type: typing.Type, possible_value_get
             if n_type is not None:
                 for vt,nt in zip(v_type,n_type):
                     f_type = _replace_type_arg(f_type, base_type, vt, nt)
-        case typing.Union:
-            if f_type==typing.Union[str, pathlib.Path]:
+        case _ if _is_union_type(f_type):
+            if _is_path_union(f_type):
                 is_dict = False
             if all(typed_dict_defaults.is_typeddictdefault(t) for t in typing.get_args(f_type)):
                 is_dict = True
-        case _ if issubclass(f_type, enum.Enum):
+        case _ if inspect.isclass(f_type) and issubclass(f_type, enum.Enum):
             is_dict = False
         case _:
             raise ValueError(f'type of {field} ({f_type}) not handled')
@@ -491,7 +498,7 @@ def draw_value(field_lbl: str, val: _T, f_type: typing.Type, o_type_args: tuple[
         else:
             if base_type==typing.Literal:
                 val = typing.get_args(f_type)[0]
-            elif base_type==typing.Union and f_type==typing.Union[str, pathlib.Path]:
+            elif _is_path_union(f_type):
                 val = ''
             elif inspect.isclass(base_type) and issubclass(base_type, enum.Enum):
                 val = [x for x in base_type][0]
@@ -510,7 +517,7 @@ def draw_value(field_lbl: str, val: _T, f_type: typing.Type, o_type_args: tuple[
             new_val = imgui.checkbox(f'##{field_lbl}', val)[1]
         case builtins.str:
             new_val = imgui.input_text(f'##{field_lbl}', val)[1]
-        case typing.Union if f_type==typing.Union[str, pathlib.Path]:
+        case _ if _is_path_union(f_type):
             new_val = imgui.input_text(f'##{field_lbl}', str(val))[1]
             if isinstance(val,pathlib.Path):
                 new_val = pathlib.Path(new_val)
