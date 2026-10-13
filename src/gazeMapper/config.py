@@ -1528,7 +1528,7 @@ class StudyOverride:
                 if field == self.marker_group_assignments_field:
                     continue
                 self._check_marker_settings_structure(field, getattr(self, field))
-                targets = {p.name: p for p in obj.marker_assemblies if isinstance(p, marker_assembly.Definition_Plane_Aruco)} if field == 'marker_assemblies' else obj.individual_marker_settings
+                targets = {p.name: p for p in obj.marker_assemblies if isinstance(p, marker_assembly.Definition_MarkerAssembly)} if field == 'marker_assemblies' else obj.individual_marker_settings
                 for name, patch in getattr(self, field).items():
                     if name not in targets:
                         kind = 'marker assembly' if field == 'marker_assemblies' else 'marker settings group'
@@ -1727,8 +1727,8 @@ def _study_diff_impl(config: Study, parent_config: Study, fields: tuple[list[str
     kwds: dict[str,Any] = {}
     for f in fields[0]:
         if f == 'marker_assemblies' and isinstance(config, Study):
-            parents = {p.name: p for p in parent_config.marker_assemblies if isinstance(p, marker_assembly.Definition_Plane_Aruco)}
-            changes = {p.name: diff for p in config.marker_assemblies if isinstance(p, marker_assembly.Definition_Plane_Aruco) and p.name in parents and
+            parents = {p.name: p for p in parent_config.marker_assemblies if isinstance(p, marker_assembly.Definition_MarkerAssembly)}
+            changes = {p.name: diff for p in config.marker_assemblies if isinstance(p, marker_assembly.Definition_MarkerAssembly) and p.name in parents and
                        (diff := _study_diff_impl(p, parents[p.name], (['aruco_settings'], None)))}
             if changes:
                 kwds[f] = changes
