@@ -1411,7 +1411,7 @@ class StudyOverride:
                 exclude = set(all_params) - StudyOverride.marker_settings_fields
             else:
                 # Session-level disallowed parameters
-                exclude = {'self', 'session_def', 'individual_markers', 'coding_setup', 'working_directory', 'import_known_custom_eye_trackers'}
+                exclude = {'self', 'session_def', 'individual_markers', 'coding_setup', 'working_directory', 'import_known_custom_eye_trackers', 'gui_num_workers'}
             allowed_params = [a for a in all_params if a not in exclude]
         return allowed_params, exclude
 
