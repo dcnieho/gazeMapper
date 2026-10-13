@@ -306,6 +306,7 @@ class Study:
                  overlay_video_gaze_world_pos_radius        : int                           = 5,
                  overlay_video_gaze_vid_pos_thickness       : int                           = 2,
                  overlay_video_gaze_world_pos_thickness     : int                           = -1,
+                 overlay_video_pixel_format                 : Literal['yuv420p','yuv444p']  = 'yuv420p',
 
                  sync_ref_recording                         : str|None                      = None,
                  sync_ref_do_time_stretch                   : bool|None                     = None,
@@ -317,6 +318,7 @@ class Study:
                  export_only_code_marker_presence           : bool                          = True,
 
                  mapped_video_make_which                               : set[str]|None                     = None,
+                 mapped_video_pixel_format                             : Literal['yuv420p','yuv444p']      = 'yuv420p',
                  mapped_video_recording_colors                         : dict[str,RgbColor]|None           = None,
                  mapped_video_projected_vidPos_color                   : RgbColor|None                     = RgbColor(255,255,  0),
                  mapped_video_projected_world_pos_color                : RgbColor|None                     = RgbColor(255,  0,255),
@@ -368,6 +370,7 @@ class Study:
         self.overlay_video_gaze_world_pos_radius        = overlay_video_gaze_world_pos_radius
         self.overlay_video_gaze_vid_pos_thickness       = overlay_video_gaze_vid_pos_thickness
         self.overlay_video_gaze_world_pos_thickness     = overlay_video_gaze_world_pos_thickness
+        self.overlay_video_pixel_format                 = overlay_video_pixel_format
 
         self.sync_ref_recording                         = sync_ref_recording
         self.sync_ref_do_time_stretch                   = sync_ref_do_time_stretch
@@ -379,6 +382,7 @@ class Study:
         self.export_only_code_marker_presence           = export_only_code_marker_presence
 
         self.mapped_video_make_which                               = mapped_video_make_which
+        self.mapped_video_pixel_format                             = mapped_video_pixel_format
         self.mapped_video_recording_colors                         = mapped_video_recording_colors
         self.mapped_video_projected_vidPos_color                   = mapped_video_projected_vidPos_color
         self.mapped_video_projected_world_pos_color                = mapped_video_projected_world_pos_color
@@ -779,13 +783,15 @@ class Study:
                   if isinstance(params, dict) else params
             for name, params in groups.items()}
 
-    def add_individual_marker_settings(self, name: str):
+    def add_individual_marker_settings(self, name: str, copy_from: str = 'default'):
         name = name.strip()
         if not name:
             raise ValueError('A marker detection settings group must have a name')
         if name in self.individual_marker_settings:
             raise ValueError(f'Marker detection settings group "{name}" already exists')
-        self.individual_marker_settings[name] = ArucoDetectorParameters(copy.deepcopy(self.individual_marker_settings['default']))
+        if copy_from not in self.individual_marker_settings:
+            raise ValueError(f'Marker detection settings group "{copy_from}" does not exist')
+        self.individual_marker_settings[name] = ArucoDetectorParameters(copy.deepcopy(self.individual_marker_settings[copy_from]))
 
     def _check_individual_marker_settings(self) -> type_utils.ProblemDict:
         problems: type_utils.ProblemDict = {}
@@ -1209,6 +1215,10 @@ _gaze_type_doc = {
     gaze_worldref.Type.Right_Eye_Gaze_Vector: type_utils.GUIDocInfo('Right eye gaze vector', 'Projection of the right eye\'s gaze vector to the plane.'),
     gaze_worldref.Type.Average_Gaze_Vector  : type_utils.GUIDocInfo('Average of gaze vectors', 'Average of the projections of the left and right eyes\' gaze vectors to the plane.'),
 }
+_video_pixel_format_docs = {None: {
+    'yuv420p': type_utils.GUIDocInfo('yuv420p', 'Broad playback compatibility and smaller files. Chroma subsampling can soften thin, saturated annotations.'),
+    'yuv444p': type_utils.GUIDocInfo('yuv444p', 'Preserves full color resolution for sharper annotations, but can create larger files and has more limited hardware/player support.'),
+}}
 study_parameter_doc = {
     'individual_marker_settings': type_utils.GUIDocInfo('Marker detection settings', 'Named detector parameter groups managed in the individual-marker setup pane.'),
     'allow_duplicated_markers': type_utils.GUIDocInfo('Allow duplicated markers?', 'If enabled, the same marker can be used in multiple places in the coding setup (e.g. for auto coding and/or in planes). If disabled, each marker can only be used once. Enabling this may be ok, if the duplicate markers never occur at the same time. Still, use at your own risk.'),
@@ -1224,6 +1234,7 @@ study_parameter_doc = {
     'overlay_video_gaze_world_pos_radius': type_utils.GUIDocInfo('Gaze overlay video: Radius for 3D gaze position', 'Radius of circle used for drawing the recorded 3D gaze position in the world.'),
     'overlay_video_gaze_vid_pos_thickness': type_utils.GUIDocInfo('Gaze overlay video: Thickness for gaze position on video', 'Line thickness of circle used for drawing the recorded gaze position on the scene video.'),
     'overlay_video_gaze_world_pos_thickness': type_utils.GUIDocInfo('Gaze overlay video: Thickness for 3D gaze position', 'Line thickness of circle used for drawing the recorded 3D gaze position in the world.'),
+    'overlay_video_pixel_format': type_utils.GUIDocInfo('Gaze overlay video: Output pixel format', 'Pixel format used by the gaze overlay video encoder.', _video_pixel_format_docs),
     'sync_ref_recording': type_utils.GUIDocInfo('Synchronization: Reference recording', 'If there are multiple recordings, sets to which recording all other recordings will be synchronized.'),
     'sync_ref_do_time_stretch': type_utils.GUIDocInfo('Synchronization: Do time stretch?', 'If enabled, multiple sync points are used to calculate a time stretch factor to compensate for clock drift when synchronizing multiple recordings.'),
     'sync_ref_stretch_which': type_utils.GUIDocInfo('Synchronization: Stretch which recording', 'Which recording(s) should be corrected for clock drift if "Synchronization: Do time stretch?" is enabled.',{
@@ -1237,6 +1248,7 @@ study_parameter_doc = {
     'export_output2D': type_utils.GUIDocInfo('Mapped data export: include 2D fields', 'Determines whether gaze positions on the plane in the plane\'s reference frame are exported when invoking the Export Trials action.'),
     'export_only_code_marker_presence': type_utils.GUIDocInfo('Mapped data export: only include marker presence?', 'If enabled, for each marker only a single column is added to the export created by the Export Trials action, indicating whether the given marker was detected or not on a given frame. If not enabled, marker pose information is included in the export.'),
     'mapped_video_make_which': type_utils.GUIDocInfo('Mapped video: Which recordings', 'Indicates one or multiple recordings for which to make videos of the eye tracker scene camera or external camera (synchronized to one of the recordings if there are multiple) showing detected plane origins, detected individual markers and gaze from any other recordings eye tracker recordings. Also shown for eye tracker recordings are gaze on the scene video from the eye tracker, gaze projected to the detected planes. Each only if available, and enabled in the below video generation settings.'),
+    'mapped_video_pixel_format': type_utils.GUIDocInfo('Mapped video: Output pixel format', 'Pixel format used by the mapped video encoder.', _video_pixel_format_docs),
     'mapped_video_recording_colors': type_utils.GUIDocInfo('Mapped video: Recording colors', 'Colors used for drawing each recording\'s gaze point, scene camera and gaze vector (depending on settings).'),
     'mapped_video_projected_vidPos_color': type_utils.GUIDocInfo('Mapped video: Color for gaze position on plane', 'Color used for drawing the recorded gaze position on the scene video transformed to the plane. Not drawn if value is not set.'),
     'mapped_video_projected_world_pos_color': type_utils.GUIDocInfo('Mapped video: Color for 3D gaze position on plane', 'Color used for drawing the projection on a plane of the recorded 3D gaze position in the world. Not drawn if value is not set.'),

@@ -8,11 +8,8 @@ import subprocess
 import typing
 
 from ffpyplayer.writer import MediaWriter
-from ffpyplayer.pic import Image
-import ffpyplayer.tools
-from fractions import Fraction
 
-from glassesTools import annotation, aruco, drawing, gaze_headref, gaze_worldref, marker_assembly as gt_marker_assembly, naming as gt_naming, ocv, plane as gt_plane, pose, process_pool, propagating_thread, timestamps, utils
+from glassesTools import annotation, aruco, drawing, gaze_headref, gaze_worldref, marker_assembly as gt_marker_assembly, naming as gt_naming, ocv, plane as gt_plane, pose, process_pool, propagating_thread, timestamps, utils, video_utils
 from glassesTools.gui import video_player
 
 from .. import config, episode, marker, naming, process, session, synchronization
@@ -333,13 +330,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
 
         # open output video files
         for v in write_vids:
-            # get which pixel format
-            codec    = ffpyplayer.tools.get_format_codec(fmt=pathlib.Path(naming.mapped_gaze_video).suffix[1:])
-            pix_fmt  = ffpyplayer.tools.get_best_pix_fmt('bgr24',ffpyplayer.tools.get_supported_pixfmts(codec))
-            fpsFrac  = Fraction(vid_info[lead_vid][2]).limit_denominator(10000).as_integer_ratio()
-            # scene video
-            out_opts = {'pix_fmt_in':'bgr24', 'pix_fmt_out':pix_fmt, 'width_in':vid_info[v][0], 'height_in':vid_info[v][1], 'frame_rate':fpsFrac}
-            vid_writer[v] = MediaWriter(str(working_dir / v / naming.mapped_gaze_video), [out_opts], overwrite=True)
+            vid_writer[v] = video_utils.create_video_writer(working_dir / v / naming.mapped_gaze_video, study_config.mapped_video_pixel_format, vid_info[v][0], vid_info[v][1], vid_info[lead_vid][2])
 
         # update state: set to not run so that if we crash or cancel below the task is correctly marked as not run (video files are corrupt)
         session.update_action_states(working_dir, process.Action.MAKE_MAPPED_GAZE_VIDEO, process_pool.State.Not_Run, study_config)
@@ -509,8 +500,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
                     x_end += x_advance
 
                 # submit frame to be encoded
-                img = Image(plane_buffers=[out_frame.flatten().tobytes()], pix_fmt='bgr24', size=(out_frame.shape[1], out_frame.shape[0]))
-                vid_writer[v].write_frame(img=img, pts=lead_frame_idx/vid_info[lead_vid][2])
+                video_utils.write_video_frame(vid_writer[v], out_frame, lead_frame_idx/vid_info[lead_vid][2])
             progress_indicator.update()
 
             # update gui, if any
