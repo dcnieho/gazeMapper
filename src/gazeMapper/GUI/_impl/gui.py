@@ -758,7 +758,7 @@ class GUI:
         except Exception as exc:
             self.assembly_configs[p_def.name] = exc
         else:
-            if isinstance(self.assembly_configs[p_def.name], gt_plane.Plane):
+            if isinstance(self.assembly_configs[p_def.name], gt_marker_assembly.MarkerAssembly):
                 if defer_image_upload:
                     self._assembly_preview_cache[p_def.name] = 'needs_upload'
                 else:
@@ -1424,7 +1424,7 @@ class GUI:
                 imgui.begin_tooltip()
                 if load_error:
                     imgui.text(str(load_error))
-                elif isinstance(self.assembly_configs.get(p.name), gt_plane.Plane) and p.name in self._assembly_preview_cache:
+                elif isinstance(self.assembly_configs.get(p.name), gt_marker_assembly.MarkerAssembly) and p.name in self._assembly_preview_cache:
                     if isinstance(self._assembly_preview_cache[p_def.name],str) and self._assembly_preview_cache[p_def.name]=='needs_upload':
                         self._upload_assembly_image(p_def)
                     self._assembly_preview_cache[p_def.name].render(largest=400*hello_imgui.dpi_window_size_factor())

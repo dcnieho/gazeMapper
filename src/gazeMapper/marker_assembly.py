@@ -401,6 +401,8 @@ def get_marker_assembly_from_definition(assembly_def: Definition, path: str|path
             aruco_settings  = config.aruco_settings_with_border(assembly_def.aruco_settings, assembly_def.marker_border_bits),
             min_num_markers = assembly_def.min_num_markers,
             unit            = assembly_def.unit,
+            ref_image_store_path = path/_gt_marker_assembly.MarkerAssembly.default_ref_image_name,
+            ref_image_size  = assembly_def.ref_image_size,
         )
 
     raise ValueError(f'Unsupported marker assembly type: {assembly_def.type}')
