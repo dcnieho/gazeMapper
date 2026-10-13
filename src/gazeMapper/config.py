@@ -43,6 +43,12 @@ class ArucoPoseConsistency(typed_dict_defaults.TypedDictDefault, total=False):
     temporal_history_size           : int   = 5
     max_translation_speed_m_s       : float = 3.
     max_rotation_speed_deg_s        : float = 400.
+    temporal_corner_enabled         : bool  = True
+    temporal_corner_history_size    : int   = 10
+    temporal_corner_history_max_age_ms: float = 1000.
+    temporal_corner_min_observations: int   = 5
+    temporal_corner_instability_factor: float = 3.
+    temporal_corner_jitter_floor_fraction: float = .01
 
 
 class ArucoSettings(typed_dict_defaults.TypedDictDefault, total=False):
@@ -152,7 +158,7 @@ aruco_settings_doc = type_utils.GUIDocInfo('ArUco detection',
     'refine_params': type_utils.GUIDocInfo('Assembly refinement parameters', 'Parameters for recovering missing markers in an assembly, using OpenCV\'s board refinement process.', aruco_refine_parameter_doc),
     'refine': type_utils.GUIDocInfo('Refine assembly detections', 'Recover missing markers in an assembly.'),
     'undistort': type_utils.GUIDocInfo('Undistort before detection', 'Undistort images before ArUco marker detection. Requires camera calibration.'),
-    'pose_consistency': type_utils.GUIDocInfo('Pose consistency', 'Try to robustly determine an assembly pose by rejecting detected markers that are behind the camera, face away from it or are too tilted with respect to the camera, or disagree with the assembly pose beyond a corner reprojection limit. Optionally also checks temporal pose consistency with previous poses.', {
+    'pose_consistency': type_utils.GUIDocInfo('Pose consistency', 'Try to robustly determine an assembly pose by rejecting detected markers that are behind the camera, face away from it or are too tilted with respect to the camera, or disagree with the assembly pose beyond a corner reprojection limit. Optionally also checks whether the pose change and temporal corner stability against previous frames.', {
         'enabled': type_utils.GUIDocInfo('Enabled', 'Filter detected markers by checking whether they are in front of the camera, facing the camera, are not too tilted, and have a small corner reprojection error. Requires camera calibration.'),
         'max_reprojection_error_fraction': type_utils.GUIDocInfo('Corner reprojection limit (fraction)', 'For each marker, the reprojection error is the largest 2D Euclidean distance, in pixels, between any detected corner and its expected projected position given the fitted assembly pose. The marker passes the reprojection check when this error is no greater than this fraction of its median detected edge length, clamped to the minimum and maximum pixel limits below.'),
         'min_reprojection_error_px': type_utils.GUIDocInfo('Minimum corner error limit (pixels)', 'Lower clamp for the per-corner reprojection limit.'),
@@ -164,7 +170,13 @@ aruco_settings_doc = type_utils.GUIDocInfo('ArUco detection',
         'temporal_invert_pose': type_utils.GUIDocInfo('Invert pose for temporal check', 'Check camera movement with respect to the assembly when enabled (default); otherwise check\'s the movement of the assembly with respect to the camera.'),
         'temporal_history_size': type_utils.GUIDocInfo('Temporal history size', 'Number of previous accepted poses retained for speed checks.'),
         'max_translation_speed_m_s': type_utils.GUIDocInfo('Maximum translation speed (m/s)', 'Maximum camera translation speed relative to the assembly.'),
-        'max_rotation_speed_deg_s': type_utils.GUIDocInfo('Maximum rotation speed (degrees/s)', 'Maximum camera-orientation change relative to the plane per second.')
+        'max_rotation_speed_deg_s': type_utils.GUIDocInfo('Maximum rotation speed (degrees/s)', 'Maximum camera-orientation change relative to the plane per second.'),
+        'temporal_corner_enabled': type_utils.GUIDocInfo('Enable temporal corner stability check', 'Check whether corners of markers are stable over time, reject markers with unstable detections.'),
+        'temporal_corner_history_size': type_utils.GUIDocInfo('Corner stability window size', 'Number of accepted observations retained per marker for corner-stability checks.'),
+        'temporal_corner_history_max_age_ms': type_utils.GUIDocInfo('Corner stability history age (ms)', 'Discard per-marker corner observations older than this many milliseconds, including while a marker is not detected.'),
+        'temporal_corner_min_observations': type_utils.GUIDocInfo('Corner stability warm-up observations', 'Minimum observations needed before a marker can be rejected by the temporal corner check.'),
+        'temporal_corner_instability_factor': type_utils.GUIDocInfo('Corner instability factor', 'Reject a marker when its noisiest corner varies by more than this multiple of the median variation of other inlier corners, subject to the jitter floor.'),
+        'temporal_corner_jitter_floor_fraction': type_utils.GUIDocInfo('Corner jitter floor (marker fraction)', 'Minimum normalized corner variation required before relative instability can reject a marker. This avoids classifying tiny numerical differences as unstable.')
     })
 })
 
