@@ -777,7 +777,7 @@ class Study:
         return problems
 
     def _prepare_individual_marker_settings(self):
-        groups = {'default': self.individual_marker_settings.get('default', {})} | self.individual_marker_settings
+        groups = {'general': self.individual_marker_settings.get('general', {})} | self.individual_marker_settings
         self.individual_marker_settings = {
             name: ArucoDetectorParameters({k: v for k, v in params.items() if k != 'markerBorderBits'})
                   if isinstance(params, dict) else params

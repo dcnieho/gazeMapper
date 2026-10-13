@@ -15,7 +15,7 @@ class Marker:
                  size               : float|None                = None,
                  aruco_dict_id      : type_utils.ArucoDictType  = aruco.default_dict,
                  marker_border_bits : int                       = 1,
-                 detection_settings : str                       = 'default'
+                 detection_settings : str                       = 'general'
                  ):
         self.id                 = m_id
         self.detect_only        = detect_only

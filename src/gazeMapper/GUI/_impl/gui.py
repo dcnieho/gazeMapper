@@ -1885,15 +1885,14 @@ class GUI:
                 gt_gui.utils.draw_hover_text('\n'.join(message[1] for message in problems.values() if message[1]), text='')
             if expanded:
                 imgui.push_id(name)
-                if name != 'default':
+                if name != 'general':
                     delete = imgui.button(ifa6.ICON_FA_TRASH_CAN+' delete settings')
                     if delete:
                         del self.study_config.individual_marker_settings[name]
                         changed = True
                         imgui.pop_id()
                         continue
-                edited, _, new_params, _, _ = settings_editor.draw_dict_editor(
-                    params, config.ArucoDetectorParameters, 0, {}, problems=problems, documentation=config.aruco_detector_parameter_doc)
+                edited, _, new_params, _, _ = settings_editor.draw_dict_editor(params, config.ArucoDetectorParameters, 0, {}, problems=problems, documentation=config.aruco_detector_parameter_doc)
                 if edited:
                     self.study_config.individual_marker_settings[name] = new_params
                     changed = True
@@ -1904,7 +1903,7 @@ class GUI:
         if imgui.button('+ new marker detection settings'):
             new_name = ''
             copy_group_names = list(self.study_config.individual_marker_settings)
-            copy_group_options = ['Fresh defaults', *copy_group_names]
+            copy_group_options = ['Defaults', *copy_group_names]
             new_copy_from_idx = 0
             def valid_name():
                 if not new_name.strip():
