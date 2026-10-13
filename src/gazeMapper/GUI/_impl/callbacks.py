@@ -374,6 +374,10 @@ def delete_individual_marker(study_config: config.Study, mark: marker.Marker|Non
     # store config
     study_config.store_as_json()
 
+def add_individual_marker_settings(study_config: config.Study, name: str, copy_from: str|None = None):
+    study_config.add_individual_marker_settings(name, copy_from)
+    study_config.store_as_json()
+
 def new_session_button(g, notify_func: typing.Callable[[str], None]|None = None):
     from . import gui
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker

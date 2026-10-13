@@ -1903,6 +1903,9 @@ class GUI:
             self._update_shown_actions_for_config()
         if imgui.button('+ new marker detection settings'):
             new_name = ''
+            copy_group_names = list(self.study_config.individual_marker_settings)
+            copy_group_options = ['Fresh defaults', *copy_group_names]
+            new_copy_from_idx = 0
             def valid_name():
                 if not new_name.strip():
                     return False, 'Settings group name cannot be empty or contain only whitespace'
@@ -1911,6 +1914,7 @@ class GUI:
                 return True, ''
             def draw_new_group():
                 nonlocal new_name
+                nonlocal new_copy_from_idx
                 imgui.dummy((30*imgui.calc_text_size('x').x, 0))
                 if imgui.begin_table('##new_marker_settings_info', 2):
                     imgui.table_setup_column('##new_marker_settings_label', imgui.TableColumnFlags_.width_fixed)
@@ -1927,20 +1931,26 @@ class GUI:
                     imgui.table_next_column()
                     imgui.set_next_item_width(-1)
                     _, new_name = imgui.input_text('##new_marker_settings_name', new_name)
+                    imgui.table_next_row()
+                    imgui.table_next_column()
+                    imgui.align_text_to_frame_padding()
+                    imgui.text('Copy settings from')
+                    imgui.table_next_column()
+                    imgui.set_next_item_width(-1)
+                    _, new_copy_from_idx = imgui.combo('##new_marker_settings_copy_from', new_copy_from_idx, copy_group_options)
                     imgui.end_table()
                 valid, reason = valid_name()
                 if not valid:
                     imgui.text_colored(colors.error, reason)
             def add_group():
-                self.study_config.add_individual_marker_settings(new_name)
-                self.study_config.store_as_json()
+                copy_from = None if new_copy_from_idx == 0 else copy_group_names[new_copy_from_idx - 1]
+                callbacks.add_individual_marker_settings(self.study_config, new_name, copy_from)
                 self._update_shown_actions_for_config()
             buttons = {
                 ifa6.ICON_FA_CHECK+' Create': (add_group, lambda: not valid_name()[0]),
                 ifa6.ICON_FA_CIRCLE_XMARK+' Cancel': None
             }
-            gt_gui.utils.push_popup(self, lambda: gt_gui.utils.popup('Add marker detection settings', draw_new_group,
-                buttons=buttons, button_keymap={0: imgui.Key.enter}, outside=False))
+            gt_gui.utils.push_popup(self, lambda: gt_gui.utils.popup('Add marker detection settings', draw_new_group, buttons=buttons, button_keymap={0: imgui.Key.enter}, outside=False))
 
     def _marker_detection_overrides_drawer(self, current: config.Study, parent: config.Study,
                                           actual_types: dict,

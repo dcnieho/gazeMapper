@@ -783,15 +783,19 @@ class Study:
                   if isinstance(params, dict) else params
             for name, params in groups.items()}
 
-    def add_individual_marker_settings(self, name: str, copy_from: str = 'default'):
+    def add_individual_marker_settings(self, name: str, copy_from: str|None = None):
         name = name.strip()
         if not name:
             raise ValueError('A marker detection settings group must have a name')
         if name in self.individual_marker_settings:
             raise ValueError(f'Marker detection settings group "{name}" already exists')
-        if copy_from not in self.individual_marker_settings:
+        if copy_from is None:
+            settings = ArucoDetectorParameters()
+        elif copy_from not in self.individual_marker_settings:
             raise ValueError(f'Marker detection settings group "{copy_from}" does not exist')
-        self.individual_marker_settings[name] = ArucoDetectorParameters(copy.deepcopy(self.individual_marker_settings[copy_from]))
+        else:
+            settings = ArucoDetectorParameters(copy.deepcopy(self.individual_marker_settings[copy_from]))
+        self.individual_marker_settings[name] = settings
 
     def _check_individual_marker_settings(self) -> type_utils.ProblemDict:
         problems: type_utils.ProblemDict = {}
