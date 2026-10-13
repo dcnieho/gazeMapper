@@ -93,7 +93,7 @@ class GUI:
         self._icon_font_size_multiplier                                 = 4.2
 
         self._marker_preview_cache  : dict[tuple[int,int,int], image_helper.ImageHelper]= {}
-        self._plane_preview_cache   : dict[str               , image_helper.ImageHelper]= {}
+        self._assembly_preview_cache: dict[str               , image_helper.ImageHelper]= {}
         self._async_task_popups     : dict[concurrent.futures.Future, typing.Callable] = {}
         self._async_task_popup_lock : threading.Lock = threading.Lock()
 
@@ -743,14 +743,14 @@ class GUI:
 
     def _reload_marker_assemblies(self):
         self.assembly_configs.clear()
-        self._plane_preview_cache.clear()
+        self._assembly_preview_cache.clear()
         for p_def in self.study_config.marker_assemblies:
             self._load_marker_assembly(p_def)
     def _load_marker_assembly(self, p_def: marker_assembly.Definition, defer_image_upload=False):
         config_dir = config.guess_config_dir(self.study_config.working_directory)
         if not p_def.has_complete_setup(config_dir / p_def.name):
             self.assembly_configs[p_def.name] = None
-            self._plane_preview_cache.pop(p_def.name,None)
+            self._assembly_preview_cache.pop(p_def.name,None)
             return
 
         try:
@@ -760,16 +760,16 @@ class GUI:
         else:
             if isinstance(self.assembly_configs[p_def.name], gt_plane.Plane):
                 if defer_image_upload:
-                    self._plane_preview_cache[p_def.name] = 'needs_upload'
+                    self._assembly_preview_cache[p_def.name] = 'needs_upload'
                 else:
-                    self._plane_preview_cache[p_def.name] = utils.load_image_with_helper(self.assembly_configs[p_def.name].get_ref_image(as_RGB=True))
-    def _upload_plane_image(self, p_def: marker_assembly.Definition):
-        self._plane_preview_cache[p_def.name] = utils.load_image_with_helper(self.assembly_configs[p_def.name].get_ref_image(as_RGB=True))
+                    self._assembly_preview_cache[p_def.name] = utils.load_image_with_helper(self.assembly_configs[p_def.name].get_ref_image(as_RGB=True))
+    def _upload_assembly_image(self, p_def: marker_assembly.Definition):
+        self._assembly_preview_cache[p_def.name] = utils.load_image_with_helper(self.assembly_configs[p_def.name].get_ref_image(as_RGB=True))
     def _remove_marker_assembly(self, p_def: marker_assembly.Definition):
         callbacks.delete_marker_assembly(self.study_config, p_def)
         self.study_config.marker_assemblies = [p for p in self.study_config.marker_assemblies if p.name!=p_def.name]
         self.assembly_configs.pop(p_def.name, None)
-        self._plane_preview_cache.pop(p_def.name, None)
+        self._assembly_preview_cache.pop(p_def.name, None)
 
     def _reload_calibrations(self):
         self.cam_calibrations.clear()
@@ -1028,7 +1028,7 @@ class GUI:
         self.recording_config_overrides.clear()
         self._recording_listers.clear()
         self._selected_recordings.clear()
-        self._plane_preview_cache.clear()
+        self._assembly_preview_cache.clear()
         self._marker_preview_cache.clear()
         self._problems_cache.clear()
         self._active_jobs_cache.clear()
@@ -1424,10 +1424,10 @@ class GUI:
                 imgui.begin_tooltip()
                 if load_error:
                     imgui.text(str(load_error))
-                elif isinstance(self.assembly_configs.get(p.name), gt_plane.Plane) and p.name in self._plane_preview_cache:
-                    if isinstance(self._plane_preview_cache[p_def.name],str) and self._plane_preview_cache[p_def.name]=='needs_upload':
-                        self._upload_plane_image(p_def)
-                    self._plane_preview_cache[p_def.name].render(largest=400*hello_imgui.dpi_window_size_factor())
+                elif isinstance(self.assembly_configs.get(p.name), gt_plane.Plane) and p.name in self._assembly_preview_cache:
+                    if isinstance(self._assembly_preview_cache[p_def.name],str) and self._assembly_preview_cache[p_def.name]=='needs_upload':
+                        self._upload_assembly_image(p_def)
+                    self._assembly_preview_cache[p_def.name].render(largest=400*hello_imgui.dpi_window_size_factor())
                 imgui.end_tooltip()
         for p in self.study_config.marker_assemblies:
             assembly_problems = self._problems_cache.get('marker_assemblies', {})
@@ -1731,19 +1731,8 @@ class GUI:
                 changed |= this_changed
             if problem:
                 imgui.pop_style_color()
-            if imgui.is_item_hovered(imgui.HoveredFlags_.for_tooltip|imgui.HoveredFlags_.delay_normal):
-                imgui.begin_tooltip()
-                if problem:
-                    problem_text = problem[1] if isinstance(problem, tuple) else str(problem)
-                    if problem_text is not None:
-                        imgui.text_colored(gt_gui.colors.error, problem_text)
-                key = m.id,m.aruco_dict_id,m.marker_border_bits
-                sz = int(200*hello_imgui.dpi_window_size_factor())
-                if key not in self._marker_preview_cache and not problem:
-                    self._marker_preview_cache[key] = utils.get_aruco_marker_image(sz, *key)
-                if key in self._marker_preview_cache and self._marker_preview_cache[key] is not None:
-                    self._marker_preview_cache[key].render(width=sz, height=sz)
-                imgui.end_tooltip()
+            problem_text = (problem[1] if isinstance(problem, tuple) else str(problem)) if problem else None
+            self._draw_individual_marker_preview_tooltip(m, problem_text, create_preview=not problem)
             imgui.table_next_column()
             new_val = settings_editor.draw_value(f'detect_only_{m.id}##{i}', m.detect_only, marker.marker_parameter_types['detect_only'], tuple(), False, marker.marker_defaults.get('detect_only',None), None, False, {}, False)[0]
             if (this_changed:=m.detect_only!=new_val):
@@ -1870,6 +1859,20 @@ class GUI:
 
         self._marker_detection_settings_drawer()
 
+    def _draw_individual_marker_preview_tooltip(self, m: marker.Marker, problem_text: str|None = None, create_preview=True):
+        if not imgui.is_item_hovered(imgui.HoveredFlags_.for_tooltip|imgui.HoveredFlags_.delay_normal):
+            return
+        imgui.begin_tooltip()
+        if problem_text is not None:
+            imgui.text_colored(gt_gui.colors.error, problem_text)
+        key = m.id, m.aruco_dict_id, m.marker_border_bits
+        sz = int(200*hello_imgui.dpi_window_size_factor())
+        if key not in self._marker_preview_cache and create_preview:
+            self._marker_preview_cache[key] = utils.get_aruco_marker_image(sz, *key)
+        if key in self._marker_preview_cache and self._marker_preview_cache[key] is not None:
+            self._marker_preview_cache[key].render(width=sz, height=sz)
+        imgui.end_tooltip()
+
     def _marker_detection_settings_drawer(self):
         imgui.separator()
         imgui.text('Marker detection settings')
@@ -1961,7 +1964,7 @@ class GUI:
             'marker_assemblies': ('Planes & 3D Assemblies', {name: p.aruco_settings for name, p in current_planes.items()},
                        {name: p.aruco_settings for name, p in parent_planes.items()},
                        config.ArucoSettings, config.aruco_settings_doc.children),
-            'individual_marker_settings': ('Individual-marker groups', current.individual_marker_settings,
+            'individual_marker_settings': ('Individual markers', current.individual_marker_settings,
                                            parent.individual_marker_settings,
                                            config.ArucoDetectorParameters, config.aruco_detector_parameter_doc)
         }
@@ -1974,33 +1977,69 @@ class GUI:
                 imgui.pop_style_color()
             return opened
 
-        has_problems = any(problems.get(field) for field in sections)
-        if not node('Marker detection settings', 'marker_detection_overrides', has_problems):
-            return False
-        for field, (label, values, inherited, cls, docs) in sections.items():
-            errors = problems.get(field, {})
-            if not node(label, field, errors):
-                continue
-            for name, params in values.items():
-                field_errors = errors.get(name, {}) if isinstance(errors, dict) else {}
-                if field == 'marker_assemblies' and isinstance(field_errors, dict):
-                    field_errors = field_errors.get('aruco_settings', {})
-                if not node(name, name, field_errors):
-                    continue
-                # The editor's group reset must not alias the inherited settings.
-                edited, _, new_params, _, field_types = settings_editor.draw_dict_editor(
-                    params, cls, 0, actual_types.setdefault(field, {}).get(name, {}),
-                    parent_obj=copy.deepcopy(inherited[name]), problems=field_errors, documentation=docs)
-                actual_types[field][name] = field_types
-                if edited:
-                    if field == 'marker_assemblies':
-                        current_planes[name].aruco_settings = new_params
-                    else:
-                        current.individual_marker_settings[name] = new_params
-                    changed = True
-                imgui.tree_pop()
+        assignment_errors = problems.get('individual_markers', {})
+        has_problems = any(problems.get(field) for field in sections) or bool(problems.get('individual_markers'))
+        if node('Marker detection settings', 'marker_detection_overrides', has_problems):
+            for field, (label, values, inherited, cls, docs) in sections.items():
+                errors = problems.get(field, {})
+                if node(label, field, errors):
+                    if field == 'individual_marker_settings':
+                        parent_markers = {config.individual_marker_override_key(m): m for m in parent.individual_markers}
+                        group_names = list(current.individual_marker_settings)
+                        for m in current.individual_markers:
+                            key = config.individual_marker_override_key(m)
+                            inherited_marker = parent_markers.get(key)
+                            marker_error = assignment_errors.get(gt_marker.MarkerID(m.id, m.aruco_dict_id).to_family()) if isinstance(assignment_errors, dict) else None
+                            imgui.push_id(key)
+                            if marker_error:
+                                imgui.push_style_color(imgui.Col_.text, colors.error)
+                            imgui.align_text_to_frame_padding()
+                            imgui.text(f'{key}')
+                            error_text = None
+                            if marker_error:
+                                imgui.pop_style_color()
+                                if isinstance(marker_error, tuple):
+                                    error_text = marker_error[1]
+                                else:
+                                    error_text = '\n'.join(message[1] for message in marker_error.values() if message[1])
+                            self._draw_individual_marker_preview_tooltip(m, error_text, create_preview=not marker_error)
+                            imgui.same_line()
+                            selected = group_names.index(m.detection_settings) if m.detection_settings in group_names else -1
+                            if selected < 0:
+                                imgui.push_style_color(imgui.Col_.text, colors.error)
+                            picked, index = imgui.combo('##individual_marker_group', selected, group_names)
+                            if selected < 0:
+                                imgui.pop_style_color()
+                                gt_gui.utils.draw_hover_text(f'Unknown settings group: {m.detection_settings}', text='')
+                            if picked and 0 <= index < len(group_names):
+                                m.detection_settings = group_names[index]
+                                changed = True
+                            if inherited_marker is not None and m.detection_settings != inherited_marker.detection_settings:
+                                imgui.same_line()
+                                if imgui.button(' parent'):
+                                    m.detection_settings = inherited_marker.detection_settings
+                                    changed = True
+                            imgui.pop_id()
+                    for name, params in values.items():
+                        field_errors = errors.get(name, {}) if isinstance(errors, dict) else {}
+                        if field == 'marker_assemblies' and isinstance(field_errors, dict):
+                            field_errors = field_errors.get('aruco_settings', {})
+                        if not node(name, name, field_errors):
+                            continue
+                        # The editor's group reset must not alias the inherited settings.
+                        edited, _, new_params, _, field_types = settings_editor.draw_dict_editor(
+                            params, cls, 0, actual_types.setdefault(field, {}).get(name, {}),
+                            parent_obj=copy.deepcopy(inherited[name]), problems=field_errors, documentation=docs)
+                        actual_types[field][name] = field_types
+                        if edited:
+                            if field == 'marker_assemblies':
+                                current_planes[name].aruco_settings = new_params
+                            else:
+                                current.individual_marker_settings[name] = new_params
+                            changed = True
+                        imgui.tree_pop()
+                    imgui.tree_pop()
             imgui.tree_pop()
-        imgui.tree_pop()
         return changed
 
     def _session_action_status(self, item: session.Session, action: process.Action):
@@ -2302,8 +2341,15 @@ class GUI:
         top_dump = {k: v for k, v in top_override.get_dump().items() if k in allowed_fields}
         # Drop overrides whose named targets no longer exist
         for field in config.StudyOverride.marker_settings_fields.intersection(top_dump):
-            known = {p.name for p in parent_config.marker_assemblies if isinstance(p, marker_assembly.Definition_MarkerAssembly)} if field == 'marker_assemblies' else parent_config.individual_marker_settings
-            top_dump[field] = {name: params for name, params in top_dump[field].items() if name in known}
+            if field == 'marker_assemblies':
+                known = {p.name for p in parent_config.marker_assemblies if isinstance(p, marker_assembly.Definition_MarkerAssembly)}
+                top_dump[field] = {name: params for name, params in top_dump[field].items() if name in known}
+            elif field == 'individual_marker_settings':
+                top_dump[field] = {name: params for name, params in top_dump[field].items() if name in parent_config.individual_marker_settings}
+            else:
+                known_markers = {config.individual_marker_override_key(m) for m in parent_config.individual_markers}
+                known_groups = set(parent_config.individual_marker_settings)
+                top_dump[field] = {key: group for key, group in top_dump[field].items() if key in known_markers and group in known_groups}
             if not top_dump[field]:
                 del top_dump[field]
         rebuilt_top_override = config.StudyOverride(level, recording_type, **top_dump)

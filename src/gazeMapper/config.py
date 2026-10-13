@@ -1384,9 +1384,13 @@ class OverrideLevel(enum.Enum):
     Recording   = enum.auto()
     FunctionArgs= enum.auto()
 
+def individual_marker_override_key(m: marker.Marker) -> str:
+    return f'{m.id} ({aruco.dict_id_to_str[m.aruco_dict_id]})'
+
 class StudyOverride:
     default_json_file_name = 'study_def_override.json'
-    marker_settings_fields = {'marker_assemblies', 'individual_marker_settings'}
+    marker_group_assignments_field = 'individual_marker_group_assignments'
+    marker_settings_fields = {'marker_assemblies', 'individual_marker_settings', marker_group_assignments_field}
 
     @staticmethod
     def get_allowed_parameters(level: OverrideLevel, recording_type: session.RecordingType|None = None, for_event_setup: bool = False) -> tuple[list[str],set[str]]:
@@ -1406,6 +1410,8 @@ class StudyOverride:
             exclude = set(all_params)-set(allowed_params)
         else:
             all_params = list(study_parameter_types.keys())
+            if level in (OverrideLevel.Session, OverrideLevel.Recording):
+                all_params.append(StudyOverride.marker_group_assignments_field)
             if level in [OverrideLevel.Recording, OverrideLevel.FunctionArgs]:
                 # these make no sense on a recording level as they are settings for
                 # processing functions that run on a whole session at once. As function
@@ -1437,7 +1443,10 @@ class StudyOverride:
         for p in kwargs:
             self._check_parameter(p, f"{StudyOverride.__name__}.__init__(): ")
             if not self.for_event_setup and p in self.marker_settings_fields:
-                self._check_marker_settings_structure(p, kwargs[p])
+                if p == self.marker_group_assignments_field:
+                    self._check_marker_group_assignments_structure(kwargs[p])
+                else:
+                    self._check_marker_settings_structure(p, kwargs[p])
                 setattr(self, p, copy.deepcopy(kwargs[p]))
                 continue
             # special case: for dict-like object we can unset specific fields, so allow those by skipping check for them
@@ -1496,6 +1505,14 @@ class StudyOverride:
         for name, patch in value.items():
             check(patch, template, f'{field}.{name}')
 
+    @staticmethod
+    def _check_marker_group_assignments_structure(value):
+        if not isinstance(value, dict) or any(not isinstance(key, str) for key in value):
+            raise ValueError('individual_marker_group_assignments overrides must be keyed by marker identity')
+        for key, group_name in value.items():
+            if not key or not isinstance(group_name, str) or not group_name:
+                raise ValueError('individual_marker_group_assignments values must be non-empty group names')
+
     def apply(self, obj: Study, strict_check=True) -> Study:
         obj = copy.deepcopy(obj)
         if self.for_event_setup:
@@ -1508,6 +1525,8 @@ class StudyOverride:
         else:
             obj = _apply_impl(obj, {p: getattr(self,p) for p in self._overridden_params if p not in self.marker_settings_fields}, study_parameter_types)
             for field in self.marker_settings_fields.intersection(self._overridden_params):
+                if field == self.marker_group_assignments_field:
+                    continue
                 self._check_marker_settings_structure(field, getattr(self, field))
                 targets = {p.name: p for p in obj.marker_assemblies if isinstance(p, marker_assembly.Definition_Plane_Aruco)} if field == 'marker_assemblies' else obj.individual_marker_settings
                 for name, patch in getattr(self, field).items():
@@ -1518,6 +1537,15 @@ class StudyOverride:
                         targets[name].aruco_settings = merge_aruco_settings(targets[name].aruco_settings, patch.get('aruco_settings', {}))
                     else:
                         targets[name] = merge_aruco_settings(targets[name], patch)
+            if self.marker_group_assignments_field in self._overridden_params:
+                self._check_marker_group_assignments_structure(self.individual_marker_group_assignments)
+                markers = {individual_marker_override_key(m): m for m in obj.individual_markers}
+                for key, group_name in self.individual_marker_group_assignments.items():
+                    if key not in markers:
+                        raise ValueError(f'Could not find individual marker {key} to apply overrides to {self._get_err_msg()}')
+                    if group_name not in obj.individual_marker_settings:
+                        raise ValueError(f'Could not find marker settings group with name "{group_name}" to apply overrides to {self._get_err_msg()}')
+                    markers[key].detection_settings = group_name
         # check resulting study is valid
         try:
             obj.check_valid(strict_check)
@@ -1637,8 +1665,19 @@ class StudyOverride:
 
     @staticmethod
     def from_study_diff(config: Study|EventSetup, parent_config: Study|EventSetup, level: OverrideLevel, recording_type: session.RecordingType|None = None, which_coding_setups: list[str]|None = None) -> tuple['StudyOverride', dict[str, 'StudyOverride']]:
-        fields = (StudyOverride.get_allowed_parameters(level, recording_type, False)[0]+['coding_setup'], (which_coding_setups,StudyOverride.get_allowed_parameters(level, recording_type, True)[0]))
+        allowed_fields = StudyOverride.get_allowed_parameters(level, recording_type, False)[0]
+        fields = ([f for f in allowed_fields if f != StudyOverride.marker_group_assignments_field]+['coding_setup'], (which_coding_setups,StudyOverride.get_allowed_parameters(level, recording_type, True)[0]))
         kwds = _study_diff_impl(config, parent_config, fields)
+        if StudyOverride.marker_group_assignments_field in allowed_fields and isinstance(config, Study):
+            parent_markers = {individual_marker_override_key(m): m for m in parent_config.individual_markers}
+            assignments = {
+                key: m.detection_settings
+                for m in config.individual_markers
+                if (key := individual_marker_override_key(m)) in parent_markers
+                and m.detection_settings != parent_markers[key].detection_settings
+            }
+            if assignments:
+                kwds[StudyOverride.marker_group_assignments_field] = assignments
         # split off coding setup overrides if present
         coding_setup_overrides: dict[str, StudyOverride] = {}
         if 'coding_setup' in kwds:
