@@ -25,6 +25,11 @@ def _flatten_episodes(episodes: episode.EpisodeMap) -> dict[str, tuple[annotatio
 def _make_color_triplet(color: tuple[float, float, float]) -> tuple[int, int, int]:
     return tuple(int(round(component * 255)) for component in color)
 
+def _ensure_bgr_frame(frame: np.ndarray) -> np.ndarray:
+    if frame.ndim == 2 or (frame.ndim == 3 and frame.shape[2] == 1):
+        return cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+    return frame
+
 def _get_sync_settings(study_config: config.Study) -> tuple[bool, list[str], str]:
     return (
         bool(study_config.sync_ref_do_time_stretch),
@@ -374,10 +379,14 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
                     _, apose[v], _, _, (frame[v], frame_idx[v], frame_ts[v], frame_info[v]) = \
                         pose_estimators[v].process_one_frame(fr_idx_this)
 
+            # prepare frame for annotation and writing
             for v in write_vids:
                 if frame[v] is None:
                     # we don't have a valid frame, use a fully black frame
                     frame[v] = np.zeros((vid_info[v][1],vid_info[v][0],3), np.uint8)   # black image
+                else:
+                    # ensure the frame is in BGR format (it may be grayscale if the original video was grayscale), so that annotations can be drawn on it in color
+                    frame[v] = _ensure_bgr_frame(frame[v])
             ROI_offsets = {
                 v: (frame_info[v]['offset_x'], frame_info[v]['offset_y'])
                 if frame_info[v] is not None and 'offset_x' in frame_info[v] and 'offset_y' in frame_info[v]
