@@ -239,9 +239,7 @@ class List:
                             n_rec = len(item.definition.recordings)
                             missing_recs = item.missing_recordings()
                             clr = glassesTools.gui.colors.error if missing_recs else glassesTools.gui.colors.ok
-                            imgui.text_colored(clr, f'{n_rec-len(missing_recs)}/{n_rec}{" "+ifa6.ICON_FA_TRIANGLE_EXCLAMATION if missing_recs else ""}')
-                            if missing_recs:
-                                glassesTools.gui.utils.draw_hover_text('missing recordings:\n'+'\n'.join(missing_recs), '')
+                            imgui.text_colored(clr, f'{n_rec-len(missing_recs)}/{n_rec}')
                         elif kind == 'action':
                             self.draw_action_status_callback(item, typing.cast(process.Action, value))
                         else:

@@ -1028,8 +1028,8 @@ class GUI:
         if recording_override_level is not None:
             recording_names = ', '.join(recording_override_names)
             entries.append((recording_override_level, f'Problem in recording overrides for recordings: {recording_names}', None))
-        if not sess.has_all_recordings():
-            entries.append((type_utils.ProblemLevel.Error, 'One or more recordings are missing for this session.', None))
+        if missing_recordings := sess.missing_recordings():
+            entries.append((type_utils.ProblemLevel.Error, 'Missing recordings:\n' + '\n'.join(missing_recordings), None))
         return entries
 
     def _recording_problem_entries(self, session_name: str, recording: session.Recording) -> list[tuple[type_utils.ProblemLevel, str, str | None]]:
@@ -2399,37 +2399,34 @@ class GUI:
         return changed
 
     def _session_action_status(self, item: session.Session, action: process.Action):
-        if not item.has_all_recordings():
-            imgui.text_colored(colors.error, '-')
+        if process.is_session_level_action(action):
+            progress = None
+            if item.state[action]==process_pool.State.Running and (job_desc:=self._get_active_job(action, item.name)[1]):
+                progress = job_desc.progress.get_progress() if job_desc.progress is not None else None
+            gt_gui.utils.draw_process_state(item.state[action], progress=progress)
         else:
-            if process.is_session_level_action(action):
-                progress = None
-                if item.state[action]==process_pool.State.Running and (job_desc:=self._get_active_job(action, item.name)[1]):
-                    progress = job_desc.progress.get_progress() if job_desc.progress is not None else None
-                gt_gui.utils.draw_process_state(item.state[action], progress=progress)
+            cfg = self._get_effective_session_config(item.name) if item.name in self.session_config_overrides else self.study_config
+            states = {r:item.recordings[r].state[action] for r in item.recordings if process.is_action_possible_for_recording(r, item.definition.get_recording_def(r).type, action, cfg)}
+            not_completed = [r for r in states if states[r]!=process_pool.State.Completed]
+            progress: dict[str,tuple[float,str]] = {}
+            if any(st:={s for r in states if (s:=states[r]) in [process_pool.State.Pending, process_pool.State.Running]}):
+                # progress marker
+                if process_pool.State.Running in st:
+                    # figure out progress, if available
+                    for r in states:
+                        if (job_desc:=self._get_active_job(action, item.name, r)[1]) and job_desc.progress is not None:
+                            progress[r] = job_desc.progress.get_progress()
+                gt_gui.utils.draw_process_state(process_pool.State.Running if process_pool.State.Running in st else process_pool.State.Pending, have_hover_popup=False, progress=(sum((progress[r][0] for r in progress))/len(progress),'') if progress else None)
             else:
-                cfg = self._get_effective_session_config(item.name) if item.name in self.session_config_overrides else self.study_config
-                states = {r:item.recordings[r].state[action] for r in item.recordings if process.is_action_possible_for_recording(r, item.definition.get_recording_def(r).type, action, cfg)}
-                not_completed = [r for r in states if states[r]!=process_pool.State.Completed]
-                progress: dict[str,tuple[float,str]] = {}
-                if any(st:={s for r in states if (s:=states[r]) in [process_pool.State.Pending, process_pool.State.Running]}):
-                    # progress marker
-                    if process_pool.State.Running in st:
-                        # figure out progress, if available
-                        for r in states:
-                            if (job_desc:=self._get_active_job(action, item.name, r)[1]) and job_desc.progress is not None:
-                                progress[r] = job_desc.progress.get_progress()
-                    gt_gui.utils.draw_process_state(process_pool.State.Running if process_pool.State.Running in st else process_pool.State.Pending, have_hover_popup=False, progress=(sum((progress[r][0] for r in progress))/len(progress),'') if progress else None)
-                else:
-                    n_rec = len(states)
-                    clr = colors.error if not_completed else colors.ok
-                    imgui.text_colored(clr, f'{n_rec-len(not_completed)}/{n_rec}')
-                if not_completed:
-                    rec_strs: list[str] = []
-                    for r in not_completed:
-                        extra = (', '+progress[r][1]) if r in progress else ''
-                        rec_strs.append(f'{r} ({states[r].displayable_name}{extra})')
-                    gt_gui.utils.draw_hover_text('not completed for recordings:\n'+'\n'.join(rec_strs),'')
+                n_rec = len(states)
+                clr = colors.error if not states or not_completed else colors.ok
+                imgui.text_colored(clr, f'{n_rec-len(not_completed)}/{n_rec}')
+            if not_completed:
+                rec_strs: list[str] = []
+                for r in not_completed:
+                    extra = (', '+progress[r][1]) if r in progress else ''
+                    rec_strs.append(f'{r} ({states[r].displayable_name}{extra})')
+                gt_gui.utils.draw_hover_text('not completed for recordings:\n'+'\n'.join(rec_strs),'')
 
     def _session_context_menu(self, session_name: str) -> bool:
         # ignore input session name, get selected sessions
