@@ -12,8 +12,9 @@ class ColumnSpec(typing.NamedTuple):
     name: str
     flags: int
     display_func:  typing.Callable[[session.Session],None]
-    sort_key_func: typing.Callable[[int],typing.Any]
+    sort_key_func: typing.Callable[[int|str],typing.Any]
     header_lbl: str|None=None   # if set, different string than name is used for the column header. Works only for non-angled headers
+    before_recordings: bool=False
 
 class List:
     def __init__(self,
@@ -37,7 +38,6 @@ class List:
         self._require_sort: bool = True
 
         self.display_actions: list[process.Action] = []
-        self._view_column_count_base = 3    # selector, name, recordings
         self._view_column_count = None
 
         self._extra_columns: list[ColumnSpec] = None
@@ -58,6 +58,15 @@ class List:
             imgui.TableFlags_.no_borders_in_body_until_resize
         )
 
+    def _column_layout(self) -> list[tuple[str, ColumnSpec|process.Action|None]]:
+        columns: list[tuple[str, ColumnSpec|process.Action|None]] = [('selector', None), ('name', None)]
+        extras = self._extra_columns or []
+        columns.extend(('extra', column) for column in extras if column.before_recordings)
+        columns.append(('recordings', None))
+        columns.extend(('action', action) for action in self.display_actions)
+        columns.extend(('extra', column) for column in extras if not column.before_recordings)
+        return columns
+
     def set_actions_to_show(self, actions: set[process.Action]):
         self.display_actions = [k for k in process.Action if k in actions] # filter out crap and fix display order
         self._determine_column_count()
@@ -70,7 +79,7 @@ class List:
         self._require_sort = True
 
     def _determine_column_count(self):
-        self._view_column_count = self._view_column_count_base + len(self.display_actions) + (0 if self._extra_columns is None else len(self._extra_columns))
+        self._view_column_count = len(self._column_layout())
 
     def draw(self, limit_outer_size=False):
         with self.items_lock:
@@ -88,18 +97,23 @@ class List:
             outer_size=outer_size
         ):
             frame_height = imgui.get_frame_height()
+            column_layout = self._column_layout()
 
             # Setup
             checkbox_width = frame_height-2*imgui.get_style().frame_padding.y
-            imgui.table_setup_column("Selector", imgui.TableColumnFlags_.no_hide | imgui.TableColumnFlags_.no_sort | imgui.TableColumnFlags_.no_reorder | imgui.TableColumnFlags_.no_header_label, init_width_or_weight=checkbox_width)  # 0
-            imgui.table_setup_column("Name", imgui.TableColumnFlags_.default_sort | imgui.TableColumnFlags_.no_hide)  # 1
-            imgui.table_setup_column("Recordings", imgui.TableColumnFlags_.angled_header)  # 2
-            # 3+
-            for k in self.display_actions:
-                imgui.table_setup_column(k.displayable_name, imgui.TableColumnFlags_.angled_header)
-            if self._extra_columns is not None:
-                for c in self._extra_columns:
-                    imgui.table_setup_column(c.name, c.flags)
+            for kind, value in column_layout:
+                if kind == 'selector':
+                    imgui.table_setup_column("Selector", imgui.TableColumnFlags_.no_hide | imgui.TableColumnFlags_.no_sort | imgui.TableColumnFlags_.no_reorder | imgui.TableColumnFlags_.no_header_label, init_width_or_weight=checkbox_width)
+                elif kind == 'name':
+                    imgui.table_setup_column("Name", imgui.TableColumnFlags_.default_sort | imgui.TableColumnFlags_.no_hide)
+                elif kind == 'recordings':
+                    imgui.table_setup_column("Recordings", imgui.TableColumnFlags_.angled_header)
+                elif kind == 'action':
+                    action = typing.cast(process.Action, value)
+                    imgui.table_setup_column(action.displayable_name, imgui.TableColumnFlags_.angled_header)
+                else:
+                    column = typing.cast(ColumnSpec, value)
+                    imgui.table_setup_column(column.name, column.flags)
 
             # Sticky column headers and selector row
             if imgui.table_get_column_flags(0) & imgui.TableColumnFlags_.is_enabled:
@@ -121,7 +135,7 @@ class List:
                 # Headers
                 imgui.table_angled_headers_row()
                 imgui.table_next_row(imgui.TableRowFlags_.headers)
-                for c_idx in range(self._view_column_count):
+                for c_idx, (kind, value) in enumerate(column_layout):
                     if not imgui.table_set_column_index(c_idx):
                         continue
                     if c_idx==0:  # checkbox column: reflects whether all, some or none of visible sessions are selected, and allows selecting all or none
@@ -146,18 +160,15 @@ class List:
                         if clicked:
                             glassesTools.utils.set_all(self.selected_items, new_state, subset = self.sorted_ids)
                     else:
-                        # action status columns or extra columns
-                        if c_idx<3:
-                            column_name = ("Name","Recordings")[c_idx-1]
+                        if kind == 'name':
+                            column_name = 'Name'
+                        elif kind == 'recordings':
+                            column_name = 'Recordings'
+                        elif kind == 'action':
+                            column_name = typing.cast(process.Action, value).displayable_name
                         else:
-                            idx = c_idx-self._view_column_count_base
-                            if idx<len(self.display_actions):
-                                # action columns
-                                column_name = self.display_actions[idx].displayable_name
-                            else:
-                                # extra columns
-                                idx = idx-len(self.display_actions)
-                                column_name = self._extra_columns[idx].header_lbl if self._extra_columns[idx].header_lbl is not None else self._extra_columns[idx].name
+                            column = typing.cast(ColumnSpec, value)
+                            column_name = column.header_lbl if column.header_lbl is not None else column.name
                         if imgui.table_get_column_flags(c_idx) & imgui.TableColumnFlags_.no_header_label:
                             column_name = '##'+column_name
                         imgui.table_header(column_name)
@@ -212,38 +223,29 @@ class List:
 
                             imgui.same_line()
 
-                        match ri:
-                            case 0:
-                                # Selector
-                                checkbox_clicked, checkbox_out = glassesTools.gui.utils.my_checkbox(f"##{iid}_selected", self.selected_items[iid], frame_size=(0,0), frame_padding_override=(imgui.get_style().frame_padding.x/2,imgui.get_style().frame_padding.y))
-                                checkbox_hovered = imgui.is_item_hovered()
-                            case 1:
-                                # Name
-                                if self.info_callback:
-                                    if imgui.button(f"{ifa6.ICON_FA_CIRCLE_INFO}##{iid}_info"):
-                                        self._show_item_info(iid)
-                                    glassesTools.gui.utils.draw_hover_text('More info about this session, and access session-specific configuration', '')
-                                    config_button_hovered = imgui.is_item_hovered()
-                                    imgui.same_line()
-                                imgui.text(item.name)
-                            case 2:
-                                # Number of recordings
-                                n_rec = len(item.definition.recordings)
-                                missing_recs = item.missing_recordings()
-                                clr = glassesTools.gui.colors.error if missing_recs else glassesTools.gui.colors.ok
-                                imgui.text_colored(clr, f'{n_rec-len(missing_recs)}/{n_rec}{" "+ifa6.ICON_FA_TRIANGLE_EXCLAMATION if missing_recs else ""}')
-                                if missing_recs:
-                                    glassesTools.gui.utils.draw_hover_text('missing recordings:\n'+'\n'.join(missing_recs), '')
-                            case _:
-                                # action status columns or extra columns
-                                idx = ri-self._view_column_count_base
-                                if idx<len(self.display_actions):
-                                    # action columns
-                                    self.draw_action_status_callback(item, self.display_actions[idx])
-                                else:
-                                    # extra columns
-                                    idx = idx-len(self.display_actions)
-                                    self._extra_columns[idx].display_func(item)
+                        kind, value = column_layout[ri]
+                        if kind == 'selector':
+                            checkbox_clicked, checkbox_out = glassesTools.gui.utils.my_checkbox(f"##{iid}_selected", self.selected_items[iid], frame_size=(0,0), frame_padding_override=(imgui.get_style().frame_padding.x/2,imgui.get_style().frame_padding.y))
+                            checkbox_hovered = imgui.is_item_hovered()
+                        elif kind == 'name':
+                            if self.info_callback:
+                                if imgui.button(f"{ifa6.ICON_FA_CIRCLE_INFO}##{iid}_info"):
+                                    self._show_item_info(iid)
+                                glassesTools.gui.utils.draw_hover_text('More info about this session, and access session-specific configuration', '')
+                                config_button_hovered = imgui.is_item_hovered()
+                                imgui.same_line()
+                            imgui.text(item.name)
+                        elif kind == 'recordings':
+                            n_rec = len(item.definition.recordings)
+                            missing_recs = item.missing_recordings()
+                            clr = glassesTools.gui.colors.error if missing_recs else glassesTools.gui.colors.ok
+                            imgui.text_colored(clr, f'{n_rec-len(missing_recs)}/{n_rec}{" "+ifa6.ICON_FA_TRIANGLE_EXCLAMATION if missing_recs else ""}')
+                            if missing_recs:
+                                glassesTools.gui.utils.draw_hover_text('missing recordings:\n'+'\n'.join(missing_recs), '')
+                        elif kind == 'action':
+                            self.draw_action_status_callback(item, typing.cast(process.Action, value))
+                        else:
+                            typing.cast(ColumnSpec, value).display_func(item)
                         num_columns_drawn+=1
 
                     # handle selection logic
@@ -285,24 +287,22 @@ class List:
             ids = list(self.items)
             sort_specs = [sort_specs_in.get_specs(i) for i in range(sort_specs_in.specs_count)]
             for sort_spec in reversed(sort_specs):
-                match sort_spec.column_index:
-                    case 1:     # Name
-                        key = natsort.os_sort_keygen(key=lambda iid: self.items[iid].name)
-                    case 2:     # Number of recordings
-                        key = lambda iid: self.items[iid].num_present_recordings()
-                    case _:     # status indicators
-                        idx = sort_spec.column_index-self._view_column_count_base
-                        if idx<len(self.display_actions):
-                            # action columns
-                            action = self.display_actions[sort_spec.column_index-self._view_column_count_base]
-                            if process.is_session_level_action(action):
-                                key = lambda iid: 999 if not self.items[iid].has_all_recordings() else self.items[iid].state[action]
-                            else:
-                                key = lambda iid: 999 if not self.items[iid].has_all_recordings() else self.items[iid].action_completed_num_recordings(action)
-                        else:
-                            # extra columns
-                            idx = idx-len(self.display_actions)
-                            key = self._extra_columns[idx].sort_key_func
+                key: typing.Callable[[int|str],typing.Any]
+                kind, value = self._column_layout()[sort_spec.column_index]
+                if kind == 'name':
+                    key = natsort.os_sort_keygen(key=lambda iid: self.items[iid].name)
+                elif kind == 'recordings':
+                    key = lambda iid: self.items[iid].num_present_recordings()
+                elif kind == 'action':
+                    action = typing.cast(process.Action, value)
+                    if process.is_session_level_action(action):
+                        key = lambda iid: 999 if not self.items[iid].has_all_recordings() else self.items[iid].state[action]
+                    else:
+                        key = lambda iid: 999 if not self.items[iid].has_all_recordings() else self.items[iid].action_completed_num_recordings(action)
+                elif kind == 'extra':
+                    key = typing.cast(ColumnSpec, value).sort_key_func
+                else:
+                    continue
                 ids.sort(key=key, reverse=sort_spec.get_sort_direction()==imgui.SortDirection.descending)
             self.sorted_ids = ids
             sort_specs_in.specs_dirty = False
