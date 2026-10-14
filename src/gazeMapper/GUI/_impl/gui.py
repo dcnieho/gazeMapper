@@ -1679,17 +1679,15 @@ class GUI:
             imgui.align_text_to_frame_padding()
             if calibration is None or calibration.level == type_utils.ProblemLevel.Warning:
                 label = 'Default camera calibration not set'
-                details = calibration.details if calibration is not None else label
+                diagnostic = calibration.diagnostic if calibration is not None else label
                 if r.type == session.RecordingType.Eye_Tracker:
-                    hover_text = 'This is not a problem for most eye trackers, as the camera calibration is retrieved from the recording upon import'
-                    self._draw_calibration_status(type_utils.ProblemLevel.Warning, hover_text, label, calibration.extra_info if calibration is not None else None)
-                else:
-                    self._draw_calibration_status(
-                        type_utils.ProblemLevel.Warning,
-                        calibration.diagnostic if calibration is not None else details,
-                        label,
-                        calibration.extra_info if calibration is not None else None,
-                    )
+                    diagnostic += '\nThis is not a problem for most eye trackers, as the camera calibration is retrieved from the recording upon import'
+                self._draw_calibration_status(
+                    type_utils.ProblemLevel.Warning,
+                    diagnostic,
+                    label,
+                    calibration.extra_info if calibration is not None else None,
+                )
             else:
                 self._draw_calibration_status(calibration.level, calibration.diagnostic, calibration.label, calibration.extra_info)
                 imgui.same_line()
