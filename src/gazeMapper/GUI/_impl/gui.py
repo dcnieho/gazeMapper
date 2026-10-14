@@ -953,11 +953,123 @@ class GUI:
             if (sess.name, name) in self._recording_calibrations
         ]
 
+    @staticmethod
+    def _flatten_problem_dict(problems: type_utils.ProblemDict, path: tuple[str, ...] = ()) -> list[tuple[type_utils.ProblemLevel, str]]:
+        entries = []
+        for key, problem in problems.items():
+            current_path = path if key == 'problem_with_this_key' else path + (str(key),)
+            if isinstance(problem, tuple):
+                label = ' > '.join(current_path)
+                diagnostic = f'{label}: {problem[1]}' if label and problem[1] else problem[1] or label
+                entries.append((problem[0], diagnostic))
+            else:
+                entries.extend(GUI._flatten_problem_dict(problem, current_path))
+        return entries
+
+    @staticmethod
+    def _new_problem_entries(problems: type_utils.ProblemDict, inherited_problems: type_utils.ProblemDict) -> list[tuple[type_utils.ProblemLevel, str]]:
+        inherited = set(GUI._flatten_problem_dict(inherited_problems))
+        return [entry for entry in GUI._flatten_problem_dict(problems) if entry not in inherited]
+
+    @staticmethod
+    def _problem_entries_level(entries: list[tuple[type_utils.ProblemLevel, str]]) -> type_utils.ProblemLevel | None:
+        return max((level for level, _ in entries), key=lambda level: level.value, default=None)
+
+    def _ensure_session_override_state(self, sess: session.Session):
+        if sess.name not in self.session_config_overrides:
+            self.session_config_overrides[sess.name] = config.load_or_create_override(config.OverrideLevel.Session, sess.working_directory)
+            self._session_dict_type_rec.setdefault(sess.name, {-1: {}})
+            self._refresh_session_override_state(sess)
+            effective_config = self._get_effective_session_config(sess.name)
+            self._refresh_recording_override_state(sess, effective_config)
+            return
+
+        self._session_dict_type_rec.setdefault(sess.name, {-1: {}})
+        self.recording_config_overrides.setdefault(sess.name, {})
+        self._recording_dict_type_rec.setdefault(sess.name, {})
+        effective_config = self._get_effective_session_config(sess.name)
+        for recording_name in sess.recordings:
+            if recording_name not in self.recording_config_overrides[sess.name]:
+                self._refresh_one_recording_override_state(sess, recording_name, effective_config)
+
+    def _session_override_problem_entries(self, sess: session.Session) -> list[tuple[type_utils.ProblemLevel, str]]:
+        if self.study_config is None or not hasattr(self.study_config, 'field_problems'):
+            return []
+        self._ensure_session_override_state(sess)
+        problems = self._session_override_field_problems(sess.name, self._get_effective_session_config(sess.name))
+        return self._new_problem_entries(problems, self.study_config.field_problems())
+
+    def _recording_override_problem_entries(self, sess: session.Session, recording_name: str) -> list[tuple[type_utils.ProblemLevel, str]]:
+        if self.study_config is None or not hasattr(self.study_config, 'field_problems'):
+            return []
+        self._ensure_session_override_state(sess)
+        effective_config = self._get_effective_recording_config(sess.name, recording_name)
+        problems = self._recording_override_field_problems(sess.name, recording_name, effective_config)
+        inherited = self._session_override_field_problems(sess.name, self._get_effective_session_config(sess.name))
+        return self._new_problem_entries(problems, inherited)
+
+    def _session_problem_entries(self, sess: session.Session) -> list[tuple[type_utils.ProblemLevel, str, str | None]]:
+        entries = [
+            (result.level, f'{name}: {result.diagnostic}', None)
+            for name, result in self._session_calibration_inspections(sess)
+            if result.level != type_utils.ProblemLevel.Information
+        ]
+        session_override_level = self._problem_entries_level(self._session_override_problem_entries(sess))
+        if session_override_level is not None:
+            entries.append((session_override_level, 'Problem in session overrides', None))
+        recording_override_names = []
+        recording_override_level = None
+        for recording_name in sess.recordings:
+            problem_level = self._problem_entries_level(self._recording_override_problem_entries(sess, recording_name))
+            if problem_level is not None:
+                recording_override_names.append(recording_name)
+                if recording_override_level is None or problem_level.value > recording_override_level.value:
+                    recording_override_level = problem_level
+        if recording_override_level is not None:
+            recording_names = ', '.join(recording_override_names)
+            entries.append((recording_override_level, f'Problem in recording overrides for recordings: {recording_names}', None))
+        if not sess.has_all_recordings():
+            entries.append((type_utils.ProblemLevel.Error, 'One or more recordings are missing for this session.', None))
+        return entries
+
+    def _recording_problem_entries(self, session_name: str, recording: session.Recording) -> list[tuple[type_utils.ProblemLevel, str, str | None]]:
+        sess = self.sessions.get(session_name)
+        if sess is None:
+            return []
+        entries = []
+        result = self._recording_calibrations.get((session_name, recording.definition.name))
+        if result is None:
+            if recording.definition.type != session.RecordingType.Eye_Tracker:
+                entries.append((type_utils.ProblemLevel.Warning, 'Calibration has not been inspected, loading...', None))
+        elif result.level != type_utils.ProblemLevel.Information:
+            entries.append((result.level, result.diagnostic, result.extra_info))
+        override_level = self._problem_entries_level(self._recording_override_problem_entries(sess, recording.definition.name))
+        if override_level is not None:
+            entries.append((override_level, 'Problem in recording overrides', None))
+        return entries
+
+    def _draw_problem_status(self, entries: list[tuple[type_utils.ProblemLevel, str, str | None]]):
+        if not entries:
+            self._draw_calibration_status(type_utils.ProblemLevel.Information, '')
+            return
+        if len(entries) == 1:
+            level, diagnostic, extra_info = entries[0]
+            self._draw_calibration_status(level, diagnostic, extra_info=extra_info)
+            return
+        level = max((entry[0] for entry in entries), key=lambda item: item.value)
+        icon = ifa6.ICON_FA_CIRCLE_XMARK if level == type_utils.ProblemLevel.Error else ifa6.ICON_FA_TRIANGLE_EXCLAMATION
+        color = colors.error if level == type_utils.ProblemLevel.Error else colors.warning
+        imgui.text_colored(color, icon)
+        self._draw_calibration_tooltip_entries([
+            (colors.error if item_level == type_utils.ProblemLevel.Error else colors.warning, diagnostic, extra_info)
+            for item_level, diagnostic, extra_info in entries
+        ])
+
     def _session_calibration_sort_key(self, session_name: int | str) -> int:
         sess = self.sessions.get(str(session_name))
         if sess is None:
             return 0
-        return max((result.level.value for _, result in self._session_calibration_inspections(sess)), default=0)
+        return max((level.value for level, _, _ in self._session_problem_entries(sess)), default=0)
 
     def _draw_calibration_status(self, level: type_utils.ProblemLevel, details: str, label: str | None = None, extra_info: str | None = None):
         match level:
@@ -992,53 +1104,17 @@ class GUI:
         self._draw_calibration_tooltip_entries([(diagnostic_color, diagnostic, extra_info)])
 
     def _draw_session_calibration_status(self, sess: session.Session):
-        if not sess.has_all_recordings():
-            imgui.text_colored(colors.error, '-')
-            return
-        inspections = [
-            (name, result)
-            for name, result in self._session_calibration_inspections(sess)
-            if result.level != type_utils.ProblemLevel.Information
-        ]
-        if not inspections:
-            imgui.text_colored(colors.ok, ifa6.ICON_FA_CIRCLE_CHECK)
-            return
-        level = max((result.level for _, result in inspections), key=lambda item: item.value)
-        match level:
-            case type_utils.ProblemLevel.Error:
-                icon, color = ifa6.ICON_FA_CIRCLE_XMARK, colors.error
-            case _:
-                icon, color = ifa6.ICON_FA_TRIANGLE_EXCLAMATION, colors.warning
-        imgui.text_colored(color, icon)
-        entries = [
-            (
-                colors.error if result.level == type_utils.ProblemLevel.Error else colors.warning,
-                f'{name}: {result.diagnostic}',
-                result.extra_info,
-            )
-            for name, result in inspections
-        ]
-        self._draw_calibration_tooltip_entries(entries)
+        self._draw_problem_status(self._session_problem_entries(sess))
 
     def _draw_recording_calibration_status(self, session_name: str, recording: session.Recording):
-        result = self._recording_calibrations.get((session_name, recording.definition.name))
-        if result is None:
-            # during loading, it may be that a calibration inspection is not available yet, handle that case
-            if recording.definition.type == session.RecordingType.Eye_Tracker:
-                return
-            self._draw_calibration_status(type_utils.ProblemLevel.Warning, 'Calibration has not been inspected, loading...')
-            return
-        self._draw_calibration_status(result.level, result.diagnostic, extra_info=result.extra_info)
+        self._draw_problem_status(self._recording_problem_entries(session_name, recording))
 
     def _recording_calibration_sort_key(self, session_name: str, recording_id: str) -> int:
-        result = self._recording_calibrations.get((session_name, recording_id))
-        if result is not None:
-            return result.level.value
         sess = self.sessions.get(session_name)
         recording = sess.recordings.get(recording_id) if sess is not None else None
-        if recording is not None and recording.definition.type == session.RecordingType.Eye_Tracker:
-            return type_utils.ProblemLevel.Information.value
-        return type_utils.ProblemLevel.Warning.value
+        if recording is None:
+            return 0
+        return max((level.value for level, _, _ in self._recording_problem_entries(session_name, recording)), default=0)
 
     def _invalidate_project_setup_state(self):
         self._setup_state_dirty = True
@@ -2868,8 +2944,15 @@ class GUI:
         self._recording_listers[sess.name].draw(limit_outer_size=True)
         sess_changed = False
         session_override_updated = False
-        if imgui.tree_node_ex('Setting overrides for this session',imgui.TreeNodeFlags_.framed):
-            field_problems = self._session_override_field_problems(sess.name, effective_config)
+        field_problems = self._session_override_field_problems(sess.name, effective_config)
+        session_problem_level = self._problem_entries_level(self._session_override_problem_entries(sess))
+        session_override_label = ('*' if session_problem_level is not None else '') + 'Setting overrides for this session##session_overrides'
+        if session_problem_level is not None:
+            imgui.push_style_color(imgui.Col_.text, colors.error if session_problem_level == type_utils.ProblemLevel.Error else colors.warning)
+        session_overrides_open = imgui.tree_node_ex(session_override_label, imgui.TreeNodeFlags_.framed)
+        if session_problem_level is not None:
+            imgui.pop_style_color()
+        if session_overrides_open:
             new_config = copy.deepcopy(effective_config)
             sess_changed = False
             fixed_fields = type_utils.NestedDict({k:None for k in ['name', 'event_type']})
@@ -2924,9 +3007,16 @@ class GUI:
             if session_override_updated:
                 self._refresh_recording_override_state(sess, effective_config_for_session)
             for r in sess.recordings:
-                if imgui.tree_node_ex(f'Setting overrides for {r} recording',imgui.TreeNodeFlags_.framed):
-                    effective_config = self._get_effective_recording_config(sess.name, r)
-                    field_problems = self._recording_override_field_problems(sess.name, r, effective_config)
+                effective_config = self._get_effective_recording_config(sess.name, r)
+                field_problems = self._recording_override_field_problems(sess.name, r, effective_config)
+                recording_problem_level = self._problem_entries_level(self._recording_override_problem_entries(sess, r))
+                recording_override_label = ('*' if recording_problem_level is not None else '') + f'Setting overrides for {r} recording##{r}_recording_overrides'
+                if recording_problem_level is not None:
+                    imgui.push_style_color(imgui.Col_.text, colors.error if recording_problem_level == type_utils.ProblemLevel.Error else colors.warning)
+                recording_overrides_open = imgui.tree_node_ex(recording_override_label, imgui.TreeNodeFlags_.framed)
+                if recording_problem_level is not None:
+                    imgui.pop_style_color()
+                if recording_overrides_open:
                     new_config = copy.deepcopy(effective_config)
                     rec_changed = False
                     fixed_fields = type_utils.NestedDict({k:None for k in ['name', 'event_type']})
