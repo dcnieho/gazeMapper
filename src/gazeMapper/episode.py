@@ -78,11 +78,14 @@ def _get_local_episode_sources(episodes: EpisodeMap) -> EpisodeSourceRefs:
 def _get_empty_imported_episodes(episodes: EpisodeMap) -> EpisodeImportedMap:
     return typing.cast(EpisodeImportedMap, {nm: {} for nm in episodes})
 
-def get_source_labeled_episodes(episodes: EpisodeMap, imported_episodes: EpisodeImportedMap) -> EpisodeMap:
-    labeled = copy_episode_map(episodes)
-    for nm in imported_episodes:
-        if nm not in episodes:
-            continue
+def get_source_labeled_episodes(episodes: EpisodeMap, imported_episodes: EpisodeImportedMap, include_local_events: set[str]|None=None) -> EpisodeMap:
+    labeled: EpisodeMap = {}
+    # output local events, if they are codable
+    for nm in episodes:
+        if include_local_events is None or nm in include_local_events:
+            labeled[nm] = (episodes[nm][0], _copy_intervals(episodes[nm][1]))
+    # append imported events
+    for nm in episodes:
         for other_rec in imported_episodes[nm]:
             labeled[f'{nm} (from recording {other_rec})'] = (episodes[nm][0], _copy_intervals(imported_episodes[nm][other_rec]))
     return labeled
