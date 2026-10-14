@@ -24,7 +24,7 @@ import glassesTools
 from glassesTools import annotation, aruco, camera_recording, gui as gt_gui, naming as gt_naming, marker as gt_marker, marker_assembly as gt_marker_assembly, ocv, plane as gt_plane, platform as gt_platform, process_pool, utils as gt_utils
 from glassesTools.gui import colors
 
-from ... import config, marker, marker_assembly, process, project_watcher, session, type_utils, version
+from ... import camera_calibration, config, marker, marker_assembly, process, project_watcher, session, type_utils, version
 from .. import async_thread
 from . import callbacks, image_helper, session_lister, settings_editor, utils
 
@@ -38,31 +38,32 @@ class GUI:
         self.running     = False
         settings_editor.set_gui_instance(self)
 
-        self.project_dir      : pathlib.Path|None                       = None
-        self.study_config     : config.Study|None                       = None
-        self.assembly_configs : dict[str,gt_marker_assembly.MarkerAssembly|Exception|None] = {}
-        self.cam_calibrations : dict[str,ocv.CameraParams|Exception]    = {}
+        self.project_dir      : pathlib.Path|None                                           = None
+        self.study_config     : config.Study|None                                           = None
+        self.assembly_configs : dict[str,gt_marker_assembly.MarkerAssembly|Exception|None]  = {}
+        self.cam_calibrations : dict[str,camera_calibration.Inspection]                     = {}
         self._dict_type_rec   : dict[str, typing.Type]|None             = None
-        self._coding_setup_dict_type_rec: dict[str, dict[typing.Any, typing.Type]] = {}
+        self._coding_setup_dict_type_rec: dict[str, dict[typing.Any, typing.Type]]          = {}
 
-        self.sessions                   : dict[str, session.Session]        = {}
-        self.session_config_overrides   : dict[str, tuple[config.StudyOverride, dict[str,config.StudyOverride]]] = {}
-        self._session_effective_config_cache: dict[str, config.Study] = {}
-        self._session_override_problems_cache: dict[str, type_utils.ProblemDict] = {}
-        self._session_dict_type_rec     : dict[str, dict[int|str, dict[str, typing.Type]]] = {}
-        self._sessions_lock             : threading.Lock                    = threading.Lock()
-        self._selected_sessions         : dict[str, bool]                   = {}
-        self._session_lister                                                = session_lister.List(self.sessions, self._sessions_lock, self._selected_sessions, info_callback=self._open_session_detail, draw_action_status_callback=self._session_action_status, item_context_callback=self._session_context_menu)
-        self._et_widget_drawer                                              = gt_gui.recording_table.EyeTrackerName()
+        self.sessions                           : dict[str, session.Session]                        = {}
+        self.session_config_overrides           : dict[str, tuple[config.StudyOverride, dict[str,config.StudyOverride]]] = {}
+        self._session_effective_config_cache    : dict[str, config.Study]                           = {}
+        self._session_override_problems_cache   : dict[str, type_utils.ProblemDict]                 = {}
+        self._session_dict_type_rec             : dict[str, dict[int|str, dict[str, typing.Type]]]  = {}
+        self._sessions_lock                     : threading.Lock                                    = threading.Lock()
+        self._selected_sessions                 : dict[str, bool]                                   = {}
+        self._session_lister                                                                        = session_lister.List(self.sessions, self._sessions_lock, self._selected_sessions, info_callback=self._open_session_detail, draw_action_status_callback=self._session_action_status, item_context_callback=self._session_context_menu)
+        self._et_widget_drawer                                                                      = gt_gui.recording_table.EyeTrackerName()
 
         self.recording_config_overrides : dict[str, dict[str, tuple[config.StudyOverride, dict[str,config.StudyOverride]]]] = {}
-        self._recording_effective_config_cache: dict[str, dict[str, config.Study]] = {}
-        self._recording_override_problems_cache: dict[str, dict[str, type_utils.ProblemDict]] = {}
+        self._recording_effective_config_cache: dict[str, dict[str, config.Study]]                  = {}
+        self._recording_override_problems_cache: dict[str, dict[str, type_utils.ProblemDict]]       = {}
         self._recording_dict_type_rec   : dict[str, dict[str, dict[int|str, dict[str, typing.Type]]]] = {}
-        self._recording_listers         : dict[str, gt_gui.recording_table.RecordingTable]  = {}
-        self._selected_recordings       : dict[str, dict[str, bool]]                        = {}
+        self._recording_listers         : dict[str, gt_gui.recording_table.RecordingTable]          = {}
+        self._recording_calibrations    : dict[tuple[str, str], camera_calibration.Inspection]      = {}
+        self._selected_recordings       : dict[str, dict[str, bool]]                                = {}
 
-        self._possible_value_getters    : dict[str, typing.Callable]                        = {}
+        self._possible_value_getters                : dict[str, typing.Callable]    = {}
 
         self.setup_recordings_error_level           : type_utils.ProblemLevel|None  = None
         self.setup_assembly_error_level             : type_utils.ProblemLevel|None  = None
@@ -243,6 +244,8 @@ class GUI:
             window_bg = imgui.get_style().color_(imgui.Col_.window_bg)
             window_bg.w = 1
         self.running = True
+        self._check_project_setup_state()
+        self._update_jobs_and_process_pool()
         if self._need_set_window_title:
             self._set_window_title()
 
@@ -309,9 +312,7 @@ class GUI:
             imgui.end_disabled()
 
     def _show_menu_gui(self):
-        # this is always called, so we handle popups and other state here
-        self._check_project_setup_state()
-        self._update_jobs_and_process_pool()
+        # this is always called, so handle popups here
         gt_gui.utils.handle_popup_stack(self.popup_stack)
         # also handle showing of debug windows
         if self._show_demo_window:
@@ -350,9 +351,13 @@ class GUI:
                 # its a change in the study or session definition files, reload config
                 try:
                     self.study_config = config.Study.load_from_json(config_dir, strict_check=False)
+                    if change_path.name == session.SessionDefinition.default_json_file_name:
+                        # session keep a ref to the session definition, so we need to reload sessions as well
+                        self._reload_sessions()
+                    else:
+                        self._update_shown_actions_for_config()
+                        self._session_lister_set_extra_columns_to_show()
                     self._reload_calibrations()
-                    self._update_shown_actions_for_config()
-                    self._session_lister_set_extra_columns_to_show()
                 except Exception as exc:
                     gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Project reloading error", f"The project's settings were changed, but failed to reload:\n{exc}", gt_gui.msg_box.MsgBox.error, more=gt_gui.utils.get_traceback(type(exc), exc, exc.__traceback__))
             elif change_path.suffix == '.xml':
@@ -416,11 +421,14 @@ class GUI:
     def _remove_session_from_gui(self, sess: str):
         self.sessions.pop(sess, None)
         self._selected_sessions.pop(sess, None)
+        for key in [key for key in self._recording_calibrations if key[0]==sess]:
+            self._recording_calibrations.pop(key, None)
         self._window_list = [w for w in hello_imgui.get_runner_params().docking_params.dockable_windows if w.label!=f'{sess}##session_view']
         self._request_session_sort()
 
     def _remove_recording_from_gui(self, sess: str, rec: str):
         self.sessions[sess].recordings.pop(rec, None)
+        self._recording_calibrations.pop((sess, rec), None)
         if sess in self._selected_recordings:
             self._selected_recordings[sess].pop(rec, None)
         if sess in self.session_config_overrides:
@@ -435,6 +443,7 @@ class GUI:
         recording_obj = session_obj.add_existing_recording(rec)
         if recording_obj is None:
             return
+        self._load_recording_calibration(sess, recording_obj)
         if sess in self._selected_recordings:
             self._selected_recordings[sess][rec] = False
         if sess in self.session_config_overrides:
@@ -480,6 +489,7 @@ class GUI:
         is_session_status = len(parts)==2 and filename==session.Session.status_file_name
         is_recording_status = len(parts)==3 and filename==session.Recording.status_file_name
         is_recording_info = len(parts)==3 and filename in (session.EyeTrackerRecording.default_json_file_name, session.CameraRecording.default_json_file_name)
+        is_recording_calibration = len(parts)==3 and filename==gt_naming.scene_camera_calibration_fname
 
         if is_session_status:
             with self._sessions_lock:
@@ -494,6 +504,7 @@ class GUI:
                         return
                     self.sessions[sess] = session_obj
                     self._selected_sessions[sess] = False
+                    self._load_session_recording_calibrations(sess, session_obj)
                 else:
                     if action_states := self._reload_action_states(self.sessions[sess].working_directory, False):
                         self.sessions[sess].state = action_states
@@ -508,6 +519,17 @@ class GUI:
                     return
                 if action_states := self._reload_action_states(session_obj.recordings[rec].info.working_directory, True):
                     session_obj.recordings[rec].state = action_states
+                self._request_recording_sort(sess)
+                self._request_session_sort()
+            return
+
+        if is_recording_calibration:
+            with self._sessions_lock:
+                session_obj = self.sessions.get(sess)
+                recording_obj = session_obj.recordings.get(parts[1]) if session_obj is not None else None
+                if recording_obj is None:
+                    return
+                self._load_recording_calibration(sess, recording_obj)
                 self._request_recording_sort(sess)
                 self._request_session_sort()
             return
@@ -533,8 +555,10 @@ class GUI:
                     return
                 if rec in session_obj.recordings:
                     session_obj.update_recording_info(rec, rec_info)
+                    self._load_recording_calibration(sess, session_obj.recordings[rec])
                 else:
                     session_obj.add_recording_from_info(rec, rec_info)
+                    self._load_recording_calibration(sess, session_obj.recordings[rec])
                     if sess in self._selected_recordings:
                         self._selected_recordings[sess][rec] = False
                     if sess in self.session_config_overrides:
@@ -568,6 +592,7 @@ class GUI:
                             return
                         self.sessions[sess] = session_obj
                         self._selected_sessions[sess] = False
+                        self._load_session_recording_calibrations(sess, session_obj)
                         self._request_session_sort()
             case 2:
                 # recording directory
@@ -782,7 +807,7 @@ class GUI:
             return
 
         self._session_watcher_stop_event = asyncio.Event()
-        self._session_watcher = async_thread.run(project_watcher.watch_and_report_changes(self.project_dir, self._session_change_callback, self._session_watcher_stop_event, watch_filter=project_watcher.ChangeFilter(('.json','.gazeMapper',), True, {config_dir}, True)))
+        self._session_watcher = async_thread.run(project_watcher.watch_and_report_changes(self.project_dir, self._session_change_callback, self._session_watcher_stop_event, watch_filter=project_watcher.ChangeFilter(('.json','.gazeMapper','.xml'), True, {config_dir}, True)))
         self._config_watcher_stop_event = asyncio.Event()
         self._config_watcher = async_thread.run(project_watcher.watch_and_report_changes(config_dir, self._config_change_callback, self._config_watcher_stop_event, watch_filter=project_watcher.ChangeFilter(('.json','.csv','.txt','.xml'), do_report_directories=True, do_report_files=True)))
 
@@ -889,19 +914,131 @@ class GUI:
         self.cam_calibrations.clear()
         for r in self.study_config.session_def.recordings:
             self._load_calibration(r)
+        self._reload_recording_calibrations()
     def _load_calibration(self, r_def: session.RecordingDefinition):
         self._invalidate_project_setup_state()
-        cal_path = r_def.get_default_cal_file(config.guess_config_dir(self.study_config.working_directory))
-        if not cal_path:
-            return
-
-        try:
-            self.cam_calibrations[r_def.name] = ocv.CameraParams.read_from_file(cal_path)
-        except Exception as exc:
-            self.cam_calibrations[r_def.name] = exc
+        cal_path = config.guess_config_dir(self.study_config.working_directory) / f'{r_def.name}_{session.RecordingDefinition.cal_file_name}'
+        self.cam_calibrations[r_def.name] = camera_calibration.inspect(cal_path, self._calibration_requires_extrinsics(r_def))
     def _remove_calibration(self, r_def: session.RecordingDefinition):
-        self._invalidate_project_setup_state()
-        self.cam_calibrations.pop(r_def.name, None)
+        self._load_calibration(r_def)
+
+    def _calibration_requires_extrinsics(self, recording: session.RecordingDefinition) -> bool:
+        return (
+            recording.type == session.RecordingType.Camera
+            and recording.camera_recording_type == camera_recording.Type.Head_attached
+            and self.study_config.head_attached_recordings_replace_et_scene is not None
+            and recording.name in self.study_config.head_attached_recordings_replace_et_scene
+        )
+
+    def _load_recording_calibration(self, session_name: str, recording: session.Recording):
+        working_dir = recording.info.working_directory if recording.info is not None else None
+        cal_path = working_dir / gt_naming.scene_camera_calibration_fname if working_dir is not None else None
+        key = (session_name, recording.definition.name)
+        inspection = camera_calibration.inspect(cal_path, self._calibration_requires_extrinsics(recording.definition))
+        self._recording_calibrations[key] = inspection
+
+    def _reload_recording_calibrations(self):
+        self._recording_calibrations.clear()
+        for session_name, sess in self.sessions.items():
+            self._load_session_recording_calibrations(session_name, sess)
+
+    def _load_session_recording_calibrations(self, session_name: str, sess: session.Session):
+        for recording in sess.recordings.values():
+            self._load_recording_calibration(session_name, recording)
+
+    def _session_calibration_inspections(self, sess: session.Session) -> list[tuple[str, camera_calibration.Inspection]]:
+        return [
+            (name, self._recording_calibrations[(sess.name, name)])
+            for name in sess.recordings
+            if (sess.name, name) in self._recording_calibrations
+        ]
+
+    def _session_calibration_sort_key(self, session_name: int | str) -> int:
+        sess = self.sessions.get(str(session_name))
+        if sess is None:
+            return 0
+        return max((result.level.value for _, result in self._session_calibration_inspections(sess)), default=0)
+
+    def _draw_calibration_status(self, level: type_utils.ProblemLevel, details: str, label: str | None = None, extra_info: str | None = None):
+        match level:
+            case type_utils.ProblemLevel.Error:
+                icon, color = ifa6.ICON_FA_CIRCLE_XMARK, colors.error
+            case type_utils.ProblemLevel.Warning:
+                icon, color = ifa6.ICON_FA_TRIANGLE_EXCLAMATION, colors.warning
+            case _:
+                icon, color = ifa6.ICON_FA_CIRCLE_CHECK, colors.ok
+        imgui.text_colored(color, icon)
+        if level != type_utils.ProblemLevel.Information:
+            self._draw_calibration_tooltip(color, details, extra_info)
+        if label is not None:
+            imgui.same_line()
+            imgui.text_colored(color, label)
+            if level != type_utils.ProblemLevel.Information:
+                self._draw_calibration_tooltip(color, details, extra_info)
+
+    def _draw_calibration_tooltip_entries(self, entries: list[tuple[object, str, str | None]]):
+        if not imgui.is_item_hovered(imgui.HoveredFlags_.for_tooltip | imgui.HoveredFlags_.delay_normal):
+            return
+        imgui.begin_tooltip()
+        imgui.push_text_wrap_pos(min(imgui.get_font_size() * 35, imgui.get_io().display_size.x))
+        for diagnostic_color, diagnostic, extra_info in entries:
+            imgui.text_colored(diagnostic_color, diagnostic)
+            if extra_info:
+                imgui.text(extra_info)
+        imgui.pop_text_wrap_pos()
+        imgui.end_tooltip()
+
+    def _draw_calibration_tooltip(self, diagnostic_color, diagnostic: str, extra_info: str | None):
+        self._draw_calibration_tooltip_entries([(diagnostic_color, diagnostic, extra_info)])
+
+    def _draw_session_calibration_status(self, sess: session.Session):
+        if not sess.has_all_recordings():
+            imgui.text_colored(colors.error, '-')
+            return
+        inspections = [
+            (name, result)
+            for name, result in self._session_calibration_inspections(sess)
+            if result.level != type_utils.ProblemLevel.Information
+        ]
+        if not inspections:
+            imgui.text_colored(colors.ok, ifa6.ICON_FA_CIRCLE_CHECK)
+            return
+        level = max((result.level for _, result in inspections), key=lambda item: item.value)
+        match level:
+            case type_utils.ProblemLevel.Error:
+                icon, color = ifa6.ICON_FA_CIRCLE_XMARK, colors.error
+            case _:
+                icon, color = ifa6.ICON_FA_TRIANGLE_EXCLAMATION, colors.warning
+        imgui.text_colored(color, icon)
+        entries = [
+            (
+                colors.error if result.level == type_utils.ProblemLevel.Error else colors.warning,
+                f'{name}: {result.diagnostic}',
+                result.extra_info,
+            )
+            for name, result in inspections
+        ]
+        self._draw_calibration_tooltip_entries(entries)
+
+    def _draw_recording_calibration_status(self, session_name: str, recording: session.Recording):
+        result = self._recording_calibrations.get((session_name, recording.definition.name))
+        if result is None:
+            # during loading, it may be that a calibration inspection is not available yet, handle that case
+            if recording.definition.type == session.RecordingType.Eye_Tracker:
+                return
+            self._draw_calibration_status(type_utils.ProblemLevel.Warning, 'Calibration has not been inspected, loading...')
+            return
+        self._draw_calibration_status(result.level, result.diagnostic, extra_info=result.extra_info)
+
+    def _recording_calibration_sort_key(self, session_name: str, recording_id: str) -> int:
+        result = self._recording_calibrations.get((session_name, recording_id))
+        if result is not None:
+            return result.level.value
+        sess = self.sessions.get(session_name)
+        recording = sess.recordings.get(recording_id) if sess is not None else None
+        if recording is not None and recording.definition.type == session.RecordingType.Eye_Tracker:
+            return type_utils.ProblemLevel.Information.value
+        return type_utils.ProblemLevel.Warning.value
 
     def _invalidate_project_setup_state(self):
         self._setup_state_dirty = True
@@ -937,8 +1074,7 @@ class GUI:
 
         # First check recording definition problems, which cannot be allowed in any case.
         # Check for a missing recording setup or trouble with the camera calibrations if any are defined.
-        self.setup_recordings_error_level = setup_error_level('session_def', invalid=any(
-            isinstance(self.cam_calibrations.get(r.name), Exception) for r in self.study_config.session_def.recordings))
+        self.setup_recordings_error_level = setup_error_level('session_def')
         if any((self.study_config.marker_assemblies, self.study_config.coding_setup, self.study_config.individual_markers)):
             # This is not overlay-only, perform relevant checks.
             self.setup_assembly_error_level = setup_error_level('marker_assemblies', invalid=not self.study_config.marker_assemblies or any(
@@ -1014,13 +1150,11 @@ class GUI:
                 seen_markers.update(used_markers[s][m])
 
     def _check_camera_calibrations(self):
-        for r in self.study_config.session_def.recordings:
-            if not r.name in self.cam_calibrations or not isinstance(self.cam_calibrations[r.name],ocv.CameraParams):
+        for recording_name, inspection in self.cam_calibrations.items():
+            if inspection.level == type_utils.ProblemLevel.Information:
                 continue
-            if not self.cam_calibrations[r.name].has_intrinsics():
-                type_utils.merge_problem_dicts(self._problems_cache, {'session_def': {r.name: (type_utils.ProblemLevel.Error,f'The provided calibration file does not include camera intrinsics, not usable')}})
-            if self.study_config.head_attached_recordings_replace_et_scene is not None and r.name in self.study_config.head_attached_recordings_replace_et_scene and not self.cam_calibrations[r.name].has_extrinsics():
-                type_utils.merge_problem_dicts(self._problems_cache, {'session_def': {r.name: (type_utils.ProblemLevel.Error,f'The provided calibration file does not include camera extrinsics (transformation between this head-attached camera and the scene camera of the associated eye tracker recording), but these are required because the recording is configured to replace the eye tracker recording\'s scene camera (see the head_attached_recordings_replace_et_scene setting)')}})
+            message = '\n'.join(inspection.messages)
+            type_utils.merge_problem_dicts(self._problems_cache, {'session_def': {recording_name: (inspection.level, message)}})
 
     def _session_lister_set_actions_to_show(self, lister: session_lister.List):
         if self.study_config is None:
@@ -1050,9 +1184,10 @@ class GUI:
 
         # build set of column, trigger column rebuild
         columns = [
-            gt_gui.recording_table.ColumnSpec(1,ifa6.ICON_FA_SIGNATURE+" Recording name",imgui.TableColumnFlags_.default_sort | imgui.TableColumnFlags_.no_hide, lambda rec: imgui.text(rec.definition.name), lambda iid: iid, "Recording name")
+            gt_gui.recording_table.ColumnSpec(1,ifa6.ICON_FA_SIGNATURE+" Recording name",imgui.TableColumnFlags_.default_sort | imgui.TableColumnFlags_.no_hide, lambda rec: imgui.text(rec.definition.name), lambda iid: iid, "Recording name"),
+            gt_gui.recording_table.ColumnSpec(2, "Problems", imgui.TableColumnFlags_.angled_header | imgui.TableColumnFlags_.no_hide, lambda rec: self._draw_recording_calibration_status(sess, rec), lambda iid: self._recording_calibration_sort_key(sess, iid))
         ]+[
-            gt_gui.recording_table.ColumnSpec(2+c, a.displayable_name, imgui.TableColumnFlags_.angled_header, lambda rec, a=a: _draw_status(a, rec), lambda iid, a=a: _get_sort_value(a, iid)) for c,a in enumerate(actions)
+            gt_gui.recording_table.ColumnSpec(3+c, a.displayable_name, imgui.TableColumnFlags_.angled_header, lambda rec, a=a: _draw_status(a, rec), lambda iid, a=a: _get_sort_value(a, iid)) for c,a in enumerate(actions)
         ]
         lister.build_columns(columns)
 
@@ -1064,9 +1199,14 @@ class GUI:
             self._recording_lister_set_actions_to_show(self._recording_listers[sess], sess)
 
     def _session_lister_set_extra_columns_to_show(self):
-        if len(self.study_config.session_def.recordings)>1:
-            self._session_lister.set_extra_columns(None)
-        else:
+        columns = [session_lister.ColumnSpec(
+            'Problems',
+            imgui.TableColumnFlags_.angled_header | imgui.TableColumnFlags_.no_hide,
+            self._draw_session_calibration_status,
+            self._session_calibration_sort_key,
+            before_recordings=True,
+        )]
+        if len(self.study_config.session_def.recordings)==1:
             # only a single recording per session, show some extra info about the recording in the session view:
             # Eye Tracker, Recording name, Participant and duration
             def _draw_status(which: str, item: session.Session):
@@ -1102,7 +1242,7 @@ class GUI:
                     case "Duration":
                         return lambda iid: d if (d:=_get_rec(iid,'duration')) is not None else 999
 
-            self._session_lister.set_extra_columns([
+            columns.extend([
                 session_lister.ColumnSpec(lbl,
                                           imgui.TableColumnFlags_.no_resize,
                                           lambda rec,w=lbl[2:]: _draw_status(w,rec),
@@ -1110,6 +1250,7 @@ class GUI:
                                           lbl[2:])
                 for lbl in (ifa6.ICON_FA_EYE+" Eye Tracker", ifa6.ICON_FA_SIGNATURE+" Recording Name", ifa6.ICON_FA_USER_TIE+" Participant", ifa6.ICON_FA_STOPWATCH+" Duration")
             ])
+        self._session_lister.set_extra_columns(columns)
 
     def close_project(self):
         self._project_settings_pane.is_visible = False
@@ -1147,6 +1288,7 @@ class GUI:
         self._possible_value_getters = {}
         self.study_config = None
         self.assembly_configs.clear()
+        self.cam_calibrations.clear()
         self.sessions.clear()
         self._selected_sessions.clear()
         self._need_set_window_title = True
@@ -1156,6 +1298,7 @@ class GUI:
         self._recording_effective_config_cache.clear()
         self._recording_override_problems_cache.clear()
         self._recording_listers.clear()
+        self._recording_calibrations.clear()
         self._selected_recordings.clear()
         self._assembly_preview_cache.clear()
         self._marker_preview_cache.clear()
@@ -1410,7 +1553,8 @@ class GUI:
         changed = False
         for r in self.study_config.session_def.recordings:
             problem = None if 'session_def' not in self._problems_cache or not isinstance(self._problems_cache['session_def'],dict) else self._problems_cache['session_def'].get(r.name,None)
-            if has_cal_error := r.name in self.cam_calibrations and isinstance(self.cam_calibrations[r.name],Exception):
+            calibration = self.cam_calibrations.get(r.name)
+            if calibration is not None and calibration.level == type_utils.ProblemLevel.Error:
                 msg = 'There is a problem with the configured calibration'
                 if problem is None:
                     problem = (type_utils.ProblemLevel.Error, msg)
@@ -1457,21 +1601,25 @@ class GUI:
                     imgui.text('-')
             imgui.table_next_column()
             imgui.align_text_to_frame_padding()
-            if r.name not in self.cam_calibrations:
-                imgui.text('Default camera calibration not set')
-                if r.type==session.RecordingType.Eye_Tracker:
-                    gt_gui.utils.draw_hover_text('This is not a problem for most eye trackers, as the recording contains the camera calibration', '')
-            else:
-                if has_cal_error:
-                    imgui.push_style_color(imgui.Col_.text, colors.error)
-                    imgui.text('Error loading provided camera calibration')
-                    gt_gui.utils.draw_hover_text(str(self.cam_calibrations[r.name]), '')
-                    imgui.pop_style_color()
+            if calibration is None or calibration.level == type_utils.ProblemLevel.Warning:
+                label = 'Default camera calibration not set'
+                details = calibration.details if calibration is not None else label
+                if r.type == session.RecordingType.Eye_Tracker:
+                    hover_text = 'This is not a problem for most eye trackers, as the camera calibration is retrieved from the recording upon import'
+                    self._draw_calibration_status(type_utils.ProblemLevel.Warning, hover_text, label, calibration.extra_info if calibration is not None else None)
                 else:
-                    imgui.text('Camera calibration set')
+                    self._draw_calibration_status(
+                        type_utils.ProblemLevel.Warning,
+                        calibration.diagnostic if calibration is not None else details,
+                        label,
+                        calibration.extra_info if calibration is not None else None,
+                    )
+            else:
+                self._draw_calibration_status(calibration.level, calibration.diagnostic, calibration.label, calibration.extra_info)
                 imgui.same_line()
-                if imgui.button(ifa6.ICON_FA_TRASH_CAN+f' delete calibration##{r.name}'):
+                if calibration.path is not None and calibration.path.is_file() and imgui.button(ifa6.ICON_FA_TRASH_CAN+f' delete calibration##{r.name}'):
                     r.remove_default_cal_file(config_path)
+                    self._load_calibration(r)
             imgui.same_line()
             if imgui.button(ifa6.ICON_FA_DOWNLOAD+f' select calibration xml##cal_{r.name}'):
                 gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='set_default_cam_cal', rec_def=r, rec_def_path=config_path))
@@ -2387,14 +2535,16 @@ class GUI:
         # draw source/working folder interactions
         imgui.separator()
         if len(recs)==1 and imgui.begin_menu('Camera calibration'):
-            working_directory = sess.recordings[recs[0]].info.working_directory
-            has_cam_cal_file = working_directory and (working_directory/gt_naming.scene_camera_calibration_fname).is_file()
-            if not has_cam_cal_file:
-                imgui.text_colored(colors.error,'No camera calibration!')
-            else:
+            recording_info = sess.recordings[recs[0]].info
+            working_directory = recording_info.working_directory if recording_info is not None else None
+            inspection = self._recording_calibrations.get((sess.name, recs[0]))
+            if inspection is not None:
+                self._draw_calibration_status(inspection.level, inspection.diagnostic, inspection.label, inspection.extra_info)
+            cal_file = working_directory / gt_naming.scene_camera_calibration_fname if working_directory else None
+            if cal_file is not None and cal_file.is_file():
                 if imgui.selectable(ifa6.ICON_FA_TRASH_CAN+' Delete calibration file', False)[0]:
                     callbacks.delete_cam_cal(working_directory)
-            if imgui.selectable(ifa6.ICON_FA_DOWNLOAD+' Set calibration XML', False)[0]:
+            if working_directory and imgui.selectable(ifa6.ICON_FA_DOWNLOAD+' Set calibration XML', False)[0]:
                 gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='set_cam_cal', working_directory=working_directory))
             imgui.end_menu()
         changed = self._draw_context_menu_items_for_recording_folders([sess], recs, actions_running)
