@@ -345,10 +345,9 @@ class GUI:
         # (get ignored) but this is pretty quick, so not worth the additional complexity
         config_dir = config.guess_config_dir(change_path.parent)
         if change_path.parent==config_dir:
-            # we're dealing with a change in the main config folder
-            # Check the study/session definitions and default calibration files.
+            # we're dealing with a change in the main config folder. Check if its a relevant file
             if change_path.name in (config.Study.default_json_file_name, session.SessionDefinition.default_json_file_name):
-                # reload config
+                # its a change in the study or session definition files, reload config
                 try:
                     self.study_config = config.Study.load_from_json(config_dir, strict_check=False)
                     self._reload_calibrations()
@@ -357,7 +356,7 @@ class GUI:
                 except Exception as exc:
                     gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Project reloading error", f"The project's settings were changed, but failed to reload:\n{exc}", gt_gui.msg_box.MsgBox.error, more=gt_gui.utils.get_traceback(type(exc), exc, exc.__traceback__))
             elif change_path.suffix == '.xml':
-                # figure out which recording it is for
+                # its a calibration xml file, figure out which recording it is for and update the calibration for that recording
                 rec_name = change_path.name.removesuffix(f'_{session.RecordingDefinition.cal_file_name}')
                 rec_defs = [r for r in self.study_config.session_def.recordings if r.name==rec_name]
                 if not rec_defs:
