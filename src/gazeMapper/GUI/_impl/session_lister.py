@@ -66,6 +66,9 @@ class List:
         self._extra_columns = columns
         self._determine_column_count()
 
+    def request_sort(self):
+        self._require_sort = True
+
     def _determine_column_count(self):
         self._view_column_count = self._view_column_count_base + len(self.display_actions) + (0 if self._extra_columns is None else len(self._extra_columns))
 
