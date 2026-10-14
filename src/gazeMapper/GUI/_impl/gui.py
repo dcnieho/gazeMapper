@@ -61,12 +61,13 @@ class GUI:
         self._possible_value_getters    : dict[str, typing.Callable]                        = {}
 
         self.setup_recordings_error_level           : type_utils.ProblemLevel|None  = None
-        self.setup_assembly_error_level                : type_utils.ProblemLevel|None  = None
+        self.setup_assembly_error_level             : type_utils.ProblemLevel|None  = None
         self.setup_coding_error_level               : type_utils.ProblemLevel|None  = None
         self.setup_individual_markers_error_level   : type_utils.ProblemLevel|None  = None
         self.can_accept_sessions                                                    = False
         self._session_actions                       : set[process.Action]           = set()
         self._problems_cache                        : type_utils.ProblemDict        = {}
+        self._setup_state_dirty                     : bool                          = True
 
         self._session_watcher           : concurrent.futures.Future|None = None
         self._session_watcher_stop_event: asyncio.Event|None             = None
@@ -742,11 +743,13 @@ class GUI:
         self._session_lister_set_extra_columns_to_show()    # only place we have to add this. Adding or deleting a session def from the study config triggers the current function
 
     def _reload_marker_assemblies(self):
+        self._invalidate_project_setup_state()
         self.assembly_configs.clear()
         self._assembly_preview_cache.clear()
         for p_def in self.study_config.marker_assemblies:
             self._load_marker_assembly(p_def)
     def _load_marker_assembly(self, p_def: marker_assembly.Definition, defer_image_upload=False):
+        self._invalidate_project_setup_state()
         config_dir = config.guess_config_dir(self.study_config.working_directory)
         if not p_def.has_complete_setup(config_dir / p_def.name):
             self.assembly_configs[p_def.name] = None
@@ -766,16 +769,19 @@ class GUI:
     def _upload_assembly_image(self, p_def: marker_assembly.Definition):
         self._assembly_preview_cache[p_def.name] = utils.load_image_with_helper(self.assembly_configs[p_def.name].get_ref_image(as_RGB=True))
     def _remove_marker_assembly(self, p_def: marker_assembly.Definition):
+        self._invalidate_project_setup_state()
         callbacks.delete_marker_assembly(self.study_config, p_def)
         self.study_config.marker_assemblies = [p for p in self.study_config.marker_assemblies if p.name!=p_def.name]
         self.assembly_configs.pop(p_def.name, None)
         self._assembly_preview_cache.pop(p_def.name, None)
 
     def _reload_calibrations(self):
+        self._invalidate_project_setup_state()
         self.cam_calibrations.clear()
         for r in self.study_config.session_def.recordings:
             self._load_calibration(r)
     def _load_calibration(self, r_def: session.RecordingDefinition):
+        self._invalidate_project_setup_state()
         cal_path = r_def.get_default_cal_file(config.guess_config_dir(self.study_config.working_directory))
         if not cal_path:
             return
@@ -785,14 +791,22 @@ class GUI:
         except Exception as exc:
             self.cam_calibrations[r_def.name] = exc
     def _remove_calibration(self, r_def: session.RecordingDefinition):
+        self._invalidate_project_setup_state()
         self.cam_calibrations.pop(r_def.name, None)
 
+    def _invalidate_project_setup_state(self):
+        self._setup_state_dirty = True
+
     def _check_project_setup_state(self):
+        if not self._setup_state_dirty:
+            return
+
         if self.study_config is None:
             self._problems_cache = {}
             self.setup_recordings_error_level = type_utils.ProblemLevel.Error
             self.setup_assembly_error_level = self.setup_coding_error_level = self.setup_individual_markers_error_level = None
             self.can_accept_sessions = False
+            self._setup_state_dirty = False
             return
 
         self._problems_cache = self.study_config.field_problems()
@@ -831,6 +845,7 @@ class GUI:
         self.can_accept_sessions = type_utils.ProblemLevel.Error not in (
             type_utils.get_error_level(self._problems_cache), self.setup_recordings_error_level,
             self.setup_assembly_error_level, self.setup_coding_error_level, self.setup_individual_markers_error_level)
+        self._setup_state_dirty = False
 
     @typing.overload
     def _get_markers(self, use_family: typing.Literal[False] = False) -> dict[str,dict[str|int,list[gt_marker.MarkerID]]]: ...
@@ -933,6 +948,7 @@ class GUI:
         lister.build_columns(columns)
 
     def _update_shown_actions_for_config(self):
+        self._invalidate_project_setup_state()
         self._refresh_open_override_states()
         self._session_lister_set_actions_to_show(self._session_lister)
         for sess in self._recording_listers:
@@ -1031,6 +1047,7 @@ class GUI:
         self._assembly_preview_cache.clear()
         self._marker_preview_cache.clear()
         self._problems_cache.clear()
+        self._invalidate_project_setup_state()
         self._active_jobs_cache.clear()
 
 
@@ -1163,6 +1180,7 @@ class GUI:
         if changed:
             self.study_config = new_config
             self.study_config.store_as_json()
+            self._invalidate_project_setup_state()
             self.process_pool.set_num_workers(self.study_config.gui_num_workers)
 
         if not self.job_scheduler.jobs:
