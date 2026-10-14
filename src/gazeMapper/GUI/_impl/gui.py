@@ -346,11 +346,12 @@ class GUI:
         config_dir = config.guess_config_dir(change_path.parent)
         if change_path.parent==config_dir:
             # we're dealing with a change in the main config folder
-            # check if its in the json files or default calibration xml files
-            if change_path.suffix == '.json':
+            # Check the study/session definitions and default calibration files.
+            if change_path.name in (config.Study.default_json_file_name, session.SessionDefinition.default_json_file_name):
                 # reload config
                 try:
                     self.study_config = config.Study.load_from_json(config_dir, strict_check=False)
+                    self._reload_calibrations()
                     self._update_shown_actions_for_config()
                     self._session_lister_set_extra_columns_to_show()
                 except Exception as exc:
@@ -1422,6 +1423,7 @@ class GUI:
             if imgui.button(ifa6.ICON_FA_TRASH_CAN+f'##{r.name}'):
                 callbacks.delete_recording_definition(self.study_config, r)
                 self._reload_sessions()
+                self._reload_calibrations()
             imgui.same_line()
             if problem is not None:
                 imgui.push_style_color(imgui.Col_.text, colors.error if problem[0]==type_utils.ProblemLevel.Error else colors.warning)
@@ -1530,7 +1532,7 @@ class GUI:
                     imgui.text_colored(colors.error, 'Select a recording type')
 
             buttons = {
-                ifa6.ICON_FA_CHECK+" Create recording": (lambda: (callbacks.make_recording_definition(self.study_config, new_rec_type, new_rec_name), self._reload_sessions()), lambda: not _valid_rec_name()[0] or new_rec_type is None),
+                ifa6.ICON_FA_CHECK+" Create recording": (lambda: (callbacks.make_recording_definition(self.study_config, new_rec_type, new_rec_name), self._reload_sessions(), self._reload_calibrations()), lambda: not _valid_rec_name()[0] or new_rec_type is None),
                 ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
             }
             gt_gui.utils.push_popup(self, lambda: gt_gui.utils.popup("Add recording", _add_rec_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, outside=False))
