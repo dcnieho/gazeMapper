@@ -406,101 +406,180 @@ class GUI:
         # try to load marker assembly
         self._load_marker_assembly(self.study_config.marker_assemblies[i], defer_image_upload=True)
 
+    def _request_session_sort(self):
+        self._session_lister.request_sort()
+
+    def _request_recording_sort(self, sess: str):
+        if recording_lister := self._recording_listers.get(sess):
+            recording_lister.request_sort()
+
+    def _remove_session_from_gui(self, sess: str):
+        self.sessions.pop(sess, None)
+        self._selected_sessions.pop(sess, None)
+        self._window_list = [w for w in hello_imgui.get_runner_params().docking_params.dockable_windows if w.label!=f'{sess}##session_view']
+        self._request_session_sort()
+
+    def _remove_recording_from_gui(self, sess: str, rec: str):
+        self.sessions[sess].recordings.pop(rec, None)
+        if sess in self._selected_recordings:
+            self._selected_recordings[sess].pop(rec, None)
+        if sess in self.session_config_overrides:
+            self.recording_config_overrides.get(sess, {}).pop(rec, None)
+            self._recording_dict_type_rec.get(sess, {}).pop(rec, None)
+            self._invalidate_recording_override_state(sess, rec)
+        self._request_recording_sort(sess)
+        self._request_session_sort()
+
+    def _add_recording_to_gui(self, sess: str, rec: str):
+        session_obj = self.sessions[sess]
+        recording_obj = session_obj.add_existing_recording(rec)
+        if recording_obj is None:
+            return
+        if sess in self._selected_recordings:
+            self._selected_recordings[sess][rec] = False
+        if sess in self.session_config_overrides:
+            effective_config = self._get_effective_session_config(sess)
+            self._refresh_one_recording_override_state(session_obj, rec, effective_config)
+            if sess in self._recording_listers:
+                self._recording_lister_set_actions_to_show(self._recording_listers[sess], sess)
+        self._request_recording_sort(sess)
+        self._request_session_sort()
+
+    def _reload_action_states(self, working_dir: pathlib.Path, for_recording: bool):
+        for attempt in range(3):
+            try:
+                action_states = session.get_action_states(working_dir, for_recording, skip_if_missing=True)
+            except Exception:
+                if attempt<2:
+                    time.sleep(.1)
+                continue
+            if action_states is None:
+                return session._get_not_run_action_states(for_recording)
+            return action_states
+        return None
+
     def _session_change_callback(self, change_path: pathlib.Path, change_type: str):
-        # NB watcher filter is configured such that all adds and deletes are folder and all modifies are files of interest
+        project_dir = self.project_dir
+        study_config = self.study_config
+        if project_dir is None or study_config is None:
+            return
         if change_path.name == config.StudyOverride.default_json_file_name:
             self._reload_cached_override_from_file(change_path)
             return
 
-        if change_type=='modified':
-            # file: deal with status changes
-            def status_file_reloader(loader: Callable[[bool, bool], None]):
-                n_try=0
-                while n_try<3:
+        try:
+            relative_path = change_path.relative_to(project_dir)
+        except ValueError:
+            return
+
+        parts = relative_path.parts
+        if not parts:
+            return
+        sess = parts[0]
+        filename = change_path.name
+        is_session_status = len(parts)==2 and filename==session.Session.status_file_name
+        is_recording_status = len(parts)==3 and filename==session.Recording.status_file_name
+        is_recording_info = len(parts)==3 and filename in (session.EyeTrackerRecording.default_json_file_name, session.CameraRecording.default_json_file_name)
+
+        if is_session_status:
+            with self._sessions_lock:
+                if change_type=='deleted':
+                    if sess in self.sessions:
+                        self._remove_session_from_gui(sess)
+                    return
+                if sess not in self.sessions:
                     try:
-                        n_try+=1
-                        loader(False, False)
-                    except:
-                        time.sleep(.1)  # file possibly not fully written yet
+                        session_obj = session.get_session_from_directory(project_dir / sess, study_config.session_def)
+                    except Exception:
+                        return
+                    self.sessions[sess] = session_obj
+                    self._selected_sessions[sess] = False
+                else:
+                    if action_states := self._reload_action_states(self.sessions[sess].working_directory, False):
+                        self.sessions[sess].state = action_states
+                self._request_session_sort()
+            return
+
+        if is_recording_status:
+            with self._sessions_lock:
+                session_obj = self.sessions.get(sess)
+                rec = parts[1]
+                if session_obj is None or rec not in session_obj.recordings:
+                    return
+                if action_states := self._reload_action_states(session_obj.recordings[rec].info.working_directory, True):
+                    session_obj.recordings[rec].state = action_states
+                self._request_recording_sort(sess)
+                self._request_session_sort()
+            return
+
+        if is_recording_info:
+            with self._sessions_lock:
+                session_obj = self.sessions.get(sess)
+                rec = parts[1]
+                if session_obj is None or not session_obj.definition.is_known_recording(rec):
+                    return
+                if change_type=='deleted':
+                    self._remove_recording_from_gui(sess, rec)
+                    return
+                rec_info = None
+                for _ in range(3):
+                    try:
+                        rec_info = session_obj.load_recording_info(rec)
+                    except Exception:
+                        time.sleep(.1)
                     else:
                         break
-                # NB: reapplying pending and running state (not stored in file) is done on next frame as part of _update_jobs_and_process_pool()
-            change_path = change_path.relative_to(self.project_dir)
-            match len(change_path.parents):
-                case 2:
-                    # session-level states
-                    sess = change_path.parent.name
-                    with self._sessions_lock:
-                        if sess not in self.sessions:
-                            # some other folder apparently
+                if rec_info is None:
+                    return
+                if rec in session_obj.recordings:
+                    session_obj.update_recording_info(rec, rec_info)
+                else:
+                    session_obj.add_recording_from_info(rec, rec_info)
+                    if sess in self._selected_recordings:
+                        self._selected_recordings[sess][rec] = False
+                    if sess in self.session_config_overrides:
+                        effective_config = self._get_effective_session_config(sess)
+                        self._refresh_one_recording_override_state(session_obj, rec, effective_config)
+                        if sess in self._recording_listers:
+                            self._recording_lister_set_actions_to_show(self._recording_listers[sess], sess)
+                self._request_recording_sort(sess)
+                self._request_session_sort()
+            return
+
+        if change_type=='modified':
+            return
+        if change_type=='added' and not change_path.is_dir():
+            return
+        if change_path.suffix in ('.json', '.gazeMapper'):
+            return
+
+        # Handle session- and recording-directory add/delete events; file events are handled above.
+        match len(parts):
+            case 1:
+                # session directory
+                with self._sessions_lock:
+                    if change_type=='deleted':
+                        if sess in self.sessions:
+                            self._remove_session_from_gui(sess)
+                    else:
+                        try:
+                            session_obj = session.get_session_from_directory(project_dir / relative_path, study_config.session_def)
+                        except Exception:
                             return
-                        status_file_reloader(self.sessions[sess].load_action_states)
-                case 3:
-                    # recording-level states
-                    sess = change_path.parent.parent.name
-                    rec = change_path.parent.name
-                    with self._sessions_lock:
-                        if sess not in self.sessions:
-                            # some other folder apparently
-                            return
-                        if rec not in self.sessions[sess].recordings:
-                            # some other folder apparently
-                            return
-                        status_file_reloader(self.sessions[sess].recordings[rec].load_action_states)
-                case _:
-                    pass    # ignore, not of interest
-        else:
-            # folder
-            change_path = change_path.relative_to(self.project_dir)
-            match len(change_path.parents):
-                case 1:
-                    # added or deleted session
-                    with self._sessions_lock:
-                        if change_type=='deleted':
-                            if (sess:=change_path.name) in self.sessions:
-                                self.sessions.pop(sess)
-                                self._selected_sessions.pop(sess)
-                                self._window_list = [w for w in hello_imgui.get_runner_params().docking_params.dockable_windows if w.label!=f'{sess}##session_view']
-                        else:
-                            # get new session
-                            try:
-                                sess = session.get_session_from_directory(self.project_dir/change_path, self.study_config.session_def)
-                            except:
-                                pass
-                            else:
-                                self.sessions |= {sess.name: sess}
-                                self._selected_sessions |= {sess.name: False}
-                case 2:
-                    # added or deleted recording
-                    sess = change_path.parent.name
-                    with self._sessions_lock:
-                        if sess not in self.sessions:
-                            # some other folder apparently
-                            return
-                        rec = change_path.name
-                        if not self.sessions[sess].definition.is_known_recording(rec):
-                            # some other folder apparently
-                            return
-                        if change_type=='deleted':
-                            self.sessions[sess].recordings.pop(rec, None)
-                            if sess in self._selected_recordings:
-                                self._selected_recordings[sess].pop(rec, None)
-                            if sess in self.session_config_overrides:
-                                self.recording_config_overrides.get(sess, {}).pop(rec, None)
-                                self._recording_dict_type_rec.get(sess, {}).pop(rec, None)
-                                self._invalidate_recording_override_state(sess, rec)
-                        elif rec not in self.sessions[sess].recordings: # don't replace if already present
-                            session_obj = self.sessions[sess]
-                            session_obj.add_existing_recording(rec)
-                            if sess in self._selected_recordings:
-                                self._selected_recordings[sess] |= {rec: False}
-                            if sess in self.session_config_overrides:
-                                effective_config = self._get_effective_session_config(sess)
-                                self._refresh_one_recording_override_state(session_obj, rec, effective_config)
-                                if sess in self._recording_listers:
-                                    self._recording_lister_set_actions_to_show(self._recording_listers[sess], sess)
-                case _:
-                    pass    # ignore, not of interest
+                        self.sessions[sess] = session_obj
+                        self._selected_sessions[sess] = False
+                        self._request_session_sort()
+            case 2:
+                # recording directory
+                rec = parts[1]
+                with self._sessions_lock:
+                    session_obj = self.sessions.get(sess)
+                    if session_obj is None or not session_obj.definition.is_known_recording(rec):
+                        return
+                    if change_type=='deleted':
+                        self._remove_recording_from_gui(sess, rec)
+                    else:
+                        self._add_recording_to_gui(sess, rec)
 
     def launch_task(self, sess: str, recording: str|None, action: process.Action, **kwargs):
         # NB: this is run under lock, so sess and recording are valid
@@ -639,9 +718,12 @@ class GUI:
                 return
             if job_state!=  rec.state[job.action] and (job_state in [process_pool.State.Pending, process_pool.State.Running] or  rec.state[job.action] in [process_pool.State.Pending, process_pool.State.Running]):
                 rec.state[job.action] = job_state
+                self._request_recording_sort(job.session)
+                self._request_session_sort()
         else:
             if job_state!= sess.state[job.action] and (job_state in [process_pool.State.Pending, process_pool.State.Running] or sess.state[job.action] in [process_pool.State.Pending, process_pool.State.Running]):
                 sess.state[job.action] = job_state
+                self._request_session_sort()
 
     def _action_done_callback(self, future: process_pool.ProcessFuture, job_id: int, job: utils.JobInfo, state: process_pool.State):
         # if process failed, notify error
@@ -660,6 +742,8 @@ class GUI:
             # also update GUI state, might be needed if there was no working directory yet for instance
             if sess:=self.sessions.get(job.session,None):
                 sess.recordings.pop(job.recording,None)
+                self._request_recording_sort(job.session)
+                self._request_session_sort()
             return
         # get final task state when completed, load from file. Need to do this because change listener may fire before task
         # completes, and its output is then overwritten in _update_jobs_and_process_pool()
@@ -677,8 +761,11 @@ class GUI:
                 rec_info = sess.load_recording_info(job.recording)
                 sess.update_recording_info(job.recording, rec_info)
             rec.load_action_states(False, False)
+            self._request_recording_sort(job.session)
+            self._request_session_sort()
         else:
             sess.load_action_states(False, False)
+            self._request_session_sort()
 
     def load_project(self, path: pathlib.Path):
         self.project_dir = path
