@@ -153,6 +153,7 @@ def load_episodes_from_all_recordings_with_info(study_config: config.Study, reco
     # load coding from other recordings
     # checking for coding from other recordings is done using the study config setup, it can be switched off for specific events
     all_recs = [r.name for r in study_config.session_def.recordings if r.name!=ref_rec]
+    mapping_cache = synchronization.EpisodeFrameMappingCache(recording_dir.parent, all_recs, ref_rec, bool(study_config.sync_ref_do_time_stretch), list(study_config.sync_ref_average_recordings or []), study_config.sync_ref_stretch_which or 'other')
     for cs in study_config.coding_setup:
         nm = cs['name']
         if episode_subset is not None and nm not in episode_subset:
@@ -167,7 +168,7 @@ def load_episodes_from_all_recordings_with_info(study_config: config.Study, reco
         should_use_other_for_base = should_get_from_other and not episodes[nm][1]
         gotten_from_other = not should_use_other_for_base
         for other_rec in candidate_recs:
-            eps = synchronization.get_episode_frame_indices_from_other_video(recording_dir, nm, rec_name, other_rec, ref_rec, all_recs, bool(study_config.sync_ref_do_time_stretch), list(study_config.sync_ref_average_recordings or []), study_config.sync_ref_stretch_which or 'other', missing_other_coding_ok=True)
+            eps = synchronization.get_episode_frame_indices_from_other_video(recording_dir, nm, rec_name, other_rec, ref_rec, all_recs, bool(study_config.sync_ref_do_time_stretch), list(study_config.sync_ref_average_recordings or []), study_config.sync_ref_stretch_which or 'other', missing_other_coding_ok=True, mapping_cache=mapping_cache)
             if not eps:
                 continue
             imported_episodes[nm][other_rec] = _copy_intervals(eps)

@@ -168,24 +168,60 @@ def get_coding_file(working_dir: str|pathlib.Path, all_sync_events: list[tuple[s
         raise ValueError(f'No {annotation.tooltip_map[annotation.EventType.Sync_Camera]} codes found for this recording ({working_dir.name}). Run code_episodes and code at least one of the configured {annotation.tooltip_map[annotation.EventType.Sync_Camera]} events.')
     return episodes
 
-def get_episode_frame_indices_from_other_video(working_dir: str|pathlib.Path, event: str, rec: str, other_rec: str, ref_rec:str, all_recs: list[str], do_time_stretch: bool, average_recordings: list[str], stretch_which: str, extra_fr=0, missing_other_coding_ok=False) -> list[list[int]]|None:
+class EpisodeFrameMappingCache:
+    def __init__(self, working_dir: str|pathlib.Path, all_recs: list[str], ref_rec: str, do_time_stretch: bool, average_recordings: list[str], stretch_which: str):
+        self.working_dir = pathlib.Path(working_dir)
+        self.all_recs = all_recs
+        self.ref_rec = ref_rec
+        self.do_time_stretch = do_time_stretch
+        self.average_recordings = average_recordings
+        self.stretch_which = stretch_which
+        self._sync_loaded = False
+        self._sync: pd.DataFrame|None = None
+        self._source_episodes: dict[str, episode.EpisodeMap|None] = {}
+        self._video_timestamps: dict[str, timestamps.VideoTimestamps] = {}
+
+    def get_sync(self, missing_ref_coding_ok: bool) -> pd.DataFrame|None:
+        if not self._sync_loaded:
+            self._sync = get_sync_for_recs(self.working_dir, self.all_recs, self.ref_rec, self.do_time_stretch, self.average_recordings, missing_ref_coding_ok)
+            self._sync_loaded = True
+        return self._sync
+
+    def get_source_episodes(self, recording: str, missing_coding_ok: bool) -> episode.EpisodeMap|None:
+        if recording not in self._source_episodes:
+            coding_file = self.working_dir / recording / naming.coding_file
+            if not coding_file.is_file():
+                self._source_episodes[recording] = None
+            else:
+                self._source_episodes[recording] = episode.list_to_marker_dict(episode.read_list_from_file(coding_file))
+        source_episodes = self._source_episodes[recording]
+        if source_episodes is None and not missing_coding_ok:
+            coding_file = self.working_dir / recording / naming.coding_file
+            raise FileNotFoundError(f'The coding file for the other recording is not found, cannot continue ("{coding_file}").')
+        return source_episodes
+
+    def get_video_timestamps(self, recording: str) -> timestamps.VideoTimestamps:
+        if recording not in self._video_timestamps:
+            self._video_timestamps[recording] = timestamps.VideoTimestamps(self.working_dir / recording / gt_naming.frame_timestamps_fname)
+        return self._video_timestamps[recording]
+
+def get_episode_frame_indices_from_other_video(working_dir: str|pathlib.Path, event: str, rec: str, other_rec: str, ref_rec:str, all_recs: list[str], do_time_stretch: bool, average_recordings: list[str], stretch_which: str, extra_fr=0, missing_other_coding_ok=False, mapping_cache: EpisodeFrameMappingCache|None=None) -> list[list[int]]|None:
     working_dir  = pathlib.Path(working_dir)
-    other_coding_file = working_dir.parent / other_rec / naming.coding_file
-    if not other_coding_file.is_file():
-        if missing_other_coding_ok:
-            return None
-        raise FileNotFoundError(f'The coding file for the other recording is not found, cannot continue ("{other_coding_file}").')
-    other_episodes = episode.list_to_marker_dict(episode.read_list_from_file(other_coding_file))
+    if mapping_cache is None:
+        mapping_cache = EpisodeFrameMappingCache(working_dir.parent, all_recs, ref_rec, do_time_stretch, average_recordings, stretch_which)
+    other_episodes = mapping_cache.get_source_episodes(other_rec, missing_other_coding_ok)
+    if other_episodes is None:
+        return None
     if event not in other_episodes:
         if missing_other_coding_ok:
             return None
         raise KeyError(f'Requested event "{event}" is not found. Either the requested event does not exist in the event coding for the other recording ({other_rec}) or the event is unknown.')
     # get sync and timestamp info we need to transform reference frames indices to frame indices of this recording
-    sync = get_sync_for_recs(working_dir.parent, all_recs, ref_rec, do_time_stretch, average_recordings, missing_other_coding_ok)
+    sync = mapping_cache.get_sync(missing_other_coding_ok)
     if sync is None:
         return None
-    video_ts_other = timestamps.VideoTimestamps(working_dir.parent / other_rec / gt_naming.frame_timestamps_fname)
-    video_ts       = timestamps.VideoTimestamps(working_dir / gt_naming.frame_timestamps_fname)
+    video_ts_other = mapping_cache.get_video_timestamps(other_rec)
+    video_ts       = mapping_cache.get_video_timestamps(rec)
     def _check_bounds(eps: list[list[int]], max_i: int) -> list[list[int]]:
         return [[max(0,ep[0]), min(ep[1], max_i)] for ep in eps if not all([x==-1 for x in ep])]
     # if one of the recordings is the reference recording, we can directly go from reference to this recording
@@ -196,7 +232,7 @@ def get_episode_frame_indices_from_other_video(working_dir: str|pathlib.Path, ev
     else:
         # else we need to go from other_rec to ref_rec and then from ref_rec to this recording. Do so with a function that does not clip, nor quantize to the frames in the reference video
         # so that we do not lose precision or range
-        video_ts_ref = timestamps.VideoTimestamps(working_dir.parent / ref_rec / gt_naming.frame_timestamps_fname)
+        video_ts_ref = mapping_cache.get_video_timestamps(ref_rec)
         frame_idx = video_frames_to_other_video(other_rec, rec, sync, other_episodes[event][1], video_ts_other.timestamps, video_ts.timestamps, video_ts_ref.timestamps, do_time_stretch, stretch_which)
     # remove out of range
     frame_idx = _check_bounds(frame_idx, video_ts.indices[-1])
