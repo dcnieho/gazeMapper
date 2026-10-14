@@ -454,9 +454,12 @@ def open_folder(g, path: pathlib.Path):
         return
     open_url(str(path))
 
-def remove_folder(folder: pathlib.Path):
+def remove_folder(g, folder: pathlib.Path):
     if folder.is_dir():
-        shutil.rmtree(folder)
+        try:
+            shutil.rmtree(folder)
+        except OSError as exc:
+            gt_gui.utils.push_popup(g, gt_gui.msg_box.msgbox, "Could not delete folder", f"Failed to delete {folder}:\n{exc}\n\nClose any files or folders open inside it, then try again if still visible in the app, or manually delete the folder.", gt_gui.msg_box.MsgBox.warn)
 
 def show_action_options(session_name: str, rec_name: str|None, action: process.Action, g):
     from . import gui
