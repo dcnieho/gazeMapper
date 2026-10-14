@@ -47,6 +47,8 @@ class GUI:
 
         self.sessions                   : dict[str, session.Session]        = {}
         self.session_config_overrides   : dict[str, tuple[config.StudyOverride, dict[str,config.StudyOverride]]] = {}
+        self._session_effective_config_cache: dict[str, config.Study] = {}
+        self._session_override_problems_cache: dict[str, type_utils.ProblemDict] = {}
         self._session_dict_type_rec     : dict[str, dict[int|str, dict[str, typing.Type]]] = {}
         self._sessions_lock             : threading.Lock                    = threading.Lock()
         self._selected_sessions         : dict[str, bool]                   = {}
@@ -54,6 +56,8 @@ class GUI:
         self._et_widget_drawer                                              = gt_gui.recording_table.EyeTrackerName()
 
         self.recording_config_overrides : dict[str, dict[str, tuple[config.StudyOverride, dict[str,config.StudyOverride]]]] = {}
+        self._recording_effective_config_cache: dict[str, dict[str, config.Study]] = {}
+        self._recording_override_problems_cache: dict[str, dict[str, type_utils.ProblemDict]] = {}
         self._recording_dict_type_rec   : dict[str, dict[str, dict[int|str, dict[str, typing.Type]]]] = {}
         self._recording_listers         : dict[str, gt_gui.recording_table.RecordingTable]  = {}
         self._selected_recordings       : dict[str, dict[str, bool]]                        = {}
@@ -259,8 +263,12 @@ class GUI:
                     sess_name = r.removesuffix('##session_view')
                     # cleanup
                     self.session_config_overrides.pop(sess_name)
+                    self._session_effective_config_cache.pop(sess_name, None)
+                    self._session_override_problems_cache.pop(sess_name, None)
                     self._session_dict_type_rec.pop(sess_name)
                     self.recording_config_overrides.pop(sess_name)
+                    self._recording_effective_config_cache.pop(sess_name, None)
+                    self._recording_override_problems_cache.pop(sess_name, None)
                     self._recording_dict_type_rec.pop(sess_name)
                     self._selected_recordings.pop(sess_name)
                     self._recording_listers.pop(sess_name)
@@ -400,6 +408,10 @@ class GUI:
 
     def _session_change_callback(self, change_path: pathlib.Path, change_type: str):
         # NB watcher filter is configured such that all adds and deletes are folder and all modifies are files of interest
+        if change_path.name == config.StudyOverride.default_json_file_name:
+            self._reload_cached_override_from_file(change_path)
+            return
+
         if change_type=='modified':
             # file: deal with status changes
             def status_file_reloader(loader: Callable[[bool, bool], None]):
@@ -473,10 +485,20 @@ class GUI:
                             self.sessions[sess].recordings.pop(rec, None)
                             if sess in self._selected_recordings:
                                 self._selected_recordings[sess].pop(rec, None)
+                            if sess in self.session_config_overrides:
+                                self.recording_config_overrides.get(sess, {}).pop(rec, None)
+                                self._recording_dict_type_rec.get(sess, {}).pop(rec, None)
+                                self._invalidate_recording_override_state(sess, rec)
                         elif rec not in self.sessions[sess].recordings: # don't replace if already present
-                            self.sessions[sess].add_existing_recording(rec)
+                            session_obj = self.sessions[sess]
+                            session_obj.add_existing_recording(rec)
                             if sess in self._selected_recordings:
                                 self._selected_recordings[sess] |= {rec: False}
+                            if sess in self.session_config_overrides:
+                                effective_config = self._get_effective_session_config(sess)
+                                self._refresh_one_recording_override_state(session_obj, rec, effective_config)
+                                if sess in self._recording_listers:
+                                    self._recording_lister_set_actions_to_show(self._recording_listers[sess], sess)
                 case _:
                     pass    # ignore, not of interest
 
@@ -673,7 +695,7 @@ class GUI:
             return
 
         self._session_watcher_stop_event = asyncio.Event()
-        self._session_watcher = async_thread.run(project_watcher.watch_and_report_changes(self.project_dir, self._session_change_callback, self._session_watcher_stop_event, watch_filter=project_watcher.ChangeFilter(('.gazeMapper',), True, {config_dir}, True)))
+        self._session_watcher = async_thread.run(project_watcher.watch_and_report_changes(self.project_dir, self._session_change_callback, self._session_watcher_stop_event, watch_filter=project_watcher.ChangeFilter(('.json','.gazeMapper',), True, {config_dir}, True)))
         self._config_watcher_stop_event = asyncio.Event()
         self._config_watcher = async_thread.run(project_watcher.watch_and_report_changes(config_dir, self._config_change_callback, self._config_watcher_stop_event, watch_filter=project_watcher.ChangeFilter(('.json','.csv','.txt','.xml'), do_report_directories=True, do_report_files=True)))
 
@@ -922,7 +944,7 @@ class GUI:
         lister.set_actions_to_show(self._session_actions)
 
     def _recording_lister_set_actions_to_show(self, lister: gt_gui.recording_table.RecordingTable, sess: str):
-        cfg = config.apply_all_overrides(self.study_config, self.session_config_overrides[sess], strict_check=False)
+        cfg = self._get_effective_session_config(sess)
         actions = process.get_actions_for_config(cfg, exclude_session_level=True)
         def _draw_status(action: process.Action, item: session.Recording):
             if process.is_action_possible_for_recording(item.definition.name, item.definition.type, action, cfg):
@@ -1042,6 +1064,10 @@ class GUI:
         self._selected_sessions.clear()
         self._need_set_window_title = True
         self.recording_config_overrides.clear()
+        self._session_effective_config_cache.clear()
+        self._session_override_problems_cache.clear()
+        self._recording_effective_config_cache.clear()
+        self._recording_override_problems_cache.clear()
         self._recording_listers.clear()
         self._selected_recordings.clear()
         self._assembly_preview_cache.clear()
@@ -2070,7 +2096,7 @@ class GUI:
                     progress = job_desc.progress.get_progress() if job_desc.progress is not None else None
                 gt_gui.utils.draw_process_state(item.state[action], progress=progress)
             else:
-                cfg = config.apply_all_overrides(self.study_config, self.session_config_overrides[item.name], strict_check=False) if item.name in self.session_config_overrides else self.study_config
+                cfg = self._get_effective_session_config(item.name) if item.name in self.session_config_overrides else self.study_config
                 states = {r:item.recordings[r].state[action] for r in item.recordings if process.is_action_possible_for_recording(r, item.definition.get_recording_def(r).type, action, cfg)}
                 not_completed = [r for r in states if states[r]!=process_pool.State.Completed]
                 progress: dict[str,tuple[float,str]] = {}
@@ -2099,7 +2125,7 @@ class GUI:
         actions: dict[str, dict[process.Action,tuple[bool|list[str],dict[process.Action,list[str]]]]] = {}
         actions_running: dict[str, dict[process.Action, bool|list[str]]] = {}
         for s in sess:
-            cfg = config.apply_all_overrides(self.study_config, self.session_config_overrides[s.name], strict_check=False) if s.name in self.session_config_overrides else self.study_config
+            cfg = self._get_effective_session_config(s.name) if s.name in self.session_config_overrides else self.study_config
             actions[s.name] = process.get_possible_actions(s.state, {r:s.recordings[r].state for r in s.recordings}, {a for a in process.Action if a!=process.Action.IMPORT}, cfg)
             actions[s.name], actions_running[s.name] = self._filter_session_context_menu_actions(s.name, None, actions[s.name])
         # draw actions that can be run
@@ -2207,7 +2233,7 @@ class GUI:
         actions: dict[str, dict[process.Action, bool|list[str]]] = {}
         actions_running: dict[str, dict[process.Action, bool|list[str]]] = {}
         for r in recs:
-            cfg = config.apply_all_overrides(self.study_config, self.session_config_overrides[session_name], strict_check=False) if session_name in self.session_config_overrides else self.study_config
+            cfg = self._get_effective_session_config(session_name) if session_name in self.session_config_overrides else self.study_config
             actions[r] = process.get_possible_actions(sess.state, {r:sess.recordings[r].state}, {a for a in process.Action if a!=process.Action.IMPORT and not process.is_session_level_action(a)}, cfg)
             actions[r], actions_running[r] = self._filter_session_context_menu_actions(sess.name, r, actions[r])
         # draw actions that can be run
@@ -2350,7 +2376,68 @@ class GUI:
     @staticmethod
     def _get_override_dump_state(overrides: tuple[config.StudyOverride, dict[str,config.StudyOverride]]) -> tuple[dict[str, typing.Any], dict[str, dict[str, typing.Any]]]:
         top_override, coding_overrides = overrides
-        return top_override.get_dump(), {name: coding_overrides[name].get_dump() for name in coding_overrides}
+        coding_dumps = {name: dump for name, override in coding_overrides.items() if (dump := override.get_dump())}
+        return top_override.get_dump(), coding_dumps
+
+    def _invalidate_session_override_state(self, sess_name: str):
+        self._session_effective_config_cache.pop(sess_name, None)
+        self._session_override_problems_cache.pop(sess_name, None)
+        self._recording_effective_config_cache.pop(sess_name, None)
+        self._recording_override_problems_cache.pop(sess_name, None)
+
+    def _invalidate_recording_override_state(self, sess_name: str, recording_name: str):
+        self._recording_effective_config_cache.get(sess_name, {}).pop(recording_name, None)
+        self._recording_override_problems_cache.get(sess_name, {}).pop(recording_name, None)
+
+    def _get_effective_session_config(self, sess_name: str) -> config.Study:
+        if sess_name not in self._session_effective_config_cache:
+            self._session_effective_config_cache[sess_name] = config.apply_all_overrides(self.study_config, self.session_config_overrides[sess_name], strict_check=False)
+        return self._session_effective_config_cache[sess_name]
+
+    def _get_effective_recording_config(self, sess_name: str, recording_name: str) -> config.Study:
+        session_cache = self._recording_effective_config_cache.setdefault(sess_name, {})
+        if recording_name not in session_cache:
+            session_cache[recording_name] = config.apply_all_overrides(self._get_effective_session_config(sess_name), self.recording_config_overrides[sess_name][recording_name], strict_check=False)
+        return session_cache[recording_name]
+
+    def _session_override_field_problems(self, sess_name: str, effective_config: config.Study) -> type_utils.ProblemDict:
+        if sess_name not in self._session_override_problems_cache:
+            self._session_override_problems_cache[sess_name] = effective_config.field_problems()
+        return self._session_override_problems_cache[sess_name]
+
+    def _recording_override_field_problems(self, sess_name: str, recording_name: str, effective_config: config.Study) -> type_utils.ProblemDict:
+        session_cache = self._recording_override_problems_cache.setdefault(sess_name, {})
+        if recording_name not in session_cache:
+            session_cache[recording_name] = effective_config.field_problems()
+        return session_cache[recording_name]
+
+    def _reload_cached_override_from_file(self, override_path: pathlib.Path):
+        relative_path = override_path.relative_to(self.project_dir)
+        parts = relative_path.parts
+        if len(parts) == 2:
+            sess_name = parts[0]
+            if sess_name not in self.session_config_overrides or sess_name not in self.sessions:
+                return
+            sess = self.sessions[sess_name]
+            self.session_config_overrides[sess_name] = config.load_or_create_override(config.OverrideLevel.Session, sess.working_directory)
+            self._session_dict_type_rec[sess_name] = {-1: {}}
+            self._refresh_session_override_state(sess)
+            effective_config = self._get_effective_session_config(sess_name)
+            self._refresh_recording_override_state(sess, effective_config)
+            if sess_name in self._recording_listers:
+                self._recording_lister_set_actions_to_show(self._recording_listers[sess_name], sess_name)
+        elif len(parts) == 3:
+            sess_name, recording_name = parts[:2]
+            if sess_name not in self.recording_config_overrides or recording_name not in self.recording_config_overrides[sess_name]:
+                return
+            sess = self.sessions.get(sess_name)
+            if sess is None or recording_name not in sess.recordings:
+                return
+            recording = sess.recordings[recording_name]
+            self.recording_config_overrides[sess_name][recording_name] = config.load_or_create_override(config.OverrideLevel.Recording, recording.info.working_directory, recording.definition.type)
+            self._recording_dict_type_rec.setdefault(sess_name, {})[recording_name] = {-1: {}}
+            effective_config = self._get_effective_session_config(sess_name)
+            self._refresh_one_recording_override_state(sess, recording_name, effective_config)
 
     def _recreate_override_state(self, overrides: tuple[config.StudyOverride, dict[str,config.StudyOverride]], level: config.OverrideLevel, parent_config: config.Study, recording_type: session.RecordingType|None = None, recording_name: str|None = None) -> tuple[config.StudyOverride, dict[str,config.StudyOverride]]:
         top_override, coding_overrides = overrides
@@ -2392,6 +2479,7 @@ class GUI:
         return {-1: type_rec.get(-1, {})} | {name: type_rec.get(name, {}) for name in coding_overrides}
 
     def _refresh_session_override_state(self, sess: session.Session):
+        self._invalidate_session_override_state(sess.name)
         if sess.name not in self.session_config_overrides:
             self.session_config_overrides[sess.name] = config.load_or_create_override(config.OverrideLevel.Session, sess.working_directory)
 
@@ -2404,6 +2492,8 @@ class GUI:
             config.store_overrides_to_json(refreshed, sess.working_directory)
 
     def _refresh_recording_override_state(self, sess: session.Session, parent_config: config.Study):
+        self._recording_effective_config_cache.pop(sess.name, None)
+        self._recording_override_problems_cache.pop(sess.name, None)
         self.recording_config_overrides.setdefault(sess.name, {})
         self._recording_dict_type_rec.setdefault(sess.name, {})
 
@@ -2415,16 +2505,24 @@ class GUI:
                 self._recording_dict_type_rec[sess.name].pop(r, None)
 
         for r in sess.recordings:
-            if r not in self.recording_config_overrides[sess.name]:
-                self.recording_config_overrides[sess.name][r] = config.load_or_create_override(config.OverrideLevel.Recording, sess.recordings[r].info.working_directory, sess.recordings[r].definition.type)
+            self._refresh_one_recording_override_state(sess, r, parent_config)
 
-            previous = self.recording_config_overrides[sess.name][r]
-            refreshed = self._recreate_override_state(previous, config.OverrideLevel.Recording, parent_config, sess.recordings[r].definition.type, r)
-            self.recording_config_overrides[sess.name][r] = refreshed
-            self._recording_dict_type_rec[sess.name][r] = self._sync_override_type_rec(self._recording_dict_type_rec[sess.name].get(r, {}), refreshed[1])
+    def _refresh_one_recording_override_state(self, sess: session.Session, recording_name: str, parent_config: config.Study):
+        self._invalidate_recording_override_state(sess.name, recording_name)
+        self.recording_config_overrides.setdefault(sess.name, {})
+        self._recording_dict_type_rec.setdefault(sess.name, {})
+        recording = sess.recordings[recording_name]
+        if recording_name not in self.recording_config_overrides[sess.name]:
+            self.recording_config_overrides[sess.name][recording_name] = config.load_or_create_override(config.OverrideLevel.Recording, recording.info.working_directory, recording.definition.type)
 
-            if self._get_override_dump_state(previous) != self._get_override_dump_state(refreshed):
-                config.store_overrides_to_json(refreshed, sess.recordings[r].info.working_directory)
+        previous = self.recording_config_overrides[sess.name][recording_name]
+        refreshed = self._recreate_override_state(previous, config.OverrideLevel.Recording, parent_config, recording.definition.type, recording_name)
+        self.recording_config_overrides[sess.name][recording_name] = refreshed
+        self._recording_dict_type_rec[sess.name][recording_name] = self._sync_override_type_rec(
+            self._recording_dict_type_rec[sess.name].get(recording_name, {}), refreshed[1])
+
+        if self._get_override_dump_state(previous) != self._get_override_dump_state(refreshed):
+            config.store_overrides_to_json(refreshed, recording.info.working_directory)
 
     def _refresh_open_override_states(self):
         if self.study_config is None:
@@ -2434,7 +2532,7 @@ class GUI:
             if (sess := self.sessions.get(sess_name, None)) is None:
                 continue
             self._refresh_session_override_state(sess)
-            effective_config_for_session = config.apply_all_overrides(self.study_config, self.session_config_overrides[sess.name], strict_check=False)
+            effective_config_for_session = self._get_effective_session_config(sess.name)
             self._refresh_recording_override_state(sess, effective_config_for_session)
 
     def _open_session_detail(self, sess: session.Session):
@@ -2460,7 +2558,7 @@ class GUI:
                 self.recording_config_overrides[sess.name][r] = config.load_or_create_override(config.OverrideLevel.Recording, sess.recordings[r].info.working_directory, sess.recordings[r].definition.type)
                 self._recording_dict_type_rec[sess.name][r] = {-1: {}}
             self._refresh_session_override_state(sess)
-            effective_config_for_session = config.apply_all_overrides(self.study_config, self.session_config_overrides[sess.name], strict_check=False)
+            effective_config_for_session = self._get_effective_session_config(sess.name)
             self._refresh_recording_override_state(sess, effective_config_for_session)
             self._recording_lister_set_actions_to_show(self._recording_listers[sess.name], sess.name)
 
@@ -2482,7 +2580,7 @@ class GUI:
             if imgui.button(ifa6.ICON_FA_FILE_IMPORT+' import camera recordings'):
                 gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='add_cam_recordings', sessions=[sess.name]))
         session_level_actions = [a for a in self._session_actions if process.is_session_level_action(a)]
-        effective_config = config.apply_all_overrides(self.study_config, self.session_config_overrides[sess.name], strict_check=False)
+        effective_config = self._get_effective_session_config(sess.name)
         possible_actions = process.get_possible_actions(sess.state, {r:sess.recordings[r].state for r in sess.recordings}, set(session_level_actions), effective_config)
         menu_actions,menu_actions_running = self._filter_session_context_menu_actions(sess.name, None, possible_actions)
         if session_level_actions and imgui.begin_table(f'##{sess.name}_session_level', 2, imgui.TableFlags_.sizing_fixed_fit):
@@ -2533,7 +2631,7 @@ class GUI:
         sess_changed = False
         session_override_updated = False
         if imgui.tree_node_ex('Setting overrides for this session',imgui.TreeNodeFlags_.framed):
-            field_problems = effective_config.field_problems()
+            field_problems = self._session_override_field_problems(sess.name, effective_config)
             new_config = copy.deepcopy(effective_config)
             sess_changed = False
             fixed_fields = type_utils.NestedDict({k:None for k in ['name', 'event_type']})
@@ -2576,19 +2674,20 @@ class GUI:
                 else:
                     # persist changed config
                     config.store_overrides_to_json(self.session_config_overrides[sess.name], sess.working_directory)
+                    self._invalidate_session_override_state(sess.name)
                     session_override_updated = True
             imgui.tree_pop()
 
         if len(self.study_config.session_def.recordings)>1:
             # if more than one recording per session, show recording-level settings overrides
             # don't show if only one recording per session, would be redundant
-            effective_config_for_session = config.apply_all_overrides(self.study_config, self.session_config_overrides[sess.name], strict_check=False)
+            effective_config_for_session = self._get_effective_session_config(sess.name)
             if session_override_updated:
                 self._refresh_recording_override_state(sess, effective_config_for_session)
             for r in sess.recordings:
                 if imgui.tree_node_ex(f'Setting overrides for {r} recording',imgui.TreeNodeFlags_.framed):
-                    effective_config = config.apply_all_overrides(effective_config_for_session, self.recording_config_overrides[sess.name][r], strict_check=False)
-                    field_problems = effective_config.field_problems()
+                    effective_config = self._get_effective_recording_config(sess.name, r)
+                    field_problems = self._recording_override_field_problems(sess.name, r, effective_config)
                     new_config = copy.deepcopy(effective_config)
                     rec_changed = False
                     fixed_fields = type_utils.NestedDict({k:None for k in ['name', 'event_type']})
@@ -2621,7 +2720,7 @@ class GUI:
                     rec_changed |= self._marker_detection_overrides_drawer(new_config, effective_config_for_session, self._recording_dict_type_rec[sess.name][r][-1], field_problems)
                     fields = [f for f in config.StudyOverride.get_allowed_parameters(config.OverrideLevel.Recording, sess.recordings[r].definition.type)[0] if f not in config.StudyOverride.marker_settings_fields]
                     if fields:
-                        this_changed, new_config, self._recording_dict_type_rec[sess.name][r][-1] = settings_editor.draw(new_config, fields, config.study_parameter_types, config.study_defaults, self._possible_value_getters, effective_config_for_session, self._recording_dict_type_rec[sess.name][r][-1], effective_config.field_problems(), config.study_parameter_doc)
+                        this_changed, new_config, self._recording_dict_type_rec[sess.name][r][-1] = settings_editor.draw(new_config, fields, config.study_parameter_types, config.study_defaults, self._possible_value_getters, effective_config_for_session, self._recording_dict_type_rec[sess.name][r][-1], field_problems, config.study_parameter_doc)
                     if rec_changed or (fields and this_changed): # NB: also need to update file when parent has changed
                         try:
                             new_config.check_valid(strict_check=False)
@@ -2632,6 +2731,7 @@ class GUI:
                         else:
                             # persist changed config
                             config.store_overrides_to_json(self.recording_config_overrides[sess.name][r], sess.recordings[r].info.working_directory)
+                            self._invalidate_recording_override_state(sess.name, r)
                     imgui.tree_pop()
 
     def _about_popup_drawer(self):
