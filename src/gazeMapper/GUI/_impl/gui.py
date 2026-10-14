@@ -2734,9 +2734,10 @@ class GUI:
                 if (has_error:=type_utils.get_error_level(problem_fields or {}) is not None):
                     extra = '*'
                     imgui.push_style_color(imgui.Col_.text, colors.error if type_utils.get_error_level(problem_fields)==type_utils.ProblemLevel.Error else colors.warning)
-                if imgui.tree_node_ex(f'{extra}{lbl}###{i}', imgui.TreeNodeFlags_.framed):
-                    if has_error:
-                        imgui.pop_style_color()
+                is_open = imgui.tree_node_ex(f'{extra}{lbl}###{i}', imgui.TreeNodeFlags_.framed)
+                if has_error:
+                    imgui.pop_style_color()
+                if is_open:
                     this_changed, new_coding_config, self._session_dict_type_rec[sess.name][c_name] = settings_editor.draw(
                         new_config.coding_setup[i],
                         fields,
@@ -2790,9 +2791,10 @@ class GUI:
                         if (has_error:=type_utils.get_error_level(problem_fields or {}) is not None):
                             extra = '*'
                             imgui.push_style_color(imgui.Col_.text, colors.error if type_utils.get_error_level(problem_fields)==type_utils.ProblemLevel.Error else colors.warning)
-                        if imgui.tree_node_ex(f'{extra}{lbl}###{i}', imgui.TreeNodeFlags_.framed):
-                            if has_error:
-                                imgui.pop_style_color()
+                        is_open = imgui.tree_node_ex(f'{extra}{lbl}###{i}', imgui.TreeNodeFlags_.framed)
+                        if has_error:
+                            imgui.pop_style_color()
+                        if is_open:
                             this_changed, new_coding_config, self._recording_dict_type_rec[sess.name][r][c_name] = settings_editor.draw(
                                 new_config.coding_setup[i],
                                 fields,
