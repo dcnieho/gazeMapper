@@ -121,45 +121,38 @@ def load_episodes_from_all_recordings_with_info(study_config: config.Study, reco
     if episode_subset is not None:
         to_code = to_code.intersection(episode_subset)
 
-    # add missing fields
-    wanted_events = {cs['name'] for cs in study_config.coding_setup if episode_subset is None or cs['name'] in episode_subset}
-    for evt in wanted_events:
-        if evt not in episodes:
-            cs = [cs for cs in study_config.coding_setup if cs['name']==evt][0]
-            episodes[evt] = (cs['event_type'], [])
-
-    episode_sources = _get_local_episode_sources(episodes)
-    imported_episodes = _get_empty_imported_episodes(episodes)
-
-    if not load_from_other_recordings:
-        return episodes, to_code, episode_sources, imported_episodes
-
-    # now check if there is coding to get from other recordings, or if there is coding that should not be there
-    # checking for coding from other recordings is done using the study config setup, it can be switched off for specific events
-    # check for unwanted coding
+    # discard local coding for events that are not configured for this recording
     to_remove = []
     for nm in episodes:
         if episodes[nm][1] and nm not in to_code:
             if error_if_unwanted_found:
                 cs = [cs for cs in study_config.coding_setup if cs['name']==nm][0]
                 raise ValueError(f'{nm} episodes are gotten from the recordings {", ".join(sorted(cs.get("which_recordings")))} and should not be coded for this recording ({rec_name})')
-            else:
-                to_remove.append(nm)
+            to_remove.append(nm)
     for nm in to_remove:
         del episodes[nm]
+
+    # add missing fields
+    wanted_events = [cs['name'] for cs in study_config.coding_setup if episode_subset is None or cs['name'] in episode_subset]
     for evt in wanted_events:
         if evt not in episodes:
             cs = [cs for cs in study_config.coding_setup if cs['name']==evt][0]
             episodes[evt] = (cs['event_type'], [])
+
+    # Use coding-setup order for local and imported event maps.
+    event_order = [cs['name'] for cs in study_config.coding_setup]
+    episodes = {nm: episodes[nm] for nm in event_order if nm in episodes} | {nm: value for nm, value in episodes.items() if nm not in event_order}
     episode_sources = _get_local_episode_sources(episodes)
     imported_episodes = _get_empty_imported_episodes(episodes)
 
+    # now check if there is coding to get from other recordings
     ref_rec = study_config.sync_ref_recording
-    if ref_rec is None:
+    if not load_from_other_recordings or ref_rec is None:
         return episodes, to_code, episode_sources, imported_episodes
-    all_recs = [r.name for r in study_config.session_def.recordings if r.name!=ref_rec]
 
-    # check for coding to get from other recordings
+    # load coding from other recordings
+    # checking for coding from other recordings is done using the study config setup, it can be switched off for specific events
+    all_recs = [r.name for r in study_config.session_def.recordings if r.name!=ref_rec]
     for cs in study_config.coding_setup:
         nm = cs['name']
         if episode_subset is not None and nm not in episode_subset:
