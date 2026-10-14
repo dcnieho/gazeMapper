@@ -859,9 +859,6 @@ async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[record
                                     payload = imgui.accept_drag_drop_payload_py_id("RECORDING")
                                     if payload is not None:
                                         recording_assignment[sess.name][r] = payload.data_id
-                                        if dev_type==session.RecordingType.Camera:
-                                            # set camera recording type according to assigned slot
-                                            recordings_to_add[recording_assignment[sess.name][r]].type = rec_def.camera_recording_type
                                         recording_list.require_sort = True
                                     imgui.end_drag_drop_target()
                         else:
@@ -1070,8 +1067,7 @@ def _find_camera_recordings(paths: list[pathlib.Path], glob_filter: str) -> list
                 video_paths.append(p)
         elif p.is_dir():
             video_paths.extend([pth.resolve() for pth in p.glob("**/*") if pth.suffix in extensions])
-    # turn into list of recordings (NB: set all recordings as type external for now as need to provide something. This is resolved when a recording is assigned to a slot)
-    return [camera_recording.Recording('',camera_recording.Type.External,p.name,p.parent, duration=video_utils.get_video_duration(p)) for p in video_paths]
+    return [camera_recording.Recording('',p.name,p.parent, duration=video_utils.get_video_duration(p)) for p in video_paths]
 
 def get_and_filter_eligible_sessions(g, sessions: list[str], dev_type:session.RecordingType) -> list[str]:
     from . import gui
