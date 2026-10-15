@@ -563,7 +563,7 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
 
             t_fields = [ff for ff in dataclasses.fields(fld) if ff.name not in ('available','do_it','sess','recs')]
             if t_fields and fld.do_it and imgui.tree_node(f'{f.name} settings'):
-                right_width = hello_imgui.dpi_window_size_factor()*90
+                right_width = imgui.get_window_dpi_scale()*90
                 if f.name=='validation':
                     need_node = len(fld.episodes)>1
                     for nm in fld.episodes:
@@ -722,7 +722,7 @@ def _push_preparing_recordings_popup(g, dev_type: session.RecordingType, dev: ey
         imgui.text_unformatted(text)
         imgui.dummy((0,3*imgui.get_style().item_spacing.y))
         text_size = imgui.calc_text_size(text)
-        size_mult = hello_imgui.dpi_window_size_factor()
+        size_mult = imgui.get_window_dpi_scale()
         spinner_radii = [x*size_mult for x in [22, 16, 10]]
         imgui.set_cursor_pos_x(imgui.get_cursor_pos_x()+(text_size.x-2*spinner_radii[0])/2)
         imspinner.spinner_ang_triple('waitSpinner', *spinner_radii, 3.5*size_mult, c1=imgui.get_style_color_vec4(imgui.Col_.text), c2=colors.warning, c3=imgui.get_style_color_vec4(imgui.Col_.text))
@@ -809,7 +809,7 @@ async def _show_addable_recordings(g, rec_getter: typing.Callable[[],list[record
         imgui.text_unformatted("Select which recordings you would like to import. Assign a recording from the list on the right to a recording in a session on the left by dragging and dropping it. Add new sessions if needed")
         imgui.dummy((0,1*imgui.get_style().item_spacing.y))
 
-        size_mult = hello_imgui.dpi_window_size_factor()
+        size_mult = imgui.get_window_dpi_scale()
         imgui.begin_child("##main_frame_adder", size=(1260*size_mult,min(700*size_mult,max(400*size_mult,(len(recording_list.recordings)+2)*imgui.get_frame_height_with_spacing()))))
         imgui.begin_child("##session_list", size=(600*size_mult,0))
         if imgui.button('+ new session'):

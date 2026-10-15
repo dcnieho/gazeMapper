@@ -94,6 +94,7 @@ class GUI:
         self._project_settings_pane : hello_imgui.DockableWindow|None   = None
         self._action_list_pane      : hello_imgui.DockableWindow|None   = None
         self._show_demo_window                                          = False
+        self._main_window_dpi_scale                                     : float|None = None
 
         self._big_font_size_multiplier                                  = 1.75
         self._icon_font_size_multiplier                                 = 4.2
@@ -146,13 +147,49 @@ class GUI:
     def _load_fonts(self):
         # load the default font. Do it manually as we want to use Roboto as the default font
         normal_size = 16.
-        hello_imgui.load_font("fonts/Roboto/Roboto-Regular.ttf", normal_size)
+        font_params = hello_imgui.FontLoadingParams(adjust_size_to_dpi=False)
+        hello_imgui.load_font("fonts/Roboto/Roboto-Regular.ttf", normal_size, font_params)
         # add icons
-        hello_imgui.load_font("fonts/Font_Awesome_6_Free-Solid-900.otf", normal_size, hello_imgui.FontLoadingParams(merge_to_last_font=True))
+        icon_font_params = hello_imgui.FontLoadingParams(adjust_size_to_dpi=False, merge_to_last_font=True)
+        hello_imgui.load_font("fonts/Font_Awesome_6_Free-Solid-900.otf", normal_size, icon_font_params)
+
+        # markdown font loading does not expose the adjust_size_to_dpi=False parameter, so we have to adjust for DPI at load time ourselves.
+        dpi_loading_factor = hello_imgui.dpi_font_loading_factor()
+        markdown_options = imgui_md.MarkdownOptions()
+        if dpi_loading_factor > 0:
+            markdown_options.font_options.regular_size = normal_size / dpi_loading_factor
+        imgui_md.initialize_markdown(markdown_options)
+        imgui_md.get_font_loader_function()()
+
+    def _setup_imgui_config(self):
+        io = imgui.get_io()
+        io.config_dpi_scale_fonts = True
+        io.config_dpi_scale_viewports = True
 
     def _setup_glfw(self):
         win = glfw_utils.glfw_window_hello_imgui()
         glfw.set_drop_callback(win, self._drop_callback)
+
+    def _scale_main_window_on_dpi_change(self):
+        win = glfw_utils.glfw_window_hello_imgui()
+        dpi_scale, _ = glfw.get_window_content_scale(win)
+        if dpi_scale <= 0:
+            return
+        if self._main_window_dpi_scale is None:
+            self._main_window_dpi_scale = dpi_scale
+            return
+        if dpi_scale == self._main_window_dpi_scale:
+            return
+
+        width, height = glfw.get_window_size(win)
+        if width > 0 and height > 0:
+            scale = dpi_scale / self._main_window_dpi_scale
+            glfw.set_window_size(win, round(width * scale), round(height * scale))
+            self._main_window_dpi_scale = dpi_scale
+
+    def _pre_new_frame(self):
+        self._scale_main_window_on_dpi_change()
+        self._update_windows()
 
     def _drop_callback(self, _: glfw._GLFWwindow, items: list[str]):
         paths = [pathlib.Path(item) for item in items]
@@ -179,9 +216,10 @@ class GUI:
 
         runner_params.app_window_params.window_geometry.size = (1400, 700)
         runner_params.app_window_params.restore_previous_geometry = True
+        runner_params.callbacks.setup_imgui_config = self._setup_imgui_config
         runner_params.callbacks.post_init_add_platform_backend_callbacks = self._setup_glfw
         runner_params.callbacks.load_additional_fonts = self._load_fonts
-        runner_params.callbacks.pre_new_frame = self._update_windows
+        runner_params.callbacks.pre_new_frame = self._pre_new_frame
         runner_params.callbacks.before_exit = self._exiting
 
         # Status bar, idle throttling
@@ -218,11 +256,10 @@ class GUI:
             self._action_list_pane
         ]
 
-        addons_params = immapp.AddOnsParams()
-        addons_params.with_markdown = True
-        immapp.run(runner_params, addons_params)
+        immapp.run(runner_params)
 
     def _exiting(self):
+        imgui_md.de_initialize_markdown()
         self.close_project()
         self.running = False
 
@@ -1416,8 +1453,9 @@ class GUI:
 
     def _unopened_interface_drawer(self):
         avail      = imgui.get_content_region_avail()
-        but_width  = 200*hello_imgui.dpi_window_size_factor()
-        but_height = 100*hello_imgui.dpi_window_size_factor()
+        dpi_scale  = imgui.get_window_dpi_scale()
+        but_width  = 200*dpi_scale
+        but_height = 100*dpi_scale
 
         but_x = (avail.x - 2*but_width - 10*imgui.get_style().item_spacing.x) / 2
         but_y = (avail.y - but_height) / 2
@@ -1781,7 +1819,7 @@ class GUI:
                 elif isinstance(self.assembly_configs.get(p.name), gt_marker_assembly.MarkerAssembly) and p.name in self._assembly_preview_cache:
                     if isinstance(self._assembly_preview_cache[p_def.name],str) and self._assembly_preview_cache[p_def.name]=='needs_upload':
                         self._upload_assembly_image(p_def)
-                    self._assembly_preview_cache[p_def.name].render(largest=400*hello_imgui.dpi_window_size_factor())
+                    self._assembly_preview_cache[p_def.name].render(largest=400*imgui.get_window_dpi_scale())
                 imgui.end_tooltip()
         for p in self.study_config.marker_assemblies:
             assembly_problems = self._problems_cache.get('marker_assemblies', {})
@@ -2220,7 +2258,7 @@ class GUI:
         if problem_text is not None:
             imgui.text_colored(gt_gui.colors.error, problem_text)
         key = m.id, m.aruco_dict_id, m.marker_border_bits
-        sz = int(200*hello_imgui.dpi_window_size_factor())
+        sz = int(200*imgui.get_window_dpi_scale())
         if key not in self._marker_preview_cache and create_preview:
             self._marker_preview_cache[key] = utils.get_aruco_marker_image(sz, *key)
         if key in self._marker_preview_cache and self._marker_preview_cache[key] is not None:
@@ -3061,9 +3099,10 @@ class GUI:
 
     def _about_popup_drawer(self):
         def popup_content():
-            _60 = 60*hello_imgui.dpi_window_size_factor()
-            _200 = 200*hello_imgui.dpi_window_size_factor()
-            width = 530*hello_imgui.dpi_window_size_factor()
+            dpi_scale = imgui.get_window_dpi_scale()
+            _60 = 60*dpi_scale
+            _200 = 200*dpi_scale
+            width = 530*dpi_scale
             imgui.begin_group()
             imgui.dummy((_60, _200))
             imgui.same_line()
@@ -3120,7 +3159,7 @@ class GUI:
             imgui_md.render(f"If you find bugs or have some feedback, please do let me know on [GitHub](https://github.com/dcnieho/gazeMapper) (using issues or pull requests).")
             imgui.spacing()
             imgui.spacing()
-            imgui.dummy((0, 10*hello_imgui.dpi_window_size_factor()))
+            imgui.dummy((0, 10*imgui.get_window_dpi_scale()))
             imgui.push_font(None, imgui.get_style().font_size_base*self._big_font_size_multiplier)
             size = imgui.calc_text_size("Reference")
             imgui.set_cursor_pos_x((width - size.x + imgui.get_style().scrollbar_size) / 2)
