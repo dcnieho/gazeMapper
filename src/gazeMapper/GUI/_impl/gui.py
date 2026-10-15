@@ -1628,6 +1628,12 @@ class GUI:
                                 if imgui.small_button(ifa6.ICON_FA_COPY+f'##{job_id}_copy_error'):
                                     imgui.set_clipboard_text(jobs[job_id].error)
                                 gt_gui.utils.draw_hover_text('Copy error to clipboard', text='')
+                            if job_warnings:
+                                imgui.same_line()
+                                if imgui.small_button(ifa6.ICON_FA_COPY+f'##{job_id}_copy_warnings'):
+                                    warning_details = '\n\n'.join(self._format_job_warning_details(warning, index) for index, warning in enumerate(job_warnings, start=1))
+                                    imgui.set_clipboard_text(warning_details)
+                                gt_gui.utils.draw_hover_text('Copy warnings to clipboard', text='')
                             if job_state in [process_pool.State.Pending, process_pool.State.Running]:
                                 imgui.same_line()
                                 if imgui.small_button(ifa6.ICON_FA_HAND+f' Cancel##{job_id}'):
