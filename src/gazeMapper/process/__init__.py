@@ -114,12 +114,14 @@ def action_to_func(action: Action) -> typing.Callable[..., None]|None:
 def is_session_level_action(action: Action) -> bool:
     return action in [Action.SYNC_TO_REFERENCE, Action.MAKE_MAPPED_GAZE_VIDEO, Action.EXPORT_TRIALS]
 
-def config_has_auto_coding(study_config: 'config.Study', specific_event_type: annotation.EventType|None=None, specific_episode_type: annotation.Type|None=None) -> bool:
+def config_has_auto_coding(study_config: 'config.Study', specific_event_type: annotation.EventType|list[annotation.EventType]|None=None, specific_episode_type: annotation.Type|None=None) -> bool:
     if not study_config.coding_setup:
         return False
+    if specific_event_type is not None and not isinstance(specific_event_type, list):
+        specific_event_type = [specific_event_type]
     for cs in study_config.coding_setup:
         if cs['auto_code']:
-            if specific_event_type and cs['event_type']!=specific_event_type:
+            if specific_event_type is not None and cs['event_type'] not in specific_event_type:
                 continue
             elif specific_episode_type and annotation.type_map[cs['event_type']]!=specific_episode_type:
                 continue
