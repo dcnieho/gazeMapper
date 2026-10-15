@@ -212,11 +212,12 @@ class GUI:
     def run(self):
         # Hello ImGui params (they hold the settings as well as the Gui callbacks)
         runner_params = hello_imgui.RunnerParams()
+        runner_params.ini_disable = True
 
         runner_params.app_window_params.window_title = self._get_window_title()
 
         runner_params.app_window_params.window_geometry.size = (1400, 700)
-        runner_params.app_window_params.restore_previous_geometry = True
+        runner_params.app_window_params.restore_previous_geometry = False
         runner_params.callbacks.setup_imgui_config = self._setup_imgui_config
         runner_params.callbacks.post_init_add_platform_backend_callbacks = self._setup_glfw
         runner_params.callbacks.load_additional_fonts = self._load_fonts
