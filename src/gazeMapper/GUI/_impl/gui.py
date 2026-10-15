@@ -1998,7 +1998,8 @@ class GUI:
             if (has_error:=type_utils.get_error_level(problem_fields or {}) is not None):
                 extra = '*'
                 imgui.push_style_color(imgui.Col_.text, colors.error if type_utils.get_error_level(problem_fields)==type_utils.ProblemLevel.Error else colors.warning)
-            if imgui.tree_node_ex(f'{extra}{lbl}###{i}', imgui.TreeNodeFlags_.framed):
+            imgui.push_id(i)
+            if imgui.tree_node_ex(f'{extra}{lbl}##coding_setup_tree', imgui.TreeNodeFlags_.framed):
                 if has_error:
                     imgui.pop_style_color()
                 changed, new_coding_config, self._coding_setup_dict_type_rec[cs['name']] = settings_editor.draw(
@@ -2021,12 +2022,13 @@ class GUI:
                         self.study_config = new_config
                         self.study_config.store_as_json()
                         self._update_shown_actions_for_config()
-                if imgui.button(ifa6.ICON_FA_TRASH_CAN+f' delete "{cs["name"]}" coding###{i}'):
+                if imgui.button(ifa6.ICON_FA_TRASH_CAN+f' delete "{cs["name"]}" coding##delete_coding_setup'):
                     marked_for_deletion.append(i)
                 imgui.tree_pop()
             else:
                 if has_error:
                     imgui.pop_style_color()
+            imgui.pop_id()
         if marked_for_deletion:
             for idx in sorted(marked_for_deletion, reverse=True):
                 self._coding_setup_dict_type_rec.pop(self.study_config.coding_setup[idx]['name'], None)
