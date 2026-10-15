@@ -538,6 +538,9 @@ class Study:
     def _check_coding_setup(self) -> type_utils.ProblemDict:
         problems: type_utils.ProblemDict = {}
         for i, cs in enumerate(self.coding_setup):
+            if cs['event_type'] in annotation.internal_types:
+                msg = f'Explicit event coding for a {annotation.tooltip_map[cs["event_type"]]} cannot be configured. This type of event is generated automatically internally when needed.'
+                type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'event_type': (type_utils.ProblemLevel.Error, msg)}}})
             if not pathvalidate.is_valid_filename(cs['name'], "auto"):
                 msg = f'Coding setup name "{cs["name"]}" is not valid. It should be a valid filename'
                 type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'name': (type_utils.ProblemLevel.Error, msg)}}})
