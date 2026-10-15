@@ -2,9 +2,31 @@ import pathlib
 import shutil
 import copy
 
-from glassesTools import annotation, marker as gt_marker, process_pool
+from glassesTools import annotation, marker as gt_marker, naming as gt_naming, process_pool, timestamps
 
 from .. import config, episode, naming, process, session
+
+
+def _get_transition_frames(event_type: annotation.EventType, starts, ends, last_frame: int) -> list[int]:
+    if event_type == annotation.EventType.Sync_Camera:
+        return [int(frame) for frame in starts]
+    if event_type == annotation.EventType.Sync_Camera_Offset:
+        return [int(frame) + 1 for frame in ends if frame < last_frame]
+    raise ValueError(f'Unsupported event type for automatic sync coding: {event_type}')
+
+
+def _get_auto_sync_transition_events(cs, starts, ends, last_frame: int):
+    if cs['event_type'] == annotation.EventType.Sync_Camera:
+        transition = cs['auto_code'].get('transition', 'onset')
+        events = []
+        if transition in ('onset', 'both'):
+            events.append((cs['name'], annotation.EventType.Sync_Camera, [int(frame) for frame in starts]))
+        if transition in ('offset', 'both'):
+            name = config.sync_offset_event_name(cs['name']) if transition == 'both' else cs['name']
+            event_type = annotation.EventType.Sync_Camera_Offset if transition == 'both' else annotation.EventType.Sync_Camera
+            events.append((name, event_type, _get_transition_frames(annotation.EventType.Sync_Camera_Offset, starts, ends, last_frame)))
+        return events
+    return [(cs['name'], cs['event_type'], _get_transition_frames(cs['event_type'], starts, ends, last_frame))]
 
 
 def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None, **study_settings):
@@ -24,6 +46,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
     episodes = episode.load_episodes_from_all_recordings(study_config, working_dir, load_from_other_recordings=False)[0]
     episodes = annotation.flatten_annotation_dict(episodes)
     episodes_original = copy.deepcopy(episodes)
+    last_frame = timestamps.VideoTimestamps(working_dir / gt_naming.frame_timestamps_fname).indices[-1]
 
     # get marker files
     for cs in sync_events:
@@ -39,12 +62,16 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
             raise RuntimeError(f'No markers found in the marker detection files for session "{working_dir.parent.name}", recording "{working_dir.name}"')
         # marker presence signal only contains marker detections (True). We need to fill the gaps in between detections with False (not detected) so we have a continuous signal without gaps
         markers = [gt_marker.expand_detection(m, fill_value=False) for m in markers]
-        # see where stretches of True (marker presence) start
-        marker_starts = [s for m in markers for s in gt_marker.get_appearance_starts_ends(m, cs['auto_code']['max_gap_duration'], cs['auto_code']['min_duration'])[0]]
-        # insert in episodes
-        if cs['name'] not in episodes:
-            episodes[cs['name']] = (cs['event_type'], [])
-        [episodes[cs['name']][1].append(i) for i in marker_starts if i not in episodes[cs['name']][1]]
+        # Find the configured appearance or disappearance transition frames.
+        marker_transitions = {}
+        for marker_df in markers:
+            starts, ends = gt_marker.get_appearance_starts_ends(marker_df, cs['auto_code']['max_gap_duration'], cs['auto_code']['min_duration'])
+            for name, event_type, transitions in _get_auto_sync_transition_events(cs, starts, ends, last_frame):
+                marker_transitions.setdefault(name, (event_type, set()))[1].update(transitions)
+        for name, (event_type, transitions) in marker_transitions.items():
+            if name not in episodes:
+                episodes[name] = (event_type, [])
+            episodes[name][1].extend(i for i in sorted(transitions) if i not in episodes[name][1])
 
     # early exit if nothing has changed
     if episodes==episodes_original:

@@ -1,9 +1,10 @@
 import numpy as np
 import pandas as pd
 import pathlib
+import warnings
 from typing import overload
 
-from glassesTools import annotation, naming as gt_naming, timestamps, video_utils
+from glassesTools import annotation, naming as gt_naming, process_pool, timestamps, video_utils
 
 from . import config, episode, naming, process
 
@@ -14,17 +15,89 @@ def get_cols(do_time_stretch: bool):
     else:
         cols += ['mean_off']
 
+def _half_frame_corrected_timestamp(video_ts: timestamps.VideoTimestamps, frame_idx: int) -> float:
+    timestamp = video_ts.get_timestamp(frame_idx)
+    if timestamp < 0:
+        raise ValueError(f'No video timestamp is available for sync frame {frame_idx}')
+    if frame_idx == video_ts.indices[0]:
+        return timestamp
+    previous_timestamp = video_ts.get_timestamp(frame_idx - 1)
+    if previous_timestamp < 0:
+        raise ValueError(f'No video timestamp is available for the frame before sync frame {frame_idx}')
+    return (previous_timestamp + timestamp) / 2
+
+def _cluster_sync_points(timestamps_ms: list[float], threshold_ms: float) -> tuple[list[float], list[int]]:
+    if not timestamps_ms:
+        return [], []
+    if threshold_ms <= 0:
+        return timestamps_ms, [1] * len(timestamps_ms)
+
+    clusters: list[list[float]] = [[timestamps_ms[0]]]
+    for timestamp in timestamps_ms[1:]:
+        if timestamp - clusters[-1][-1] < threshold_ms:
+            clusters[-1].append(timestamp)
+        else:
+            clusters.append([timestamp])
+    return [float(np.mean(cluster)) for cluster in clusters], [len(cluster) for cluster in clusters]
+
+def _ordinal(number: int) -> str:
+    if 10 <= number % 100 <= 20:
+        suffix = 'th'
+    else:
+        suffix = {1: 'st', 2: 'nd', 3: 'rd'}.get(number % 10, 'th')
+    return f'{number}{suffix}'
+
+def _normalize_sync_points(sync_points: list[tuple[int, annotation.EventType]],
+                           video_ts: timestamps.VideoTimestamps,
+                           recording: str,
+                           average_onset_offset: bool,
+                           max_onset_offset_ms: float,
+                           cluster_threshold_ms: float) -> tuple[list[float], list[int]]:
+    typed_timestamps: dict[annotation.EventType, list[float]] = {
+        event_type: [] for event_type in (annotation.EventType.Sync_Camera, annotation.EventType.Sync_Camera_Offset)
+    }
+    for frame_idx, event_type in sync_points:
+        typed_timestamps[event_type].append(_half_frame_corrected_timestamp(video_ts, frame_idx))
+
+    if average_onset_offset:
+        onsets = typed_timestamps[annotation.EventType.Sync_Camera]
+        offsets = typed_timestamps[annotation.EventType.Sync_Camera_Offset]
+        if len(onsets) != len(offsets):
+            raise ValueError(f'Recording {recording} has {len(onsets)} sync onsets and {len(offsets)} sync offsets; they must be paired one-to-one')
+        sync_timestamps = []
+        for index, (onset, offset) in enumerate(zip(onsets, offsets), start=1):
+            duration_ms = offset - onset
+            if duration_ms <= 0:
+                raise ValueError(f'Recording {recording} sync pair {index} has an offset that does not follow its onset')
+            if duration_ms > max_onset_offset_ms:
+                raise ValueError(f'Recording {recording} sync pair {index} lasts {duration_ms:.3f} ms, exceeding the configured maximum of {max_onset_offset_ms:.3f} ms')
+            sync_timestamps.append((onset + offset) / 2)
+    else:
+        sync_timestamps = sorted(typed_timestamps[annotation.EventType.Sync_Camera] + typed_timestamps[annotation.EventType.Sync_Camera_Offset])
+
+    return _cluster_sync_points(sync_timestamps, cluster_threshold_ms)
+
 def get_sync_for_recs(working_dir: str|pathlib.Path, recs: str|list[str], ref_rec: str, do_time_stretch: bool, average_recordings: list[str], missing_ref_coding_ok=False) -> pd.DataFrame|None:
     working_dir  = pathlib.Path(working_dir)
     if isinstance(recs,str):
         recs = [recs]
     config_dir = config.guess_config_dir(working_dir)
     study_config = config.Study.load_from_json(config_dir)
-    sync_events = process.get_specific_event_types(study_config, annotation.EventType.Sync_Camera)
-    ref_episodes = get_coding_file(working_dir / ref_rec, [(cs['name'], cs['event_type']) for cs in sync_events], missing_ref_coding_ok)
-    if ref_episodes is None:
+    if study_config is None:
+        raise ValueError(f'Could not load study configuration from {config_dir}')
+    sync_types = [annotation.EventType.Sync_Camera, annotation.EventType.Sync_Camera_Offset]
+    sync_events = [cs for cs in config.get_coding_setup_with_auto_sync_offsets(study_config.coding_setup) if cs['event_type'] in sync_types]
+    sync_event_defs = [(cs['name'], cs['event_type']) for cs in sync_events]
+    ref_sync_points = get_coding_file(working_dir / ref_rec, sync_event_defs, missing_ref_coding_ok)
+    if ref_sync_points is None:
         return None
     video_ts_ref = timestamps.VideoTimestamps(working_dir / ref_rec / gt_naming.frame_timestamps_fname)
+    ref_episodes, ref_cluster_sizes = _normalize_sync_points(
+        ref_sync_points, video_ts_ref, ref_rec,
+        study_config.sync_ref_average_onset_offset,
+        study_config.sync_ref_max_onset_offset_ms,
+        study_config.sync_ref_cluster_threshold_ms,
+    )
 
     if do_time_stretch:
         if len(ref_episodes)<2:
@@ -43,26 +116,46 @@ def get_sync_for_recs(working_dir: str|pathlib.Path, recs: str|list[str], ref_re
     # collect timestamps for the recordings
     for r in recs:
         # get interval coding for this recording
-        episodes = get_coding_file(working_dir / r, [(cs['name'], cs['event_type']) for cs in sync_events], missing_ref_coding_ok)
-        if episodes is None:
+        sync_points = get_coding_file(working_dir / r, sync_event_defs, missing_ref_coding_ok)
+        if sync_points is None:
             if missing_ref_coding_ok:
                 return None
             else:
                 raise FileNotFoundError(f'A coding file must be available for the recording ({r}) to run sync_to_ref, but it is not. Run code_episodes and code at least one {annotation.tooltip_map[annotation.EventType.Sync_Camera]}. Not found: {working_dir / r / naming.coding_file}')
 
-        # check intervals
-        if len(episodes)!=len(ref_episodes):
-            if missing_ref_coding_ok:
-                return None
-            raise ValueError(f"The number of sync points for this recording ({len(episodes)}, {r}) is not equal to that for the reference recording ({len(ref_episodes)}, {ref_rec}). Cannot continue, fix your coding")
-
-        # get time information
+        # Normalize points the same way in every recording, then validate matching cluster structure.
         video_ts = timestamps.VideoTimestamps(working_dir / r / gt_naming.frame_timestamps_fname)
+        episodes, cluster_sizes = _normalize_sync_points(
+            sync_points, video_ts, r,
+            study_config.sync_ref_average_onset_offset,
+            study_config.sync_ref_max_onset_offset_ms,
+            study_config.sync_ref_cluster_threshold_ms,
+        )
+        if cluster_sizes != ref_cluster_sizes:
+            has_merged_clusters = any(size > 1 for size in cluster_sizes + ref_cluster_sizes)
+            if not has_merged_clusters:
+                mismatch = (
+                    f'The number of sync events for recording {r} ({len(episodes)}) is not equal to '
+                    f'that for the reference recording {ref_rec} ({len(ref_episodes)}).'
+                )
+            elif len(cluster_sizes) != len(ref_cluster_sizes):
+                mismatch = (
+                    f'Recording {r} has {len(cluster_sizes)} sync clusters, while reference recording '
+                    f'{ref_rec} has {len(ref_cluster_sizes)}.'
+                )
+            else:
+                different_clusters = [
+                    f'{_ordinal(index)} (recording {r}: {recording_count}, reference {ref_rec}: {reference_count})'
+                    for index, (recording_count, reference_count) in enumerate(zip(cluster_sizes, ref_cluster_sizes), start=1)
+                    if recording_count != reference_count
+                ]
+                mismatch = 'Different sync cluster member counts: ' + '; '.join(different_clusters) + '.'
+            raise ValueError(f'{mismatch} Cannot continue, fix the event coding for your recordings.')
 
-        # get timestamps corresponding to sync frames
+        # Store normalized sync timestamps in seconds.
         for ival in range(len(episodes)):
-            sync.loc[(r,ival),'t_ref']  = video_ts_ref.get_timestamp(ref_episodes[ival])/1000.  # ms -> s
-            sync.loc[(r,ival),'t_this'] =   video_ts  .get_timestamp(    episodes[ival])/1000.  # ms -> s
+            sync.loc[(r,ival),'t_ref']  = ref_episodes[ival]/1000.  # ms -> s
+            sync.loc[(r,ival),'t_this'] = episodes[ival]/1000.      # ms -> s
             sync.loc[(r,ival),'offset'] = sync.loc[(r,ival),'t_ref']-sync.loc[(r,ival),'t_this']
         if not do_time_stretch:
             # no time stretching, get average offset. Applies to whole file, store only for first interval
@@ -160,13 +253,16 @@ def get_coding_file(working_dir: str|pathlib.Path, all_sync_events: list[tuple[s
         raise FileNotFoundError(f'A coding file must be available for the recording ({working_dir.name}) to run sync_to_ref, but it is not. Run code_episodes and code at least one {annotation.tooltip_map[annotation.EventType.Sync_Camera]}. Not found: {coding_file}')
     if not all_sync_events:
         raise ValueError('No camera sync events have been set up to be coded. Cannot continue.')
-    episodes = episode.list_to_marker_dict(episode.read_list_from_file(coding_file), [e for e in all_sync_events])
-    episodes = [x[0] for e in episodes for x in episodes[e][1]] # merge all sync codes and remove inner wrapping list, there are only single values in it anyway
-    if not episodes:
+    episodes = episode.list_to_marker_dict(episode.read_list_from_file(coding_file), all_sync_events)
+    sync_points = sorted(
+        ((int(point[0]), event_type) for name, event_type in all_sync_events for point in episodes[name][1]),
+        key=lambda point: point[0],
+    )
+    if not sync_points:
         if missing_ref_coding_ok:
             return None
         raise ValueError(f'No {annotation.tooltip_map[annotation.EventType.Sync_Camera]} codes found for this recording ({working_dir.name}). Run code_episodes and code at least one of the configured {annotation.tooltip_map[annotation.EventType.Sync_Camera]} events.')
-    return episodes
+    return sync_points
 
 class EpisodeFrameMappingCache:
     def __init__(self, working_dir: str|pathlib.Path, all_recs: list[str], ref_rec: str, do_time_stretch: bool, average_recordings: list[str], stretch_which: str):
@@ -180,6 +276,13 @@ class EpisodeFrameMappingCache:
         self._sync: pd.DataFrame|None = None
         self._source_episodes: dict[str, episode.EpisodeMap|None] = {}
         self._video_timestamps: dict[str, timestamps.VideoTimestamps] = {}
+        self._warned_sync_errors: set[str] = set()
+
+    def warn_sync_error(self, error: ValueError) -> None:
+        message = str(error)
+        if message not in self._warned_sync_errors:
+            self._warned_sync_errors.add(message)
+            warnings.warn(message, process_pool.ProcessingWarning, stacklevel=2)
 
     def get_sync(self, missing_ref_coding_ok: bool) -> pd.DataFrame|None:
         if not self._sync_loaded:
@@ -205,7 +308,7 @@ class EpisodeFrameMappingCache:
             self._video_timestamps[recording] = timestamps.VideoTimestamps(self.working_dir / recording / gt_naming.frame_timestamps_fname)
         return self._video_timestamps[recording]
 
-def get_episode_frame_indices_from_other_video(working_dir: str|pathlib.Path, event: str, rec: str, other_rec: str, ref_rec:str, all_recs: list[str], do_time_stretch: bool, average_recordings: list[str], stretch_which: str, extra_fr=0, missing_other_coding_ok=False, mapping_cache: EpisodeFrameMappingCache|None=None) -> list[list[int]]|None:
+def get_episode_frame_indices_from_other_video(working_dir: str|pathlib.Path, event: str, rec: str, other_rec: str, ref_rec:str, all_recs: list[str], do_time_stretch: bool, average_recordings: list[str], stretch_which: str, extra_fr=0, missing_other_coding_ok=False, mapping_cache: EpisodeFrameMappingCache|None=None, ignore_sync_errors=False) -> list[list[int]]|None:
     working_dir  = pathlib.Path(working_dir)
     if mapping_cache is None:
         mapping_cache = EpisodeFrameMappingCache(working_dir.parent, all_recs, ref_rec, do_time_stretch, average_recordings, stretch_which)
@@ -217,7 +320,13 @@ def get_episode_frame_indices_from_other_video(working_dir: str|pathlib.Path, ev
             return None
         raise KeyError(f'Requested event "{event}" is not found. Either the requested event does not exist in the event coding for the other recording ({other_rec}) or the event is unknown.')
     # get sync and timestamp info we need to transform reference frames indices to frame indices of this recording
-    sync = mapping_cache.get_sync(missing_other_coding_ok)
+    try:
+        sync = mapping_cache.get_sync(missing_other_coding_ok)
+    except ValueError as error:
+        if ignore_sync_errors:
+            mapping_cache.warn_sync_error(error)
+            return None
+        raise
     if sync is None:
         return None
     video_ts_other = mapping_cache.get_video_timestamps(other_rec)

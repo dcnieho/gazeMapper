@@ -100,7 +100,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
     study_config = config.read_study_config_with_overrides(config_dir, {config.OverrideLevel.Session: working_dir}, **study_settings)
     if not study_config.mapped_video_make_which:
         raise ValueError(f'There are no videos to be made (mapped_video_make_which is not defined or null in the study setup)')
-    coding_events = [(cs['name'], cs['event_type']) for cs in study_config.coding_setup]
+    coding_events = [(cs['name'], cs['event_type']) for cs in config.get_coding_setup_with_auto_sync_offsets(study_config.coding_setup)]
     empty_episodes = episode.get_empty_marker_dict(coding_events)
     event_colors = {name: _make_color_triplet(color) for (name, _), color in zip(coding_events, utils.get_colors(len(coding_events), 0.45, 0.65))}
     do_time_stretch, average_recordings, stretch_which = _get_sync_settings(study_config)
@@ -210,7 +210,11 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
 
     if study_config.sync_ref_recording and sync is not None:
         # check that all camera sync point frames of a recording are in the reference recordings sync frames (a recording may miss some, but the ones it has must be equal)
-        sync_events = process.get_specific_event_types(study_config, annotation.EventType.Sync_Camera, check_specific_fields=['auto_code'])
+        sync_events = [
+            cs for cs in config.get_coding_setup_with_auto_sync_offsets(study_config.coding_setup)
+            if cs['event_type'] == annotation.EventType.Sync_Camera_Offset
+            or (cs['event_type'] == annotation.EventType.Sync_Camera and cs['auto_code'] is not None)
+        ]
         for r in sync.index.get_level_values('recording').unique():
             for cs in sync_events:
                 nm = cs['name']

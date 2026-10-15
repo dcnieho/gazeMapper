@@ -57,11 +57,12 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
 
     # get previous interval coding, if available
     if val_coding_event is None:
-        episodes, episodes_to_code, _, imported_episodes = episode.load_episodes_from_all_recordings_with_info(study_config, working_dir, error_if_unwanted_found=False, missing_other_coding_ok=True)
+        episodes, episodes_to_code, _, imported_episodes = episode.load_episodes_from_all_recordings_with_info(study_config, working_dir, error_if_unwanted_found=False, missing_other_coding_ok=True, ignore_sync_errors=True)
         # for display, add coding streams from other recordings (will be read only as not included in episodes_to_code)
         episodes = episode.get_source_labeled_episodes(episodes, imported_episodes, include_local_events=episodes_to_code)
-        hotkeys = {cs['name']:cs['hotkey'] for cs in study_config.coding_setup if cs['hotkey'] is not None}
-        descriptions = {cs['name']:cs['description'] for cs in study_config.coding_setup if cs['description'] is not None}
+        coding_setup = config.get_coding_setup_with_auto_sync_offsets(study_config.coding_setup)
+        hotkeys = {cs['name']:cs['hotkey'] for cs in coding_setup if cs['hotkey'] is not None}
+        descriptions = {cs['name']:cs['description'] for cs in coding_setup if cs['description'] is not None}
         plane_points = {0: np.zeros((1,2))}
     else:
         # code target occurrences on a validation plane
@@ -72,7 +73,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
         if cs['which_recordings'] and working_dir.name not in cs['which_recordings']:
             raise ValueError(f'Coding of validation targets for the "{val_coding_event}" episode was selected, but this event is not configured for the recording "{working_dir.name}", can\'t continue')
         # get coded episodes, if available:
-        e = episode.load_episodes_from_all_recordings(study_config, working_dir, error_if_unwanted_found=False, missing_other_coding_ok=True)[0]
+        e = episode.load_episodes_from_all_recordings(study_config, working_dir, error_if_unwanted_found=False, missing_other_coding_ok=True, ignore_sync_errors=True)[0]
         # get targets to code
         val_p_def = [pl for pl in study_config.marker_assemblies if pl.name in cs['marker_assemblies']][0]    # NB: only one plane for a validation interval
         pl = marker_assembly.get_marker_assembly_from_definition(val_p_def, config_dir/val_p_def.name)

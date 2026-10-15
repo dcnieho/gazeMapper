@@ -2,6 +2,7 @@ import pathlib
 import inspect
 import copy
 import enum
+import math
 import typeguard
 import pathvalidate
 import typing
@@ -188,6 +189,7 @@ from .GUI._impl import utils as gui_utils
 
 class AutoCodeSyncPoints(typed_dict_defaults.TypedDictDefault, total=False):
     markers         : set[gt_marker.MarkerID]
+    transition      : Literal['onset','offset','both'] = 'onset'
     max_gap_duration: int       = 4
     min_duration    : int       = 6
 
@@ -257,6 +259,28 @@ class EventSetup(typed_dict_defaults.TypedDictDefault, total=False):
     validation_setup: ValidationSetup|None = None
     gaze_offset_setup: dict[str,GazeOffsetSetup]|None = None
 
+def sync_offset_event_name(event_name: str) -> str:
+    return f'{event_name} (offset)'
+
+def get_coding_setup_with_auto_sync_offsets(coding_setup: list[EventSetup]) -> list[EventSetup]:
+    effective_setup = []
+    for cs in coding_setup:
+        if cs['event_type'] == annotation.EventType.Sync_Camera_Offset:
+            continue
+        effective_setup.append(cs)
+        if (cs['event_type'] == annotation.EventType.Sync_Camera
+                and cs['auto_code'] is not None
+                and cs['auto_code'].get('transition', 'onset') == 'both'):
+            offset_setup = EventSetup(
+                name=sync_offset_event_name(cs['name']),
+                event_type=annotation.EventType.Sync_Camera_Offset,
+                description=f'Offsets for {cs["name"]}',
+                hotkey=annotation.default_hotkeys[annotation.EventType.Sync_Camera_Offset],
+            )
+            offset_setup.apply_defaults()
+            effective_setup.append(offset_setup)
+    return effective_setup
+
 event_setup_field_order = [
     'event_type',
     'name',
@@ -312,6 +336,9 @@ class Study:
                  sync_ref_do_time_stretch                   : bool|None                     = None,
                  sync_ref_stretch_which                     : Literal['ref','other']|None   = None,
                  sync_ref_average_recordings                : set[str]|None                 = None,
+                 sync_ref_average_onset_offset              : bool                          = False,
+                 sync_ref_max_onset_offset_ms               : float                         = 600.,
+                 sync_ref_cluster_threshold_ms              : float                         = 0.,
 
                  export_output3D                            : bool                          = False,
                  export_output2D                            : bool                          = True,
@@ -376,6 +403,9 @@ class Study:
         self.sync_ref_do_time_stretch                   = sync_ref_do_time_stretch
         self.sync_ref_stretch_which                     = sync_ref_stretch_which
         self.sync_ref_average_recordings                = sync_ref_average_recordings
+        self.sync_ref_average_onset_offset              = sync_ref_average_onset_offset
+        self.sync_ref_max_onset_offset_ms               = sync_ref_max_onset_offset_ms
+        self.sync_ref_cluster_threshold_ms              = sync_ref_cluster_threshold_ms
 
         self.export_output3D                            = export_output3D
         self.export_output2D                            = export_output2D
@@ -464,7 +494,7 @@ class Study:
 
     def _register_annotations(self):
         annotation.unregister_all_annotation_types()
-        for cs in self.coding_setup:
+        for cs in get_coding_setup_with_auto_sync_offsets(self.coding_setup):
             annotation.register_event(annotation.Event(
                 name        = cs['name'],
                 event_type  = cs['event_type'],
@@ -557,7 +587,7 @@ class Study:
             # Check how many marker assemblies are allowed for the episode.
             num_assemblies_allowed = []    # min, max; 999 means more than one allowed, 0 means none
             match (e:=cs['event_type']):
-                case annotation.EventType.Sync_Camera:
+                case annotation.EventType.Sync_Camera | annotation.EventType.Sync_Camera_Offset:
                     num_assemblies_allowed = [0,0]
                 case annotation.EventType.Sync_ET_Data:
                     if cs['sync_setup'] is not None and cs['sync_setup'].get('get_cam_movement_method','')=='assembly':
@@ -664,6 +694,11 @@ class Study:
 
             # check auto coding setup
             if cs.get('auto_code') is not None:
+                if cs['event_type'] == annotation.EventType.Sync_Camera:
+                    transition = cs['auto_code'].get('transition', 'onset')
+                    if transition not in ('onset', 'offset', 'both'):
+                        msg = 'auto_code.transition should be one of "onset", "offset", or "both".'
+                        type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'auto_code': {'transition': (type_utils.ProblemLevel.Error, msg)}}}})
                 if annotation.type_map[cs['event_type']]==annotation.Type.Point:
                     fields = ['markers']
                 else:
@@ -683,7 +718,7 @@ class Study:
                             type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'auto_code': {f: (type_utils.ProblemLevel.Error, msg)}}}})
 
             # check which_recordings settings
-            if cs['event_type']==annotation.EventType.Sync_Camera:
+            if cs['event_type'] in (annotation.EventType.Sync_Camera, annotation.EventType.Sync_Camera_Offset):
                 # for camera sync episodes, which_recordings should not be set
                 if cs.get('which_recordings') is not None:
                     msg = f'which_recordings should not be set for a {annotation.tooltip_map[cs["event_type"]]} episode.'
@@ -707,13 +742,23 @@ class Study:
                         msg = f'which_recordings should not include camera recordings for a {annotation.tooltip_map[cs["event_type"]]} episode. Offending recording(s): {problem_recs[0] if len(problem_recs)==1 else problem_recs}'
                         type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'which_recordings': (type_utils.ProblemLevel.Error, msg)}}})
             # check load_from_other_recordings settings
-            if cs['event_type']==annotation.EventType.Sync_Camera and  cs.get('load_from_other_recordings'):
+            if cs['event_type'] in (annotation.EventType.Sync_Camera, annotation.EventType.Sync_Camera_Offset) and cs.get('load_from_other_recordings'):
                 msg = f'load_from_other_recordings should not be set for a {annotation.tooltip_map[cs["event_type"]]} episode.'
                 type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'load_from_other_recordings': (type_utils.ProblemLevel.Error, msg)}}})
             elif cs.get('load_from_other_recordings') and not self.sync_ref_recording:
                 # this is really because there is only one recording, in which case load_from_other_recordings should not be set
                 msg = 'When no sync reference recording is defined for the project, load_from_other_recordings should not be defined.'
                 type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'load_from_other_recordings': (type_utils.ProblemLevel.Error, msg)}}})
+
+        configured_names = {cs['name'] for cs in self.coding_setup}
+        for i, cs in enumerate(self.coding_setup):
+            if (cs['event_type'] == annotation.EventType.Sync_Camera
+                    and cs['auto_code'] is not None
+                    and cs['auto_code'].get('transition', 'onset') == 'both'):
+                offset_name = sync_offset_event_name(cs['name'])
+                if offset_name in configured_names:
+                    msg = f'The generated offset event name "{offset_name}" conflicts with a configured event name.'
+                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'auto_code': {'transition': (type_utils.ProblemLevel.Error, msg)}}}})
 
         sync_events = [(i, cs) for i, cs in enumerate(self.coding_setup) if cs['event_type']==annotation.EventType.Sync_ET_Data]
         use_average_settings = [cs['sync_setup'].get('use_average', False) for _, cs in sync_events if cs['sync_setup'] is not None]
@@ -867,6 +912,10 @@ class Study:
 
     def _check_sync_ref(self):
         problems: type_utils.ProblemDict = {}
+        if not math.isfinite(self.sync_ref_max_onset_offset_ms) or self.sync_ref_max_onset_offset_ms <= 0:
+            problems['sync_ref_max_onset_offset_ms'] = (type_utils.ProblemLevel.Error, 'sync_ref_max_onset_offset_ms should be finite and greater than 0')
+        if not math.isfinite(self.sync_ref_cluster_threshold_ms) or self.sync_ref_cluster_threshold_ms < 0:
+            problems['sync_ref_cluster_threshold_ms'] = (type_utils.ProblemLevel.Error, 'sync_ref_cluster_threshold_ms should be finite and greater than or equal to 0')
         msg = None
         if self.sync_ref_recording is None:
             if len(self.session_def.recordings)>1:
@@ -892,9 +941,18 @@ class Study:
                     problems[a] = (type_utils.ProblemLevel.Error, f'{a} should be set when sync_ref_recording is set and sync_ref_do_time_stretch is enabled')
         if self.sync_ref_average_recordings and self.sync_ref_recording in self.sync_ref_average_recordings:
             problems['sync_ref_average_recordings'] = (type_utils.ProblemLevel.Error, f'Recording {self.sync_ref_recording} is the reference recording for sync, cannot be specified in sync_ref_average_recordings')
-        if not any(cs['event_type']==annotation.EventType.Sync_Camera for cs in self.coding_setup):
-            problems['coding_setup'] = (type_utils.ProblemLevel.Error, f'if sync_ref_recording is set, a {annotation.tooltip_map[annotation.EventType.Sync_Camera]}s should be set up to be coded')
-            type_utils.merge_problem_dicts(problems, {'sync_ref_recording': (type_utils.ProblemLevel.Error, f'sync_ref_recording is set, but no {annotation.tooltip_map[annotation.EventType.Sync_Camera]}s are not set up to be coded in coding_setup')})
+        has_sync_event = any(cs['event_type'] == annotation.EventType.Sync_Camera for cs in self.coding_setup)
+        if not has_sync_event:
+            problems['coding_setup'] = (type_utils.ProblemLevel.Error, f'if sync_ref_recording is set, {annotation.tooltip_map[annotation.EventType.Sync_Camera]} should be set up to be coded')
+            type_utils.merge_problem_dicts(problems, {'sync_ref_recording': (type_utils.ProblemLevel.Error, f'sync_ref_recording is set, but no {annotation.tooltip_map[annotation.EventType.Sync_Camera]} are set up to be coded in coding_setup')})
+        has_both_transitions = any(
+            cs['event_type'] == annotation.EventType.Sync_Camera
+            and cs['auto_code'] is not None
+            and cs['auto_code'].get('transition', 'onset') == 'both'
+            for cs in self.coding_setup
+        )
+        if self.sync_ref_average_onset_offset and not has_both_transitions:
+            problems['sync_ref_average_onset_offset'] = (type_utils.ProblemLevel.Error, f'sync_ref_average_onset_offset requires auto_code.transition="both" on a {annotation.tooltip_map[annotation.EventType.Sync_Camera]} coding setup')
         return problems
 
     def _check_make_video(self) -> type_utils.ProblemDict:
@@ -1251,6 +1309,9 @@ study_parameter_doc = {
         }
     }),
     'sync_ref_average_recordings': type_utils.GUIDocInfo('Synchronization: Average recordings?', 'Whether to average the clock drifts for multiple recordings if "Synchronization: Do time stretch?" is enabled.'),
+    'sync_ref_average_onset_offset': type_utils.GUIDocInfo('Synchronization: Average onset and offset?', 'Average each detected sync marker onset and its matching offset into one sync point.'),
+    'sync_ref_max_onset_offset_ms': type_utils.GUIDocInfo('Synchronization: Maximum onset-offset duration (ms)', 'Maximum allowed duration between a sync marker onset and offset when averaging them. Ignored unless onset/offset averaging is enabled.'),
+    'sync_ref_cluster_threshold_ms': type_utils.GUIDocInfo('Synchronization: Sync event cluster threshold (ms)', 'Group consecutive sync events whose adjacent timestamps are closer than this threshold, and use each cluster mean as one sync point. Set to 0 to disable clustering.'),
     'export_output3D': type_utils.GUIDocInfo('Mapped data export: include 3D fields', 'Determines whether gaze positions on the plane in the scene camera reference frame are exported when invoking the Export Trials action.'),
     'export_output2D': type_utils.GUIDocInfo('Mapped data export: include 2D fields', 'Determines whether gaze positions on the plane in the plane\'s reference frame are exported when invoking the Export Trials action.'),
     'export_only_code_marker_presence': type_utils.GUIDocInfo('Mapped data export: only include marker presence?', 'If enabled, for each marker only a single column is added to the export created by the Export Trials action, indicating whether the given marker was detected or not on a given frame. If not enabled, marker pose information is included in the export.'),
@@ -1293,6 +1354,13 @@ event_setup_doc = {
     'load_from_other_recordings': type_utils.GUIDocInfo('Load from other recordings?', 'If enabled, coding for this event is also allowed to come from another recording, if it is not found in the current recording (or even cannot be coded for the current recording because it is not listed in the "Which recordings" setting).'),
     'auto_code': type_utils.GUIDocInfo('Auto-coding setup', 'Setup for automatically coding this event based on individual marker detections.',{
         'markers': type_utils.GUIDocInfo('Marker(s)', 'Set of marker IDs whose appearance indicates a synchronization timepoint.'),
+        'transition': type_utils.GUIDocInfo('Sync marker transition', 'Transition to code for this marker.', {
+            None: {
+                'onset': type_utils.GUIDocInfo('Onset', 'Code the first frame in which the marker is visible.'),
+                'offset': type_utils.GUIDocInfo('Offset', 'Code the first frame after the marker was last visible.'),
+                'both': type_utils.GUIDocInfo('Both', 'Code both the onset and offset.'),
+            }
+        }),
         'start_markers': type_utils.GUIDocInfo('Start marker(s)', 'A single marker ID or a sequence of marker IDs that indicate the start of an episode.'),
         'end_markers': type_utils.GUIDocInfo('End marker(s)', 'A single marker ID or a sequence of marker IDs that indicate the end of an episode.'),
         'max_gap_duration': type_utils.GUIDocInfo('Maximum gap duration', 'Maximum gap (number of frames) in marker detections that will be filled in (ignored).'),
