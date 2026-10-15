@@ -49,6 +49,7 @@ class GUI:
         self.session_config_overrides           : dict[str, tuple[config.StudyOverride, dict[str,config.StudyOverride]]] = {}
         self._session_effective_config_cache    : dict[str, config.Study]                           = {}
         self._session_override_problems_cache   : dict[str, type_utils.ProblemDict]                 = {}
+        self._session_problem_entries_cache     : dict[str, list[tuple[type_utils.ProblemLevel, str, str | None]]] = {}
         self._session_dict_type_rec             : dict[str, dict[int|str, dict[str, typing.Type]]]  = {}
         self._sessions_lock                     : threading.Lock                                    = threading.Lock()
         self._selected_sessions                 : dict[str, bool]                                   = {}
@@ -456,6 +457,7 @@ class GUI:
             recording_lister.request_sort()
 
     def _remove_session_from_gui(self, sess: str):
+        self._invalidate_session_problem_cache(sess)
         self.sessions.pop(sess, None)
         self._selected_sessions.pop(sess, None)
         for key in [key for key in self._recording_calibrations if key[0]==sess]:
@@ -464,6 +466,7 @@ class GUI:
         self._request_session_sort()
 
     def _remove_recording_from_gui(self, sess: str, rec: str):
+        self._invalidate_session_problem_cache(sess)
         self.sessions[sess].recordings.pop(rec, None)
         self._recording_calibrations.pop((sess, rec), None)
         if sess in self._selected_recordings:
@@ -480,6 +483,7 @@ class GUI:
         recording_obj = session_obj.add_existing_recording(rec)
         if recording_obj is None:
             return
+        self._invalidate_session_problem_cache(sess)
         self._load_recording_calibration(sess, recording_obj)
         if sess in self._selected_recordings:
             self._selected_recordings[sess][rec] = False
@@ -973,6 +977,7 @@ class GUI:
         key = (session_name, recording.definition.name)
         inspection = camera_calibration.inspect(cal_path, self._calibration_requires_extrinsics(recording.definition))
         self._recording_calibrations[key] = inspection
+        self._invalidate_session_problem_cache(session_name)
 
     def _reload_recording_calibrations(self):
         self._recording_calibrations.clear()
@@ -1046,6 +1051,9 @@ class GUI:
         return self._new_problem_entries(problems, inherited)
 
     def _session_problem_entries(self, sess: session.Session) -> list[tuple[type_utils.ProblemLevel, str, str | None]]:
+        if sess.name in self._session_problem_entries_cache:
+            return self._session_problem_entries_cache[sess.name]
+
         entries = [
             (result.level, f'{name}: {result.diagnostic}', None)
             for name, result in self._session_calibration_inspections(sess)
@@ -1067,6 +1075,7 @@ class GUI:
             entries.append((recording_override_level, f'Problem in recording overrides for recordings: {recording_names}', None))
         if missing_recordings := sess.missing_recordings():
             entries.append((type_utils.ProblemLevel.Error, 'Missing recordings:\n' + '\n'.join(missing_recordings), None))
+        self._session_problem_entries_cache[sess.name] = entries
         return entries
 
     def _recording_problem_entries(self, session_name: str, recording: session.Recording) -> list[tuple[type_utils.ProblemLevel, str, str | None]]:
@@ -1153,7 +1162,14 @@ class GUI:
             return 0
         return max((level.value for level, _, _ in self._recording_problem_entries(session_name, recording)), default=0)
 
+    def _invalidate_session_problem_cache(self, sess_name: str | None = None):
+        if sess_name is None:
+            self._session_problem_entries_cache.clear()
+        else:
+            self._session_problem_entries_cache.pop(sess_name, None)
+
     def _invalidate_project_setup_state(self):
+        self._invalidate_session_problem_cache()
         self._setup_state_dirty = True
 
     def _check_project_setup_state(self):
@@ -2735,12 +2751,14 @@ class GUI:
         return top_override.get_dump(), coding_dumps
 
     def _invalidate_session_override_state(self, sess_name: str):
+        self._invalidate_session_problem_cache(sess_name)
         self._session_effective_config_cache.pop(sess_name, None)
         self._session_override_problems_cache.pop(sess_name, None)
         self._recording_effective_config_cache.pop(sess_name, None)
         self._recording_override_problems_cache.pop(sess_name, None)
 
     def _invalidate_recording_override_state(self, sess_name: str, recording_name: str):
+        self._invalidate_session_problem_cache(sess_name)
         self._recording_effective_config_cache.get(sess_name, {}).pop(recording_name, None)
         self._recording_override_problems_cache.get(sess_name, {}).pop(recording_name, None)
 
