@@ -1168,6 +1168,19 @@ class GUI:
         else:
             self._session_problem_entries_cache.pop(sess_name, None)
 
+    def _has_coding_setup_needing_marker_assembly(self) -> bool:
+        if self.study_config is None:
+            return False
+        return any(
+            cs.get('event_type') in (annotation.EventType.Trial, annotation.EventType.Validate)
+            or (
+                cs.get('event_type') == annotation.EventType.Sync_ET_Data
+                and (sync_setup := cs.get('sync_setup')) is not None
+                and sync_setup.get('get_cam_movement_method') == 'assembly'
+            )
+            for cs in self.study_config.coding_setup
+        )
+
     def _invalidate_project_setup_state(self):
         self._invalidate_session_problem_cache()
         self._setup_state_dirty = True
@@ -1206,8 +1219,12 @@ class GUI:
         self.setup_recordings_error_level = setup_error_level('session_def')
         if any((self.study_config.marker_assemblies, self.study_config.coding_setup, self.study_config.individual_markers)):
             # This is not overlay-only, perform relevant checks.
-            self.setup_assembly_error_level = setup_error_level('marker_assemblies', invalid=not self.study_config.marker_assemblies or any(
-                not isinstance(self.assembly_configs.get(p.name), (gt_plane.Plane, gt_marker_assembly.MarkerAssembly)) for p in self.study_config.marker_assemblies))
+            needs_marker_assembly = self._has_coding_setup_needing_marker_assembly()
+            invalid_marker_assembly = (
+                (needs_marker_assembly and not self.study_config.marker_assemblies)
+                or any(not isinstance(self.assembly_configs.get(p.name), gt_marker_assembly.MarkerAssembly) for p in self.study_config.marker_assemblies)
+            )
+            self.setup_assembly_error_level = setup_error_level('marker_assemblies', invalid=invalid_marker_assembly)
             self.setup_coding_error_level = setup_error_level('coding_setup', invalid=not self.study_config.coding_setup)
             self.setup_individual_markers_error_level = setup_error_level('individual_markers', 'individual_marker_settings')
         else:
@@ -1825,14 +1842,12 @@ class GUI:
             else:
                 imgui.text_colored(colors.warning,'*There are potential problems in the below setup.\nHover over yellow text to get information about the warning.')
         if self.setup_assembly_error_level is not None and (not self.study_config or not self.study_config.marker_assemblies):
-            has_coding_setup_needing_assembly = not not self.study_config.coding_setup and any((cs['event_type'] in (annotation.EventType.Trial, annotation.EventType.Validate) or (cs['event_type']==annotation.EventType.Sync_ET_Data and cs['sync_setup'] and cs['sync_setup']['get_cam_movement_method']=='assembly') for cs in self.study_config.coding_setup))
+            has_coding_setup_needing_assembly = self._has_coding_setup_needing_marker_assembly()
             has_individual_markers = not not self.study_config.individual_markers
             if has_coding_setup_needing_assembly and has_individual_markers:
                 imgui.text_colored(colors.error,'*At minimum one marker assembly should be defined when a coding setup needing a marker assembly and individual markers are defined')
             elif has_coding_setup_needing_assembly:
                 imgui.text_colored(colors.error,'*At minimum one marker assembly should be defined when a coding setup needing a marker assembly is defined')
-            elif has_individual_markers:
-                imgui.text_colored(colors.error,'*At minimum one marker assembly should be defined when individual markers are defined')
         def _hover_img_error_popup(p_def: marker_assembly.Definition, load_error: Exception):
             if imgui.is_item_hovered(imgui.HoveredFlags_.for_tooltip|imgui.HoveredFlags_.delay_normal):
                 imgui.begin_tooltip()
