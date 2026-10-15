@@ -126,7 +126,9 @@ def load_episodes_from_all_recordings_with_info(study_config: config.Study, reco
     for nm in episodes:
         if episodes[nm][1] and nm not in to_code:
             if error_if_unwanted_found:
-                cs = [cs for cs in study_config.coding_setup if cs['name']==nm][0]
+                cs = next((cs for cs in coding_setup if cs['name']==nm), None)
+                if cs is None:
+                    raise ValueError(f'{nm} episodes are present in the coding file but are not configured for this study')
                 raise ValueError(f'{nm} episodes are gotten from the recordings {", ".join(sorted(cs.get("which_recordings")))} and should not be coded for this recording ({rec_name})')
             to_remove.append(nm)
     for nm in to_remove:
