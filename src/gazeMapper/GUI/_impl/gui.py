@@ -2891,33 +2891,42 @@ class GUI:
             self._refresh_recording_override_state(sess, effective_config_for_session)
 
     def _open_session_detail(self, sess: session.Session):
-        win_name = f'{sess.name}##session_view'
+        sess_name = sess.name
+        win_name = f'{sess_name}##session_view'
         if win := hello_imgui.get_runner_params().docking_params.dockable_window_of_name(win_name):
             win.focus_window_at_next_frame = True
         else:
             window_list = hello_imgui.get_runner_params().docking_params.dockable_windows
             window_list.append(
-                self._make_main_space_window(win_name, lambda: self._session_detail_GUI(sess), can_be_closed=True)
+                self._make_main_space_window(win_name, lambda sess_name=sess_name: self._session_detail_GUI(sess_name), can_be_closed=True)
             )
             self._window_list = window_list
             self._to_dock = [win_name]
             self._to_focus= win_name
-            self._selected_recordings[sess.name] = {k:False for k in sess.recordings}
-            self._recording_listers[sess.name] = gt_gui.recording_table.RecordingTable(sess.recordings, self._sessions_lock, self._selected_recordings[sess.name], None, lambda r: r.info, item_context_callback=lambda rec_name: self._recording_context_menu(sess.name, rec_name))
-            self._recording_listers[sess.name].dont_show_empty = True
-            self.session_config_overrides[sess.name] = config.load_or_create_override(config.OverrideLevel.Session, sess.working_directory)
-            self._session_dict_type_rec[sess.name] = {-1: {}}
-            self.recording_config_overrides[sess.name] = {}
-            self._recording_dict_type_rec[sess.name] = {}
+            self._selected_recordings[sess_name] = {k:False for k in sess.recordings}
+            self._recording_listers[sess_name] = gt_gui.recording_table.RecordingTable(sess.recordings, self._sessions_lock, self._selected_recordings[sess_name], None, lambda r: r.info, item_context_callback=lambda rec_name, sess_name=sess_name: self._recording_context_menu(sess_name, rec_name))
+            self._recording_listers[sess_name].dont_show_empty = True
+            self.session_config_overrides[sess_name] = config.load_or_create_override(config.OverrideLevel.Session, sess.working_directory)
+            self._session_dict_type_rec[sess_name] = {-1: {}}
+            self.recording_config_overrides[sess_name] = {}
+            self._recording_dict_type_rec[sess_name] = {}
             for r in sess.recordings:
-                self.recording_config_overrides[sess.name][r] = config.load_or_create_override(config.OverrideLevel.Recording, sess.recordings[r].info.working_directory, sess.recordings[r].definition.type)
-                self._recording_dict_type_rec[sess.name][r] = {-1: {}}
+                self.recording_config_overrides[sess_name][r] = config.load_or_create_override(config.OverrideLevel.Recording, sess.recordings[r].info.working_directory, sess.recordings[r].definition.type)
+                self._recording_dict_type_rec[sess_name][r] = {-1: {}}
             self._refresh_session_override_state(sess)
             effective_config_for_session = self._get_effective_session_config(sess.name)
             self._refresh_recording_override_state(sess, effective_config_for_session)
-            self._recording_lister_set_actions_to_show(self._recording_listers[sess.name], sess.name)
+            self._recording_lister_set_actions_to_show(self._recording_listers[sess_name], sess_name)
 
-    def _session_detail_GUI(self, sess: session.Session):
+    def _session_detail_GUI(self, sess_name: str):
+        with self._sessions_lock:
+            if (sess := self.sessions.get(sess_name)) is None:
+                return
+            lister = self._recording_listers.get(sess_name)
+            if lister is None:
+                return
+            lister.recordings = sess.recordings
+
         missing_recs = sess.missing_recordings()
         if missing_recs:
             imgui.text_colored(colors.error,'*The following recordings are missing for this session:\n'+'\n'.join(missing_recs))
