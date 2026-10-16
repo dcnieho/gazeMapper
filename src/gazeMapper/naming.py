@@ -13,5 +13,6 @@ mapped_gaze_video   = 'mappedGaze.mp4'
 data_quality_fname  = 'data_quality.tsv'
 
 gaze_export_prefix          = 'planeGaze_'
+head_pose_export_prefix     = 'headPose_'
 offset_export_prefix        = 'gazeOffset_'
 data_quality_export_fname   = 'trial_data_quality.tsv'
