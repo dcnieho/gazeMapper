@@ -16,6 +16,7 @@ class Action(enum.IntEnum):
     SYNC_ET_TO_CAM = enum.auto()
     INTERPOLATE_PLANE_POSE = enum.auto()
     SYNC_TO_REFERENCE = enum.auto()
+    COMPUTE_DATA_LOSS = enum.auto()
     GAZE_TO_PLANE = enum.auto()
     COMPUTE_GAZE_OFFSETS = enum.auto()
     VALIDATE = enum.auto()
@@ -71,6 +72,7 @@ def action_to_func(action: Action) -> typing.Callable[..., None]|None:
     from .sync_et_to_cam import run as sync_et_to_cam
     from .interpolate_plane_pose import run as interpolate_plane_pose
     from .sync_to_ref import run as sync_to_ref
+    from .compute_data_loss import run as compute_data_loss
     from .gaze_to_plane import run as gaze_to_plane
     from .compute_gaze_offsets import run as compute_gaze_offsets
     from .run_validation import run as run_validation
@@ -98,6 +100,8 @@ def action_to_func(action: Action) -> typing.Callable[..., None]|None:
             return interpolate_plane_pose
         case Action.SYNC_TO_REFERENCE:
             return sync_to_ref
+        case Action.COMPUTE_DATA_LOSS:
+            return compute_data_loss
         case Action.GAZE_TO_PLANE:
             return gaze_to_plane
         case Action.COMPUTE_GAZE_OFFSETS:
@@ -172,6 +176,8 @@ def is_action_possible_given_config(action: Action, study_config: 'config.Study'
             return any(not not (gs['which_targets']) for cs in cs for gs in cs['gaze_offset_setup'].values())  # check if any event has at least one plane with at least one target
         case Action.VALIDATE:
             return config_has_specific_event_type(study_config, annotation.EventType.Validate)
+        case Action.COMPUTE_DATA_LOSS:
+            return config_has_specific_event_type(study_config, annotation.EventType.Trial)
         case Action.EXPORT_TRIALS:
             return True     # always possible (in terms of config), since gaze overlay videos are always possible
         case Action.MAKE_MAPPED_GAZE_VIDEO:
@@ -183,7 +189,7 @@ def is_action_possible_given_config(action: Action, study_config: 'config.Study'
 
 def is_action_possible_for_recording(rec: str, rec_type: 'session.RecordingType', action: Action, study_config: 'config.Study') -> bool:
     from .. import session
-    if rec_type==session.RecordingType.Camera and action in [Action.MAKE_GAZE_OVERLAY_VIDEO, Action.GAZE_TO_PLANE, Action.SYNC_ET_TO_CAM, Action.INTERPOLATE_PLANE_POSE, Action.COMPUTE_GAZE_OFFSETS, Action.VALIDATE]:
+    if rec_type==session.RecordingType.Camera and action in [Action.MAKE_GAZE_OVERLAY_VIDEO, Action.GAZE_TO_PLANE, Action.SYNC_ET_TO_CAM, Action.INTERPOLATE_PLANE_POSE, Action.COMPUTE_GAZE_OFFSETS, Action.VALIDATE, Action.COMPUTE_DATA_LOSS]:
         return False
     elif action==Action.INTERPOLATE_PLANE_POSE:
         return config_has_plane_pose_interpolation(study_config, rec)
@@ -268,10 +274,12 @@ def _determine_to_invalidate(action: Action, study_config: 'config.Study') -> se
             states_to_invalidate = action.next_values()
         case Action.GAZE_TO_PLANE:
             # NB: MAKE_MAPPED_GAZE_VIDEO does the job itself/doesn't use the gaze-to-plane file
-            states_to_invalidate = {a for a in action.next_values() if a not in [Action.MAKE_MAPPED_GAZE_VIDEO]}
+            states_to_invalidate = {a for a in action.next_values() if a not in [Action.MAKE_MAPPED_GAZE_VIDEO, Action.COMPUTE_DATA_LOSS]}
         case Action.COMPUTE_GAZE_OFFSETS:
             states_to_invalidate = {Action.EXPORT_TRIALS}
         case Action.VALIDATE:
+            states_to_invalidate = {Action.EXPORT_TRIALS}
+        case Action.COMPUTE_DATA_LOSS:
             states_to_invalidate = {Action.EXPORT_TRIALS}
         case Action.MAKE_MAPPED_GAZE_VIDEO:
             states_to_invalidate = {Action.EXPORT_TRIALS}
@@ -343,6 +351,12 @@ def _is_recording_action_possible(rec: str, action_states: dict[Action, process_
             preconditions.update([Action.CODE_EPISODES, Action.GAZE_TO_PLANE])
             if config_has_plane_pose_interpolation(study_config, rec):
                 preconditions.add(Action.INTERPOLATE_PLANE_POSE)
+        case Action.COMPUTE_DATA_LOSS:
+            preconditions.add(Action.CODE_EPISODES)
+            if study_config.sync_ref_recording:
+                preconditions.add(Action.SYNC_TO_REFERENCE)
+            if _config_has_et_sync(study_config):
+                preconditions.add(Action.SYNC_ET_TO_CAM)
         case _:
             raise NotImplementedError(f'Logic is not implemented for {action.displayable_name} ({action}), major developer oversight! Let him know.')
 
@@ -371,7 +385,7 @@ def _is_session_action_possible(session_action_states: dict[Action, process_pool
             if _config_has_et_sync(study_config):
                 preconditions.add(Action.SYNC_ET_TO_CAM)
         case Action.EXPORT_TRIALS:
-            preconditions.update([Action.MAKE_GAZE_OVERLAY_VIDEO, Action.GAZE_TO_PLANE, Action.VALIDATE, Action.MAKE_MAPPED_GAZE_VIDEO])
+            preconditions.update([Action.MAKE_GAZE_OVERLAY_VIDEO, Action.GAZE_TO_PLANE, Action.VALIDATE, Action.MAKE_MAPPED_GAZE_VIDEO, Action.COMPUTE_DATA_LOSS])
         case Action.MAKE_MAPPED_GAZE_VIDEO:
             preconditions.update([Action.CODE_EPISODES])
             # NB: even if automatic coding of sync points is defined, user may decide to code sync manually. So don't add Action.AUTO_CODE_SYNC to preconditions

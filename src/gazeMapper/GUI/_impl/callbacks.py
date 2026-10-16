@@ -536,8 +536,8 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
     path = pathlib.Path(path)
 
-    export_config = export_trials.prep_export(g.study_config.working_directory, sessions)
-    if export is None:
+    export_config, anything_to_do = export_trials.prep_export(g.study_config.working_directory, sessions)
+    if not anything_to_do:
         gt_gui.utils.push_popup(g, gt_gui.msg_box.msgbox, "Nothing to export", "No data available for export.", gt_gui.msg_box.MsgBox.error)
         return
 
@@ -662,7 +662,7 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
         imgui.end_group()
 
     def launch_export():
-        fields = [f for f in dataclasses.fields(export_config) if f.name not in ('validation','eye_tracker_sync')]
+        fields = [f for f in dataclasses.fields(export_config) if f.name not in ('validation','eye_tracker_sync','trial_data_loss')]
         sess = list({s for f in fields for s in getattr(export_config, f.name).sess})
         for s in sess:
             this_config = copy.deepcopy(export_config)
@@ -678,6 +678,11 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
                 do_it = do_it or this_do_it
             if do_it:
                 g.launch_task(s, None, process.Action.EXPORT_TRIALS, export_path=path, export_config=this_config)
+
+        # export trial data quality for all selected recordings
+        if export_config.trial_data_loss.do_it:
+            sess_recs = list(zip(export_config.trial_data_loss.sess, export_config.trial_data_loss.recs))
+            export_trials.export_trial_data_loss(g.study_config.working_directory, sess_recs, path)
 
         # export data quality for all recordings in all sessions
         if export_config.validation.do_it:

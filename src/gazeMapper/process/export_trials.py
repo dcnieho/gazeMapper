@@ -76,12 +76,13 @@ class ExportConfig:
     #head_pose: HeadPose = dataclasses.field(default_factory=lambda: HeadPose(False, False, [], []))
     gaze_offsets: GazeOffset = dataclasses.field(default_factory=lambda: GazeOffset(False, False, [], []))
     validation: Validation = dataclasses.field(default_factory=lambda: Validation(False, False))
+    trial_data_loss: OptionBase = dataclasses.field(default_factory=lambda: OptionBase(False, False, [], []))
     eye_tracker_sync: OptionBase = dataclasses.field(default_factory=lambda: OptionBase(False, False, [], []))
     gaze_overlay_video: GazeOverlayVideo = dataclasses.field(default_factory=lambda: GazeOverlayVideo(False, False, [], []))
     mapped_gaze_video: OptionBase = dataclasses.field(default_factory=lambda: OptionBase(False, False, [], []))
 
 
-def prep_export(project_dir: str|pathlib.Path, session_names: list[str], config_dir: str|pathlib.Path|None = None, **study_settings) -> ExportConfig|None:
+def prep_export(project_dir: str|pathlib.Path, session_names: list[str], config_dir: str|pathlib.Path|None = None, **study_settings) -> tuple[ExportConfig, bool]:
     project_dir = pathlib.Path(project_dir)
     if config_dir is None:
         config_dir = config.guess_config_dir(project_dir)
@@ -130,6 +131,13 @@ def prep_export(project_dir: str|pathlib.Path, session_names: list[str], config_
             export_config.mapped_gaze_video.sess.extend([s.name for _ in s.recordings])
             export_config.mapped_gaze_video.recs.extend([r for r in s.recordings])  # NB: even though this is done per session, we want to flag all recordings for export, as there is a video for each recording
 
+        for r in s.recordings:
+            if s.recordings[r].state[process.Action.COMPUTE_DATA_LOSS]==process_pool.State.Completed:
+                export_config.trial_data_loss.available = True
+                export_config.trial_data_loss.do_it = True
+                export_config.trial_data_loss.sess.append(s.name)
+                export_config.trial_data_loss.recs.append(r)
+
     # if validation export is wanted, prep some of the data for it (data quality info from validation export, which is needed to decide what to include in the export, and also to be included in the export itself)
     if val_sess_recs:
         rec_dirs = [project_dir/s/r for s, r in val_sess_recs]
@@ -168,7 +176,7 @@ def prep_export(project_dir: str|pathlib.Path, session_names: list[str], config_
             export_config.validation.available = True
             export_config.validation.do_it = True
 
-    return export_config if got_any else None
+    return export_config, got_any
 
 def run(working_dir: str|pathlib.Path, export_path: str|pathlib.Path, export_config: ExportConfig, config_dir: str|pathlib.Path|None = None, **study_settings):
     working_dir = pathlib.Path(working_dir) # working directory of a session, not of a recording
@@ -584,6 +592,22 @@ def export_validation(export_path: pathlib.Path, val_export_config: Validation):
         targets  = [t for t in val_export_config.episodes[nm].targets if val_export_config.episodes[nm].targets[t]]
         val_export.summarize_and_store_data_quality(val_export_config.episodes[nm].df, export_path/f'data_quality_{nm}.tsv', dq_types, targets, val_export_config.episodes[nm].targets_avg, val_export_config.episodes[nm].include_data_loss)
 
+def export_trial_data_loss(project_dir: str|pathlib.Path, sess_recs: list[tuple[str, str]], output_dir: str|pathlib.Path):
+    project_dir = pathlib.Path(project_dir)
+    output_dir = pathlib.Path(output_dir)
+    data_frames = []
+    for sess, rec in sess_recs:
+        data_file = project_dir / sess / rec / naming.data_loss_fname
+        if not data_file.is_file():
+            warnings.warn(f'No computed trial data loss file found for recording {rec} in session {sess}; skipping.', process_pool.ProcessingWarning)
+            continue
+        df = pd.read_csv(data_file, delimiter='\t')
+        df.insert(0, 'recording', rec)
+        df.insert(0, 'session', sess)
+        data_frames.append(df)
+    if not data_frames:
+        return
+    pd.concat(data_frames, ignore_index=True).to_csv(output_dir / naming.data_loss_export_fname, index=False, sep='\t', na_rep='nan', float_format='%.6f')
 
 def export_et_sync(project_dir: str|pathlib.Path, sess_recs: list[tuple[str,str|None]], output_dir: str|pathlib.Path):
     project_dir = pathlib.Path(project_dir)
