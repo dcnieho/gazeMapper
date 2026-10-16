@@ -3150,18 +3150,18 @@ class GUI:
                     imgui.tree_pop()
 
     def _about_popup_drawer(self):
+        base_content_width = 530
         def popup_content():
             dpi_scale = imgui.get_window_dpi_scale()
             _60 = 60*dpi_scale
             _200 = 200*dpi_scale
-            width = 530*dpi_scale
+            content_width = base_content_width*dpi_scale
             imgui.begin_group()
             imgui.dummy((_60, _200))
             imgui.same_line()
-            imgui.dummy((_200, _200))
+            imgui.dummy((_200, _200))   # space for a logo at some point
             imgui.same_line()
             imgui.begin_group()
-            imgui.push_text_wrap_pos(width - imgui.get_style().frame_padding.x)
             imgui.push_font(None, imgui.get_style().font_size_base*self._big_font_size_multiplier)
             imgui.text("gazeMapper")
             imgui.pop_font()
@@ -3182,13 +3182,12 @@ class GUI:
                     imgui.text(f"{platform.system()} {rel} {platform.win32_edition()} ({platform.version()})")
                 case gt_platform.Os.MacOS:
                     imgui.text(f"{platform.system()} {platform.release()}")
-            imgui.pop_text_wrap_pos()
             imgui.end_group()
             imgui.same_line()
-            imgui.dummy((width-imgui.get_cursor_pos_x(), _200))
+            imgui.dummy((content_width-imgui.get_cursor_pos_x(), _200))
             imgui.end_group()
             imgui.spacing()
-            btn_tot_width = (width - 2*imgui.get_style().item_spacing.x)
+            btn_tot_width = (content_width - 3*imgui.get_style().item_spacing.x)
             if imgui.button("PyPI", size=(btn_tot_width/6, 0)):
                 webbrowser.open("https://pypi.org/project/gazeMapper/")
             imgui.same_line()
@@ -3203,10 +3202,11 @@ class GUI:
 
             imgui.spacing()
             imgui.spacing()
-            imgui.push_text_wrap_pos(width - imgui.get_style().frame_padding.x)
+            imgui.push_text_wrap_pos(content_width - imgui.get_style().frame_padding.x)
             imgui.text("This software is licensed under the MIT license and is provided to you for free. Furthermore, due to "
                        "its license, it is also free as in freedom: you are free to use, study, modify and share this software "
                        "in whatever way you wish as long as you keep the same license.")
+            imgui.pop_text_wrap_pos()
             imgui.spacing()
             imgui.spacing()
             imgui_md.render(f"If you find bugs or have some feedback, please do let me know on [GitHub](https://github.com/dcnieho/gazeMapper) (using issues or pull requests).")
@@ -3215,7 +3215,7 @@ class GUI:
             imgui.dummy((0, 10*imgui.get_window_dpi_scale()))
             imgui.push_font(None, imgui.get_style().font_size_base*self._big_font_size_multiplier)
             size = imgui.calc_text_size("Reference")
-            imgui.set_cursor_pos_x((width - size.x + imgui.get_style().scrollbar_size) / 2)
+            imgui.set_cursor_pos_x((content_width - size.x + imgui.get_style().scrollbar_size) / 2)
             imgui.text("Reference")
             imgui.pop_font()
             imgui.spacing()
@@ -3298,5 +3298,7 @@ class GUI:
                 imgui.end_popup()
             gt_gui.utils.draw_hover_text(text='', hover_text="Right-click to copy citation to clipboard")
 
-            imgui.pop_text_wrap_pos()
+        dpi_scale = imgui.get_window_dpi_scale()
+        content_width = base_content_width*dpi_scale + 2*imgui.get_style().window_padding.x
+        imgui.set_next_window_size_constraints((0.0, 0.0), (content_width, imgui.FLT_MAX))
         return gt_gui.utils.popup("About gazeMapper", popup_content, closable=True, outside=True)
