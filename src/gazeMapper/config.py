@@ -1215,9 +1215,10 @@ class Study:
                     if kwds.get('auto_code_episodes', None) is not None and e in kwds['auto_code_episodes']:
                         kwds['coding_setup'][-1]['auto_code'] = kwds['auto_code_episodes'].pop(e)
                 # check ET sync setup
-                if e==annotation.EventType.Sync_ET_Data and kwds.get('get_cam_movement_for_et_sync_method','') in ['assembly','function']:
+                if e==annotation.EventType.Sync_ET_Data and kwds.get('get_cam_movement_for_et_sync_method','') in ['plane','function']:
+                    method = kwds.pop('get_cam_movement_for_et_sync_method', '')
                     kwds['coding_setup'][-1]['sync_setup'] = EtSyncSetup(
-                        get_cam_movement_method     = kwds.pop('get_cam_movement_for_et_sync_method', ''),
+                        get_cam_movement_method     = 'assembly' if method=='plane' else method,
                         get_cam_movement_function   = kwds.pop('get_cam_movement_for_et_sync_function', None),
                     )
                     if 'sync_et_to_cam_use_average' in kwds:
@@ -1289,8 +1290,6 @@ class Study:
                 if old_key in kwds:
                     kwds.setdefault(new_key, kwds[old_key])
                     del kwds[old_key]
-            if kwds.get('get_cam_movement_for_et_sync_method') == 'plane':
-                kwds['get_cam_movement_for_et_sync_method'] = 'assembly'
             for event_setup in kwds.get('coding_setup', []):
                 if event_setup.get('sync_setup', {}).get('get_cam_movement_method') == 'plane':
                     event_setup['sync_setup']['get_cam_movement_method'] = 'assembly'
