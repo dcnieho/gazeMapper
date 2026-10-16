@@ -8,8 +8,6 @@ import pathvalidate
 import typing
 from typing import Any, Literal
 
-import cv2
-
 from glassesTools import annotation, aruco, camera_recording, data_types as _data_types, gaze_worldref, json, marker as gt_marker, utils as gt_utils
 
 from . import typed_dict_defaults, type_utils
