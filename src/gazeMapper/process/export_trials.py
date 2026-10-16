@@ -34,8 +34,7 @@ class PlaneGaze(OptionBase):
     include_plane_pose: bool = False
     include_2D: bool = True
     include_3D: bool = False
-    # TODO: something about specific fields/data types
-    plane_gaze_types: list[str] = dataclasses.field(default_factory=lambda: [])
+    plane_gaze_types: set[gaze_worldref.Type] = dataclasses.field(default_factory=lambda: {gaze_worldref.Type.Scene_Video_Position})
     include_markers: bool = True
     markers_only_presence: bool = True
     markers_compress: bool = True
@@ -96,6 +95,13 @@ export_config_doc = {
         'include_plane_pose': type_utils.GUIDocInfo('Include plane pose', 'Add each mapped plane\'s stored pose to this gaze export. The pose maps plane coordinates into the scene-camera coordinate system.'),
         'include_2D': type_utils.GUIDocInfo('Include 2D gaze positions', 'Include gaze positions in each plane\'s 2D coordinate system.'),
         'include_3D': type_utils.GUIDocInfo('Include 3D gaze positions', 'Include gaze positions in the scene-camera 3D coordinate system.'),
+        'plane_gaze_types': type_utils.GUIDocInfo('Gaze types', 'Choose which gaze-point-on-plane estimates to include in the export.', {
+            gaze_worldref.Type.Scene_Video_Position: type_utils.GUIDocInfo('Scene video position', 'Provide gaze from the scene-image position. The ray estimate falls back to homography when unavailable.'),
+            gaze_worldref.Type.World_3D_Point: type_utils.GUIDocInfo('World gaze point', 'Provide the binocular gaze point.'),
+            gaze_worldref.Type.Left_Eye_Gaze_Vector: type_utils.GUIDocInfo('Left-eye gaze point', 'Provide the left-eye gaze estimate.'),
+            gaze_worldref.Type.Right_Eye_Gaze_Vector: type_utils.GUIDocInfo('Right-eye gaze point', 'Provide the right-eye gaze estimate.'),
+            gaze_worldref.Type.Average_Gaze_Vector: type_utils.GUIDocInfo('Average gaze point', 'Provide the average of the left- and right-eye gaze estimates when both are available.'),
+        }),
         'include_markers': type_utils.GUIDocInfo('Include individual markers', 'Add detected individual marker data to the export.'),
         'markers_only_presence': type_utils.GUIDocInfo('Export marker presence only', 'Applies only when Include individual markers is enabled. Export only whether each marker was detected, rather than its full pose data.'),
         'markers_compress': type_utils.GUIDocInfo('Combine marker presence into one column', 'Applies only when Include individual markers and Export marker presence only are enabled. Store detected marker IDs in one comma-separated column instead of as a separate presence column for each marker.'),
@@ -251,6 +257,62 @@ def run(working_dir: str|pathlib.Path, export_path: str|pathlib.Path, export_con
     # update state
     session.update_action_states(working_dir, process.Action.EXPORT_TRIALS, process_pool.State.Completed, study_config)
 
+_plane_gaze_type_slugs = {
+    gaze_worldref.Type.Scene_Video_Position: 'scene_video_position',
+    gaze_worldref.Type.World_3D_Point: 'world_gaze_point',
+    gaze_worldref.Type.Left_Eye_Gaze_Vector: 'left_eye_gaze_point',
+    gaze_worldref.Type.Right_Eye_Gaze_Vector: 'right_eye_gaze_point',
+    gaze_worldref.Type.Average_Gaze_Vector: 'average_gaze_point',
+}
+
+def _select_plane_gaze_columns(plane_gaze: pd.DataFrame, plane_name: str, gaze_types: set[gaze_worldref.Type], include_2d: bool, include_3d: bool, plane_unit: str, column_info: dict[str, str]) -> pd.DataFrame:
+    source_columns = [column for column in plane_gaze.columns if column.startswith(('gazePos', 'gazeOri'))]
+    selected = plane_gaze.drop(columns=source_columns).copy()
+
+    for gaze_type in gaze_worldref.Type:
+        if gaze_type not in gaze_types:
+            continue
+        slug = _plane_gaze_type_slugs[gaze_type]
+        label = export_config_doc['plane_gaze'].children['plane_gaze_types'].children[gaze_type].display_string
+        for reference_frame, enabled, axes in (
+            ('plane', include_2d, ('x', 'y')),
+            ('camera', include_3d, ('x', 'y', 'z')),
+        ):
+            if not enabled:
+                continue
+            fields = gaze_worldref.get_gaze_point_fields(gaze_type, reference_frame)
+            vectors = {
+                field: pd.DataFrame({
+                    axis: plane_gaze[f'{field}_{axis}'] if f'{field}_{axis}' in plane_gaze
+                    else pd.Series(np.nan, index=plane_gaze.index)
+                    for axis in axes
+                }, index=plane_gaze.index)
+                for field in fields
+            }
+            if gaze_type == gaze_worldref.Type.Average_Gaze_Vector:
+                left, right = (vectors[field] for field in fields)
+                valid = left.notna().all(axis=1) & right.notna().all(axis=1)
+                vector = ((left + right) / 2).where(valid, axis=0)
+            else:
+                vector = pd.DataFrame(np.nan, index=plane_gaze.index, columns=axes)
+                resolved = pd.Series(False, index=plane_gaze.index)
+                for field in fields:
+                    candidate = vectors[field]
+                    valid = candidate.notna().all(axis=1)
+                    use_candidate = ~resolved & valid
+                    vector.loc[use_candidate, axes] = candidate.loc[use_candidate, axes]
+                    resolved |= valid
+            for axis in axes:
+                value = vector[axis]
+                output_column = f'gaze_{slug}_{plane_name}_{reference_frame}_{axis}'
+                selected[output_column] = value
+                if reference_frame == 'plane':
+                    column_info[output_column] = f'{label} on {plane_name}, plane {axis} ({plane_unit})'
+                else:
+                    column_info[output_column] = f'{label} on {plane_name}, scene-camera {axis} (mm)'
+
+    return selected
+
 
 def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, study_config: config.Study, export_config: PlaneGaze):
     plane_definitions = {definition.name: definition for definition in study_config.marker_assemblies if isinstance(definition, marker_assembly.Definition_Plane_Aruco)}
@@ -281,11 +343,7 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
         plane_gazes = {p:pd.read_csv(working_dir / r / f'{naming.world_gaze_prefix}{p}.tsv', sep='\t', dtype=defaultdict(lambda: float, **gaze_worldref.Gaze._non_float)) for p in planes}
         cols = set(c for df in plane_gazes.values() for c in df.columns)
         for c in cols:
-            if c.startswith('gazePos'):
-                column_info[c] = 'mm'
-            elif c.startswith('gazeOri'):
-                column_info[c] = 'mm'
-            elif c == 'frame_idx':
+            if c == 'frame_idx':
                 column_info[c] = 'frame number'
             elif c == 'frame_idx_VOR':
                 column_info[c] = 'frame number (after gaze to camera sync)'
@@ -320,24 +378,12 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
                 head_ref_gaze['azimuth'], head_ref_gaze['elevation'] = vector_to_Fick(gazew[:,0], gazew[:,1], gazew[:,2])
                 column_info.update({'azimuth': 'deg (Fick)', 'elevation': 'deg (Fick)'})
 
-        # throw away unwanted columns
-        if not export_config.include_3D:
-            for p in plane_gazes:
-                # throw away all columns starting with gazePosCam or gazeOriCam
-                plane_gazes[p] = plane_gazes[p].drop(columns=[c for c in plane_gazes[p].columns if c.startswith('gazePosCam') or c.startswith('gazeOriCam')])
-        if not export_config.include_2D:
-            for p in plane_gazes:
-                # throw away all columns starting with gazePosPlane2D
-                plane_gazes[p] = plane_gazes[p].drop(columns=[c for c in plane_gazes[p].columns if c.startswith('gazePosPlane2D')])
-
-        # rename putting plane name in there so that names are unique
         for p in plane_gazes:
-            rename = {c:f'{c[:7]}_{p}_{c[7:]}' for c in plane_gazes[p].columns if c.startswith('gazePos') or c.startswith('gazeOri')}
-            plane_gazes[p] = plane_gazes[p].rename(columns=rename)
-            # update column info with new names
-            for c in rename:
-                if c in column_info:
-                    column_info[rename[c]] = column_info[c]
+            plane_gazes[p] = _select_plane_gaze_columns(
+                plane_gazes[p], p, export_config.plane_gaze_types,
+                export_config.include_2D, export_config.include_3D,
+                plane_definitions[p].unit or 'plane units', column_info,
+            )
 
         # if there are individual markers, load them so they can be added later
         # load

@@ -15,7 +15,7 @@ from glassesTools import annotation, aruco, async_thread, camera_recording, data
 from glassesTools.validation import config as val_config, default_poster, dynamic as val_dynamic, export
 from glassesTools.gui import colors
 
-from . import utils
+from . import settings_editor, utils
 from ... import config, marker, marker_assembly, process, session
 from ...process import export_trials
 
@@ -655,6 +655,8 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
                         imgui.dummy((right_width, 1))
 
                         for tf in t_fields:
+                            if tf.name == 'plane_gaze_types':
+                                continue
                             if tf.type!=bool:
                                 continue
                             imgui.table_next_row()
@@ -671,6 +673,20 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
                             _, tmp = imgui.checkbox(f'##{tf.name}', tfld)
                             setattr(fld, tf.name, tmp)
                         imgui.end_table()
+                        if f.name == 'plane_gaze':
+                            gaze_types_field = next(tf for tf in t_fields if tf.name == 'plane_gaze_types')
+                            gaze_types_doc = field_doc.children.get('plane_gaze_types') if field_doc else None
+                            gaze_types_label = gaze_types_doc.display_string if gaze_types_doc else 'Gaze types'
+                            imgui.align_text_to_frame_padding()
+                            imgui.text(gaze_types_label + ':')
+                            if gaze_types_doc and gaze_types_doc.doc_str:
+                                gt_gui.utils.draw_hover_text(gaze_types_doc.doc_str, text='')
+                            imgui.set_next_item_width(imgui.get_content_region_avail().x)
+                            fld.plane_gaze_types = settings_editor.draw_list_set_editor(
+                                'plane_gaze_types', fld.plane_gaze_types, gaze_types_field.type,
+                                typing.get_args(gaze_types_field.type),
+                                gaze_types_doc.children if gaze_types_doc else {},
+                            )
                 imgui.tree_pop()
             imgui.spacing()
 
