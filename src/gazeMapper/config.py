@@ -1282,9 +1282,9 @@ class Study:
                     event_setup['marker_assemblies'] = event_setup.pop('planes')
             for old_key, new_key in (
                 ('mapped_video_process_planes_for_all_frames', 'mapped_video_process_marker_assemblies_for_all_frames'),
-                ('mapped_video_plane_marker_color', 'mapped_video_assembly_marker_color'),
-                ('mapped_video_recovered_plane_marker_color', 'mapped_video_recovered_assembly_marker_color'),
-                ('mapped_video_plane_axis_arm_length', 'mapped_video_assembly_axis_arm_length'),
+                ('mapped_video_plane_marker_color'           , 'mapped_video_assembly_marker_color'),
+                ('mapped_video_recovered_plane_marker_color' , 'mapped_video_recovered_assembly_marker_color'),
+                ('mapped_video_plane_axis_arm_length'        , 'mapped_video_assembly_axis_arm_length'),
             ):
                 if old_key in kwds:
                     kwds.setdefault(new_key, kwds[old_key])
