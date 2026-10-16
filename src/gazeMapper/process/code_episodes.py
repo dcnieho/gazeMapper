@@ -163,7 +163,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
 
         # Read gaze on poster data, if available
         plane_files = [working_dir/f'{naming.world_gaze_prefix}{p}.tsv' for p in planes]
-        plane_gazes = {p:gaze_worldref.read_dict_from_file(f) for p,f in zip(planes,plane_files) if f.is_file()}
+        plane_gazes = {p:gaze_worldref.read_dict_from_file(f, ts_column_suffixes=['VOR','']) for p,f in zip(planes,plane_files) if f.is_file()}
         has_plane_gaze = not not plane_gazes
 
         if has_plane_gaze:
