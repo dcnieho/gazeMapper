@@ -41,6 +41,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
     # We run processing in a separate thread (GUI needs to be on the main thread for OSX, see https://github.com/pthom/hello_imgui/issues/33)
     gui = GUI(use_thread = False)
     gui.add_window(f'{working_dir.parent.name}, {working_dir.name}')
+    gui.set_screenshot_filename_prefix(f'{working_dir.parent.name}_{working_dir.name}')
 
     proc_thread = propagating_thread.PropagatingThread(target=do_the_work, args=(working_dir, config_dir, gui, val_coding_event), kwargs=study_settings, cleanup_fun=gui.stop)
     proc_thread.start()

@@ -319,6 +319,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
                     gui_obj.set_window_title(f'{working_dir.name}: {v}', gui_obj.main_window_id)
                 else:
                     gui_window_ids[v] = gui_obj.add_window(f'{working_dir.name}: {v}')
+                gui_obj.set_screenshot_filename_prefix(f'{working_dir.name}_{v}', gui_window_ids[v])
                 gui_obj.set_detachable(True)
                 gui_obj.set_show_timeline(True, videos_ts[lead_vid], episodes_as_ref_flat[v], gui_window_ids[v])
                 gui_obj.set_frame_size(vid_info[v][:2], gui_window_ids[v])
