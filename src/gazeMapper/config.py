@@ -491,13 +491,13 @@ class Study:
                 raise ValueError('\n'.join(messages))
 
     @staticmethod
-    def _format_problems(problems: type_utils.ProblemDict, prefix: str = '') -> list[str]:
+    def _format_problems(problems: type_utils.ProblemDict, prefix: str = '', errors_only: bool = True) -> list[str]:
         messages = []
         for key, entry in problems.items():
             path = f'{prefix}.{key}' if prefix else str(key)
             if isinstance(entry, dict):
-                messages.extend(Study._format_problems(entry, path))
-            elif entry[0] != type_utils.ProblemLevel.Information:
+                messages.extend(Study._format_problems(entry, path, errors_only))
+            elif entry[0] == type_utils.ProblemLevel.Error or (not errors_only and entry[0] == type_utils.ProblemLevel.Warning):
                 messages.append(f'{path}: {entry[1]}' if entry[1] else path)
         return messages
 
