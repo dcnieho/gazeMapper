@@ -9,7 +9,7 @@ import threading
 import natsort
 import dataclasses
 import copy
-from imgui_bundle import imgui, imspinner, hello_imgui, icons_fontawesome_6 as ifa6
+from imgui_bundle import imgui, imspinner, icons_fontawesome_6 as ifa6
 
 from glassesTools import annotation, aruco, async_thread, camera_recording, data_types, eyetracker, gui as gt_gui, marker as gt_marker, naming as gt_naming, platform, process_pool, recording, video_utils
 from glassesTools.validation import config as val_config, default_poster, dynamic as val_dynamic, export
