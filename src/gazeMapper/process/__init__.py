@@ -360,12 +360,16 @@ def _is_recording_action_possible(rec: str, action_states: dict[Action, process_
             recs_to_check = [rec]
             if study_config.sync_ref_recording:
                 recs_to_check.append(study_config.sync_ref_recording)
-            has_plane_metrics = any(
+            needs_plane_gaze = any(
                 (cs['which_recordings'] is None or any(r in cs['which_recordings'] for r in recs_to_check))
-                and bool((setup := cs.get('trial_data_quality_setup')) and setup.get('planes'))
+                and bool(set((cs.get('trial_data_quality_setup') or {}).get('planes') or ()) & {
+                    definition.name
+                    for definition in study_config.marker_assemblies
+                    if isinstance(definition, marker_assembly.Definition_Plane_Aruco)
+                })
                 for cs in get_specific_event_types(study_config, annotation.EventType.Trial)
             )
-            if has_plane_metrics:
+            if needs_plane_gaze:
                 preconditions.add(Action.GAZE_TO_PLANE)
         case _:
             raise NotImplementedError(f'Logic is not implemented for {action.displayable_name} ({action}), major developer oversight! Let him know.')
