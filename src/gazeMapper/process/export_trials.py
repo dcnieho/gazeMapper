@@ -104,7 +104,7 @@ export_config_doc = {
     'plane_gaze': type_utils.GUIDocInfo('Mapped gaze data', 'Export gaze mapped to planes, with optional gaze, head-pose, and marker data.', {
         'include_unit_header_row': type_utils.GUIDocInfo('Include units row', 'Add a second header row describing the units or meaning of each column.'),
         'include_head_ref_gaze': type_utils.GUIDocInfo('Include head-referenced gaze fields', 'Append the available head-referenced gaze fields from the eye tracker\'s gaze file to each mapped-gaze export. These are eye-tracker measurements, not gaze positions mapped onto a plane and, depending on availability, include: 2D gaze position on the scene image (gaze_pos_vid), 3D/world gaze point (gaze_pos_3d), and left/right eye gaze direction vectors (gaze_dir_l/r) with their origins (gaze_ori_l/r). Also provided are timestamps and frame indices, including synchronized scene-camera timing when available.'),
-        'include_head_ref_gaze_Fick_angles': type_utils.GUIDocInfo('Include head-referenced gaze angles', 'Add azimuth and elevation angles computed from the 2D gaze position on the scene image, relative to straight ahead in the scene camera. Requires eye-tracker gaze fields to be included.'),
+        'include_head_ref_gaze_Fick_angles': type_utils.GUIDocInfo('Include head-referenced gaze angles', 'Add azimuth and elevation angles (Fick order) computed from the 2D gaze position on the scene image, relative to straight ahead in the scene camera. Requires eye-tracker gaze fields to be included.'),
         'head_ref_gaze_types': type_utils.GUIDocInfo('Head-referenced gaze types', 'Choose which head-referenced eye-tracker measurements to include. Timestamps and frame indices remain included for alignment.', {
             HeadRefGazeType.Scene_Video_Position: type_utils.GUIDocInfo('Scene video position', '2D gaze position on the scene image.'),
             HeadRefGazeType.World_3D_Point: type_utils.GUIDocInfo('3D gaze point', 'Gaze point in 3D camera/world coordinates.'),
@@ -131,7 +131,7 @@ export_config_doc = {
     }),
     'head_pose': type_utils.GUIDocInfo('Head pose relative to planes', 'Export the scene-camera (head) pose in each configured plane\'s coordinate system at available pose frames. This is the inverse of the stored plane-to-camera pose.', {
         'include_unit_header_row': type_utils.GUIDocInfo('Include units row', 'Add a second header row describing the units or meaning of each column.'),
-        'include_Fick_angles': type_utils.GUIDocInfo('Include Fick angles', 'Include azimuth and elevation of the scene-camera forward direction, expressed in each plane\'s coordinate system.'),
+        'include_Fick_angles': type_utils.GUIDocInfo('Include angles', 'Include azimuth and elevation (Fick order) of the scene-camera forward direction, expressed in each plane\'s coordinate system.'),
         'planes': type_utils.GUIDocInfo('Planes', 'Leave empty to export a pose file for every configured plane.'),
         'episodes': type_utils.GUIDocInfo('Coding events', 'Leave empty to export all pose frames. Otherwise, include frames within the selected coding events.'),
     }),
