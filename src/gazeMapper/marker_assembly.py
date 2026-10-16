@@ -9,6 +9,7 @@ from glassesTools import (
     json as _json,
     marker_assembly as _gt_marker_assembly,
     plane as _gt_plane,
+    units as _units,
     utils as _gt_utils,
     validation as _validation)
 
@@ -29,6 +30,10 @@ type_display_names = {
     Type.Target_Plane_2D: '2D Target Plane',
     Type.MarkerAssembly_3D: '3D Marker Assembly',
 }
+
+
+def unit_to_mm(unit: str) -> float:
+    return _units.conversion_factor(unit, 'mm')
 
 class Definition:
     @typeguard.typechecked(collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
@@ -97,13 +102,13 @@ class Definition_MarkerAssembly(Definition):
     def field_problems(self, config_path: str|pathlib.Path|None = None) -> type_utils.ProblemDict:
         problems = config.aruco_settings_problems(self.aruco_settings)
         consistency = self.aruco_settings['pose_consistency']
-        unit = self.unit.strip().lower()
-        if consistency['enabled'] and consistency['temporal_enabled'] and unit not in _aruco.unit_to_meters:
-            unit_error = (type_utils.ProblemLevel.Error, 'When temporal pose checking is enabled in the ArUco detection settings, the unit must be m, cm, mm, inches, or feet')
-            problems = type_utils.merge_problem_dicts(problems, {
-                'aruco_settings': {'pose_consistency': {'temporal_enabled': unit_error}},
-                'unit': unit_error,
-            })
+        unit = _units.normalize_unit(self.unit)
+        supported_units = ', '.join(_units.SUPPORTED_UNITS)
+        if not _units.is_supported_unit(unit):
+            problems['unit'] = (type_utils.ProblemLevel.Error, f'Unit must be one of the supported units: {supported_units}')
+            if consistency['enabled'] and consistency['temporal_enabled']:
+                unit_error = (type_utils.ProblemLevel.Error, 'Temporal pose checking requires a supported assembly unit')
+                problems = type_utils.merge_problem_dicts(problems, {'aruco_settings': {'pose_consistency': {'temporal_enabled': unit_error}}})
         if type(self.marker_border_bits) is not int or self.marker_border_bits < 1:
             problems['marker_border_bits'] = (type_utils.ProblemLevel.Error, 'marker_border_bits must be a positive integer')
         if config_path is not None:
@@ -167,7 +172,7 @@ class Definition_GlassesValidator(Definition_Plane_Aruco):
                  is_dynamic         : bool = False,
                  aruco_settings     : 'config.ArucoSettings|None' = None,
                  ):
-        super().__init__(Type.GlassesValidator, name, aruco_settings, marker_border_bits, aruco_dict_id=aruco_dict_id, min_num_markers=min_num_markers, marker_file=marker_file, ref_image_size=ref_image_size)
+        super().__init__(Type.GlassesValidator, name, aruco_settings, marker_border_bits, aruco_dict_id=aruco_dict_id, min_num_markers=min_num_markers, marker_file=marker_file, ref_image_size=ref_image_size, unit='mm')
         # These two together mean the following:
         #  use_default & !is_dynamic: the default/built-in static glassesValidator poster is used
         # !use_default & !is_dynamic: a non-default static glassesValidator poster is used. Custom settings files are expected in the plane folder
@@ -282,8 +287,6 @@ class Definition_MarkerAssembly_3D(Definition_MarkerAssembly):
         problems = super().field_problems(config_path)
         if not self.marker_file:
             problems['marker_file'] = (type_utils.ProblemLevel.Error, 'A marker corner CSV is required')
-        if not isinstance(self.unit, str) or not self.unit.strip():
-            problems['unit'] = (type_utils.ProblemLevel.Error, 'A coordinate unit is required')
         return problems
 
     def fixed_fields(self) -> type_utils.NestedDict:
@@ -346,7 +349,7 @@ definition_parameter_doc = {
         'x': type_utils.GUIDocInfo('X','Horizontal coordinate of the plane\'s or marker assembly\'s origin in the assembly\'s units (e.g., mm).'),
         'y': type_utils.GUIDocInfo('Y','Vertical coordinate of the plane\'s or marker assembly\'s origin in the assembly\'s units (e.g., mm).'),
     }),
-    'unit': type_utils.GUIDocInfo('Unit','Unit used for marker coordinates. Coordinates are not rescaled, output is in this same unit. In most cases, this is merely informational, but when temporal pose checking is enabled the unit is used to convert estimated translation to meters. The unit must then be m, cm, or mm.'),
+    'unit': type_utils.GUIDocInfo('Unit','Length unit used for marker coordinates and assembly dimensions. Every assembly must use a supported unit: m, cm, mm, in/inch/inches, or ft/foot/feet.'),
 }
 
 

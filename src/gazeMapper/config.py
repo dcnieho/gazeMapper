@@ -8,7 +8,7 @@ import pathvalidate
 import typing
 from typing import Any, Literal
 
-from glassesTools import annotation, aruco, camera_recording, data_types as _data_types, gaze_worldref, json, marker as gt_marker, utils as gt_utils
+from glassesTools import annotation, aruco, camera_recording, data_types as _data_types, gaze_worldref, json, marker as gt_marker, units, utils as gt_utils
 
 from . import typed_dict_defaults, type_utils
 
@@ -165,7 +165,7 @@ aruco_settings_doc = type_utils.GUIDocInfo('ArUco detection',
         'fast_path_min_spread_fraction': type_utils.GUIDocInfo('Fast-path minimum assembly spread', 'Require selected marker centers to span at least this fraction of the known assembly layout area to accept the initial fit without a robust search. Since this is an area, 0.05 means about 22% of the assembly\'s width and height (0.224 x 0.224 ≈ 0.05).'),
         'max_subsets': type_utils.GUIDocInfo('Maximum detection subsets', 'Maximum number of detection subsets evaluated in one pose-consistency search. Larger combinatorial searches use deterministic sampling within this limit.'),
         'max_marker_tilt_angle_deg': type_utils.GUIDocInfo('Maximum marker tilt (degrees)', 'Maximum angle between the marker front-face normal (as determined from the plane pose) and the direction from the marker center toward the camera. 0 degrees is face-on; 90 degrees is edge-on; angles above 90 degrees are back-facing. Must be in [0, 90), so edge-on and back-facing markers are rejected.'),
-        'temporal_enabled': type_utils.GUIDocInfo('Enable temporal pose check', 'Reject poses whose camera motion relative to the assembly exceeds the configured translation or rotation speed. Requires an assembly unit of m, cm, or mm for translation checking and frame timestamps.'),
+        'temporal_enabled': type_utils.GUIDocInfo('Enable temporal pose check', 'Reject poses whose camera motion relative to the assembly exceeds the configured translation or rotation speed.'),
         'temporal_invert_pose': type_utils.GUIDocInfo('Invert pose for temporal check', 'Check camera movement with respect to the assembly when enabled (default); otherwise check\'s the movement of the assembly with respect to the camera.'),
         'temporal_history_size': type_utils.GUIDocInfo('Temporal history size', 'Number of previous accepted poses retained for speed checks.'),
         'max_translation_speed_m_s': type_utils.GUIDocInfo('Maximum translation speed (m/s)', 'Maximum camera translation speed relative to the assembly.'),
@@ -698,9 +698,9 @@ class Study:
                         if plane_def.type not in (marker_assembly.Type.Plane_2D, marker_assembly.Type.Target_Plane_2D, marker_assembly.Type.GlassesValidator):
                             plane_problems[p] = (type_utils.ProblemLevel.Error, f'Assembly "{p}" is not a plane and cannot be used for trial data-loss metrics.')
                             continue
-                        unit = 'mm' if plane_def.type == marker_assembly.Type.GlassesValidator else (getattr(plane_def, 'unit', '') or '').strip().lower()
-                        if aruco.unit_to_meters.get(unit) is None:
-                            plane_problems[p] = (type_utils.ProblemLevel.Error, f'Plane "{p}" has an unknown unit "{unit}"; use m, cm, mm, inches, or feet.')
+                        unit = units.normalize_unit(plane_def.unit)
+                        if not units.is_supported_unit(unit):
+                            plane_problems[p] = (type_utils.ProblemLevel.Error, f'Plane "{p}" has an unknown unit "{unit}"; supported units: {", ".join(units.SUPPORTED_UNITS)}.')
                     if plane_problems:
                         setup_problems['planes'] = plane_problems
 

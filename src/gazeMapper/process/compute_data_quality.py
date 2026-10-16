@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from ETDQualitizer import data_loss_from_invalid, effective_frequency, precision_using_moving_window
 
-from glassesTools import annotation, aruco, gaze_headref, gaze_worldref, naming as gt_naming, process_pool
+from glassesTools import annotation, gaze_headref, gaze_worldref, naming as gt_naming, process_pool
 
 from .. import config, episode, marker_assembly, naming, process, session
 
@@ -49,8 +49,7 @@ def run(working_dir: str | pathlib.Path, config_dir: str | pathlib.Path | None =
         for plane_name in setup['planes']:
             intervals_per_plane[plane_name].extend(episodes[event_name][1])
             plane_def = plane_defs[plane_name]
-            unit = 'mm' if plane_def.type == marker_assembly.Type.GlassesValidator else (getattr(plane_def, 'unit', '') or '').strip().lower()
-            plane_unit_to_mm[plane_name] = aruco.unit_to_meters[unit] * 1000
+            plane_unit_to_mm[plane_name] = marker_assembly.unit_to_mm(plane_def.unit)
 
     plane_gazes = {}
     for plane_name, intervals in intervals_per_plane.items():

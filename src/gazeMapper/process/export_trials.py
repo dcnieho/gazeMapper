@@ -113,7 +113,7 @@ export_config_doc = {
             HeadRefGazeType.Right_Eye_Gaze_Direction: type_utils.GUIDocInfo('Right-eye gaze direction', 'Right-eye gaze direction vector.'),
             HeadRefGazeType.Right_Eye_Gaze_Origin: type_utils.GUIDocInfo('Right-eye gaze origin', 'Origin of the right-eye gaze vector.'),
         }),
-        'include_plane_pose': type_utils.GUIDocInfo('Include plane pose', 'Add each mapped plane\'s stored pose to this gaze export. The pose maps plane coordinates into the scene-camera coordinate system.'),
+        'include_plane_pose': type_utils.GUIDocInfo('Include plane pose', 'Add each mapped plane\'s stored pose to this gaze export. Translation and gaze coordinates are converted to millimeters.'),
         'include_2D': type_utils.GUIDocInfo('Include 2D gaze positions', 'Include gaze positions in each plane\'s 2D coordinate system.'),
         'include_3D': type_utils.GUIDocInfo('Include 3D gaze positions', 'Include gaze positions in the scene-camera 3D coordinate system.'),
         'plane_gaze_types': type_utils.GUIDocInfo('Gaze types', 'Choose which gaze-point-on-plane estimates to include in the export.', {
@@ -133,7 +133,7 @@ export_config_doc = {
         'include_unit_header_row': type_utils.GUIDocInfo('Include units row', 'Add a second header row describing the units or meaning of each column.'),
         'include_Fick_angles': type_utils.GUIDocInfo('Include angles', 'Include azimuth and elevation (Fick order) of the scene-camera forward direction, expressed in each plane\'s coordinate system.'),
         'planes': type_utils.GUIDocInfo('Planes', 'Leave empty to export a pose file for every configured plane.'),
-        'episodes': type_utils.GUIDocInfo('Coding events', 'Leave empty to export all pose frames. Otherwise, include frames within the selected coding events.'),
+        'episodes': type_utils.GUIDocInfo('Coding events', 'Leave empty to export every configured event with a plane. Each event file includes all available pose frames with trial numbers marking coded intervals.'),
     }),
     'gaze_offsets': type_utils.GUIDocInfo('Gaze offsets', 'Export computed gaze offsets for configured episodes and planes.', {
         'include_unit_header_row': type_utils.GUIDocInfo('Include units row', 'Add a second header row describing the units or meaning of each column.'),
@@ -292,7 +292,15 @@ _plane_gaze_type_slugs = {
     gaze_worldref.Type.Average_Gaze_Vector: 'average_gaze_point',
 }
 
-def _select_plane_gaze_columns(plane_gaze: pd.DataFrame, plane_name: str, gaze_types: set[gaze_worldref.Type], include_2d: bool, include_3d: bool, plane_unit: str, column_info: dict[str, str]) -> pd.DataFrame:
+
+def _scale_pose_translations_to_mm(pose: pd.DataFrame, unit: str) -> pd.DataFrame:
+    translation_columns = [f'pose_T_vec_{axis}' for axis in 'xyz']
+    scaled_pose = pose.copy()
+    scaled_pose[translation_columns] *= marker_assembly.unit_to_mm(unit)
+    return scaled_pose
+
+
+def _select_plane_gaze_columns(plane_gaze: pd.DataFrame, plane_name: str, gaze_types: set[gaze_worldref.Type], include_2d: bool, include_3d: bool, plane_to_mm: float, column_info: dict[str, str]) -> pd.DataFrame:
     source_columns = [column for column in plane_gaze.columns if column.startswith(('gazePos', 'gazeOri'))]
     selected = plane_gaze.drop(columns=source_columns).copy()
 
@@ -330,13 +338,11 @@ def _select_plane_gaze_columns(plane_gaze: pd.DataFrame, plane_name: str, gaze_t
                     vector.loc[use_candidate, axes] = candidate.loc[use_candidate, axes]
                     resolved |= valid
             for axis in axes:
-                value = vector[axis]
+                value = vector[axis] * plane_to_mm
                 output_column = f'gaze_{slug}_{plane_name}_{reference_frame}_{axis}'
                 selected[output_column] = value
-                if reference_frame == 'plane':
-                    column_info[output_column] = f'{label} on {plane_name}, plane {axis} ({plane_unit})'
-                else:
-                    column_info[output_column] = f'{label} on {plane_name}, scene-camera {axis} (mm)'
+                coordinate_frame = 'plane' if reference_frame == 'plane' else 'scene-camera'
+                column_info[output_column] = f'{label} on {plane_name}, {coordinate_frame} {axis} (mm)'
 
     return selected
 
@@ -458,7 +464,7 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
             plane_gazes[p] = _select_plane_gaze_columns(
                 plane_gazes[p], p, export_config.plane_gaze_types,
                 export_config.include_2D, export_config.include_3D,
-                plane_definitions[p].unit or 'plane units', column_info,
+                marker_assembly.unit_to_mm(plane_definitions[p].unit), column_info,
             )
 
         # if there are individual markers, load them so they can be added later
@@ -497,10 +503,11 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
         if export_config.include_plane_pose:
             plane_poses = {pl: pd.read_csv(_pose_files.get_preferred_plane_pose_file(working_dir / r, pl)[0], sep='\t') for pl in planes}
             column_info.update({f: 'rotation-vector component (rad)' for f in ('pose_R_vec_x','pose_R_vec_y','pose_R_vec_z')})
-            column_info.update({f: 'translation component (plane units)' for f in ('pose_T_vec_x','pose_T_vec_y','pose_T_vec_z')})
+            column_info.update({f: 'translation component (mm)' for f in ('pose_T_vec_x','pose_T_vec_y','pose_T_vec_z')})
             for p in plane_gazes:
                 # drop unwanted columns
                 plane_poses[p] = plane_poses[p].drop(columns=[c for c in plane_poses[p].columns if c.startswith('homography') or c.endswith('N_points') or c.endswith('reprojection_error')])
+                plane_poses[p] = _scale_pose_translations_to_mm(plane_poses[p], plane_definitions[p].unit)
                 # rename columns to include plane name so that they are unique
                 rename = {c:f'{c[:4]}_{p}_{c[5:]}' for c in plane_poses[p].columns if c.startswith('pose')}
                 plane_poses[p] = plane_poses[p].rename(columns=rename)
@@ -509,8 +516,7 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
                     if c in column_info:
                         column_info[rename[c]] = column_info[c]
                         if c.startswith('pose_T_vec_'):
-                            plane_unit = plane_definitions[p].unit or 'plane units'
-                            column_info[rename[c]] = f'plane position in scene-camera coordinates ({plane_unit})'
+                            column_info[rename[c]] = 'plane position in scene-camera coordinates (mm)'
 
         # for the rest, make a file per coding stream
         ori_plane_gazes = copy.deepcopy(plane_gazes)
@@ -666,10 +672,10 @@ def export_head_pose(export_path: pathlib.Path, working_dir: pathlib.Path, study
                 source_rotations[valid_pose],
                 source_translations[valid_pose],
             )
-
             pose_df = source_df.copy()
             pose_df[rotation_columns] = inverse_rotations
             pose_df[translation_columns] = inverse_translations
+            pose_df = _scale_pose_translations_to_mm(pose_df, plane_definitions[plane_name].unit)
             if export_config.include_Fick_angles:
                 pose_df['pose_azimuth'] = np.nan
                 pose_df['pose_elevation'] = np.nan
@@ -716,8 +722,7 @@ def export_head_pose(export_path: pathlib.Path, working_dir: pathlib.Path, study
                         if suffix.startswith('R_vec_'):
                             column_info[rename[col]] = 'camera-to-plane rotation-vector component (rad)'
                         elif suffix.startswith('T_vec_'):
-                            plane_unit = plane_definitions[plane_name].unit or 'plane units'
-                            column_info[rename[col]] = f'scene-camera position in plane coordinates ({plane_unit})'
+                            column_info[rename[col]] = 'scene-camera position in plane coordinates (mm)'
                         elif suffix in ('azimuth', 'elevation'):
                             column_info[rename[col]] = 'deg (Fick)'
                     elif col in temporal_fields and col not in shared_temporal:
