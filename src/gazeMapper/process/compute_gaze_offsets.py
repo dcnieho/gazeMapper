@@ -109,9 +109,9 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
             if not p in episodes_per_plane[nm]:
                 continue
             for e in episodes_per_plane[nm][p]:
-                this_gaze = {k:v for (k,v) in plane_gazes[p].items() if k>=e[0] and k<=e[1]}
+                this_gaze = {k:v for k,v in plane_gazes[p].items() if e[0] <= k <= e[1]}
                 if not this_gaze:
-                    raise RuntimeError(f'There is no gaze data on the plane for episode "{e}" on plane "{p}", cannot proceed. This may be because there was no gaze during this interval or because the plane was not detected.')
+                    raise RuntimeError(f'There is no gaze data on the plane for episode "{e}" on plane "{p}" (frames: {e[0]}-{e[1]}), cannot proceed. This may be because there was no gaze during this interval or because the plane was not detected.')
 
                 # compute offsets
                 # check what data quality types we should output. Go with good defaults
