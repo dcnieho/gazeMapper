@@ -662,7 +662,7 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
         imgui.end_group()
 
     def launch_export():
-        fields = [f for f in dataclasses.fields(export_config) if f.name not in ('validation','eye_tracker_sync','trial_data_loss')]
+        fields = [f for f in dataclasses.fields(export_config) if f.name not in ('validation','eye_tracker_sync','trial_data_quality')]
         sess = list({s for f in fields for s in getattr(export_config, f.name).sess})
         for s in sess:
             this_config = copy.deepcopy(export_config)
@@ -680,9 +680,9 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
                 g.launch_task(s, None, process.Action.EXPORT_TRIALS, export_path=path, export_config=this_config)
 
         # export trial data quality for all selected recordings
-        if export_config.trial_data_loss.do_it:
-            sess_recs = list(zip(export_config.trial_data_loss.sess, export_config.trial_data_loss.recs))
-            export_trials.export_trial_data_loss(g.study_config.working_directory, sess_recs, path)
+        if export_config.trial_data_quality.do_it:
+            sess_recs = list(zip(export_config.trial_data_quality.sess, export_config.trial_data_quality.recs))
+            export_trials.export_trial_data_quality(g.study_config.working_directory, sess_recs, path)
 
         # export data quality for all recordings in all sessions
         if export_config.validation.do_it:

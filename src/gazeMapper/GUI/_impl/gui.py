@@ -901,12 +901,16 @@ class GUI:
         if len(cs)!=1:
             return {}
         cs = cs[0]
-        # get target assemblies
-        planes = {p:pc for p in cs['marker_assemblies'] if p in self.assembly_configs and isinstance((pc:=self.assembly_configs[p]),gt_plane.TargetPlane)}
+        # get plane assemblies and target IDs
+        planes = {p:pc for p in cs['marker_assemblies'] if p in self.assembly_configs and isinstance((pc:=self.assembly_configs[p]),gt_plane.Plane)}
+        target_planes = {p:pc for p,pc in planes.items() if isinstance(pc,gt_plane.TargetPlane)}
         if not planes:
             return {}
-        # NB: use immediately invoked lambda to capture p correctly (avoid late binding issues)
-        return {'gaze_offset_setup': {p: {'which_targets': (lambda x: lambda: set(planes[x].get_target_IDs()))(p)} for p in planes}}
+        out = {'trial_data_quality_setup': {'planes': lambda: set(planes)}}
+        if target_planes:
+            # NB: use immediately invoked lambda to capture p correctly (avoid late binding issues)
+            out['gaze_offset_setup'] = {p: {'which_targets': (lambda x: lambda: set(target_planes[x].get_target_IDs()))(p)} for p in target_planes}
+        return out
 
     def _reload_sessions(self):
         sessions = session.get_sessions_from_project_directory(self.project_dir, self.study_config.session_def)

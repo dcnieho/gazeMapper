@@ -246,6 +246,11 @@ class GazeOffsetSetup(typed_dict_defaults.TypedDictDefault, total=False):
     allow_data_type_fallback    : bool                            = False
     which_targets               : set[int]|None                   = None
 
+class TrialDataQualitySetup(typed_dict_defaults.TypedDictDefault, total=False):
+    planes              : set[str] = typed_dict_defaults.Field(default_factory=lambda: set())
+    window_duration_s   : float    = .2
+    window_step_s       : float    = .02
+
 class EventSetup(typed_dict_defaults.TypedDictDefault, total=False):
     event_type      : annotation.EventType
     name            : str
@@ -258,6 +263,7 @@ class EventSetup(typed_dict_defaults.TypedDictDefault, total=False):
     sync_setup      : EtSyncSetup|None = None
     validation_setup: ValidationSetup|None = None
     gaze_offset_setup: dict[str,GazeOffsetSetup]|None = None
+    trial_data_quality_setup: TrialDataQualitySetup|None = None
 
 def sync_offset_event_name(event_name: str) -> str:
     return f'{event_name} (offset)'
@@ -292,7 +298,8 @@ event_setup_field_order = [
     'auto_code',
     'sync_setup',
     'validation_setup',
-    'gaze_offset_setup'
+    'gaze_offset_setup',
+    'trial_data_quality_setup'
 ]
 
 class RgbColor(typing.NamedTuple):
@@ -474,6 +481,8 @@ class Study:
             if cs.get('gaze_offset_setup') is not None:
                 for p in cs['gaze_offset_setup']:
                     cs['gaze_offset_setup'][p] = GazeOffsetSetup(cs['gaze_offset_setup'][p])
+            if cs.get('trial_data_quality_setup') is not None:
+                cs['trial_data_quality_setup'] = TrialDataQualitySetup(cs['trial_data_quality_setup'])
 
         problems = self.field_problems()
         if strict_check:
@@ -653,6 +662,56 @@ class Study:
                         if gs.get('viewing_distance_mm') is None:
                             msg = 'Gaze offset setup.viewing_distance_mm should be defined when using the viewpos_vidpos_homography data type.'
                             type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'gaze_offset_setup': {p: {'viewing_distance_mm': (type_utils.ProblemLevel.Warning, msg)}}}}})
+
+            if cs.get('trial_data_quality_setup') is not None:
+                setup = cs['trial_data_quality_setup']
+                setup_problems = {}
+                if e != annotation.EventType.Trial:
+                    setup_problems['problem_with_this_key'] = (type_utils.ProblemLevel.Error, 'Trial data-loss setup can only be configured for trial events.')
+
+                selected_planes = setup.get('planes') or set()
+                assigned_planes = {
+                    p for p in cs['marker_assemblies']
+                    if any(
+                        plane.name == p and plane.type in (
+                            marker_assembly.Type.Plane_2D,
+                            marker_assembly.Type.Target_Plane_2D,
+                            marker_assembly.Type.GlassesValidator,
+                        )
+                        for plane in self.marker_assemblies
+                    )
+                }
+                if not assigned_planes:
+                    setup_problems['problem_with_this_key'] = (
+                        type_utils.ProblemLevel.Error,
+                        'Trial data quality setup should not be set when no plane assemblies are assigned to the trial.',
+                    )
+                elif not selected_planes:
+                    setup_problems['planes'] = (type_utils.ProblemLevel.Error, 'Select at least one plane for trial data-loss metrics.')
+                else:
+                    plane_problems = {}
+                    for p in selected_planes:
+                        plane_def = next((pl for pl in self.marker_assemblies if pl.name == p), None)
+                        if p not in cs['marker_assemblies']:
+                            plane_problems[p] = (type_utils.ProblemLevel.Error, f'Plane "{p}" must be assigned to this trial event.')
+                        if plane_def is None:
+                            plane_problems[p] = (type_utils.ProblemLevel.Error, f'Plane "{p}" is not defined in the study.')
+                            continue
+                        if plane_def.type not in (marker_assembly.Type.Plane_2D, marker_assembly.Type.Target_Plane_2D, marker_assembly.Type.GlassesValidator):
+                            plane_problems[p] = (type_utils.ProblemLevel.Error, f'Assembly "{p}" is not a plane and cannot be used for trial data-loss metrics.')
+                            continue
+                        unit = 'mm' if plane_def.type == marker_assembly.Type.GlassesValidator else (getattr(plane_def, 'unit', '') or '').strip().lower()
+                        if aruco.unit_to_meters.get(unit) is None:
+                            plane_problems[p] = (type_utils.ProblemLevel.Error, f'Plane "{p}" has an unknown unit "{unit}"; use m, cm, mm, inches, or feet.')
+                    if plane_problems:
+                        setup_problems['planes'] = plane_problems
+
+                for field in ('window_duration_s', 'window_step_s'):
+                    value = setup.get(field)
+                    if not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
+                        setup_problems[field] = (type_utils.ProblemLevel.Error, f'{field} must be a finite value greater than zero.')
+                if setup_problems:
+                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'trial_data_quality_setup': setup_problems}}})
 
             # check hotkey
             if cs.get('hotkey') is not None and not gui_utils.is_valid_imgui_key(cs['hotkey']):
@@ -1423,6 +1482,13 @@ event_setup_doc = {
             'which_targets': type_utils.GUIDocInfo('Which targets', 'Specifies which targets on the plane to calculate the gaze offset for. If not set, all targets defined on the plane are used.')
         }
     }),
+    'trial_data_quality_setup': type_utils.GUIDocInfo('Trial data quality setup', 'Used for determining the quality of mapped gaze data during trials (data loss and moving-window precision metrics).',{
+        None: {
+            'planes': type_utils.GUIDocInfo('Planes', 'Planes to calculate mapped-data loss, RMS, and STD for.'),
+            'window_duration_s': type_utils.GUIDocInfo('Moving window duration (s)', 'Window duration used to calculate RMS-S2S and STD of the mapped gaze data (see ETDQualitizer).'),
+            'window_step_s': type_utils.GUIDocInfo('Moving window step (s)', 'Converted to a sample stride and passed through the precision calculation; currently unused because ETDQualitizer advances one sample per window.'),
+        }
+    }),
 }
 if _missing_params:=[k for k in _params if k not in study_parameter_doc and k not in ['self','session_def','marker_assemblies','individual_markers','working_directory','coding_setup','strict_check']]:
     raise NotImplementedError('Documentation missing for parameters:\n- '+'\n- '.join(_missing_params))
@@ -1474,10 +1540,10 @@ class StudyOverride:
                     allowed_params = ['auto_code']
                 else:
                     # eye tracker recording
-                    allowed_params = ['auto_code', 'sync_setup', 'validation_setup', 'gaze_offset_setup']
+                    allowed_params = ['auto_code', 'sync_setup', 'validation_setup', 'gaze_offset_setup', 'trial_data_quality_setup']
             else:
                 # session-level overrides
-                allowed_params = ['which_recordings', 'load_from_other_recordings', 'auto_code', 'sync_setup', 'validation_setup', 'gaze_offset_setup']
+                allowed_params = ['which_recordings', 'load_from_other_recordings', 'auto_code', 'sync_setup', 'validation_setup', 'gaze_offset_setup', 'trial_data_quality_setup']
             exclude = set(all_params)-set(allowed_params)
         else:
             all_params = list(study_parameter_types.keys())
