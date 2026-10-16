@@ -156,15 +156,9 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
             tp = types[f] if f in types else list(types.values())[0]    # backup only needed when we have an invalid config (e.g. trying to show planes_per_episode entry for an episode that is no longer set to be coded)
         possible_value_getter = (possible_value_getters.get(f,None) or possible_value_getters.get(None,None)) if possible_value_getters else None
         is_dict, base_type, o_type_args, f_type, nullable = _get_field_type(f, obj, tp, possible_value_getter)
-        doc = documentation.get(f,None) or documentation.get(None,None)
-        if isinstance(doc,dict):
-            this_lbl = doc[f].display_string if f in doc else f
-            this_explanation = doc[f].doc_str if f in doc else None
-            this_child_doc = doc[f].children if f in doc and isinstance(doc[f],type_utils.GUIDocInfo) else doc if doc is not None else {}
-        else:
-            this_lbl = doc.display_string if doc is not None else f
-            this_explanation = doc.doc_str if doc is not None else None
-            this_child_doc = doc.children if isinstance(doc,type_utils.GUIDocInfo) else doc if doc is not None else {}
+        doc, this_child_doc = _get_field_documentation(documentation, f)
+        this_lbl = doc.display_string if doc is not None else f
+        this_explanation = doc.doc_str if doc is not None else None
 
         this_obj = obj.get(f,None) if isinstance(obj,dict) else getattr(obj,f)
         if is_dict and this_obj is not None:
@@ -231,6 +225,16 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
             ret_new_obj = True
             obj = new_f_obj
     return table_is_started, changed, ret_new_obj, obj, removed_field, actual_types
+
+
+def _get_field_documentation(documentation: dict, field: str):
+    doc = documentation.get(field) or documentation.get(None)
+    if isinstance(doc, dict):
+        field_doc = doc.get(field)
+        child_doc = field_doc.children if isinstance(field_doc, type_utils.GUIDocInfo) else doc
+        return field_doc, child_doc
+    child_doc = doc.children if isinstance(doc, type_utils.GUIDocInfo) else doc or {}
+    return doc, child_doc
 
 def draw_dict_editor(obj: _T, o_type: typing.Type, level: int, actual_types: dict[typing.Any, typing.Type], fields: list=None, types: dict[typing.Any, typing.Type]=None, defaults:dict[typing.Any, typing.Any]=None, possible_value_getters: typing.Callable[[_T], set[typing.Any]]|list[typing.Callable[[_T], set[typing.Any]]]|dict[str,typing.Callable[[_T], set[typing.Any]]]=None, parent_obj: _C2|None=None, problems: type_utils.ProblemDict=None, documentation: dict[str,type_utils.GUIDocInfo]=None, fixed: type_utils.NestedDict=None, nullable=False, removable=False) -> tuple[bool,bool,_T,bool,dict[typing.Any, typing.Type]|None]:
     documentation = documentation or {}
