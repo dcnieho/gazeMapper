@@ -559,10 +559,15 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
             fld = getattr(export_config, f.name)
             if not fld.available:
                 continue
-            _, fld.do_it = imgui.checkbox(f.name, fld.do_it)
+            field_doc = export_trials.export_config_doc.get(f.name)
+            field_label = field_doc.display_string if field_doc else f.name
+            _, fld.do_it = imgui.checkbox(field_label, fld.do_it)
+            if field_doc and field_doc.doc_str:
+                imgui.same_line()
+                gt_gui.utils.draw_hover_text(field_doc.doc_str, text='')
 
             t_fields = [ff for ff in dataclasses.fields(fld) if ff.name not in ('available','do_it','sess','recs')]
-            if t_fields and fld.do_it and imgui.tree_node(f'{f.name} settings'):
+            if t_fields and fld.do_it and imgui.tree_node(f'{field_label} settings'):
                 right_width = imgui.get_window_dpi_scale()*90
                 if f.name=='validation':
                     need_node = len(fld.episodes)>1
@@ -627,7 +632,12 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
                             imgui.table_next_row()
                             imgui.table_next_column()
                             imgui.align_text_to_frame_padding()
-                            imgui.text("Average over selected targets:")
+                            targets_avg_doc = field_doc.children.get('targets_avg') if field_doc else None
+                            targets_avg_label = targets_avg_doc.display_string if targets_avg_doc else 'Average over selected targets'
+                            imgui.text(targets_avg_label+':')
+                            if targets_avg_doc and targets_avg_doc.doc_str:
+                                imgui.same_line()
+                                gt_gui.utils.draw_hover_text(targets_avg_doc.doc_str, text='')
                             imgui.table_next_column()
                             _, fld.episodes[nm].targets_avg = imgui.checkbox("##average_over_targets", fld.episodes[nm].targets_avg)
 
@@ -650,7 +660,12 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
                             imgui.table_next_row()
                             imgui.table_next_column()
                             imgui.align_text_to_frame_padding()
-                            imgui.text(tf.name.replace('_',' ').capitalize()+':')
+                            field_settings_doc = field_doc.children.get(tf.name) if field_doc else None
+                            setting_label = field_settings_doc.display_string if field_settings_doc else tf.name.replace('_',' ').capitalize()
+                            imgui.text(setting_label+':')
+                            if field_settings_doc and field_settings_doc.doc_str:
+                                imgui.same_line()
+                                gt_gui.utils.draw_hover_text(field_settings_doc.doc_str, text='')
                             imgui.table_next_column()
                             tfld = getattr(fld, tf.name)
                             _, tmp = imgui.checkbox(f'##{tf.name}', tfld)

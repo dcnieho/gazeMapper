@@ -14,7 +14,7 @@ from ETDQualitizer import vector_to_Fick
 from glassesTools import annotation, data_types, gaze_headref, gaze_worldref, marker as gt_marker, naming as gt_naming, ocv, process_pool, transforms
 from glassesTools.validation import export as val_export
 
-from .. import config, episode, naming, marker_assembly, process, session
+from .. import config, episode, naming, marker_assembly, process, session, type_utils
 from . import _pose_files
 
 
@@ -80,6 +80,34 @@ class ExportConfig:
     eye_tracker_sync: OptionBase = dataclasses.field(default_factory=lambda: OptionBase(False, False, [], []))
     gaze_overlay_video: GazeOverlayVideo = dataclasses.field(default_factory=lambda: GazeOverlayVideo(False, False, [], []))
     mapped_gaze_video: OptionBase = dataclasses.field(default_factory=lambda: OptionBase(False, False, [], []))
+
+
+export_config_doc = {
+    'plane_gaze': type_utils.GUIDocInfo('Mapped gaze data', 'Export gaze mapped to planes, with optional gaze, head-pose, and marker data.', {
+        'include_unit_header_row': type_utils.GUIDocInfo('Include units row', 'Add a second header row describing the units or meaning of each column.'),
+        'include_head_ref_gaze': type_utils.GUIDocInfo('Include eye-tracker gaze fields', 'Append the available head-referenced gaze fields from the eye tracker\'s gaze file to each mapped-gaze export. These are eye-tracker measurements, not gaze positions mapped onto a plane and, depending on availability, include: 2D gaze position on the scene image (gaze_pos_vid), 3D/world gaze point (gaze_pos_3d), and left/right eye gaze direction vectors (gaze_dir_l/r) with their origins (gaze_ori_l/r). Also provided are timestamps and frame indices, including synchronized scene-camera timing when available.'),
+        'include_head_ref_gaze_Fick_angles': type_utils.GUIDocInfo('Include eye-tracker gaze angles', 'Add azimuth and elevation angles computed from the 2D gaze position on the scene image, relative to straight ahead in the scene camera. Requires eye-tracker gaze fields to be included.'),
+        'include_head_pose': type_utils.GUIDocInfo('Include head pose', 'Include the estimated pose of each mapped plane.'),
+        'include_head_pose_Fick_angles': type_utils.GUIDocInfo('Include head-pose angles', 'Not implemented yet; enabling this option currently has no effect.'),
+        'include_2D': type_utils.GUIDocInfo('Include 2D gaze positions', 'Include gaze positions in each plane\'s 2D coordinate system.'),
+        'include_3D': type_utils.GUIDocInfo('Include 3D gaze positions', 'Include gaze positions in the scene-camera 3D coordinate system.'),
+        'include_markers': type_utils.GUIDocInfo('Include individual markers', 'Add detected individual marker data to the export.'),
+        'markers_only_presence': type_utils.GUIDocInfo('Export marker presence only', 'Applies only when Include individual markers is enabled. Export only whether each marker was detected, rather than its full pose data.'),
+        'markers_compress': type_utils.GUIDocInfo('Combine marker presence into one column', 'Applies only when Include individual markers and Export marker presence only are enabled. Store detected marker IDs in one comma-separated column instead of as a separate presence column for each marker.'),
+    }),
+    'gaze_offsets': type_utils.GUIDocInfo('Gaze offsets', 'Export computed gaze offsets for configured episodes and planes.', {
+        'include_unit_header_row': type_utils.GUIDocInfo('Include units row', 'Add a second header row describing the units or meaning of each column.'),
+    }),
+    'validation': type_utils.GUIDocInfo('Validation data quality', 'Export data-quality metrics from validation episodes.', {
+        'targets_avg': type_utils.GUIDocInfo('Average over selected targets', 'Average the selected targets\' metrics together.'),
+        'include_data_loss': type_utils.GUIDocInfo('Include data loss', 'Include the data-loss metric in the export. This is unlikely what you want, as it is data loss only during the validation episode, not during your trials. See the Compute data quality action and the Trial data quality export section below (only available if you have run the Compute data quality action).'),
+        'include_unit_header_row': type_utils.GUIDocInfo('Include units row', 'Add a second header row describing the units or meaning of each column.'),
+    }),
+    'trial_data_quality': type_utils.GUIDocInfo('Trial data quality', 'Export computed trial data-quality metrics.'),
+    'eye_tracker_sync': type_utils.GUIDocInfo('Eye-tracker to scene-camera synchronization', 'Export the time offset used to align eye-tracker gaze timestamps with the scene-camera video. The TSV contains one row per coded synchronization interval, with session, recording, interval, and offset_t (seconds). This is the offset applied to the eye-tracker\'s gaze data timestamps before associating samples with scene-camera frames.'),
+    'gaze_overlay_video': type_utils.GUIDocInfo('Gaze overlay videos', 'Export videos showing eye-tracker gaze overlaid on the scene video.'),
+    'mapped_gaze_video': type_utils.GUIDocInfo('Mapped gaze videos', 'Export videos showing gaze mapped to detected planes.'),
+}
 
 
 def prep_export(project_dir: str|pathlib.Path, session_names: list[str], config_dir: str|pathlib.Path|None = None, **study_settings) -> tuple[ExportConfig, bool]:
