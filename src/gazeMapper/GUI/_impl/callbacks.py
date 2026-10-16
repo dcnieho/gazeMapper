@@ -20,6 +20,64 @@ from ... import config, marker, marker_assembly, process, session
 from ...process import export_trials
 
 _picker_last_folder = None
+
+
+def _snapshot_export_preferences(export_config: export_trials.ExportConfig) -> dict:
+    preferences = {}
+    for action_field in dataclasses.fields(export_config):
+        action_name = action_field.name
+        action = getattr(export_config, action_name)
+        action_preferences = {
+            setting.name: copy.deepcopy(getattr(action, setting.name))
+            for setting in dataclasses.fields(action)
+            if setting.name not in {'available', 'sess', 'recs'}
+            and not (action_name == 'validation' and setting.name == 'episodes')
+        }
+        if action_name == 'validation':
+            action_preferences['episodes'] = {
+                event_name: {
+                    setting.name: copy.deepcopy(getattr(episode_config, setting.name))
+                    for setting in dataclasses.fields(episode_config)
+                    if setting.name not in {'available', 'do_it', 'sess', 'recs', 'df'}
+                }
+                for event_name, episode_config in action.episodes.items()
+            }
+        preferences[action_name] = action_preferences
+    return preferences
+
+
+def _restore_export_preferences(export_config: export_trials.ExportConfig, preferences: dict | None, export_filters: dict):
+    if preferences is None:
+        return
+    for action_name, action_preferences in preferences.items():
+        action = getattr(export_config, action_name, None)
+        if action is None:
+            continue
+        for setting_name, value in action_preferences.items():
+            if action_name == 'validation' and setting_name == 'episodes':
+                for event_name, episode_preferences in value.items():
+                    episode_config = action.episodes.get(event_name)
+                    if episode_config is None:
+                        continue
+                    for episode_setting, episode_value in episode_preferences.items():
+                        if not hasattr(episode_config, episode_setting):
+                            continue
+                        current_value = getattr(episode_config, episode_setting)
+                        if isinstance(current_value, dict) and isinstance(episode_value, dict):
+                            for key in current_value.keys() & episode_value.keys():
+                                current_value[key] = copy.deepcopy(episode_value[key])
+                        else:
+                            setattr(episode_config, episode_setting, copy.deepcopy(episode_value))
+                continue
+            if not hasattr(action, setting_name):
+                continue
+            if isinstance(value, set):
+                valid_options = export_filters.get(action_name, {}).get(setting_name)
+                if valid_options is not None:
+                    value = value.intersection(valid_options)
+            setattr(action, setting_name, copy.deepcopy(value))
+
+
 def get_folder_picker(g, reason: str, *args, **kwargs):
     from . import gui
     g = typing.cast(gui.GUI,g)  # indicate type to typechecker
@@ -564,6 +622,7 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
             'episodes': sorted(event['name'] for event in gaze_offset_events),
         },
     }
+    _restore_export_preferences(export_config, getattr(g, '_last_export_preferences', None), export_filters)
 
     c_fields = [f for f in dataclasses.fields(export_config)]
     def set_export_config_popup():
@@ -748,6 +807,7 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
         imgui.end_group()
 
     def launch_export():
+        g._last_export_preferences = _snapshot_export_preferences(export_config)
         fields = [f for f in dataclasses.fields(export_config) if f.name not in ('validation','eye_tracker_sync','trial_data_quality')]
         sess = list({s for f in fields for s in getattr(export_config, f.name).sess})
         for s in sess:

@@ -103,8 +103,9 @@ class GUI:
 
         self._marker_preview_cache  : dict[tuple[int,int,int], image_helper.ImageHelper]= {}
         self._assembly_preview_cache: dict[str               , image_helper.ImageHelper]= {}
-        self._async_task_popups     : dict[concurrent.futures.Future, typing.Callable] = {}
-        self._async_task_popup_lock : threading.Lock = threading.Lock()
+        self._async_task_popups     : dict[concurrent.futures.Future, typing.Callable]  = {}
+        self._async_task_popup_lock : threading.Lock                                    = threading.Lock()
+        self._last_export_preferences: dict|None                                        = None
 
         # handle async task completion (e.g., errors in async tasks)
         async_thread.done_callback = self._handle_async_task_done
@@ -836,6 +837,7 @@ class GUI:
             self._request_session_sort()
 
     def load_project(self, path: pathlib.Path):
+        self._last_export_preferences = None
         self.project_dir = path
         try:
             config_dir = config.guess_config_dir(self.project_dir)
@@ -1437,6 +1439,7 @@ class GUI:
     def _finish_unload_project(self):
         self.job_scheduler.clear()
         self.project_dir = None
+        self._last_export_preferences = None
         self._possible_value_getters = {}
         self.study_config = None
         self.assembly_configs.clear()
