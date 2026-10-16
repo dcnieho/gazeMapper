@@ -10,6 +10,7 @@ import dataclasses
 import enum
 import csv
 import warnings
+from scipy.spatial.transform import Rotation
 
 from ETDQualitizer import vector_to_Fick
 
@@ -90,11 +91,13 @@ class ExportConfig:
     mapped_gaze_video: OptionBase = dataclasses.field(default_factory=lambda: OptionBase(False, False, [], []))
 
 
-def _invert_plane_pose(rotation_vec: np.ndarray, translation_vec: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    plane_to_camera_rotation = cv2.Rodrigues(np.asarray(rotation_vec, dtype=float).reshape(3, 1))[0]
-    camera_to_plane_rotation = plane_to_camera_rotation.T
-    camera_to_plane_translation = -camera_to_plane_rotation @ np.asarray(translation_vec, dtype=float).reshape(3)
-    return cv2.Rodrigues(camera_to_plane_rotation)[0].reshape(3), camera_to_plane_translation
+def _invert_plane_poses(rotation_vecs: np.ndarray, translation_vecs: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    rotation_vecs = np.asarray(rotation_vecs, dtype=float).reshape(-1, 3)
+    translation_vecs = np.asarray(translation_vecs, dtype=float).reshape(-1, 3)
+    camera_to_plane = Rotation.from_rotvec(rotation_vecs).inv()
+    inverse_translations = camera_to_plane.apply(-translation_vecs)
+    forward_in_plane = camera_to_plane.apply(np.broadcast_to([0., 0., 1.], rotation_vecs.shape))
+    return camera_to_plane.as_rotvec(), inverse_translations, forward_in_plane
 
 
 export_config_doc = {
@@ -617,8 +620,25 @@ def export_head_pose(export_path: pathlib.Path, working_dir: pathlib.Path, study
 
     for rec_name in export_config.recs:
         rec_dir = working_dir / rec_name
+        event_names = {event['name'] for event in coding_events}
+        coded_episodes = episode.load_episodes_from_all_recordings(study_config, rec_dir, event_names)[0]
+        events_with_intervals = [
+            (event, coded_episodes.get(event['name'], (None, []))[1])
+            for event in coding_events
+            if coded_episodes.get(event['name'], (None, []))[1]
+        ]
+        if not events_with_intervals:
+            warnings.warn(f'No {annotation.tooltip_map[annotation.EventType.Trial]} events found in the coding file for recording {rec_name} in session {working_dir.name}. Skipping head-pose export...', process_pool.ProcessingWarning)
+            continue
+
+        needed_plane_names = sorted({
+            plane
+            for event, _ in events_with_intervals
+            for plane in event['marker_assemblies']
+            if plane in plane_names
+        })
         plane_frames = {}
-        for plane_name in plane_names:
+        for plane_name in needed_plane_names:
             pose_file, _ = _pose_files.get_preferred_plane_pose_file(rec_dir, plane_name)
             if pose_file.is_file():
                 plane_frames[plane_name] = pd.read_csv(pose_file, sep='\t')
@@ -626,19 +646,44 @@ def export_head_pose(export_path: pathlib.Path, working_dir: pathlib.Path, study
             warnings.warn(f'No plane pose files found for recording {rec_name} in session {working_dir.name}. Skipping head-pose export...', process_pool.ProcessingWarning)
             continue
 
-        event_names = {event['name'] for event in coding_events}
-        coded_episodes = episode.load_episodes_from_all_recordings(study_config, rec_dir, event_names)[0]
-        if not any(coded_episodes.get(name, (None, []))[1] for name in event_names):
-            warnings.warn(f'No {annotation.tooltip_map[annotation.EventType.Trial]} events found in the coding file for recording {rec_name} in session {working_dir.name}. Skipping head-pose export...', process_pool.ProcessingWarning)
-            continue
-
         timestamps = pd.read_csv(rec_dir / gt_naming.frame_timestamps_fname, sep='\t').rename(columns={'timestamp': 'frame_ts'})
-        for event in coding_events:
-            event_name = event['name']
-            intervals = coded_episodes.get(event_name, (None, []))[1]
-            if not intervals:
+        rotation_columns = ['pose_R_vec_x', 'pose_R_vec_y', 'pose_R_vec_z']
+        translation_columns = ['pose_T_vec_x', 'pose_T_vec_y', 'pose_T_vec_z']
+        processed_plane_frames = {}
+        for plane_name, source_df in plane_frames.items():
+            missing_columns = [col for col in rotation_columns + translation_columns if col not in source_df.columns]
+            if missing_columns:
+                warnings.warn(f'Plane pose file for plane {plane_name} in recording {rec_name} is missing pose columns {missing_columns}. Skipping this plane...', process_pool.ProcessingWarning)
                 continue
-            event_planes = [plane for plane in sorted(event['marker_assemblies']) if plane in plane_names and plane in plane_frames]
+
+            valid_pose = source_df[rotation_columns + translation_columns].notna().all(axis=1).to_numpy()
+            source_rotations = source_df[rotation_columns].to_numpy(dtype=float)
+            source_translations = source_df[translation_columns].to_numpy(dtype=float)
+            inverse_rotations = np.full_like(source_rotations, np.nan)
+            inverse_translations = np.full_like(source_translations, np.nan)
+            forward_in_plane = np.full_like(source_rotations, np.nan)
+            inverse_rotations[valid_pose], inverse_translations[valid_pose], forward_in_plane[valid_pose] = _invert_plane_poses(
+                source_rotations[valid_pose],
+                source_translations[valid_pose],
+            )
+
+            pose_df = source_df.copy()
+            pose_df[rotation_columns] = inverse_rotations
+            pose_df[translation_columns] = inverse_translations
+            if export_config.include_Fick_angles:
+                pose_df['pose_azimuth'] = np.nan
+                pose_df['pose_elevation'] = np.nan
+                azimuth, elevation = vector_to_Fick(
+                    forward_in_plane[valid_pose, 0],
+                    forward_in_plane[valid_pose, 1],
+                    forward_in_plane[valid_pose, 2],
+                )
+                pose_df.loc[valid_pose, ['pose_azimuth', 'pose_elevation']] = np.column_stack((azimuth, elevation))
+            processed_plane_frames[plane_name] = pose_df
+
+        for event, intervals in events_with_intervals:
+            event_name = event['name']
+            event_planes = [plane for plane in sorted(event['marker_assemblies']) if plane in processed_plane_frames]
             if not event_planes:
                 continue
 
@@ -656,34 +701,7 @@ def export_head_pose(export_path: pathlib.Path, working_dir: pathlib.Path, study
             }
 
             for plane_name in event_planes:
-                pose_df = plane_frames[plane_name]
-                rotation_columns = ['pose_R_vec_x', 'pose_R_vec_y', 'pose_R_vec_z']
-                translation_columns = ['pose_T_vec_x', 'pose_T_vec_y', 'pose_T_vec_z']
-                missing_columns = [col for col in rotation_columns + translation_columns if col not in pose_df.columns]
-                if missing_columns:
-                    warnings.warn(f'Plane pose file for plane {plane_name} in recording {rec_name} is missing pose columns {missing_columns}. Skipping this plane...', process_pool.ProcessingWarning)
-                    continue
-
-                valid_pose = pose_df[rotation_columns + translation_columns].notna().all(axis=1).to_numpy()
-                inverse_rotations = np.full((len(pose_df), 3), np.nan)
-                inverse_translations = np.full((len(pose_df), 3), np.nan)
-                for row_idx in np.flatnonzero(valid_pose):
-                    inverse_rotations[row_idx], inverse_translations[row_idx] = _invert_plane_pose(
-                        pose_df.loc[pose_df.index[row_idx], rotation_columns].to_numpy(),
-                        pose_df.loc[pose_df.index[row_idx], translation_columns].to_numpy(),
-                    )
-                pose_df = pose_df.copy()
-                pose_df[rotation_columns] = inverse_rotations
-                pose_df[translation_columns] = inverse_translations
-                if export_config.include_Fick_angles:
-                    pose_df['pose_azimuth'] = np.nan
-                    pose_df['pose_elevation'] = np.nan
-                    for row_idx in np.flatnonzero(valid_pose):
-                        inverse_rotation = cv2.Rodrigues(inverse_rotations[row_idx])[0]
-                        forward_in_plane = inverse_rotation @ np.array([0., 0., 1.])
-                        azimuth, elevation = vector_to_Fick(*forward_in_plane)
-                        pose_df.loc[pose_df.index[row_idx], ['pose_azimuth', 'pose_elevation']] = [azimuth, elevation]
-
+                pose_df = processed_plane_frames[plane_name]
                 payload_columns = [
                     col for col in pose_df.columns
                     if col not in merge_cols
