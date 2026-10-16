@@ -7,6 +7,7 @@ import polars as pl
 import cv2
 from collections import defaultdict
 import dataclasses
+import enum
 import csv
 import warnings
 
@@ -26,11 +27,20 @@ class OptionBase:
     sess: list[str]
     recs: list[str]
 
+class HeadRefGazeType(enum.Enum):
+    Scene_Video_Position = enum.auto()
+    World_3D_Point = enum.auto()
+    Left_Eye_Gaze_Direction = enum.auto()
+    Left_Eye_Gaze_Origin = enum.auto()
+    Right_Eye_Gaze_Direction = enum.auto()
+    Right_Eye_Gaze_Origin = enum.auto()
+
 @dataclasses.dataclass
 class PlaneGaze(OptionBase):
     include_unit_header_row: bool = True
     include_head_ref_gaze: bool = True
     include_head_ref_gaze_Fick_angles: bool = False
+    head_ref_gaze_types: set[HeadRefGazeType] = dataclasses.field(default_factory=lambda: {HeadRefGazeType.Scene_Video_Position})
     include_plane_pose: bool = False
     include_2D: bool = True
     include_3D: bool = False
@@ -38,19 +48,19 @@ class PlaneGaze(OptionBase):
     include_markers: bool = True
     markers_only_presence: bool = True
     markers_compress: bool = True
-    planes: list[str] = dataclasses.field(default_factory=lambda: [])
-    episodes: list[str] = dataclasses.field(default_factory=lambda: [])
+    planes: set[str] = dataclasses.field(default_factory=set)
+    episodes: set[str] = dataclasses.field(default_factory=set)
 @dataclasses.dataclass
 class HeadPose(OptionBase):
     include_unit_header_row: bool = True
     include_Fick_angles: bool = True
-    planes: list[str] = dataclasses.field(default_factory=lambda: [])
-    episodes: list[str] = dataclasses.field(default_factory=lambda: [])
+    planes: set[str] = dataclasses.field(default_factory=set)
+    episodes: set[str] = dataclasses.field(default_factory=set)
 @dataclasses.dataclass
 class GazeOffset(OptionBase):
     include_unit_header_row: bool = True
-    planes: list[str] = dataclasses.field(default_factory=lambda: [])
-    episodes: list[str] = dataclasses.field(default_factory=lambda: [])
+    planes: set[str] = dataclasses.field(default_factory=set)
+    episodes: set[str] = dataclasses.field(default_factory=set)
 @dataclasses.dataclass
 class ValidationEpisode(OptionBase):
     df: pd.DataFrame
@@ -90,8 +100,16 @@ def _invert_plane_pose(rotation_vec: np.ndarray, translation_vec: np.ndarray) ->
 export_config_doc = {
     'plane_gaze': type_utils.GUIDocInfo('Mapped gaze data', 'Export gaze mapped to planes, with optional gaze, head-pose, and marker data.', {
         'include_unit_header_row': type_utils.GUIDocInfo('Include units row', 'Add a second header row describing the units or meaning of each column.'),
-        'include_head_ref_gaze': type_utils.GUIDocInfo('Include eye-tracker gaze fields', 'Append the available head-referenced gaze fields from the eye tracker\'s gaze file to each mapped-gaze export. These are eye-tracker measurements, not gaze positions mapped onto a plane and, depending on availability, include: 2D gaze position on the scene image (gaze_pos_vid), 3D/world gaze point (gaze_pos_3d), and left/right eye gaze direction vectors (gaze_dir_l/r) with their origins (gaze_ori_l/r). Also provided are timestamps and frame indices, including synchronized scene-camera timing when available.'),
-        'include_head_ref_gaze_Fick_angles': type_utils.GUIDocInfo('Include eye-tracker gaze angles', 'Add azimuth and elevation angles computed from the 2D gaze position on the scene image, relative to straight ahead in the scene camera. Requires eye-tracker gaze fields to be included.'),
+        'include_head_ref_gaze': type_utils.GUIDocInfo('Include head-referenced gaze fields', 'Append the available head-referenced gaze fields from the eye tracker\'s gaze file to each mapped-gaze export. These are eye-tracker measurements, not gaze positions mapped onto a plane and, depending on availability, include: 2D gaze position on the scene image (gaze_pos_vid), 3D/world gaze point (gaze_pos_3d), and left/right eye gaze direction vectors (gaze_dir_l/r) with their origins (gaze_ori_l/r). Also provided are timestamps and frame indices, including synchronized scene-camera timing when available.'),
+        'include_head_ref_gaze_Fick_angles': type_utils.GUIDocInfo('Include head-referenced gaze angles', 'Add azimuth and elevation angles computed from the 2D gaze position on the scene image, relative to straight ahead in the scene camera. Requires eye-tracker gaze fields to be included.'),
+        'head_ref_gaze_types': type_utils.GUIDocInfo('Head-referenced gaze types', 'Choose which head-referenced eye-tracker measurements to include. Timestamps and frame indices remain included for alignment.', {
+            HeadRefGazeType.Scene_Video_Position: type_utils.GUIDocInfo('Scene video position', '2D gaze position on the scene image.'),
+            HeadRefGazeType.World_3D_Point: type_utils.GUIDocInfo('3D gaze point', 'Gaze point in 3D camera/world coordinates.'),
+            HeadRefGazeType.Left_Eye_Gaze_Direction: type_utils.GUIDocInfo('Left-eye gaze direction', 'Left-eye gaze direction vector.'),
+            HeadRefGazeType.Left_Eye_Gaze_Origin: type_utils.GUIDocInfo('Left-eye gaze origin', 'Origin of the left-eye gaze vector.'),
+            HeadRefGazeType.Right_Eye_Gaze_Direction: type_utils.GUIDocInfo('Right-eye gaze direction', 'Right-eye gaze direction vector.'),
+            HeadRefGazeType.Right_Eye_Gaze_Origin: type_utils.GUIDocInfo('Right-eye gaze origin', 'Origin of the right-eye gaze vector.'),
+        }),
         'include_plane_pose': type_utils.GUIDocInfo('Include plane pose', 'Add each mapped plane\'s stored pose to this gaze export. The pose maps plane coordinates into the scene-camera coordinate system.'),
         'include_2D': type_utils.GUIDocInfo('Include 2D gaze positions', 'Include gaze positions in each plane\'s 2D coordinate system.'),
         'include_3D': type_utils.GUIDocInfo('Include 3D gaze positions', 'Include gaze positions in the scene-camera 3D coordinate system.'),
@@ -102,6 +120,8 @@ export_config_doc = {
             gaze_worldref.Type.Right_Eye_Gaze_Vector: type_utils.GUIDocInfo('Right-eye gaze point', 'Provide the right-eye gaze estimate.'),
             gaze_worldref.Type.Average_Gaze_Vector: type_utils.GUIDocInfo('Average gaze point', 'Provide the average of the left- and right-eye gaze estimates when both are available.'),
         }),
+        'planes': type_utils.GUIDocInfo('Planes', 'Leave empty to export mapped gaze for every configured plane used by the selected coding events.'),
+        'episodes': type_utils.GUIDocInfo('Coding events', 'Leave empty to export every configured event for which gaze is mapped to a plane.'),
         'include_markers': type_utils.GUIDocInfo('Include individual markers', 'Add detected individual marker data to the export.'),
         'markers_only_presence': type_utils.GUIDocInfo('Export marker presence only', 'Applies only when Include individual markers is enabled. Export only whether each marker was detected, rather than its full pose data.'),
         'markers_compress': type_utils.GUIDocInfo('Combine marker presence into one column', 'Applies only when Include individual markers and Export marker presence only are enabled. Store detected marker IDs in one comma-separated column instead of as a separate presence column for each marker.'),
@@ -109,9 +129,13 @@ export_config_doc = {
     'head_pose': type_utils.GUIDocInfo('Head pose relative to planes', 'Export the scene-camera (head) pose in each configured plane\'s coordinate system at available pose frames. This is the inverse of the stored plane-to-camera pose.', {
         'include_unit_header_row': type_utils.GUIDocInfo('Include units row', 'Add a second header row describing the units or meaning of each column.'),
         'include_Fick_angles': type_utils.GUIDocInfo('Include Fick angles', 'Include azimuth and elevation of the scene-camera forward direction, expressed in each plane\'s coordinate system.'),
+        'planes': type_utils.GUIDocInfo('Planes', 'Leave empty to export a pose file for every configured plane.'),
+        'episodes': type_utils.GUIDocInfo('Coding events', 'Leave empty to export all pose frames. Otherwise, include frames within the selected coding events.'),
     }),
     'gaze_offsets': type_utils.GUIDocInfo('Gaze offsets', 'Export computed gaze offsets for configured episodes and planes.', {
         'include_unit_header_row': type_utils.GUIDocInfo('Include units row', 'Add a second header row describing the units or meaning of each column.'),
+        'planes': type_utils.GUIDocInfo('Planes', 'Leave empty to export the selected gaze-offset events for every configured target plane.'),
+        'episodes': type_utils.GUIDocInfo('Coding events', 'Leave empty to export gaze-offset data for every configured event.'),
     }),
     'validation': type_utils.GUIDocInfo('Validation data quality', 'Export data-quality metrics from validation episodes.', {
         'targets_avg': type_utils.GUIDocInfo('Average over selected targets', 'Average the selected targets\' metrics together.'),
@@ -314,14 +338,62 @@ def _select_plane_gaze_columns(plane_gaze: pd.DataFrame, plane_name: str, gaze_t
     return selected
 
 
+_head_ref_gaze_columns = {
+    HeadRefGazeType.Scene_Video_Position: 'gaze_pos_vid',
+    HeadRefGazeType.World_3D_Point: 'gaze_pos_3d',
+    HeadRefGazeType.Left_Eye_Gaze_Direction: 'gaze_dir_l',
+    HeadRefGazeType.Left_Eye_Gaze_Origin: 'gaze_ori_l',
+    HeadRefGazeType.Right_Eye_Gaze_Direction: 'gaze_dir_r',
+    HeadRefGazeType.Right_Eye_Gaze_Origin: 'gaze_ori_r',
+}
+
+def _select_head_ref_gaze_columns(head_ref_gaze: pd.DataFrame, gaze_types: set[HeadRefGazeType]) -> pd.DataFrame:
+    selected_fields = {_head_ref_gaze_columns[gaze_type] for gaze_type in gaze_types}
+    alignment_fields = {
+        'timestamp', 'timestamp_VOR', 'timestamp_ref',
+        'frame_idx', 'frame_idx_VOR', 'frame_idx_ref',
+    }
+    keep_columns = [
+        column for column in head_ref_gaze.columns
+        if column in alignment_fields
+        or column in {'azimuth', 'elevation'}
+        or any(column.startswith(f'{field}_') for field in selected_fields)
+    ]
+    return head_ref_gaze[keep_columns]
+
+
+def get_gaze_offset_plane_options(plane_definitions: list[marker_assembly.Definition], gaze_offset_events: list[dict]) -> list[str]:
+    target_plane_types = {marker_assembly.Type.Target_Plane_2D, marker_assembly.Type.GlassesValidator}
+    target_plane_names = {definition.name for definition in plane_definitions if definition.type in target_plane_types}
+    return sorted({
+        plane
+        for event in gaze_offset_events
+        for plane in event['gaze_offset_setup']
+        if plane in target_plane_names
+    })
+
+
+def get_head_pose_episode_options(coding_setup: list[config.EventSetup], assemblies: list[marker_assembly.Definition]) -> list[str]:
+    assembly_names = {assembly.name for assembly in assemblies}
+    return sorted(
+        event['name']
+        for event in coding_setup
+        if any(assembly in assembly_names for assembly in event['marker_assemblies'])
+    )
+
+
 def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, study_config: config.Study, export_config: PlaneGaze):
     plane_definitions = {definition.name: definition for definition in study_config.marker_assemblies if isinstance(definition, marker_assembly.Definition_Plane_Aruco)}
     plane_names = set(plane_definitions)
     cs_plane_gaze = [cs for cs in study_config.coding_setup if any(name in plane_names for name in cs['marker_assemblies'])]
+    if export_config.episodes:
+        cs_plane_gaze = [cs for cs in cs_plane_gaze if cs['name'] in export_config.episodes]
     if not cs_plane_gaze:
         raise ValueError('No events where gaze is mapped to a plane are configured for the study, nothing to process')
 
-    planes = {v for cs in cs_plane_gaze for v in cs['marker_assemblies'] if v in plane_names}
+    planes = {v for cs in cs_plane_gaze for v in cs['marker_assemblies'] if v in plane_names and (not export_config.planes or v in export_config.planes)}
+    if not planes:
+        raise ValueError('None of the selected planes are configured for the selected mapped-gaze events')
 
     # per recording, read the relevant files and put them all together
     for r in export_config.recs:
@@ -377,6 +449,7 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
                 # then get Fick angles from gaze vector (NB: positive angles are rightward and downward)
                 head_ref_gaze['azimuth'], head_ref_gaze['elevation'] = vector_to_Fick(gazew[:,0], gazew[:,1], gazew[:,2])
                 column_info.update({'azimuth': 'deg (Fick)', 'elevation': 'deg (Fick)'})
+            head_ref_gaze = _select_head_ref_gaze_columns(head_ref_gaze, export_config.head_ref_gaze_types)
 
         for p in plane_gazes:
             plane_gazes[p] = _select_plane_gaze_columns(
@@ -444,7 +517,9 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
                 continue
 
             # now merge
-            this_planes = list(cs['marker_assemblies'])
+            this_planes = [p for p in cs['marker_assemblies'] if p in planes]
+            if not this_planes:
+                continue
             plane_gazes = {p:ori_plane_gazes[p].copy() for p in this_planes}
             keys = list(plane_gazes.keys())
             if export_config.include_head_ref_gaze:
@@ -529,6 +604,15 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
 def export_head_pose(export_path: pathlib.Path, working_dir: pathlib.Path, study_config: config.Study, export_config: HeadPose):
     plane_definitions = {definition.name: definition for definition in study_config.marker_assemblies if isinstance(definition, marker_assembly.Definition_Plane_Aruco)}
     plane_names = sorted(plane_definitions)
+    if export_config.planes:
+        plane_names = [name for name in plane_names if name in export_config.planes]
+    coding_events = [
+        event for event in study_config.coding_setup
+        if (not export_config.episodes or event['name'] in export_config.episodes)
+        and any(plane in plane_names for plane in event['marker_assemblies'])
+    ]
+    if not coding_events:
+        raise ValueError('No coding events with selected planes are configured for head-pose export')
     temporal_fields = ('timestamp', 'timestamp_VOR', 'frame_idx_VOR', 'timestamp_ori', 'frame_idx_ori')
 
     for rec_name in export_config.recs:
@@ -542,90 +626,122 @@ def export_head_pose(export_path: pathlib.Path, working_dir: pathlib.Path, study
             warnings.warn(f'No plane pose files found for recording {rec_name} in session {working_dir.name}. Skipping head-pose export...', process_pool.ProcessingWarning)
             continue
 
-        shared_temporal = [field for field in temporal_fields if all(field in df.columns for df in plane_frames.values())]
-        merge_cols = ['frame_idx', *shared_temporal]
-        per_plane_exports = {}
-        column_info = {
-            'frame_idx': 'frame number',
-            'timestamp': 'ms',
-            'timestamp_VOR': 'ms after gaze-to-camera synchronization',
-            'frame_idx_VOR': 'frame number after gaze-to-camera synchronization',
-            'timestamp_ori': 'original timestamp (ms)',
-            'frame_idx_ori': 'original frame number',
-        }
+        event_names = {event['name'] for event in coding_events}
+        coded_episodes = episode.load_episodes_from_all_recordings(study_config, rec_dir, event_names)[0]
+        if not any(coded_episodes.get(name, (None, []))[1] for name in event_names):
+            warnings.warn(f'No {annotation.tooltip_map[annotation.EventType.Trial]} events found in the coding file for recording {rec_name} in session {working_dir.name}. Skipping head-pose export...', process_pool.ProcessingWarning)
+            continue
 
-        for plane_name, pose_df in plane_frames.items():
-            rotation_columns = ['pose_R_vec_x', 'pose_R_vec_y', 'pose_R_vec_z']
-            translation_columns = ['pose_T_vec_x', 'pose_T_vec_y', 'pose_T_vec_z']
-            missing_columns = [col for col in rotation_columns + translation_columns if col not in pose_df.columns]
-            if missing_columns:
-                warnings.warn(f'Plane pose file for plane {plane_name} in recording {rec_name} is missing pose columns {missing_columns}. Skipping this plane...', process_pool.ProcessingWarning)
+        timestamps = pd.read_csv(rec_dir / gt_naming.frame_timestamps_fname, sep='\t').rename(columns={'timestamp': 'frame_ts'})
+        for event in coding_events:
+            event_name = event['name']
+            intervals = coded_episodes.get(event_name, (None, []))[1]
+            if not intervals:
+                continue
+            event_planes = [plane for plane in sorted(event['marker_assemblies']) if plane in plane_names and plane in plane_frames]
+            if not event_planes:
                 continue
 
-            valid_pose = pose_df[rotation_columns + translation_columns].notna().all(axis=1).to_numpy()
-            inverse_rotations = np.full((len(pose_df), 3), np.nan)
-            inverse_translations = np.full((len(pose_df), 3), np.nan)
-            for row_idx in np.flatnonzero(valid_pose):
-                inverse_rotations[row_idx], inverse_translations[row_idx] = _invert_plane_pose(
-                    pose_df.loc[pose_df.index[row_idx], rotation_columns].to_numpy(),
-                    pose_df.loc[pose_df.index[row_idx], translation_columns].to_numpy(),
-                )
-            pose_df = pose_df.copy()
-            pose_df[rotation_columns] = inverse_rotations
-            pose_df[translation_columns] = inverse_translations
-            if export_config.include_Fick_angles:
-                pose_df['pose_azimuth'] = np.nan
-                pose_df['pose_elevation'] = np.nan
+            shared_temporal = [field for field in temporal_fields if all(field in plane_frames[plane].columns for plane in event_planes)]
+            merge_cols = ['frame_idx', *shared_temporal]
+            per_plane_exports = {}
+            column_info = {
+                'frame_idx': 'frame number',
+                'frame_ts': 'scene camera frame timestamp (ms)',
+                'timestamp': 'ms',
+                'timestamp_VOR': 'ms after gaze-to-camera synchronization',
+                'frame_idx_VOR': 'frame number after gaze-to-camera synchronization',
+                'timestamp_ori': 'original timestamp (ms)',
+                'frame_idx_ori': 'original frame number',
+            }
+
+            for plane_name in event_planes:
+                pose_df = plane_frames[plane_name]
+                rotation_columns = ['pose_R_vec_x', 'pose_R_vec_y', 'pose_R_vec_z']
+                translation_columns = ['pose_T_vec_x', 'pose_T_vec_y', 'pose_T_vec_z']
+                missing_columns = [col for col in rotation_columns + translation_columns if col not in pose_df.columns]
+                if missing_columns:
+                    warnings.warn(f'Plane pose file for plane {plane_name} in recording {rec_name} is missing pose columns {missing_columns}. Skipping this plane...', process_pool.ProcessingWarning)
+                    continue
+
+                valid_pose = pose_df[rotation_columns + translation_columns].notna().all(axis=1).to_numpy()
+                inverse_rotations = np.full((len(pose_df), 3), np.nan)
+                inverse_translations = np.full((len(pose_df), 3), np.nan)
                 for row_idx in np.flatnonzero(valid_pose):
-                    inverse_rotation = cv2.Rodrigues(inverse_rotations[row_idx])[0]
-                    forward_in_plane = inverse_rotation @ np.array([0., 0., 1.])
-                    azimuth, elevation = vector_to_Fick(*forward_in_plane)
-                    pose_df.loc[pose_df.index[row_idx], ['pose_azimuth', 'pose_elevation']] = [azimuth, elevation]
+                    inverse_rotations[row_idx], inverse_translations[row_idx] = _invert_plane_pose(
+                        pose_df.loc[pose_df.index[row_idx], rotation_columns].to_numpy(),
+                        pose_df.loc[pose_df.index[row_idx], translation_columns].to_numpy(),
+                    )
+                pose_df = pose_df.copy()
+                pose_df[rotation_columns] = inverse_rotations
+                pose_df[translation_columns] = inverse_translations
+                if export_config.include_Fick_angles:
+                    pose_df['pose_azimuth'] = np.nan
+                    pose_df['pose_elevation'] = np.nan
+                    for row_idx in np.flatnonzero(valid_pose):
+                        inverse_rotation = cv2.Rodrigues(inverse_rotations[row_idx])[0]
+                        forward_in_plane = inverse_rotation @ np.array([0., 0., 1.])
+                        azimuth, elevation = vector_to_Fick(*forward_in_plane)
+                        pose_df.loc[pose_df.index[row_idx], ['pose_azimuth', 'pose_elevation']] = [azimuth, elevation]
 
-            payload_columns = [
-                col for col in pose_df.columns
-                if col not in merge_cols
-                and not col.startswith('homography_')
-                and col not in ('pose_N_points', 'pose_reprojection_error')
-            ]
-            rename = {}
-            for col in payload_columns:
-                if col.startswith('pose_'):
-                    rename[col] = f'pose_{plane_name}_{col[5:]}'
-                    suffix = col[5:]
-                    if suffix.startswith('R_vec_'):
-                        column_info[rename[col]] = 'camera-to-plane rotation-vector component (rad)'
-                    elif suffix.startswith('T_vec_'):
-                        plane_unit = plane_definitions[plane_name].unit or 'plane units'
-                        column_info[rename[col]] = f'scene-camera position in plane coordinates ({plane_unit})'
-                    elif suffix == 'azimuth' or suffix == 'elevation':
-                        column_info[rename[col]] = 'deg (Fick)'
-                elif col in temporal_fields and col not in shared_temporal:
-                    rename[col] = f'{col}_{plane_name}'
-                    column_info[rename[col]] = column_info.get(col, '')
-            plane_df = pose_df[merge_cols + payload_columns].rename(columns=rename)
-            per_plane_exports[plane_name] = plane_df
+                payload_columns = [
+                    col for col in pose_df.columns
+                    if col not in merge_cols
+                    and not col.startswith('homography_')
+                    and col not in ('pose_N_points', 'pose_reprojection_error')
+                ]
+                rename = {}
+                for col in payload_columns:
+                    if col.startswith('pose_'):
+                        rename[col] = f'pose_{plane_name}_{col[5:]}'
+                        suffix = col[5:]
+                        if suffix.startswith('R_vec_'):
+                            column_info[rename[col]] = 'camera-to-plane rotation-vector component (rad)'
+                        elif suffix.startswith('T_vec_'):
+                            plane_unit = plane_definitions[plane_name].unit or 'plane units'
+                            column_info[rename[col]] = f'scene-camera position in plane coordinates ({plane_unit})'
+                        elif suffix in ('azimuth', 'elevation'):
+                            column_info[rename[col]] = 'deg (Fick)'
+                    elif col in temporal_fields and col not in shared_temporal:
+                        rename[col] = f'{col}_{plane_name}'
+                        column_info[rename[col]] = column_info.get(col, '')
+                per_plane_exports[plane_name] = pose_df[merge_cols + payload_columns].rename(columns=rename)
 
-        if not per_plane_exports:
-            continue
-        plane_export_tables = list(per_plane_exports.values())
-        head_pose = plane_export_tables[0]
-        for plane_df in plane_export_tables[1:]:
-            head_pose = head_pose.merge(plane_df, how='outer', on=merge_cols)
-        head_pose = head_pose.sort_values('frame_idx').reset_index(drop=True)
+            if not per_plane_exports:
+                continue
+            plane_export_tables = list(per_plane_exports.values())
+            head_pose = plane_export_tables[0]
+            for plane_df in plane_export_tables[1:]:
+                head_pose = head_pose.merge(plane_df, how='outer', on=merge_cols)
+            head_pose = head_pose.merge(timestamps[['frame_idx', 'frame_ts']], how='left', on='frame_idx')
+            head_pose = head_pose.sort_values('frame_idx').reset_index(drop=True)
 
-        if export_config.include_unit_header_row:
-            headers = list(zip(*[(col, column_info.get(col, '')) for col in head_pose.columns]))
-        else:
-            headers = [[col for col in head_pose.columns]]
+            columns = head_pose.columns.to_list()
+            frame_idx_end = max(columns.index(col) for col in columns if col.startswith('frame_idx')) + 1
+            frame_ts_columns = [col for col in columns if col.startswith('frame_ts')]
+            head_pose = head_pose[columns[:frame_idx_end] + frame_ts_columns + [col for col in columns[frame_idx_end:] if col not in frame_ts_columns]]
+            columns = head_pose.columns.to_list()
+            trial_idx = max(columns.index(col) for col in columns if col.startswith('frame_ts')) + 1
+            head_pose.insert(trial_idx, 'trial', np.int32(-1))
+            for trial_number, interval in enumerate(intervals, start=1):
+                start, *end = interval
+                stop = end[0] if end else start
+                in_trial = head_pose['frame_idx'].between(start, stop)
+                head_pose.loc[in_trial, 'trial'] = trial_number
+            column_info['trial'] = 'trial number (-1 means not during trial)'
 
-        head_pose = pl.from_pandas(head_pose)
-        output_file = export_path / f'{naming.head_pose_export_prefix}{working_dir.name}_{rec_name}.tsv'
-        with open(output_file, 'w', encoding='utf-8', newline='') as output:
-            writer = csv.writer(output, delimiter='\t', lineterminator='\n', quoting=csv.QUOTE_MINIMAL)
-            for header in headers:
-                writer.writerow(header)
-            head_pose.write_csv(output, separator='\t', null_value='nan', float_precision=8, include_header=False)
+            if export_config.include_unit_header_row:
+                headers = list(zip(*[(col, column_info.get(col, '')) for col in head_pose.columns]))
+            else:
+                headers = [[col for col in head_pose.columns]]
+
+            head_pose = pl.from_pandas(head_pose)
+            output_file = export_path / f'{naming.head_pose_export_prefix}{working_dir.name}_{rec_name}_{event_name}.tsv'
+            with open(output_file, 'w', encoding='utf-8', newline='') as output:
+                writer = csv.writer(output, delimiter='\t', lineterminator='\n', quoting=csv.QUOTE_MINIMAL)
+                for header in headers:
+                    writer.writerow(header)
+                head_pose.write_csv(output, separator='\t', null_value='nan', float_precision=8, include_header=False)
 
 
 def export_gaze_offsets(export_path: pathlib.Path, working_dir: pathlib.Path, study_config: config.Study, export_config: GazeOffset):

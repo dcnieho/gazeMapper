@@ -541,6 +541,30 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
         gt_gui.utils.push_popup(g, gt_gui.msg_box.msgbox, "Nothing to export", "No data available for export.", gt_gui.msg_box.MsgBox.error)
         return
 
+    configured_planes = {
+        definition.name for definition in g.study_config.marker_assemblies
+        if isinstance(definition, marker_assembly.Definition_Plane_Aruco)
+    }
+    plane_gaze_events = [
+        event for event in process.get_specific_event_types(g.study_config, check_specific_fields=['marker_assemblies'])
+        if any(plane in configured_planes for plane in event['marker_assemblies'])
+    ]
+    gaze_offset_events = process.get_specific_event_types(g.study_config, check_specific_fields=['gaze_offset_setup'])
+    export_filters = {
+        'plane_gaze': {
+            'planes': sorted({plane for event in plane_gaze_events for plane in event['marker_assemblies'] if plane in configured_planes}),
+            'episodes': sorted(event['name'] for event in plane_gaze_events),
+        },
+        'head_pose': {
+            'planes': sorted(configured_planes),
+            'episodes': export_trials.get_head_pose_episode_options(g.study_config.coding_setup, g.study_config.marker_assemblies),
+        },
+        'gaze_offsets': {
+            'planes': export_trials.get_gaze_offset_plane_options(g.study_config.marker_assemblies, gaze_offset_events),
+            'episodes': sorted(event['name'] for event in gaze_offset_events),
+        },
+    }
+
     c_fields = [f for f in dataclasses.fields(export_config)]
     def set_export_config_popup():
         nonlocal export_config
@@ -655,38 +679,69 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
                         imgui.dummy((right_width, 1))
 
                         for tf in t_fields:
-                            if tf.name == 'plane_gaze_types':
-                                continue
-                            if tf.type!=bool:
-                                continue
                             imgui.table_next_row()
                             imgui.table_next_column()
                             imgui.align_text_to_frame_padding()
+                            if f.name == 'plane_gaze' and tf.name in 'plane_gaze_types':
+                                gaze_types_field = next(tf for tf in t_fields if tf.name == 'plane_gaze_types')
+                                gaze_types_doc = field_doc.children.get('plane_gaze_types') if field_doc else None
+                                gaze_types_label = gaze_types_doc.display_string if gaze_types_doc else 'Gaze types'
+                                imgui.text(gaze_types_label + ':')
+                                if gaze_types_doc and gaze_types_doc.doc_str:
+                                    gt_gui.utils.draw_hover_text(gaze_types_doc.doc_str, text='')
+                                imgui.table_next_column()
+                                imgui.set_next_item_width(imgui.get_content_region_avail().x)
+                                fld.plane_gaze_types = settings_editor.draw_list_set_editor(
+                                    'plane_gaze_types', fld.plane_gaze_types, gaze_types_field.type,
+                                    typing.get_args(gaze_types_field.type),
+                                    gaze_types_doc.children if gaze_types_doc else {},
+                                )
+                                continue
+                            if f.name == 'plane_gaze' and tf.name in 'head_ref_gaze_types':
+                                head_ref_types_field = next(tf for tf in t_fields if tf.name == 'head_ref_gaze_types')
+                                head_ref_types_doc = field_doc.children.get('head_ref_gaze_types') if field_doc else None
+                                head_ref_types_label = head_ref_types_doc.display_string if head_ref_types_doc else 'Head-referenced gaze types'
+                                imgui.text(head_ref_types_label + ':')
+                                if head_ref_types_doc and head_ref_types_doc.doc_str:
+                                    gt_gui.utils.draw_hover_text(head_ref_types_doc.doc_str, text='')
+                                imgui.table_next_column()
+                                imgui.set_next_item_width(imgui.get_content_region_avail().x)
+                                fld.head_ref_gaze_types = settings_editor.draw_list_set_editor(
+                                    'head_ref_gaze_types', fld.head_ref_gaze_types, head_ref_types_field.type,
+                                    typing.get_args(head_ref_types_field.type),
+                                    head_ref_types_doc.children if head_ref_types_doc else {},
+                                )
+                                continue
+                            if f.name in export_filters and tf.name in export_filters[f.name]:
+                                selector_name, options = tf.name, export_filters[f.name][tf.name]
+                                selector_doc = field_doc.children.get(selector_name) if field_doc else None
+                                selector_label = selector_doc.display_string if selector_doc else selector_name.capitalize()
+                                imgui.align_text_to_frame_padding()
+                                imgui.text(selector_label + ':')
+                                if selector_doc and selector_doc.doc_str:
+                                    gt_gui.utils.draw_hover_text(selector_doc.doc_str, text='')
+                                imgui.table_next_column()
+                                if options:
+                                    imgui.set_next_item_width(imgui.get_content_region_avail().x)
+                                    literal_type = typing.Literal.__getitem__(tuple(options))
+                                    selector_type = set[literal_type]
+                                    setattr(fld, selector_name, settings_editor.draw_list_set_editor(
+                                        f'{f.name}_{selector_name}', getattr(fld, selector_name),
+                                        selector_type, (literal_type,), {},
+                                    ))
+                                else:
+                                    imgui.text_disabled('No configured choices')
+                                continue
                             field_settings_doc = field_doc.children.get(tf.name) if field_doc else None
                             setting_label = field_settings_doc.display_string if field_settings_doc else tf.name.replace('_',' ').capitalize()
                             imgui.text(setting_label+':')
                             if field_settings_doc and field_settings_doc.doc_str:
-                                imgui.same_line()
                                 gt_gui.utils.draw_hover_text(field_settings_doc.doc_str, text='')
                             imgui.table_next_column()
                             tfld = getattr(fld, tf.name)
                             _, tmp = imgui.checkbox(f'##{tf.name}', tfld)
                             setattr(fld, tf.name, tmp)
                         imgui.end_table()
-                        if f.name == 'plane_gaze':
-                            gaze_types_field = next(tf for tf in t_fields if tf.name == 'plane_gaze_types')
-                            gaze_types_doc = field_doc.children.get('plane_gaze_types') if field_doc else None
-                            gaze_types_label = gaze_types_doc.display_string if gaze_types_doc else 'Gaze types'
-                            imgui.align_text_to_frame_padding()
-                            imgui.text(gaze_types_label + ':')
-                            if gaze_types_doc and gaze_types_doc.doc_str:
-                                gt_gui.utils.draw_hover_text(gaze_types_doc.doc_str, text='')
-                            imgui.set_next_item_width(imgui.get_content_region_avail().x)
-                            fld.plane_gaze_types = settings_editor.draw_list_set_editor(
-                                'plane_gaze_types', fld.plane_gaze_types, gaze_types_field.type,
-                                typing.get_args(gaze_types_field.type),
-                                gaze_types_doc.children if gaze_types_doc else {},
-                            )
                 imgui.tree_pop()
             imgui.spacing()
 
