@@ -3151,6 +3151,9 @@ class GUI:
 
     def _about_popup_drawer(self):
         base_content_width = 530
+        def constrain_popup_size(data):
+            dpi_scale = imgui.get_window_dpi_scale()
+            data.desired_size.x = base_content_width*dpi_scale + 2*imgui.get_style().window_padding.x
         def popup_content():
             dpi_scale = imgui.get_window_dpi_scale()
             _60 = 60*dpi_scale
@@ -3300,5 +3303,5 @@ class GUI:
 
         dpi_scale = imgui.get_window_dpi_scale()
         content_width = base_content_width*dpi_scale + 2*imgui.get_style().window_padding.x
-        imgui.set_next_window_size_constraints((0.0, 0.0), (content_width, imgui.FLT_MAX))
+        imgui.set_next_window_size_constraints((0.0, 0.0), (content_width, imgui.FLT_MAX), constrain_popup_size)
         return gt_gui.utils.popup("About gazeMapper", popup_content, closable=True, outside=True)
