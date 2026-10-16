@@ -19,6 +19,7 @@ from imgui_bundle import imgui, immapp, imgui_md, hello_imgui, glfw_utils, icons
 import glfw
 import OpenGL
 import OpenGL.GL as gl
+import ETDQualitizer
 
 import glassesTools
 from glassesTools import annotation, aruco, camera_recording, gui as gt_gui, naming as gt_naming, marker as gt_marker, marker_assembly as gt_marker_assembly, ocv, plane as gt_plane, platform as gt_platform, process_pool, utils as gt_utils
@@ -3168,6 +3169,7 @@ class GUI:
             imgui.text("Made by Diederick C. Niehorster")
             imgui.text("")
             imgui_md.render(f"[glassesTools {glassesTools.version.__version__}](https://github.com/dcnieho/glassesTools)")
+            imgui_md.render(f"[ETDQualitizer {ETDQualitizer.version.__version__}](https://github.com/dcnieho/ETDQualitizer)")
             imgui.text(f"Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
             imgui.text(f"OpenGL {'.'.join(str(gl.glGetInteger(num)) for num in (gl.GL_MAJOR_VERSION, gl.GL_MINOR_VERSION))}, PyOpenGL {OpenGL.__version__}")
             imgui.text(f"GLFW {'.'.join(str(num) for num in glfw.get_version())}, pyGLFW {glfw.__version__}")
@@ -3242,6 +3244,7 @@ class GUI:
             imgui.spacing()
             imgui.spacing()
             imgui.spacing()
+
             imgui_md.render(f"This tool makes use of [glassesValidator](https://github.com/dcnieho/glassesValidator) ([paper](https://doi.org/10.3758/s13428-023-02105-5)), please also reference:")
             imgui.spacing()
             reference         = r"Niehorster, D.C., Hessels, R.S., Benjamins, J.S., Nyström, M. & Hooge, I.T.C. (2023). GlassesValidator: Data quality tool for eye tracking glasses. Behavior Research Methods. doi: [10.3758/s13428-023-02105-5](https://doi.org/10.3758/s13428-023-02105-5)"
@@ -3260,6 +3263,34 @@ class GUI:
 """
             imgui_md.render(reference)
             if imgui.begin_popup_context_item(f"##reference_context_glassesValidator"):
+                if imgui.selectable("APA", False)[0]:
+                    imgui.set_clipboard_text(reference)
+                if imgui.selectable("BibTeX", False)[0]:
+                    imgui.set_clipboard_text(reference_bibtex)
+                imgui.end_popup()
+            gt_gui.utils.draw_hover_text(text='', hover_text="Right-click to copy citation to clipboard")
+            imgui.spacing()
+            imgui.spacing()
+
+            imgui_md.render(f"This tool also makes use of [ETDQualitizer](https://github.com/dcnieho/ETDQualitizer) ([paper](https://doi.org/10.3758/s13428-026-03039-4)), please also reference:")
+            imgui.spacing()
+            reference         = r"Niehorster, D.C., Nyström, M., Hessels, R.S., Benjamins, J.S., Andersson, R. & Hooge, I.T.C. (2026). The fundamentals of eye tracking, Part 7: Determining data quality. Behavior Research Methods. doi: [10.3758/s13428-026-03039-4](https://doi.org/10.3758/s13428-026-03039-4)"
+            reference_bibtex  = r"""@article{niehorster2026Fundamentals7,
+    Author = {Niehorster, Diederick C. and
+              Nystr{\"o}m, Marcus and
+              Hessels, Roy S. and
+              Benjamins, Jeroen S. and
+              Andersson, Richard and
+              Hooge, Ignace T. C.},
+    Journal = {Behavior Research Methods},
+    Number = {},
+    Title = {The fundamentals of eye tracking, Part 7: Determining data quality},
+    Year = {2026},
+    doi = {10.3758/s13428-026-03039-4}
+}
+"""
+            imgui_md.render(reference)
+            if imgui.begin_popup_context_item(f"##reference_context_ETDQualitizer"):
                 if imgui.selectable("APA", False)[0]:
                     imgui.set_clipboard_text(reference)
                 if imgui.selectable("BibTeX", False)[0]:
