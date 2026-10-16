@@ -98,8 +98,8 @@ class Definition_MarkerAssembly(Definition):
         problems = config.aruco_settings_problems(self.aruco_settings)
         consistency = self.aruco_settings['pose_consistency']
         unit = self.unit.strip().lower()
-        if consistency['enabled'] and consistency['temporal_enabled'] and unit not in ('m', 'cm', 'mm'):
-            unit_error = (type_utils.ProblemLevel.Error, 'When temporal pose checking is enabled in the ArUco detection settings, the unit must be m, cm, or mm')
+        if consistency['enabled'] and consistency['temporal_enabled'] and unit not in _aruco.unit_to_meters:
+            unit_error = (type_utils.ProblemLevel.Error, 'When temporal pose checking is enabled in the ArUco detection settings, the unit must be m, cm, mm, inches, or feet')
             problems = type_utils.merge_problem_dicts(problems, {
                 'aruco_settings': {'pose_consistency': {'temporal_enabled': unit_error}},
                 'unit': unit_error,
