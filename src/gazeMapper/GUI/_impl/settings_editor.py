@@ -197,6 +197,9 @@ def _draw_impl(obj: _C, fields: list[str], types: dict[str, typing.Type], defaul
                 if this_changed and made_obj:
                     if isinstance(obj,dict):
                         obj[f] = new_sub_obj
+                    elif type_utils.is_NamedTuple_type(type(obj)):
+                        obj = obj._replace(**{f:new_sub_obj})
+                        ret_new_obj = True
                     else:
                         setattr(obj,f,new_sub_obj)
                 imgui.tree_pop()
