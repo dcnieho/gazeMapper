@@ -426,7 +426,6 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
             for v in proc_vids:
                 if study_config.mapped_video_recording_colors is None or v not in study_config.mapped_video_recording_colors:
                     continue
-                clr = study_config.mapped_video_recording_colors[v]
                 original_scene_video_style = study_config.mapped_video_gaze_styles.original_scene_video
                 if original_scene_video_style is not None:
                     original_scene_video_style = original_scene_video_style._replace(edge_color=original_scene_video_style.edge_color or tuple(study_config.mapped_video_recording_colors[v]))
@@ -482,7 +481,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
                                                      ROI_offsets[vo],
                                                      poses_this[matched_plane], poses_other[matched_plane],
                                                      plane_gazes[matched_plane][2],
-                                                     camera_params[vo], clr,
+                                                     camera_params[vo],
+                                                     study_config.mapped_video_recording_colors[v],
                                                      study_config.mapped_video_which_gaze_type_on_plane,
                                                      study_config.mapped_video_which_gaze_type_on_plane_allow_fallback,
                                                      study_config.mapped_video_show_gaze_on_plane_in_which is not None and vo in study_config.mapped_video_show_gaze_on_plane_in_which,
@@ -500,7 +500,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
                     matched_assembly = next((a for a in poses_this if a in assemblies and a in poses_other and poses_this[a].pose_successful() and poses_other[a].pose_successful()), None)
                     if matched_assembly is None:
                         continue
-                    draw_camera_on_other_video(frame[vo], ROI_offsets[vo], poses_this[matched_assembly], poses_other[matched_assembly], camera_params[vo], clr, sub_pixel_fac)
+                    draw_camera_on_other_video(frame[vo], ROI_offsets[vo], poses_this[matched_assembly], poses_other[matched_assembly], camera_params[vo], study_config.mapped_video_recording_colors[v], sub_pixel_fac)
 
 
             # print info on frame and submit to to be encoded
