@@ -2,11 +2,18 @@ import pathlib
 import cv2
 import warnings
 
-from glassesTools import annotation, aruco, marker as gt_marker, marker_assembly as gt_marker_assembly, naming as gt_naming, pose, process_pool, propagating_thread, ocv, timestamps
+from glassesTools import annotation, aruco, drawing, marker as gt_marker, marker_assembly as gt_marker_assembly, naming as gt_naming, pose, process_pool, propagating_thread, ocv, timestamps
 from glassesTools.camera_recording import Type as CameraRecordingType
 from glassesTools.gui.video_player import GUI
 
 from .. import config, episode, marker, naming, marker_assembly, process, session, synchronization
+
+
+def _without_id_label_background(styles: drawing.MarkerStyles) -> drawing.MarkerStyles:
+    return styles._replace(**{
+        category: style._replace(id_style=style.id_style._replace(background_opacity=0))
+        for category, style in styles._asdict().items()
+    })
 
 
 def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None=None, show_visualization=False, visualization_show_rejected_markers=False, progress_indicator: process_pool.JobProgress|None=None, **study_settings):
@@ -94,14 +101,12 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
     estimator.attach_gui(gui)
     if gui is not None:
         gui.set_show_timeline(True, timestamps.VideoTimestamps(working_dir / gt_naming.frame_timestamps_fname), annotation.flatten_annotation_dict(episodes), window_id=gui.main_window_id)
-        # override colors with settings, but do not disable drawing ones that settings disable
-        colors = {}
-        for c in ('mapped_video_assembly_marker_color','mapped_video_recovered_assembly_marker_color','mapped_video_individual_marker_color','mapped_video_unexpected_marker_color'):
-            clr = getattr(study_config,c) if getattr(study_config,c) is not None else config.study_defaults[c]
-            colors[c.removeprefix('mapped_video_')] = clr
+        styles = _without_id_label_background(study_config.mapped_video_marker_styles)
+        recovered_color = study_config.mapped_video_recovered_assembly_marker_color or drawing.RgbColor(0, 255, 255)
+        rejected_color = None
         if visualization_show_rejected_markers:
-            colors['rejected_marker_color'] = study_config.mapped_video_rejected_marker_color or (255,0,0)
-        aruco_manager.set_visualization_colors(**colors)
+            rejected_color = study_config.mapped_video_rejected_marker_color or drawing.RgbColor(255, 0, 0)
+        aruco_manager.set_visualization_styles(styles, recovered_color, rejected_color)
 
     # prep progress indicator
     progress_indicator.set_total(total:=estimator.video_ts.get_last()[0])

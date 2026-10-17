@@ -8,7 +8,7 @@ import pathvalidate
 import typing
 from typing import Any, Literal
 
-from glassesTools import annotation, aruco, camera_recording, data_types as _data_types, gaze_worldref, json, marker as gt_marker, units, utils as gt_utils
+from glassesTools import annotation, aruco, camera_recording, data_types as _data_types, drawing, gaze_headref, gaze_worldref, json, marker as gt_marker, units, utils as gt_utils
 
 from . import typed_dict_defaults, type_utils
 
@@ -300,12 +300,84 @@ event_setup_field_order = [
     'trial_data_quality_setup'
 ]
 
-class RgbColor(typing.NamedTuple):
-    r: int = 0
-    g: int = 0
-    b: int = 0
-json.register_type(json.TypeEntry(RgbColor, '__config.RgbColor__', lambda x: x._asdict(), lambda x: RgbColor(**x)))
+def _rgb_color(color):
+    if color is None or isinstance(color, drawing.RgbColor):
+        return color
+    return drawing.RgbColor(*color)
 
+def _migrate_legacy_marker_colors(settings, preserve_sparse=False):
+    legacy_colors = {
+        'assembly': 'mapped_video_assembly_marker_color',
+        'individual': 'mapped_video_individual_marker_color',
+        'unexpected': 'mapped_video_unexpected_marker_color',
+    }
+    if not any(field in settings for field in legacy_colors.values()):
+        return settings
+
+    styles = settings.get(
+        'mapped_video_marker_styles',
+        {} if preserve_sparse else drawing.DEFAULT_MAPPED_MARKER_STYLES,
+    )
+    if preserve_sparse and isinstance(styles, dict):
+        styles = copy.deepcopy(styles)
+        for category, color_field in legacy_colors.items():
+            if color_field in settings:
+                category_style = dict(styles.get(category, {}))
+                category_style['border_color'] = _rgb_color(settings.pop(color_field))
+                styles[category] = category_style
+    else:
+        for category, color_field in legacy_colors.items():
+            if color_field in settings:
+                color = _rgb_color(settings.pop(color_field))
+                styles = styles._replace(**{
+                    category: getattr(styles, category)._replace(border_color=color),
+                })
+    settings['mapped_video_marker_styles'] = styles
+    return settings
+
+def _migrate_legacy_gaze_styles(settings: dict, preserve_sparse=False):
+    overlay_legacy = {
+        'video_position': ('overlay_video_gaze_vid_pos_color', 'overlay_video_gaze_vid_pos_radius', 'overlay_video_gaze_vid_pos_thickness'),
+        'world_position': ('overlay_video_gaze_world_pos_color', 'overlay_video_gaze_world_pos_radius', 'overlay_video_gaze_world_pos_thickness'),
+    }
+    if any(key in settings for keys in overlay_legacy.values() for key in keys):
+        overlay = gaze_headref.DEFAULT_OVERLAY_GAZE_STYLES
+        for field, (color_key, radius_key, thickness_key) in overlay_legacy.items():
+            if not any(key in settings for key in (color_key, radius_key, thickness_key)):
+                continue
+            style = getattr(overlay, field)
+            color = _rgb_color(settings.pop(color_key, style.edge_color or style.fill_color))
+            radius = settings.pop(radius_key, style.radius)
+            thickness = settings.pop(thickness_key, -1 if style.fill_color is not None else style.edge_thickness)
+            if color is None:
+                style = style._replace(radius=radius, edge_color=None, edge_thickness=0, fill_color=None)
+            elif thickness < 0:
+                style = style._replace(radius=radius, edge_color=None, edge_thickness=0, fill_color=color)
+            else:
+                style = style._replace(radius=radius, edge_color=color, edge_thickness=thickness, fill_color=None)
+            overlay = overlay._replace(**{field: style})
+        settings['overlay_video_gaze_styles'] = overlay
+
+    mapped_legacy = {
+        'video_position': 'mapped_video_projected_vidPos_color',
+        'world_position': 'mapped_video_projected_world_pos_color',
+        'left_eye': 'mapped_video_projected_left_ray_color',
+        'right_eye': 'mapped_video_projected_right_ray_color',
+        'average': 'mapped_video_projected_average_ray_color',
+    }
+    if 'mapped_video_projected_vidPos_ray_color' in settings:
+        settings.setdefault('mapped_video_projected_vidPos_color', settings.pop('mapped_video_projected_vidPos_ray_color'))
+    if any(key in settings for key in mapped_legacy.values()):
+        mapped = gaze_worldref.DEFAULT_MAPPED_GAZE_STYLES
+        for field, color_key in mapped_legacy.items():
+            if color_key not in settings:
+                continue
+            color = _rgb_color(settings.pop(color_key))
+            style = getattr(mapped, field)._replace(edge_color=None, edge_thickness=0, fill_color=color)
+            mapped = mapped._replace(**{field: style})
+        settings['mapped_video_gaze_styles'] = mapped
+
+    return _migrate_legacy_marker_colors(settings, preserve_sparse)
 class Study:
     default_json_file_name = 'study_def.json'
 
@@ -329,12 +401,7 @@ class Study:
                  interpolate_plane_pose_recordings          : set[str]|None                 = None,
                  interpolate_plane_pose_max_missing_frames  : int                           = 0,
 
-                 overlay_video_gaze_vid_pos_color           : RgbColor                      = RgbColor(  0,255,  0),
-                 overlay_video_gaze_world_pos_color         : RgbColor|None                 = RgbColor(255,  0,255),
-                 overlay_video_gaze_vid_pos_radius          : int                           = 8,
-                 overlay_video_gaze_world_pos_radius        : int                           = 5,
-                 overlay_video_gaze_vid_pos_thickness       : int                           = 2,
-                 overlay_video_gaze_world_pos_thickness     : int                           = -1,
+                 overlay_video_gaze_styles                  : gaze_headref.OverlayGazeStyles = gaze_headref.DEFAULT_OVERLAY_GAZE_STYLES,
                  overlay_video_pixel_format                 : Literal['yuv420p','yuv444p']  = 'yuv420p',
 
                  sync_ref_recording                         : str|None                      = None,
@@ -351,21 +418,15 @@ class Study:
 
                  mapped_video_make_which                               : set[str]|None                     = None,
                  mapped_video_pixel_format                             : Literal['yuv420p','yuv444p']      = 'yuv420p',
-                 mapped_video_recording_colors                         : dict[str,RgbColor]|None           = None,
-                 mapped_video_projected_vidPos_color                   : RgbColor|None                     = RgbColor(255,255,  0),
-                 mapped_video_projected_world_pos_color                : RgbColor|None                     = RgbColor(255,  0,255),
-                 mapped_video_projected_left_ray_color                 : RgbColor|None                     = RgbColor(  0,  0,255),
-                 mapped_video_projected_right_ray_color                : RgbColor|None                     = RgbColor(255,  0,  0),
-                 mapped_video_projected_average_ray_color              : RgbColor|None                     = RgbColor(255,  0,255),
+                 mapped_video_recording_colors                         : dict[str,drawing.RgbColor]|None    = None,
+                 mapped_video_gaze_styles                              : gaze_worldref.MappedGazeStyles    = gaze_worldref.DEFAULT_MAPPED_GAZE_STYLES,
+                 mapped_video_marker_styles                            : drawing.MarkerStyles               = drawing.DEFAULT_MAPPED_MARKER_STYLES,
                  mapped_video_process_marker_assemblies_for_all_frames : bool                              = False,
                  mapped_video_process_annotations_for_all_recordings   : bool                              = True,
-                 mapped_video_assembly_marker_color                    : RgbColor|None                     = RgbColor(  0,255,  0),
-                 mapped_video_recovered_assembly_marker_color          : RgbColor|None                     = RgbColor(  0,255,255),
+                 mapped_video_recovered_assembly_marker_color          : drawing.RgbColor|None             = drawing.RgbColor(  0,255,255),
+                 mapped_video_rejected_marker_color                    : drawing.RgbColor|None             = None,
                  mapped_video_assembly_axis_arm_length                 : float                             = 25.,
-                 mapped_video_individual_marker_color                  : RgbColor|None                     = RgbColor(255,  0,255),
                  mapped_video_individual_marker_axis_arm_length        : float                             = 25.,
-                 mapped_video_unexpected_marker_color                  : RgbColor|None                     = RgbColor(255,255,128),
-                 mapped_video_rejected_marker_color                    : RgbColor|None                     = None,
                  mapped_video_show_sync_func_output                    : bool                              = True,
                  mapped_video_show_gaze_on_plane_in_which              : set[str]|None                     = None,
                  mapped_video_show_gaze_vec_in_which                   : set[str]|None                     = None,
@@ -396,12 +457,7 @@ class Study:
         self.interpolate_plane_pose_recordings          = interpolate_plane_pose_recordings
         self.interpolate_plane_pose_max_missing_frames  = interpolate_plane_pose_max_missing_frames
 
-        self.overlay_video_gaze_vid_pos_color           = overlay_video_gaze_vid_pos_color
-        self.overlay_video_gaze_world_pos_color         = overlay_video_gaze_world_pos_color
-        self.overlay_video_gaze_vid_pos_radius          = overlay_video_gaze_vid_pos_radius
-        self.overlay_video_gaze_world_pos_radius        = overlay_video_gaze_world_pos_radius
-        self.overlay_video_gaze_vid_pos_thickness       = overlay_video_gaze_vid_pos_thickness
-        self.overlay_video_gaze_world_pos_thickness     = overlay_video_gaze_world_pos_thickness
+        self.overlay_video_gaze_styles                  = overlay_video_gaze_styles
         self.overlay_video_pixel_format                 = overlay_video_pixel_format
 
         self.sync_ref_recording                         = sync_ref_recording
@@ -419,20 +475,14 @@ class Study:
         self.mapped_video_make_which                               = mapped_video_make_which
         self.mapped_video_pixel_format                             = mapped_video_pixel_format
         self.mapped_video_recording_colors                         = mapped_video_recording_colors
-        self.mapped_video_projected_vidPos_color                   = mapped_video_projected_vidPos_color
-        self.mapped_video_projected_world_pos_color                = mapped_video_projected_world_pos_color
-        self.mapped_video_projected_left_ray_color                 = mapped_video_projected_left_ray_color
-        self.mapped_video_projected_right_ray_color                = mapped_video_projected_right_ray_color
-        self.mapped_video_projected_average_ray_color              = mapped_video_projected_average_ray_color
+        self.mapped_video_gaze_styles                              = mapped_video_gaze_styles
+        self.mapped_video_marker_styles                           = mapped_video_marker_styles
         self.mapped_video_process_marker_assemblies_for_all_frames = mapped_video_process_marker_assemblies_for_all_frames  # if True, all marker assemblies are processed for all frames, if False, only according to the marker_assemblies_per_episode setup and the coding
         self.mapped_video_process_annotations_for_all_recordings   = mapped_video_process_annotations_for_all_recordings    # if True, all coded episodes for all marker assemblies of all recordings are processed
-        self.mapped_video_assembly_marker_color                    = mapped_video_assembly_marker_color
         self.mapped_video_recovered_assembly_marker_color          = mapped_video_recovered_assembly_marker_color
-        self.mapped_video_assembly_axis_arm_length                 = mapped_video_assembly_axis_arm_length
-        self.mapped_video_individual_marker_color                  = mapped_video_individual_marker_color
-        self.mapped_video_individual_marker_axis_arm_length        = mapped_video_individual_marker_axis_arm_length
-        self.mapped_video_unexpected_marker_color                  = mapped_video_unexpected_marker_color
         self.mapped_video_rejected_marker_color                    = mapped_video_rejected_marker_color
+        self.mapped_video_assembly_axis_arm_length                 = mapped_video_assembly_axis_arm_length
+        self.mapped_video_individual_marker_axis_arm_length        = mapped_video_individual_marker_axis_arm_length
         self.mapped_video_show_sync_func_output                    = mapped_video_show_sync_func_output
         self.mapped_video_show_gaze_on_plane_in_which              = mapped_video_show_gaze_on_plane_in_which
         self.mapped_video_show_gaze_vec_in_which                   = mapped_video_show_gaze_vec_in_which
@@ -1030,6 +1080,45 @@ class Study:
                 type_utils.merge_problem_dicts(problems,{'mapped_video_recording_colors': (type_utils.ProblemLevel.Error, msg)})
         return problems
 
+    def _check_visual_style_settings(self) -> type_utils.ProblemDict:
+        problems: type_utils.ProblemDict = {}
+
+        def check_gaze_style(group, name, style):
+            for field in ('radius', 'edge_thickness'):
+                value = getattr(style, field)
+                if value < 0:
+                    problems.setdefault(group, {}).setdefault(name, {})[field] = (type_utils.ProblemLevel.Error, 'Must be zero or greater')
+            for field in ('edge_color', 'fill_color'):
+                color = getattr(style, field)
+                if color is not None and any(component < 0 or component > 255 for component in color):
+                    problems.setdefault(group, {}).setdefault(name, {})[field] = (type_utils.ProblemLevel.Error, 'RGB components must be between 0 and 255')
+
+        for name, style in self.overlay_video_gaze_styles._asdict().items():
+            if style is not None:
+                check_gaze_style('overlay_video_gaze_styles', name, style)
+        for name, style in self.mapped_video_gaze_styles._asdict().items():
+            if style is not None:
+                check_gaze_style('mapped_video_gaze_styles', name, style)
+
+        for group, styles in (
+            ('mapped_video_marker_styles', self.mapped_video_marker_styles),
+        ):
+            for name, style in styles._asdict().items():
+                for field in ('border_color', 'corner_color'):
+                    color = getattr(style, field)
+                    if color is not None and any(component < 0 or component > 255 for component in color):
+                        problems.setdefault(group, {}).setdefault(name, {})[field] = (type_utils.ProblemLevel.Error, 'RGB components must be between 0 and 255')
+                id_style = style.id_style
+                if not 0.0 <= id_style.background_opacity <= 1.0:
+                    problems.setdefault(group, {}).setdefault(name, {}).setdefault('id_style', {})['background_opacity'] = (type_utils.ProblemLevel.Error, 'Must be between 0 and 1')
+                if id_style.font_size <= 0:
+                    problems.setdefault(group, {}).setdefault(name, {}).setdefault('id_style', {})['font_size'] = (type_utils.ProblemLevel.Error, 'Must be greater than 0')
+                for field in ('color', 'background_color'):
+                    color = getattr(id_style, field)
+                    if color is not None and any(component < 0 or component > 255 for component in color):
+                        problems.setdefault(group, {}).setdefault(name, {}).setdefault('id_style', {})[field] = (type_utils.ProblemLevel.Error, 'RGB components must be between 0 and 255')
+        return problems
+
     def _check_marker_assemblies(self) -> type_utils.ProblemDict:
         problems: type_utils.ProblemDict = {}
         config_dir = pathlib.Path(self.working_directory) / 'config'
@@ -1054,6 +1143,7 @@ class Study:
         type_utils.merge_problem_dicts(problems, self._check_interpolate_plane_pose())
         type_utils.merge_problem_dicts(problems, self._check_sync_ref())
         type_utils.merge_problem_dicts(problems, self._check_make_video())
+        type_utils.merge_problem_dicts(problems, self._check_visual_style_settings())
         return problems
 
     def store_as_json(self, path: str|pathlib.Path|None=None):
@@ -1135,10 +1225,10 @@ class Study:
                 kwds['mapped_video_make_which'] = set(kwds['mapped_video_make_which'])
             # backwards compatibility, help with named tuple roundtrip
             for k in ('overlay_video_gaze_vid_pos_color','overlay_video_gaze_world_pos_color','mapped_video_projected_vidPos_color','mapped_video_projected_world_pos_color','mapped_video_projected_left_ray_color','mapped_video_projected_right_ray_color','mapped_video_projected_average_ray_color'):
-                if k in kwds and kwds[k] is not None and not isinstance(kwds[k],RgbColor):
-                    kwds[k] = RgbColor(*kwds[k])
-            if 'mapped_video_recording_colors' in kwds and any((not isinstance(kwds['mapped_video_recording_colors'][k],RgbColor) for k in kwds['mapped_video_recording_colors'])):
-                kwds['mapped_video_recording_colors'] = {k: RgbColor(*kwds['mapped_video_recording_colors'][k]) for k in kwds['mapped_video_recording_colors']}
+                if k in kwds and kwds[k] is not None and not isinstance(kwds[k],drawing.RgbColor):
+                    kwds[k] = drawing.RgbColor(*kwds[k])
+            if 'mapped_video_recording_colors' in kwds and any((not isinstance(kwds['mapped_video_recording_colors'][k],drawing.RgbColor) for k in kwds['mapped_video_recording_colors'])):
+                kwds['mapped_video_recording_colors'] = {k: drawing.RgbColor(*kwds['mapped_video_recording_colors'][k]) for k in kwds['mapped_video_recording_colors']}
             # backwards compatibility, rename 'auto_code_trial_episodes'
             if 'auto_code_trial_episodes' in kwds:
                 kwds['auto_code_episodes'] = {annotation.EventType.Trial: kwds.pop('auto_code_trial_episodes')}
@@ -1179,7 +1269,8 @@ class Study:
             kwds.pop('mapped_video_process_individual_markers_for_all_frames',None) # setting doesn't exist anymore
             if 'mapped_video_show_detected_markers' in kwds:
                 mapped_video_show_detected_markers = kwds.pop('mapped_video_show_detected_markers')
-                kwds['mapped_video_assembly_marker_color'] = study_defaults['mapped_video_assembly_marker_color'] if mapped_video_show_detected_markers else None
+                plane_color = drawing.DEFAULT_MAPPED_MARKER_STYLES.assembly.border_color
+                kwds['mapped_video_assembly_marker_color'] = drawing.RgbColor(*plane_color) if mapped_video_show_detected_markers and plane_color is not None else None
                 kwds['mapped_video_recovered_assembly_marker_color'] = study_defaults['mapped_video_recovered_assembly_marker_color'] if mapped_video_show_detected_markers else None
             if 'mapped_video_show_plane_axes' in kwds or 'mapped_video_show_board_axes' in kwds:
                 mapped_video_show_plane_axes = kwds.pop('mapped_video_show_plane_axes') if 'mapped_video_show_plane_axes' in kwds else kwds.pop('mapped_video_show_board_axes')
@@ -1189,7 +1280,8 @@ class Study:
                 kwds['mapped_video_individual_marker_axis_arm_length'] = study_defaults['mapped_video_individual_marker_axis_arm_length'] if mapped_video_show_individual_marker_axes else None
             if 'mapped_video_show_unexpected_markers' in kwds:
                 mapped_video_show_unexpected_markers = kwds.pop('mapped_video_show_unexpected_markers')
-                kwds['mapped_video_unexpected_marker_color'] = study_defaults['mapped_video_unexpected_marker_color'] if mapped_video_show_unexpected_markers else None
+                unexpected_color = drawing.DEFAULT_MAPPED_MARKER_STYLES.unexpected.border_color
+                kwds['mapped_video_unexpected_marker_color'] = drawing.RgbColor(*unexpected_color) if mapped_video_show_unexpected_markers and unexpected_color is not None else None
             if 'mapped_video_show_rejected_markers' in kwds:
                 mapped_video_show_rejected_markers = kwds.pop('mapped_video_show_rejected_markers')
                 kwds['mapped_video_rejected_marker_color'] = study_defaults['mapped_video_rejected_marker_color'] if mapped_video_show_rejected_markers else None
@@ -1292,6 +1384,8 @@ class Study:
                 if event_setup.get('sync_setup', {}).get('get_cam_movement_method') == 'plane':
                     event_setup['sync_setup']['get_cam_movement_method'] = 'assembly'
 
+        _migrate_legacy_gaze_styles(kwds)
+
         if 'interpolate_plane_pose_recordings' in kwds and kwds['interpolate_plane_pose_recordings'] is not None and not isinstance(kwds['interpolate_plane_pose_recordings'], set):
             kwds['interpolate_plane_pose_recordings'] = set(kwds['interpolate_plane_pose_recordings'])
 
@@ -1340,6 +1434,28 @@ _video_pixel_format_docs = {None: {
     'yuv420p': type_utils.GUIDocInfo('yuv420p', 'Broad playback compatibility and smaller files. Chroma subsampling can soften thin, saturated annotations.'),
     'yuv444p': type_utils.GUIDocInfo('yuv444p', 'Preserves full color resolution for sharper annotations, but can create larger files and has more limited hardware/player support.'),
 }}
+_gaze_point_style_docs = {
+    'radius': type_utils.GUIDocInfo('Radius', 'Circle radius in pixels.'),
+    'edge_color': type_utils.GUIDocInfo('Edge color', 'RGB outline color. An unset color disables the outline; edge thickness 0 also disables it.'),
+    'edge_thickness': type_utils.GUIDocInfo('Edge thickness', 'Outline width in pixels. Set to 0 to disable the outline.'),
+    'fill_color': type_utils.GUIDocInfo('Fill color', 'RGB fill color. An unset color disables the fill.'),
+}
+_marker_id_style_docs = {
+    'draw': type_utils.GUIDocInfo('Draw marker IDs?', 'Draw marker IDs for this marker category.'),
+    'color': type_utils.GUIDocInfo('Text color', 'Optional RGB text color. If unset, use the inverse of the category marker color.'),
+    'background_opacity': type_utils.GUIDocInfo('ID backing opacity', 'Opacity of the color backing square behind marker IDs. Set to 0 to disable it.'),
+    'background_color': type_utils.GUIDocInfo('Backing color', 'Optional RGB backing color. If unset, use the inverse of the ID text color.'),
+    'font_size': type_utils.GUIDocInfo('Font size', 'OpenCV text scale used to draw marker IDs.'),
+}
+_marker_style_docs = {
+    'border_color': type_utils.GUIDocInfo('Border color', 'RGB marker border color. An unset color disables the regular border.'),
+    'corner_color': type_utils.GUIDocInfo('Corner color', 'Optional RGB color for the marker corner indicators.'),
+    'id_style': type_utils.GUIDocInfo('Marker ID', 'Appearance of the marker ID label.', _marker_id_style_docs),
+}
+_marker_styles_docs = {
+    field: type_utils.GUIDocInfo(label, label + ' marker appearance.', _marker_style_docs)
+    for field, label in (('assembly', 'Assembly'), ('individual', 'Individual'), ('unexpected', 'Unexpected'))
+}
 study_parameter_doc = {
     'individual_marker_settings': type_utils.GUIDocInfo('Marker detection settings', 'Named detector parameter groups managed in the individual-marker setup pane.'),
     'allow_duplicated_markers': type_utils.GUIDocInfo('Allow duplicated markers?', 'If enabled, the same marker can be used in multiple places in the coding setup (e.g. for auto coding and/or in planes). If disabled, each marker can only be used once. Enabling this may be ok, if the duplicate markers never occur at the same time. Still, use at your own risk.'),
@@ -1349,12 +1465,10 @@ study_parameter_doc = {
     'head_attached_recordings_replace_et_scene': type_utils.GUIDocInfo('Head-attached recording: override scene camera', 'gazeMapper allows using recordings from a head-attached camera to replace pose determination done from the scene camera image. It might make sense to enable this when the image quality of the scene camera is not good enough. Requires instrinsics and extrinsics (transformation from the head-attached camera to the scene camera) of the head-attached camera to be known.'),
     'interpolate_plane_pose_recordings': type_utils.GUIDocInfo('Plane pose interpolation: recordings', 'Eye tracker recordings for which detected plane poses should be interpolated or resampled to the eye tracking sample rate.'),
     'interpolate_plane_pose_max_missing_frames': type_utils.GUIDocInfo('Plane pose interpolation: max missing frames', 'Maximum number of missing detected video frames allowed between two detected plane poses for interpolation. A value of 0 only interpolates between adjacent detected video frames.'),
-    'overlay_video_gaze_vid_pos_color': type_utils.GUIDocInfo('Gaze overlay video: Color for gaze position on video', 'Color used for drawing the recorded gaze position on the scene video.'),
-    'overlay_video_gaze_world_pos_color': type_utils.GUIDocInfo('Gaze overlay video: Color for 3D gaze position', 'Color used for drawing the recorded 3D gaze position in the world. Not drawn if value is not set.'),
-    'overlay_video_gaze_vid_pos_radius': type_utils.GUIDocInfo('Gaze overlay video: Radius for gaze position on video', 'Radius of circle used for drawing the recorded gaze position on the scene video.'),
-    'overlay_video_gaze_world_pos_radius': type_utils.GUIDocInfo('Gaze overlay video: Radius for 3D gaze position', 'Radius of circle used for drawing the recorded 3D gaze position in the world.'),
-    'overlay_video_gaze_vid_pos_thickness': type_utils.GUIDocInfo('Gaze overlay video: Thickness for gaze position on video', 'Line thickness of circle used for drawing the recorded gaze position on the scene video.'),
-    'overlay_video_gaze_world_pos_thickness': type_utils.GUIDocInfo('Gaze overlay video: Thickness for 3D gaze position', 'Line thickness of circle used for drawing the recorded 3D gaze position in the world.'),
+    'overlay_video_gaze_styles': type_utils.GUIDocInfo('Gaze overlay video: Gaze-point styles', 'Appearance of gaze points on the scene video and in the 3D world.', {
+        'video_position': type_utils.GUIDocInfo('Scene-video gaze position', 'Appearance of gaze positions on the scene video.', _gaze_point_style_docs),
+        'world_position': type_utils.GUIDocInfo('3D gaze position', 'Appearance of recorded 3D gaze positions.', _gaze_point_style_docs),
+    }),
     'overlay_video_pixel_format': type_utils.GUIDocInfo('Gaze overlay video: Output pixel format', 'Pixel format used by the gaze overlay video encoder.', _video_pixel_format_docs),
     'sync_ref_recording': type_utils.GUIDocInfo('Synchronization: Reference recording', 'If there are multiple recordings, sets to which recording all other recordings will be synchronized.'),
     'sync_ref_do_time_stretch': type_utils.GUIDocInfo('Synchronization: Do time stretch?', 'If enabled, multiple sync points are used to calculate a time stretch factor to compensate for clock drift when synchronizing multiple recordings.'),
@@ -1374,26 +1488,30 @@ study_parameter_doc = {
     'mapped_video_make_which': type_utils.GUIDocInfo('Mapped video: Which recordings', 'Indicates one or multiple recordings for which to make videos of the eye tracker scene camera or external camera (synchronized to one of the recordings if there are multiple) showing detected plane origins, detected individual markers and gaze from any other recordings eye tracker recordings. Also shown for eye tracker recordings are gaze on the scene video from the eye tracker, gaze projected to the detected planes. Each only if available, and enabled in the below video generation settings.'),
     'mapped_video_pixel_format': type_utils.GUIDocInfo('Mapped video: Output pixel format', 'Pixel format used by the mapped video encoder.', _video_pixel_format_docs),
     'mapped_video_recording_colors': type_utils.GUIDocInfo('Mapped video: Recording colors', 'Colors used for drawing each recording\'s gaze point, scene camera and gaze vector (depending on settings).'),
-    'mapped_video_projected_vidPos_color': type_utils.GUIDocInfo('Mapped video: Color for gaze position on plane', 'Color used for drawing the recorded gaze position on the scene video transformed to the plane. Not drawn if value is not set.'),
-    'mapped_video_projected_world_pos_color': type_utils.GUIDocInfo('Mapped video: Color for 3D gaze position on plane', 'Color used for drawing the projection on a plane of the recorded 3D gaze position in the world. Not drawn if value is not set.'),
-    'mapped_video_projected_left_ray_color': type_utils.GUIDocInfo('Mapped video: Color for left eye gaze vector projected to plane', 'Color used for drawing the projection to a plane of the recorded left eye\'s gaze vector. Not drawn if value is not set.'),
-    'mapped_video_projected_right_ray_color': type_utils.GUIDocInfo('Mapped video: Color for right eye gaze vector projected to plane', 'Color used for drawing the projection to a plane of the recorded right eye\'s gaze vector. Not drawn if value is not set.'),
-    'mapped_video_projected_average_ray_color': type_utils.GUIDocInfo('Mapped video: Color for average of gaze vectors projected to plane', 'Color used for drawing the average projection to a plane of the recorded left and right eyes\' gaze vectors. Not drawn if value is not set.'),
+    'mapped_video_gaze_styles': type_utils.GUIDocInfo('Mapped video: Gaze-point styles', 'Appearance of each gaze-point type drawn on mapped videos.', {
+        field: type_utils.GUIDocInfo(label, description, _gaze_point_style_docs)
+        for field, label, description in (
+            ('original_scene_video', 'Original scene-video gaze', 'Gaze positions drawn at their original scene-video locations, using the recording color unless overridden.'),
+            ('video_position', 'Projected scene-video gaze', 'Scene-video gaze projected to a plane.'),
+            ('world_position', 'Projected 3D gaze', '3D gaze point projected to a plane.'),
+            ('left_eye', 'Projected left-eye gaze', 'Left-eye gaze vector projected to a plane.'),
+            ('right_eye', 'Projected right-eye gaze', 'Right-eye gaze vector projected to a plane.'),
+            ('average', 'Projected average gaze', 'Average of left and right gaze vectors projected to a plane.'),
+        )
+    }),
+    'mapped_video_marker_styles': type_utils.GUIDocInfo('Mapped video: Marker styles', 'Border, corner, and ID-label appearance by marker category.', _marker_styles_docs),
     'mapped_video_process_marker_assemblies_for_all_frames': type_utils.GUIDocInfo('Mapped video: Process all marker assemblies (e.g., planes) for all frames?', 'If enabled, shows detection results for all marker assemblies for all frames. If not enabled, detection of each assembly is only shown during the episode(s) to which it is assigned.'),
     'mapped_video_process_annotations_for_all_recordings': type_utils.GUIDocInfo('Mapped video: Process all annotations for all recordings?', 'Episode annotations are shown in a bar on the bottom of the screen. If enabled, annotations for not only the recording for which the video is made, but also for the other recordings are shown in this bar.'),
-    'mapped_video_assembly_marker_color': type_utils.GUIDocInfo('Mapped video: Assembly marker color', 'Color used for drawing detected markers belonging to marker assemblies. Not drawn if value is not set.'),
     'mapped_video_recovered_assembly_marker_color': type_utils.GUIDocInfo('Mapped video: Assembly marker color (recovered)', 'Color used for drawing detected markers belonging to assemblies that were identified during the second-stage ArUco search. Not drawn if value is not set.'),
-    'mapped_video_assembly_axis_arm_length': type_utils.GUIDocInfo('Mapped video: Assembly axis arm length','Length used for drawing detected assembly axes, in the same unit as the assembly. Not drawn if value is not set.'),
-    'mapped_video_individual_marker_color': type_utils.GUIDocInfo('Mapped video: Individual marker color', 'Color used for drawing the detected individual markers. Not drawn if value is not set.'),
-    'mapped_video_individual_marker_axis_arm_length': type_utils.GUIDocInfo('Mapped video: Individual marker axis arm length','Length used for drawing axes that indicate the orientation of a detected individual marker (if its size is set). In the same unit as the markers (usually mm). Not drawn if value is not set.'),
-    'mapped_video_unexpected_marker_color': type_utils.GUIDocInfo('Mapped video: Unexpected marker color', 'Color used for drawing detected markers that do not belong to any marker assembly and not registered as individual markers. Not drawn if value is not set.'),
     'mapped_video_rejected_marker_color': type_utils.GUIDocInfo('Mapped video: Rejected marker color', 'Color used for drawing marker candidates that were rejected at some stage in the ArUco pipeline. For (setup) debug purposes. Not drawn if value is not set. (255,0,0) may be a good color.'),
+    'mapped_video_assembly_axis_arm_length': type_utils.GUIDocInfo('Mapped video: Assembly axis arm length','Length used for drawing detected assembly axes, in the same unit as the assembly. Not drawn if value is not set.'),
+    'mapped_video_individual_marker_axis_arm_length': type_utils.GUIDocInfo('Mapped video: Individual marker axis arm length','Length used for drawing axes that indicate the orientation of a detected individual marker (if its size is set). In the same unit as the markers (usually mm). Not drawn if value is not set.'),
     'mapped_video_show_sync_func_output': type_utils.GUIDocInfo('Mapped video: Show sync function output?', 'If enabled, draw the output of the function on the output video. Applies if the "Gaze data synchronization: Function for camera movement" setting is set to "function".'),
     'mapped_video_show_gaze_on_plane_in_which': type_utils.GUIDocInfo('Mapped video: Videos on which to draw gaze projected to plane', 'For the listed recordings, gaze projected to the plane (both the gaze point on the scene video, and the left and right eyes\' gaze vectors if available) is drawn on the video for eye tracker recordings. If there are multiple recordings in a session, gaze positions for the other recordings (if available) will also be drawn on the indicated video(s).'),
     'mapped_video_show_gaze_vec_in_which': type_utils.GUIDocInfo('Mapped video: Videos on which to draw gaze vectors(s)', 'For the listed recordings, a line is drawn between the positions of the cameras of other recordings and the gaze position of these recordings projected to the plane in the generated video. Only for eye tracker recordings.'),
     'mapped_video_show_camera_in_which': type_utils.GUIDocInfo('Mapped video: Videos on which to draw camera position(s)', 'For the listed recordings, the position of the cameras of other recordings is marked in the generated video.'),
-    'mapped_video_which_gaze_type_on_plane': type_utils.GUIDocInfo('Mapped video: Which gaze on plane to show?', 'Sets which gaze-on-plane (e.g. from gaze position on the scene video or from gaze vectors projected to the plane) is used for the gaze positions shown in the generated videos.', _gaze_type_doc),
-    'mapped_video_which_gaze_type_on_plane_allow_fallback': type_utils.GUIDocInfo('Mapped video: Allow fallback to showing gaze on plane based on scene video gaze?', 'Sets if it is allowed to fall back to using the projection of the gaze position on the plane derived from the gaze position on the video if the gaze-on-plane type specified in the "Mapped video: Which gaze on plane to show?" setting is not available.'),
+    'mapped_video_which_gaze_type_on_plane': type_utils.GUIDocInfo('Mapped video: Which gaze on plane to show?', 'Sets which available gaze-on-plane type is drawn (in the recording color). Other available types are drawn, on the video of their recording using their configured gaze-style colors. Unset their colors to not draw them.', _gaze_type_doc),
+    'mapped_video_which_gaze_type_on_plane_allow_fallback': type_utils.GUIDocInfo('Mapped video: Allow fallback to scene-video-derived gaze on plane?', 'If the selected gaze-on-plane type is unavailable, use the gaze position mapped onto the plane from the scene-video gaze and highlight it in the recording color.'),
     'mapped_video_gaze_to_plane_margin': type_utils.GUIDocInfo('Mapped video: Gaze position margin','Gaze position more than this factor outside a defined plane will not be drawn.'),
     'gui_num_workers': type_utils.GUIDocInfo('Number of workers','Each action is processed by a worker and each worker can handle one action at a time. Having more workers means more actions are processed simultaneously, but having too many will not provide any gain and might freeze the program and your whole computer. Since much of the processing utilizes more than one processor thread, set this value to significantly less than the number of threads available in your system. NB: If you currently have running or enqueued jobs, the number of workers will only be changed once all have completed or are cancelled.'),
 }
@@ -1576,6 +1694,15 @@ class StudyOverride:
         types = EventSetup.__annotations__ if self.for_event_setup else study_parameter_types
         for p in kwargs:
             self._check_parameter(p, f"{StudyOverride.__name__}.__init__(): ")
+            style_types = {
+                'overlay_video_gaze_styles': gaze_headref.OverlayGazeStyles,
+                'mapped_video_gaze_styles': gaze_worldref.MappedGazeStyles,
+                'mapped_video_marker_styles': drawing.MarkerStyles,
+            }
+            if not self.for_event_setup and p in style_types and isinstance(kwargs[p], dict):
+                self._check_style_patch(style_types[p], kwargs[p], p)
+                setattr(self, p, copy.deepcopy(kwargs[p]))
+                continue
             if not self.for_event_setup and p in self.marker_settings_fields:
                 if p == self.marker_group_assignments_field:
                     self._check_marker_group_assignments_structure(kwargs[p])
@@ -1590,6 +1717,26 @@ class StudyOverride:
             typeguard.check_type(check_val, types[p], typecheck_fail_callback=lambda x,_: typecheck_exception_handler(x,p), collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
             setattr(self,p,kwargs[p])
         self._allow_name = False
+
+    @staticmethod
+    def _check_style_patch(style_type, patch: dict, path: str):
+        if not isinstance(patch, dict):
+            typeguard.check_type(patch, style_type, collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
+            return
+        annotations = style_type.__annotations__
+        for field, value in patch.items():
+            if field not in annotations:
+                raise ValueError(f'{path}.{field} is not a known style option')
+            field_type = gt_utils.unpack_none_union(annotations[field])[0]
+            if value is None:
+                typeguard.check_type(value, annotations[field], collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
+            elif field_type is drawing.RgbColor and isinstance(value, (list, tuple)):
+                value = drawing.RgbColor(*value)
+                patch[field] = value
+            elif type_utils.is_NamedTuple_type(field_type):
+                StudyOverride._check_style_patch(field_type, value, f'{path}.{field}')
+            else:
+                typeguard.check_type(value, annotations[field], collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
 
     def __setattr__(self, name, value):
         if name.startswith('_') or name in {'override_level', 'recording_type', 'for_event_setup'}:
@@ -1822,11 +1969,9 @@ class StudyOverride:
 
     @staticmethod
     def _fix_typing(kwds: dict[str,Any]) -> dict[str,Any]:
+        kwds = _migrate_legacy_gaze_styles(kwds, preserve_sparse=True)
         if 'mapped_video_recording_colors' in kwds and kwds['mapped_video_recording_colors'] is not None:
-            kwds['mapped_video_recording_colors'] = {k: None if kwds['mapped_video_recording_colors'][k] is None else RgbColor(*kwds['mapped_video_recording_colors'][k]) for k in kwds['mapped_video_recording_colors']}
-        for k in ['mapped_video_projected_vidPos_ray_color','mapped_video_projected_world_pos_color','mapped_video_projected_left_ray_color','mapped_video_projected_right_ray_color','mapped_video_projected_average_ray_color']:
-            if k in kwds and kwds[k] is not None:
-                kwds[k] = RgbColor(**kwds[k])
+            kwds['mapped_video_recording_colors'] = {k: None if kwds['mapped_video_recording_colors'][k] is None else drawing.RgbColor(*kwds['mapped_video_recording_colors'][k]) for k in kwds['mapped_video_recording_colors']}
         return kwds
 
 def _apply_impl(obj, overrides: dict[str,Any], annotations: dict[str,typing.Type]|None):

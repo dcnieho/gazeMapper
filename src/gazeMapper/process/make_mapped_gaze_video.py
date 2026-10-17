@@ -34,6 +34,31 @@ def _get_sync_settings(study_config: config.Study) -> tuple[bool, list[str], str
         study_config.sync_ref_stretch_which or 'other',
     )
 
+def _style_with_recording_color(style: drawing.CircleStyle | None, color: drawing.RgbColor | None) -> drawing.CircleStyle | None:
+    if style is None or color is None:
+        return style
+    edge_color = color if style.edge_color is not None else None
+    fill_color = color if style.fill_color is not None else None
+    if edge_color is None and fill_color is None:
+        fill_color = color
+    return style._replace(edge_color=edge_color, fill_color=fill_color)
+
+_style_fields = {
+    gaze_worldref.Type.Scene_Video_Position: 'video_position',
+    gaze_worldref.Type.World_3D_Point: 'world_position',
+    gaze_worldref.Type.Left_Eye_Gaze_Vector: 'left_eye',
+    gaze_worldref.Type.Right_Eye_Gaze_Vector: 'right_eye',
+    gaze_worldref.Type.Average_Gaze_Vector: 'average',
+}
+def _mapped_gaze_styles_for_recording(styles: gaze_worldref.MappedGazeStyles, gaze_type: gaze_worldref.Type, color: drawing.RgbColor | None) -> gaze_worldref.MappedGazeStyles:
+    style_field = _style_fields[gaze_type]
+    style = _style_with_recording_color(getattr(styles, style_field), color)
+    if style == getattr(styles, style_field):
+        return styles
+    return styles._replace(**{
+        style_field: style,
+    })
+
 def _needs_live_estimator(rec: str, rec_type: session.RecordingType, study_config: config.Study, output_recs: set[str]) -> bool:
     # determine if we need an estimator for the current recording. It is only needed for recordings
     # that can affect a visible output: an output video, the sync reference, whole-video plane
@@ -225,6 +250,14 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
                     raise RuntimeError(f'Camera sync points found for recording {r} ({episodes_as_ref_flat[r][nm]}) that do not occur among the reference recordings sync points ({study_config.sync_ref_recording}, {episodes_as_ref_flat[study_config.sync_ref_recording][nm]}). That means the sync logic must have failed')
 
     output_recs = set(study_config.mapped_video_make_which)
+    mapped_gaze_styles = {
+        rec: _mapped_gaze_styles_for_recording(
+            study_config.mapped_video_gaze_styles,
+            study_config.mapped_video_which_gaze_type_on_plane,
+            study_config.mapped_video_recording_colors[rec],
+        )
+        for rec in output_recs
+    }
     estimator_recs = {
         rec for rec in recs
         if _needs_live_estimator(rec, session_info.recordings[rec].definition.type, study_config, output_recs)
@@ -257,6 +290,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
         for m in (markers:=marker.get_setup_for_markers(recording_config.individual_markers, recording_config.individual_marker_settings)):
             aruco_manager.add_individual_marker(m, markers[m])
         aruco_manager.consolidate_setup(study_config.allow_duplicated_markers)
+        aruco_manager.set_visualization_styles(study_config.mapped_video_marker_styles, study_config.mapped_video_recovered_assembly_marker_color, study_config.mapped_video_rejected_marker_color)
         aruco_manager.register_with_estimator(pose_estimators[rec])
         # other setup of estimator
         sync_target_functions, function_frames  = _get_sync_function(recording_config, rec_def, episodes[rec])
@@ -268,8 +302,6 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
         if rec in study_config.mapped_video_make_which:
             pose_estimators[rec].set_visualize_on_frame(True)
             # set visualization properties
-            colors = {c.removeprefix('mapped_video_'): getattr(study_config,c) for c in ('mapped_video_assembly_marker_color','mapped_video_recovered_assembly_marker_color','mapped_video_individual_marker_color','mapped_video_unexpected_marker_color','mapped_video_rejected_marker_color')}
-            aruco_manager.set_visualization_colors(**colors)
             pose_estimators[rec].sub_pixel_fac                      = sub_pixel_fac
             pose_estimators[rec].plane_axis_arm_length              = study_config.mapped_video_assembly_axis_arm_length
             pose_estimators[rec].individual_marker_axis_arm_length  = study_config.mapped_video_individual_marker_axis_arm_length
@@ -394,13 +426,16 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
             for v in proc_vids:
                 if study_config.mapped_video_recording_colors is None or v not in study_config.mapped_video_recording_colors:
                     continue
-                clr = study_config.mapped_video_recording_colors[v][::-1]  # RGB -> BGR
+                clr = study_config.mapped_video_recording_colors[v]
+                original_scene_video_style = study_config.mapped_video_gaze_styles.original_scene_video
+                if original_scene_video_style is not None:
+                    original_scene_video_style = original_scene_video_style._replace(edge_color=original_scene_video_style.edge_color or tuple(study_config.mapped_video_recording_colors[v]))
                 poses_this = apose[v]
                 # draw gaze associated with this recording. As wanted, drawn on this but also other videos
                 if v in gazes_head and lead_frame_idx in gazes_head[v]:
                     for g in gazes_head[v][lead_frame_idx]:
                         if v in write_vids:
-                            g.draw(frame[v], sub_pixel_fac=sub_pixel_fac, clr=clr, draw_3d_gaze_point=False)
+                            g.draw(frame[v], sub_pixel_fac=sub_pixel_fac, styles=gaze_headref.OverlayGazeStyles(original_scene_video_style, None))
 
                         # check if we need gaze on plane for drawing on any of the videos
                         plane_gaze_on_this_video = v in write_vids and study_config.mapped_video_show_gaze_on_plane_in_which is not None and v in study_config.mapped_video_show_gaze_on_plane_in_which
@@ -430,7 +465,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
 
                         # draw on current video
                         if study_config.mapped_video_show_gaze_on_plane_in_which is not None and v in study_config.mapped_video_show_gaze_on_plane_in_which:
-                            plane_gazes[best[0]][2].draw_on_world_video(frame[v], camera_params[v], ROI_offsets[v], sub_pixel_fac, poses_this[best[0]], study_config.mapped_video_projected_vidPos_color, study_config.mapped_video_projected_world_pos_color, study_config.mapped_video_projected_left_ray_color, study_config.mapped_video_projected_right_ray_color, study_config.mapped_video_projected_average_ray_color)
+                            plane_gazes[best[0]][2].draw_on_world_video(frame[v], camera_params[v], ROI_offsets[v], sub_pixel_fac, poses_this[best[0]], styles=mapped_gaze_styles[v])
 
                         # also draw on other recordings, if so configured
                         # depending on configuration also includes gaze vector with origin at the camera
@@ -441,8 +476,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
                             matched_plane = next((pl for pl in best if pl in planes and pl in poses_other and (poses_other[pl].pose_successful() or poses_other[pl].homography_successful())), None)
                             if matched_plane is None:
                                 continue
-                            # draw gaze point, camera position, and gaze vector between them on the other video, as configured
-                            # and as possible (camera position and gaze vector require pose, not only homography)
+                            # draw gaze point, and gaze vector between camera position and gaze point on the other video,
+                            # as configured and as possible (camera position and gaze vector require pose, not only homography)
                             draw_gaze_on_other_video(frame[vo],
                                                      ROI_offsets[vo],
                                                      poses_this[matched_plane], poses_other[matched_plane],
@@ -452,7 +487,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
                                                      study_config.mapped_video_which_gaze_type_on_plane_allow_fallback,
                                                      study_config.mapped_video_show_gaze_on_plane_in_which is not None and vo in study_config.mapped_video_show_gaze_on_plane_in_which,
                                                      study_config.mapped_video_show_gaze_vec_in_which is not None and vo in study_config.mapped_video_show_gaze_vec_in_which,
-                                                     sub_pixel_fac)
+                                                     sub_pixel_fac,
+                                                     study_config.mapped_video_gaze_styles)
 
                 # Draw camera position on other videos, if so configured
                 if not poses_this or study_config.mapped_video_show_camera_in_which is None:
@@ -581,62 +617,66 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
     # update state
     session.update_action_states(working_dir, process.Action.MAKE_MAPPED_GAZE_VIDEO, process_pool.State.Completed, study_config)
 
-def draw_gaze_on_other_video(frame_other, ROI_offset, pose_this: pose.Pose, pose_other: pose.PlanePose, plane_gaze: gaze_worldref.Gaze, camera_params_other, clr, which_gaze_on_plane, which_gaze_on_plane_allow_fallback, do_draw_gaze, do_draw_gaze_vec, sub_pixel_fac):
+def draw_gaze_on_other_video(frame_other, ROI_offset, pose_this: pose.Pose, pose_other: pose.PlanePose, plane_gaze: gaze_worldref.Gaze, camera_params_other, recording_color: drawing.RgbColor, which_gaze_on_plane, which_gaze_on_plane_allow_fallback, do_draw_gaze, do_draw_gaze_vec, sub_pixel_fac, styles: gaze_worldref.MappedGazeStyles|None=None):
     if not do_draw_gaze and not do_draw_gaze_vec:
         # nothing to do
         return
 
+    # determine the gaze point to draw
     gaze_point_plane = plane_gaze.get_gaze_point(which_gaze_on_plane)
+    gaze_point_plane_type = which_gaze_on_plane
     if gaze_point_plane is None:
         if which_gaze_on_plane_allow_fallback:
             gaze_point_plane = plane_gaze.get_gaze_point(gaze_worldref.Type.Scene_Video_Position)
+            gaze_point_plane_type = gaze_worldref.Type.Scene_Video_Position
         else:
             raise RuntimeError(f'Gaze of type {which_gaze_on_plane.value} was requested, but is not available. Select a different gaze type or set allow_fallback to True.')
     if gaze_point_plane is None:
         return
 
+    # get style in which to draw the gaze point
+    styles = styles or gaze_worldref.DEFAULT_MAPPED_GAZE_STYLES
+    style  = _style_with_recording_color(getattr(styles, _style_fields[gaze_point_plane_type]), recording_color)
+
     if not pose_this.pose_successful() or not pose_other.pose_successful():
-        if not do_draw_gaze:
+        if not do_draw_gaze or style is None:
             return
         gaze_pos_other = pose_other.get_plane_point_on_image(gaze_point_plane, camera_params_other, ROI_offset)
-        drawing.openCVCircle(frame_other, gaze_pos_other, 8, clr, 2, sub_pixel_fac)
+        drawing.draw_circle(frame_other, gaze_pos_other, style, sub_pixel_fac)
         # can only do gaze position on plane with homography, so, exit
         return
 
-    gaze_point_plane_3d = np.append(gaze_point_plane,0.).reshape(1,3)
+    point_3d = np.append(gaze_point_plane, 0.).reshape(1, 3)
     gaze_pos_other = None
     # check if gaze position in camera frame is ok. If gaze point is behind this camera,
     # it won't be visible and projecting it anyway yields a nonsensical result
-    if gaze_ok := pose_other.world_frame_to_cam(gaze_point_plane_3d)[2]>0:
-        # project from plane to camera
+    if pose_other.world_frame_to_cam(point_3d)[2] > 0:
         gaze_pos_other = pose_other.get_plane_point_on_image(gaze_point_plane, camera_params_other, ROI_offset)
-        # draw on the other video
-        if do_draw_gaze:
-            drawing.openCVCircle(frame_other, gaze_pos_other, 8, clr, 2, sub_pixel_fac)
+        if do_draw_gaze and style is not None:
+            drawing.draw_circle(frame_other, gaze_pos_other, style, sub_pixel_fac)
 
     # also draw position of this camera on the other video, and possibly gaze vector
-    if do_draw_gaze_vec:
-        # take point 0,0,0 in this camera's space (i.e. camera position) and transform to the plane's world space
-        cam_pos_world_this = pose_this.cam_frame_to_world(np.zeros((1,3)))
-        if pose_other.world_frame_to_cam(cam_pos_world_this)[2]<=0:
-            # other video's camera is behind this camera, won't be visible
-            # and projecting it anyway yields a nonsensical result
+    if do_draw_gaze_vec and gaze_pos_other is not None:
+        cam_pos_other = _camera_position_in_other_camera_image(ROI_offset, pose_this, pose_other, camera_params_other)
+        if cam_pos_other is None:
             return
-        # draw on the other video
-        cam_pos_other = pose_other.world_frame_to_camera_image(cam_pos_world_this, camera_params_other, ROI_offset)
-        # and draw line connecting the camera and the gaze point
-        if gaze_ok and do_draw_gaze_vec and gaze_pos_other is not None:
-            drawing.openCVLine(frame_other, gaze_pos_other, cam_pos_other, clr, 5, sub_pixel_fac)
+        # draw line connecting the camera and the gaze point
+        drawing.openCVLine(frame_other, gaze_pos_other, cam_pos_other, (*recording_color[::-1],), 5, sub_pixel_fac)
 
-
-
-def draw_camera_on_other_video(frame_other, ROI_offset, pose_this: pose.Pose, pose_other: pose.Pose, camera_params_other, clr, sub_pixel_fac):
+def _camera_position_in_other_camera_image(ROI_offset, pose_this: pose.Pose, pose_other: pose.Pose, camera_params_other):
     if not pose_this.pose_successful() or not pose_other.pose_successful():
-        return
-
+        return None
+    # take point 0,0,0 in this camera's space (i.e. camera position) and transform to the plane's world space
     cam_pos_world_this = pose_this.cam_frame_to_world(np.zeros((1,3)))
     if pose_other.world_frame_to_cam(cam_pos_world_this)[2] <= 0:
-        return
+        # other video's camera is behind this camera, won't be visible
+        # and projecting it anyway yields a nonsensical result
+        return None
+    # determine where that camera position is in the other video
+    return pose_other.world_frame_to_camera_image(cam_pos_world_this, camera_params_other, ROI_offset)
 
-    cam_pos_other = pose_other.world_frame_to_camera_image(cam_pos_world_this, camera_params_other, ROI_offset)
-    drawing.openCVCircle(frame_other, cam_pos_other, 3, clr, 1, sub_pixel_fac)
+def draw_camera_on_other_video(frame_other, ROI_offset, pose_this: pose.Pose, pose_other: pose.Pose, camera_params_other, clr: drawing.RgbColor, sub_pixel_fac):
+    cam_pos_other = _camera_position_in_other_camera_image(ROI_offset, pose_this, pose_other, camera_params_other)
+    if cam_pos_other is None:
+        return
+    drawing.openCVCircle(frame_other, cam_pos_other, 3, (*clr[::-1],), 1, sub_pixel_fac)
