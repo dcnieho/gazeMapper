@@ -69,10 +69,19 @@ json.register_type(json.TypeEntry(RecordingDefinition,'__session.RecordingDefini
 class Recording:
     status_file_name = 'recording.gazeMapper'
 
+    @staticmethod
+    def _normalize_info_working_directory(info: EyeTrackerRecording|CameraRecording):
+        if info.working_directory:
+            info.working_directory = pathlib.Path(info.working_directory)
+        else:
+            info.working_directory = None
+
     @typeguard.typechecked
     def __init__(self, definition: RecordingDefinition, info:EyeTrackerRecording|CameraRecording|None=None):
         self.definition = definition
         self.info       = info
+        if self.info is not None:
+            self._normalize_info_working_directory(self.info)
 
         self.state: dict[process.Action, process_pool.State] = {}
         if not self.info.working_directory:
@@ -233,6 +242,7 @@ class Session:
         elif rec_def.type==RecordingType.Camera:
             if not isinstance(rec_info,CameraRecording):
                 raise TypeError(f"The provided rec_info is not for a camera recording, but {which} is a camera recording")
+        Recording._normalize_info_working_directory(rec_info)
 
     def update_recording_info(self, which: str, rec_info: EyeTrackerRecording|CameraRecording):
         if which not in self.recordings:

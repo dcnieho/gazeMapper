@@ -980,7 +980,7 @@ class GUI:
         )
 
     def _load_recording_calibration(self, session_name: str, recording: session.Recording):
-        working_dir = recording.info.working_directory if recording.info is not None else None
+        working_dir = pathlib.Path(recording.info.working_directory) if recording.info is not None else None
         cal_path = working_dir / gt_naming.scene_camera_calibration_fname if working_dir is not None else None
         key = (session_name, recording.definition.name)
         inspection = camera_calibration.inspect(cal_path, self._calibration_requires_extrinsics(recording.definition))
