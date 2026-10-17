@@ -667,15 +667,17 @@ class GUI:
             else:
                 working_dir = self.sessions[sess].working_directory
             args = (working_dir,)
-        # check if task needs a GUI, if so make sure only one needing a GUI can run at the same time, and that these
-        # tasks are prioritized so we're not stuck waiting for a GUI task while some other task completes
-        exclusive_id = 1 if (action.needs_GUI or kwargs.get('show_visualization',False)) else None
-        priority = 1 if exclusive_id is not None else None
+        # Keep jobs for the same owner from running concurrently, and also only one job requiring a GUI can run at a time.
+        exclusive_ids = [('session', sess)] if recording is None else [('session', sess, 'recording', recording)]
+        needs_gui = action.needs_GUI or kwargs.get('show_visualization', False)
+        if needs_gui:
+            exclusive_ids.append(('gui',))
+        priority = 1 if needs_gui else None
 
         # add to scheduler
         payload = process_pool.JobPayload(func, args, kwargs)
         progress_indicator = self.job_scheduler.get_progress_indicator() if action.has_progress_indication else None
-        self.job_scheduler.add_job(job, payload, self._action_done_callback, exclusive_id=exclusive_id, priority=priority, progress_indicator=progress_indicator)
+        self.job_scheduler.add_job(job, payload, self._action_done_callback, exclusive_ids=exclusive_ids, priority=priority, progress_indicator=progress_indicator)
 
     def _update_jobs_and_process_pool(self):
         pending_warning_popups: list[tuple[int, utils.JobInfo, process_pool.JobWarning]] = []
