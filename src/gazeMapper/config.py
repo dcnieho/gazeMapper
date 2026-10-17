@@ -418,9 +418,9 @@ class Study:
 
                  mapped_video_make_which                               : set[str]|None                     = None,
                  mapped_video_pixel_format                             : Literal['yuv420p','yuv444p']      = 'yuv420p',
-                 mapped_video_recording_colors                         : dict[str,drawing.RgbColor]|None    = None,
+                 mapped_video_recording_colors                         : dict[str,drawing.RgbColor]|None   = None,
                  mapped_video_gaze_styles                              : gaze_worldref.MappedGazeStyles    = gaze_worldref.DEFAULT_MAPPED_GAZE_STYLES,
-                 mapped_video_marker_styles                            : drawing.MarkerStyles               = drawing.DEFAULT_MAPPED_MARKER_STYLES,
+                 mapped_video_marker_styles                            : drawing.MarkerStyles              = drawing.DEFAULT_MAPPED_MARKER_STYLES,
                  mapped_video_process_marker_assemblies_for_all_frames : bool                              = False,
                  mapped_video_process_annotations_for_all_recordings   : bool                              = True,
                  mapped_video_recovered_assembly_marker_color          : drawing.RgbColor|None             = drawing.RgbColor(  0,255,255),
@@ -476,7 +476,7 @@ class Study:
         self.mapped_video_pixel_format                             = mapped_video_pixel_format
         self.mapped_video_recording_colors                         = mapped_video_recording_colors
         self.mapped_video_gaze_styles                              = mapped_video_gaze_styles
-        self.mapped_video_marker_styles                           = mapped_video_marker_styles
+        self.mapped_video_marker_styles                            = mapped_video_marker_styles
         self.mapped_video_process_marker_assemblies_for_all_frames = mapped_video_process_marker_assemblies_for_all_frames  # if True, all marker assemblies are processed for all frames, if False, only according to the marker_assemblies_per_episode setup and the coding
         self.mapped_video_process_annotations_for_all_recordings   = mapped_video_process_annotations_for_all_recordings    # if True, all coded episodes for all marker assemblies of all recordings are processed
         self.mapped_video_recovered_assembly_marker_color          = mapped_video_recovered_assembly_marker_color
