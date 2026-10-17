@@ -22,12 +22,13 @@ class Action(enum.IntEnum):
     VALIDATE = enum.auto()
     MAKE_MAPPED_GAZE_VIDEO = enum.auto()
     EXPORT_TRIALS = enum.auto()
+    VIEW_RECORDING = enum.auto()
     @property
     def displayable_name(self):
         return self.name.replace("_", " ").title()
     @property
     def needs_GUI(self):
-        return self in [Action.CODE_EPISODES, Action.SYNC_ET_TO_CAM]
+        return self in [Action.CODE_EPISODES, Action.SYNC_ET_TO_CAM, Action.VIEW_RECORDING]
     @property
     def has_options(self):
         return self in [Action.MAKE_GAZE_OVERLAY_VIDEO, Action.DETECT_MARKERS, Action.RUN_SYNC_FUNCTION, Action.GAZE_TO_PLANE, Action.MAKE_MAPPED_GAZE_VIDEO]
@@ -36,12 +37,12 @@ class Action(enum.IntEnum):
         return self in [Action.MAKE_GAZE_OVERLAY_VIDEO, Action.DETECT_MARKERS, Action.INTERPOLATE_PLANE_POSE, Action.GAZE_TO_PLANE, Action.COMPUTE_GAZE_OFFSETS, Action.VALIDATE, Action.MAKE_MAPPED_GAZE_VIDEO]
     def next(self):
         v = self.value+1
-        if v > Action.EXPORT_TRIALS.value:
+        if self == Action.VIEW_RECORDING or v > Action.EXPORT_TRIALS.value:
             raise StopIteration('Enumeration ended')
         return Action(v)
     def prev(self):
         v = self.value-1
-        if v<Action.IMPORT.value:
+        if self == Action.VIEW_RECORDING or v<Action.IMPORT.value:
             raise StopIteration('Enumeration ended')
         return Action(v)
     def next_values(self, inclusive=False) -> set['Action']:
@@ -52,7 +53,8 @@ class Action(enum.IntEnum):
         try:
             while True:
                 a = a.next()
-                vals.add(a)
+                if a != Action.VIEW_RECORDING:
+                    vals.add(a)
         except StopIteration:
             pass    # we're done
         return vals
@@ -78,6 +80,7 @@ def action_to_func(action: Action) -> typing.Callable[..., None]|None:
     from .run_validation import run as run_validation
     from .make_mapped_gaze_video import run as make_mapped_gaze_video
     from .export_trials import run as export_trials
+    from .view_recording import run as view_recording
 
     match action:
         case Action.IMPORT:
@@ -112,6 +115,8 @@ def action_to_func(action: Action) -> typing.Callable[..., None]|None:
             return make_mapped_gaze_video
         case Action.EXPORT_TRIALS:
             return export_trials
+        case Action.VIEW_RECORDING:
+            return view_recording
         case _:
             raise NotImplementedError(f'Logic is not implemented for {action.displayable_name} ({action}), major developer oversight! Let him know.')
 
@@ -150,6 +155,9 @@ def config_has_plane_pose_interpolation(study_config: 'config.Study', rec: str|N
         return False
     return rec is None or rec in study_config.interpolate_plane_pose_recordings
 
+def is_overlay_only_setup(study_config: 'config.Study') -> bool:
+    return not any((study_config.marker_assemblies, study_config.coding_setup, study_config.individual_markers))
+
 def is_action_possible_given_config(action: Action, study_config: 'config.Study') -> bool:
     match action:
         case Action.CODE_EPISODES | Action.DETECT_MARKERS:
@@ -182,6 +190,8 @@ def is_action_possible_given_config(action: Action, study_config: 'config.Study'
             return True     # always possible (in terms of config), since gaze overlay videos are always possible
         case Action.MAKE_MAPPED_GAZE_VIDEO:
             return not not study_config.mapped_video_make_which
+        case Action.VIEW_RECORDING:
+            return is_overlay_only_setup(study_config)
 
         case _:
             # no config preconditions for the other actions
@@ -277,6 +287,8 @@ def _determine_to_invalidate(action: Action) -> set[Action]:
             states_to_invalidate = {Action.EXPORT_TRIALS}
         case Action.EXPORT_TRIALS:
             states_to_invalidate = set()
+        case Action.VIEW_RECORDING:
+            states_to_invalidate = set()
         case _:
             raise NotImplementedError(f'Logic is not implemented for {action.displayable_name} ({action}), major developer oversight! Let him know.')
     return states_to_invalidate
@@ -308,6 +320,8 @@ def _is_recording_action_possible(rec: str, action_states: dict[Action, process_
             pass    # nothing besides import
         case Action.CODE_EPISODES:
             pass    # nothing besides import
+        case Action.VIEW_RECORDING:
+            pass    # viewing only requires import
         case Action.DETECT_MARKERS:
             pass    # nothing besides import
         case Action.RUN_SYNC_FUNCTION:
