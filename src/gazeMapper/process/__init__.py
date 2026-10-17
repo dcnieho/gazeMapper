@@ -240,24 +240,17 @@ def get_actions_for_config(study_config: 'config.Study', exclude_session_level: 
         actions = {a for a in actions if not is_session_level_action(a)}
     return actions
 
-def _determine_to_invalidate(action: Action, study_config: 'config.Study') -> set[Action]:
+def _determine_to_invalidate(action: Action) -> set[Action]:
     match action:
         case Action.IMPORT:
             states_to_invalidate = action.next_values()
         case Action.MAKE_GAZE_OVERLAY_VIDEO:
             states_to_invalidate = {Action.EXPORT_TRIALS}
         case Action.DETECT_MARKERS:
-            # N.B.: don't directly invalidate manually coded episodes. If auto-coding is run again based on
-            # the new marker detections, that action will invalidate CODE_EPISODES.
-            actions = {a for a in action.next_values() if a not in [Action.CODE_EPISODES, Action.RUN_SYNC_FUNCTION]}
-            if (study_config.mapped_video_process_marker_assemblies_for_all_frames or
-                study_config.mapped_video_assembly_marker_color is not None or # NB: no need to check mapped_video_recovered_assembly_marker_color as it only overrides colors for some assembly markers
-                study_config.mapped_video_individual_marker_color is not None or
-                study_config.mapped_video_unexpected_marker_color is not None or
-                study_config.mapped_video_rejected_marker_color is not None):
-                # in this case MAKE_MAPPED_GAZE_VIDEO processes each frame itself, so output of DETECT_MARKERS is not used
-                actions.discard(Action.MAKE_MAPPED_GAZE_VIDEO)
-            states_to_invalidate = actions
+            # N.B.: don't directly invalidate manually coded episodes (i.e., CODE_EPISODES).
+            # If either auto-coding is run again based on the new marker detections,
+            # that action will invalidate CODE_EPISODES.
+            states_to_invalidate = {a for a in action.next_values() if a not in [Action.CODE_EPISODES, Action.RUN_SYNC_FUNCTION, Action.MAKE_MAPPED_GAZE_VIDEO]}
         case Action.AUTO_CODE_SYNC:
             states_to_invalidate = {Action.CODE_EPISODES, Action.SYNC_TO_REFERENCE} | Action.GAZE_TO_PLANE.next_values(inclusive=True)
         case Action.AUTO_CODE_EPISODES:
@@ -273,7 +266,6 @@ def _determine_to_invalidate(action: Action, study_config: 'config.Study') -> se
         case Action.SYNC_TO_REFERENCE:
             states_to_invalidate = action.next_values()
         case Action.GAZE_TO_PLANE:
-            # NB: MAKE_MAPPED_GAZE_VIDEO does the job itself/doesn't use the gaze-to-plane file
             states_to_invalidate = {a for a in action.next_values() if a != Action.MAKE_MAPPED_GAZE_VIDEO}
         case Action.COMPUTE_GAZE_OFFSETS:
             states_to_invalidate = {Action.EXPORT_TRIALS}
@@ -296,7 +288,7 @@ def action_update_and_invalidate(action: Action, state: process_pool.State, stud
     # determine what other (later) actions are invalidated (and should thus be reset to not started state) by this action
     # being performed. There may be a better way of doing this, but i prefer to actively, per case, think this through
     # and explicitly write it out
-    states_to_invalidate = _determine_to_invalidate(action, study_config)
+    states_to_invalidate = _determine_to_invalidate(action)
     for a in states_to_invalidate:
         action_state_mutations[a] = process_pool.State.Not_Run
 
