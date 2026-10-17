@@ -488,7 +488,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
                                                      study_config.mapped_video_show_gaze_on_plane_in_which is not None and vo in study_config.mapped_video_show_gaze_on_plane_in_which,
                                                      study_config.mapped_video_show_gaze_vec_in_which is not None and vo in study_config.mapped_video_show_gaze_vec_in_which,
                                                      sub_pixel_fac,
-                                                     study_config.mapped_video_gaze_styles)
+                                                     study_config.mapped_video_gaze_styles,
+                                                     study_config.mapped_video_gaze_vector_style)
 
                 # Draw camera position on other videos, if so configured
                 if not poses_this or study_config.mapped_video_show_camera_in_which is None:
@@ -500,7 +501,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
                     matched_assembly = next((a for a in poses_this if a in assemblies and a in poses_other and poses_this[a].pose_successful() and poses_other[a].pose_successful()), None)
                     if matched_assembly is None:
                         continue
-                    draw_camera_on_other_video(frame[vo], ROI_offsets[vo], poses_this[matched_assembly], poses_other[matched_assembly], camera_params[vo], study_config.mapped_video_recording_colors[v], sub_pixel_fac)
+                    draw_camera_on_other_video(frame[vo], ROI_offsets[vo], poses_this[matched_assembly], poses_other[matched_assembly], camera_params[vo], study_config.mapped_video_recording_colors[v], sub_pixel_fac, study_config.mapped_video_camera_position_style)
 
 
             # print info on frame and submit to to be encoded
@@ -617,7 +618,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
     # update state
     session.update_action_states(working_dir, process.Action.MAKE_MAPPED_GAZE_VIDEO, process_pool.State.Completed, study_config)
 
-def draw_gaze_on_other_video(frame_other, ROI_offset, pose_this: pose.Pose, pose_other: pose.PlanePose, plane_gaze: gaze_worldref.Gaze, camera_params_other, recording_color: drawing.RgbColor, which_gaze_on_plane, which_gaze_on_plane_allow_fallback, do_draw_gaze, do_draw_gaze_vec, sub_pixel_fac, styles: gaze_worldref.MappedGazeStyles|None=None):
+def draw_gaze_on_other_video(frame_other, ROI_offset, pose_this: pose.Pose, pose_other: pose.PlanePose, plane_gaze: gaze_worldref.Gaze, camera_params_other, recording_color: drawing.RgbColor, which_gaze_on_plane, which_gaze_on_plane_allow_fallback, do_draw_gaze, do_draw_gaze_vec, sub_pixel_fac, styles: gaze_worldref.MappedGazeStyles|None=None, gaze_vector_style: drawing.LineStyle|None=drawing.LineStyle(color=None, thickness=5)):
     if not do_draw_gaze and not do_draw_gaze_vec:
         # nothing to do
         return
@@ -657,11 +658,13 @@ def draw_gaze_on_other_video(frame_other, ROI_offset, pose_this: pose.Pose, pose
 
     # also draw position of this camera on the other video, and possibly gaze vector
     if do_draw_gaze_vec and gaze_pos_other is not None:
+        if gaze_vector_style is None:
+            return
         cam_pos_other = _camera_position_in_other_camera_image(ROI_offset, pose_this, pose_other, camera_params_other)
         if cam_pos_other is None:
             return
-        # draw line connecting the camera and the gaze point
-        drawing.openCVLine(frame_other, gaze_pos_other, cam_pos_other, (*recording_color[::-1],), 5, sub_pixel_fac)
+        line_color = gaze_vector_style.color or recording_color
+        drawing.draw_line(frame_other, gaze_pos_other, cam_pos_other, gaze_vector_style._replace(color=line_color), sub_pixel_fac)
 
 def _camera_position_in_other_camera_image(ROI_offset, pose_this: pose.Pose, pose_other: pose.Pose, camera_params_other):
     if not pose_this.pose_successful() or not pose_other.pose_successful():
@@ -675,8 +678,12 @@ def _camera_position_in_other_camera_image(ROI_offset, pose_this: pose.Pose, pos
     # determine where that camera position is in the other video
     return pose_other.world_frame_to_camera_image(cam_pos_world_this, camera_params_other, ROI_offset)
 
-def draw_camera_on_other_video(frame_other, ROI_offset, pose_this: pose.Pose, pose_other: pose.Pose, camera_params_other, clr: drawing.RgbColor, sub_pixel_fac):
+def draw_camera_on_other_video(frame_other, ROI_offset, pose_this: pose.Pose, pose_other: pose.Pose, camera_params_other, clr: drawing.RgbColor, sub_pixel_fac, style: drawing.CircleStyle|None=drawing.CircleStyle(radius=3, edge_color=None, edge_thickness=1)):
+    if style is None:
+        return
     cam_pos_other = _camera_position_in_other_camera_image(ROI_offset, pose_this, pose_other, camera_params_other)
     if cam_pos_other is None:
         return
-    drawing.openCVCircle(frame_other, cam_pos_other, 3, (*clr[::-1],), 1, sub_pixel_fac)
+    if style.edge_color is None:
+        style = style._replace(edge_color=clr)
+    drawing.draw_circle(frame_other, cam_pos_other, style, sub_pixel_fac)

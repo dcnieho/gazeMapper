@@ -430,7 +430,9 @@ class Study:
                  mapped_video_show_sync_func_output                    : bool                              = True,
                  mapped_video_show_gaze_on_plane_in_which              : set[str]|None                     = None,
                  mapped_video_show_gaze_vec_in_which                   : set[str]|None                     = None,
+                 mapped_video_gaze_vector_style                        : drawing.LineStyle|None            = drawing.LineStyle(color=None, thickness=5),
                  mapped_video_show_camera_in_which                     : set[str]|None                     = None,
+                 mapped_video_camera_position_style                    : drawing.CircleStyle|None          = drawing.CircleStyle(radius=4, edge_color=None, edge_thickness=2),
                  mapped_video_which_gaze_type_on_plane                 : gaze_worldref.Type                = gaze_worldref.Type.Scene_Video_Position,
                  mapped_video_which_gaze_type_on_plane_allow_fallback  : bool                              = True,
                  mapped_video_gaze_to_plane_margin                     : float                             = 0.25,
@@ -486,7 +488,9 @@ class Study:
         self.mapped_video_show_sync_func_output                    = mapped_video_show_sync_func_output
         self.mapped_video_show_gaze_on_plane_in_which              = mapped_video_show_gaze_on_plane_in_which
         self.mapped_video_show_gaze_vec_in_which                   = mapped_video_show_gaze_vec_in_which
+        self.mapped_video_gaze_vector_style                        = mapped_video_gaze_vector_style
         self.mapped_video_show_camera_in_which                     = mapped_video_show_camera_in_which
+        self.mapped_video_camera_position_style                    = mapped_video_camera_position_style
         self.mapped_video_which_gaze_type_on_plane                 = mapped_video_which_gaze_type_on_plane
         self.mapped_video_which_gaze_type_on_plane_allow_fallback  = mapped_video_which_gaze_type_on_plane_allow_fallback
         self.mapped_video_gaze_to_plane_margin                     = mapped_video_gaze_to_plane_margin                      # fraction of plane size, added to each side of the plane
@@ -1084,14 +1088,18 @@ class Study:
         problems: type_utils.ProblemDict = {}
 
         def check_gaze_style(group, name, style):
+            style_problems: type_utils.ProblemDict = {}
             for field in ('radius', 'edge_thickness'):
                 value = getattr(style, field)
                 if value < 0:
-                    problems.setdefault(group, {}).setdefault(name, {})[field] = (type_utils.ProblemLevel.Error, 'Must be zero or greater')
+                    style_problems[field] = (type_utils.ProblemLevel.Error, 'Must be zero or greater')
             for field in ('edge_color', 'fill_color'):
                 color = getattr(style, field)
                 if color is not None and any(component < 0 or component > 255 for component in color):
-                    problems.setdefault(group, {}).setdefault(name, {})[field] = (type_utils.ProblemLevel.Error, 'RGB components must be between 0 and 255')
+                    style_problems[field] = (type_utils.ProblemLevel.Error, 'RGB components must be between 0 and 255')
+            if style_problems:
+                subtree = {name: style_problems} if name is not None else style_problems
+                type_utils.merge_problem_dicts(problems, {group: subtree})
 
         for name, style in self.overlay_video_gaze_styles._asdict().items():
             if style is not None:
@@ -1099,24 +1107,41 @@ class Study:
         for name, style in self.mapped_video_gaze_styles._asdict().items():
             if style is not None:
                 check_gaze_style('mapped_video_gaze_styles', name, style)
+        if self.mapped_video_camera_position_style is not None:
+            check_gaze_style('mapped_video_camera_position_style', None, self.mapped_video_camera_position_style)
+        if self.mapped_video_gaze_vector_style is not None:
+            style_problems = {}
+            style = self.mapped_video_gaze_vector_style
+            if style.thickness < 0:
+                style_problems['thickness'] = (type_utils.ProblemLevel.Error, 'Must be zero or greater')
+            if style.color is not None and any(component < 0 or component > 255 for component in style.color):
+                style_problems['color'] = (type_utils.ProblemLevel.Error, 'RGB components must be between 0 and 255')
+            if style_problems:
+                type_utils.merge_problem_dicts(problems, {'mapped_video_gaze_vector_style': style_problems})
 
         for group, styles in (
             ('mapped_video_marker_styles', self.mapped_video_marker_styles),
         ):
             for name, style in styles._asdict().items():
+                style_problems: type_utils.ProblemDict = {}
                 for field in ('border_color', 'corner_color'):
                     color = getattr(style, field)
                     if color is not None and any(component < 0 or component > 255 for component in color):
-                        problems.setdefault(group, {}).setdefault(name, {})[field] = (type_utils.ProblemLevel.Error, 'RGB components must be between 0 and 255')
+                        style_problems[field] = (type_utils.ProblemLevel.Error, 'RGB components must be between 0 and 255')
                 id_style = style.id_style
+                id_style_problems: type_utils.ProblemDict = {}
                 if not 0.0 <= id_style.background_opacity <= 1.0:
-                    problems.setdefault(group, {}).setdefault(name, {}).setdefault('id_style', {})['background_opacity'] = (type_utils.ProblemLevel.Error, 'Must be between 0 and 1')
+                    id_style_problems['background_opacity'] = (type_utils.ProblemLevel.Error, 'Must be between 0 and 1')
                 if id_style.font_size <= 0:
-                    problems.setdefault(group, {}).setdefault(name, {}).setdefault('id_style', {})['font_size'] = (type_utils.ProblemLevel.Error, 'Must be greater than 0')
+                    id_style_problems['font_size'] = (type_utils.ProblemLevel.Error, 'Must be greater than 0')
                 for field in ('color', 'background_color'):
                     color = getattr(id_style, field)
                     if color is not None and any(component < 0 or component > 255 for component in color):
-                        problems.setdefault(group, {}).setdefault(name, {}).setdefault('id_style', {})[field] = (type_utils.ProblemLevel.Error, 'RGB components must be between 0 and 255')
+                        id_style_problems[field] = (type_utils.ProblemLevel.Error, 'RGB components must be between 0 and 255')
+                if id_style_problems:
+                    style_problems['id_style'] = id_style_problems
+                if style_problems:
+                    type_utils.merge_problem_dicts(problems, {group: {name: style_problems}})
         return problems
 
     def _check_marker_assemblies(self) -> type_utils.ProblemDict:
@@ -1440,6 +1465,10 @@ _gaze_point_style_docs = {
     'edge_thickness': type_utils.GUIDocInfo('Edge thickness', 'Outline width in pixels. Set to 0 to disable the outline.'),
     'fill_color': type_utils.GUIDocInfo('Fill color', 'RGB fill color. An unset color disables the fill.'),
 }
+_line_style_docs = {
+    'color': type_utils.GUIDocInfo('Color', 'RGB line color.'),
+    'thickness': type_utils.GUIDocInfo('Thickness', 'Line width in pixels. Set to 0 to disable the line.'),
+}
 _marker_id_style_docs = {
     'draw': type_utils.GUIDocInfo('Draw marker IDs?', 'Draw marker IDs for this marker category.'),
     'color': type_utils.GUIDocInfo('Text color', 'Optional RGB text color. If unset, use the inverse of the category marker color.'),
@@ -1509,7 +1538,9 @@ study_parameter_doc = {
     'mapped_video_show_sync_func_output': type_utils.GUIDocInfo('Mapped video: Show sync function output?', 'If enabled, draw the output of the function on the output video. Applies if the "Gaze data synchronization: Function for camera movement" setting is set to "function".'),
     'mapped_video_show_gaze_on_plane_in_which': type_utils.GUIDocInfo('Mapped video: Videos on which to draw gaze projected to plane', 'For the listed recordings, gaze projected to the plane (both the gaze point on the scene video, and the left and right eyes\' gaze vectors if available) is drawn on the video for eye tracker recordings. If there are multiple recordings in a session, gaze positions for the other recordings (if available) will also be drawn on the indicated video(s).'),
     'mapped_video_show_gaze_vec_in_which': type_utils.GUIDocInfo('Mapped video: Videos on which to draw gaze vectors(s)', 'For the listed recordings, a line is drawn between the positions of the cameras of other recordings and the gaze position of these recordings projected to the plane in the generated video. Only for eye tracker recordings.'),
+    'mapped_video_gaze_vector_style': type_utils.GUIDocInfo('Mapped video: Gaze-vector style', 'Appearance of the line connecting a recording camera position to its projected gaze point. An unset color uses the recording color.', _line_style_docs),
     'mapped_video_show_camera_in_which': type_utils.GUIDocInfo('Mapped video: Videos on which to draw camera position(s)', 'For the listed recordings, the position of the cameras of other recordings is marked in the generated video.'),
+    'mapped_video_camera_position_style': type_utils.GUIDocInfo('Mapped video: Camera-position style', 'Appearance of camera positions projected onto another recording. If neither circle color is set, the recording color is used for the outline.', _gaze_point_style_docs),
     'mapped_video_which_gaze_type_on_plane': type_utils.GUIDocInfo('Mapped video: Which gaze on plane to show?', 'Sets which available gaze-on-plane type is drawn (in the recording color). Other available types are drawn, on the video of their recording using their configured gaze-style colors. Unset their colors to not draw them.', _gaze_type_doc),
     'mapped_video_which_gaze_type_on_plane_allow_fallback': type_utils.GUIDocInfo('Mapped video: Allow fallback to scene-video-derived gaze on plane?', 'If the selected gaze-on-plane type is unavailable, use the gaze position mapped onto the plane from the scene-video gaze and highlight it in the recording color.'),
     'mapped_video_gaze_to_plane_margin': type_utils.GUIDocInfo('Mapped video: Gaze position margin','Gaze position more than this factor outside a defined plane will not be drawn.'),
@@ -1697,6 +1728,8 @@ class StudyOverride:
             style_types = {
                 'overlay_video_gaze_styles': gaze_headref.OverlayGazeStyles,
                 'mapped_video_gaze_styles': gaze_worldref.MappedGazeStyles,
+                'mapped_video_gaze_vector_style': drawing.LineStyle,
+                'mapped_video_camera_position_style': drawing.CircleStyle,
                 'mapped_video_marker_styles': drawing.MarkerStyles,
             }
             if not self.for_event_setup and p in style_types and isinstance(kwargs[p], dict):
