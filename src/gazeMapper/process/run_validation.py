@@ -141,6 +141,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None=None, p
                                 d_types=cs['validation_setup']['data_types'],
                                 allow_data_type_fallback=cs['validation_setup']['allow_data_type_fallback'],
                                 include_data_loss=cs['validation_setup']['include_data_loss'],
+                                include_unit_header_row=cs['validation_setup']['include_unit_header_row'],
                                 camera_params=camera_params)
         progress_indicator.update()
 

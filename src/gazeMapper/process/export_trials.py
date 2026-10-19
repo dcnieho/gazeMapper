@@ -69,11 +69,11 @@ class ValidationEpisode(OptionBase):
     targets: dict[int,bool] = dataclasses.field(default_factory=lambda: {})
     targets_avg: bool = False
     include_data_loss: bool = False
-    include_unit_header_row: bool = True
 @dataclasses.dataclass
 class Validation:
     available: bool
     do_it: bool
+    include_unit_header_row: bool = True
     episodes: dict[str, ValidationEpisode] = dataclasses.field(default_factory=lambda: {})
 @dataclasses.dataclass
 class GazeOverlayVideo(OptionBase):
@@ -141,9 +141,9 @@ export_config_doc = {
         'episodes': type_utils.GUIDocInfo('Coding events', 'Leave empty to export gaze-offset data for every configured event.'),
     }),
     'validation': type_utils.GUIDocInfo('Validation data quality', 'Export data-quality metrics from validation episodes.', {
+        'include_unit_header_row': type_utils.GUIDocInfo('Include units row', 'Add a second header row describing the units or meaning of each column.'),
         'targets_avg': type_utils.GUIDocInfo('Average over selected targets', 'Average the selected targets\' metrics together.'),
         'include_data_loss': type_utils.GUIDocInfo('Include data loss', 'Include the data-loss metric in the export. This is unlikely what you want, as it is data loss only during the validation episode, not during your trials. See the Compute data quality action and the Trial data quality export section below (only available if you have run the Compute data quality action).'),
-        'include_unit_header_row': type_utils.GUIDocInfo('Include units row', 'Add a second header row describing the units or meaning of each column.'),
     }),
     'trial_data_quality': type_utils.GUIDocInfo('Trial data quality', 'Export computed trial data-quality metrics.'),
     'eye_tracker_sync': type_utils.GUIDocInfo('Eye-tracker to scene-camera synchronization', 'Export the time offset used to align eye-tracker gaze timestamps with the scene-camera video. The TSV contains one row per coded synchronization interval, with session, recording, interval, and offset_t (seconds). This is the offset applied to the eye-tracker\'s gaze data timestamps before associating samples with scene-camera frames.'),
@@ -926,7 +926,15 @@ def export_validation(export_path: pathlib.Path, val_export_config: Validation):
     for nm in val_export_config.episodes:
         dq_types = [dq for dq in val_export_config.episodes[nm].d_types if val_export_config.episodes[nm].d_types[dq]]
         targets  = [t for t in val_export_config.episodes[nm].targets if val_export_config.episodes[nm].targets[t]]
-        val_export.summarize_and_store_data_quality(val_export_config.episodes[nm].df, export_path/f'data_quality_{nm}.tsv', dq_types, targets, val_export_config.episodes[nm].targets_avg, val_export_config.episodes[nm].include_data_loss)
+        val_export.summarize_and_store_data_quality(
+            val_export_config.episodes[nm].df,
+            export_path/f'data_quality_{nm}.tsv',
+            dq_types,
+            targets,
+            val_export_config.episodes[nm].targets_avg,
+            val_export_config.episodes[nm].include_data_loss,
+            include_unit_header_row=val_export_config.include_unit_header_row,
+        )
 
 def export_trial_data_quality(project_dir: str|pathlib.Path, sess_recs: list[tuple[str, str]], output_dir: str|pathlib.Path):
     project_dir = pathlib.Path(project_dir)

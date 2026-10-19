@@ -653,6 +653,13 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
             if t_fields and fld.do_it and imgui.tree_node(f'{field_label} settings'):
                 right_width = imgui.get_window_dpi_scale()*90
                 if f.name=='validation':
+                    unit_header_doc = field_doc.children.get('include_unit_header_row') if field_doc else None
+                    unit_header_label = unit_header_doc.display_string if unit_header_doc else 'Include units row'
+                    _, fld.include_unit_header_row = imgui.checkbox(f'{unit_header_label}##validation_unit_header_row', fld.include_unit_header_row)
+                    if unit_header_doc and unit_header_doc.doc_str:
+                        imgui.same_line()
+                        gt_gui.utils.draw_hover_text(unit_header_doc.doc_str, text='')
+                    imgui.spacing()
                     need_node = len(fld.episodes)>1
                     for nm in fld.episodes:
                         cs = [c for c in g.study_config.coding_setup if c['name']==nm][0]

@@ -232,6 +232,7 @@ class ValidationSetup(typed_dict_defaults.TypedDictDefault, total=False):
     data_types                  : set[_data_types.DataType]|None = None
     allow_data_type_fallback    : bool                      = False
     include_data_loss           : bool                      = False
+    include_unit_header_row     : bool                      = True
     I2MC_settings               : I2MCSettings              = typed_dict_defaults.Field(default_factory=lambda: I2MCSettings())
     dynamic_skip_first_duration : float                     = .2
     dynamic_max_gap_duration    : int                       = 4
@@ -1595,6 +1596,7 @@ event_setup_doc = {
         }),
         'allow_data_type_fallback': type_utils.GUIDocInfo('Allow fallback data type?', 'If not enabled, an error is raised when the data type(s) indicated in "Data types" are not available. If enabled, a sensible default other data type will be used instead. Does not apply if the "Data types" is not set.'),
         'include_data_loss': type_utils.GUIDocInfo('Include data loss?', 'If enabled, the data quality report will include data loss during the episode selected for each target on the validation poster. This is NOT the data loss of the whole recording and thus not what you want to report in your paper.'),
+        'include_unit_header_row': type_utils.GUIDocInfo('Include units row?', 'Add a second header row describing the units and meaning of each column in the validation data-quality output.'),
         'I2MC_settings': type_utils.GUIDocInfo('I2MC settings','Settings for the I2MC fixation classifier used as part of determining the fixation that are assigned to validation targets. Settings that are "<not set>" will be determined based on the provided eye tracking data.',{
             'freq': type_utils.GUIDocInfo('Sampling frequency', 'Sampling frequency of the eye tracking data.'),
             'windowtimeInterp': type_utils.GUIDocInfo('Maximum gap duration for interpolation', 'Maximum duration (s) of gap in the data that is interpolated.'),
