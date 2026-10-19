@@ -148,7 +148,7 @@ class GUI:
         gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Processing error", "Something went wrong in an asynchronous task of a separate thread", gt_gui.msg_box.MsgBox.error, more=tb)
 
     def _load_fonts(self):
-        # load the default font. Do it manually as we want to use Roboto as the default font
+        # load the default font. Do it manually as we want to use Roboto as the default font, and need to set DPI scaling parameters correctly
         normal_size = 16.
         font_params = hello_imgui.FontLoadingParams(adjust_size_to_dpi=False)
         hello_imgui.load_font("fonts/Roboto/Roboto-Regular.ttf", normal_size, font_params)
