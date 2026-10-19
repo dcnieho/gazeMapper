@@ -148,21 +148,7 @@ class GUI:
         gt_gui.utils.push_popup(self, gt_gui.msg_box.msgbox, "Processing error", "Something went wrong in an asynchronous task of a separate thread", gt_gui.msg_box.MsgBox.error, more=tb)
 
     def _load_fonts(self):
-        # load the default font. Do it manually as we want to use Roboto as the default font, and need to set DPI scaling parameters correctly
-        normal_size = 16.
-        font_params = hello_imgui.FontLoadingParams(adjust_size_to_dpi=False)
-        hello_imgui.load_font("fonts/Roboto/Roboto-Regular.ttf", normal_size, font_params)
-        # add icons
-        icon_font_params = hello_imgui.FontLoadingParams(adjust_size_to_dpi=False, merge_to_last_font=True)
-        hello_imgui.load_font("fonts/Font_Awesome_6_Free-Solid-900.otf", normal_size, icon_font_params)
-
-        # markdown font loading does not expose the adjust_size_to_dpi=False parameter, so we have to adjust for DPI at load time ourselves.
-        dpi_loading_factor = hello_imgui.dpi_font_loading_factor()
-        markdown_options = imgui_md.MarkdownOptions()
-        if dpi_loading_factor > 0:
-            markdown_options.font_options.regular_size = normal_size / dpi_loading_factor
-        imgui_md.initialize_markdown(markdown_options)
-        imgui_md.get_font_loader_function()()
+        hello_imgui.load_font_ttf_with_font_awesome_icons("fonts/Roboto/Roboto-Regular.ttf", 16.)
 
     def _setup_imgui_config(self):
         io = imgui.get_io()
@@ -221,6 +207,7 @@ class GUI:
         runner_params.app_window_params.window_geometry.size = (1400, 700)
         runner_params.app_window_params.restore_previous_geometry = False
         runner_params.callbacks.setup_imgui_config = self._setup_imgui_config
+        runner_params.callbacks.default_icon_font = hello_imgui.DefaultIconFont.font_awesome6
         runner_params.callbacks.post_init_add_platform_backend_callbacks = self._setup_glfw
         runner_params.callbacks.load_additional_fonts = self._load_fonts
         runner_params.callbacks.pre_new_frame = self._pre_new_frame
@@ -260,10 +247,11 @@ class GUI:
             self._action_list_pane
         ]
 
-        immapp.run(runner_params)
+        addons_params = immapp.AddOnsParams()
+        addons_params.with_markdown = True
+        immapp.run(runner_params, addons_params)
 
     def _exiting(self):
-        imgui_md.de_initialize_markdown()
         self.close_project()
         self.running = False
 
