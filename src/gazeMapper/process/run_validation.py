@@ -2,7 +2,7 @@ import pathlib
 import numpy as np
 import pandas as pd
 
-from glassesTools import annotation, fixation_classification, naming as gt_naming, process_pool, validation
+from glassesTools import annotation, fixation_classification, naming as gt_naming, ocv, process_pool, validation
 from glassesTools.validation import assign_intervals, compute_offsets
 
 from .. import config, episode, naming, marker_assembly, process, session
@@ -34,6 +34,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None=None, p
     rec_def = study_config.session_def.get_recording_def(working_dir.name)
     if rec_def.type!=session.RecordingType.Eye_Tracker:
         raise ValueError(f'You can only run run_validation on eye tracker recordings, not on a {str(rec_def.type).split(".")[1]} recording')
+    camera_params = ocv.CameraParams.read_from_file(working_dir / gt_naming.scene_camera_calibration_fname)
 
     # get interval(s) coded to be analyzed, if any
     episodes = episode.load_episodes_from_all_recordings(study_config, working_dir, {cs['name'] for cs in val_events})[0]
@@ -139,7 +140,8 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None=None, p
                                 filename=f'{naming.validation_prefix}{e}_data_quality.tsv',
                                 d_types=cs['validation_setup']['data_types'],
                                 allow_data_type_fallback=cs['validation_setup']['allow_data_type_fallback'],
-                                include_data_loss=cs['validation_setup']['include_data_loss'])
+                                include_data_loss=cs['validation_setup']['include_data_loss'],
+                                camera_params=camera_params)
         progress_indicator.update()
 
     # update state
