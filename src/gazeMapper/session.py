@@ -1,7 +1,17 @@
 from enum import auto
+import contextlib
+import errno
+import os
 import pathlib
+import threading
+import time
 import typeguard
 import shutil
+
+if os.name == 'nt':
+    import msvcrt
+else:
+    import fcntl
 
 from glassesTools import camera_recording, importing, json, naming, process_pool, utils
 from glassesTools.recording import Recording as EyeTrackerRecording
@@ -347,24 +357,70 @@ def _get_not_run_action_states(for_recording: bool) -> dict[process.Action, proc
         filt = lambda x:     process.is_session_level_action(x)
     return {k:process_pool.State.Not_Run for k in process.Action if filt(k)}
 
+_action_state_locks: dict[pathlib.Path, threading.Lock] = {}
+_action_state_locks_guard = threading.Lock()
+
+@contextlib.contextmanager
+def _action_state_file_lock(file: pathlib.Path):
+    lock_file = file.with_name(f'.{file.name}.lock')
+    lock_key = lock_file.resolve()
+    with _action_state_locks_guard:
+        thread_lock = _action_state_locks.setdefault(lock_key, threading.Lock())
+
+    with thread_lock:
+        with lock_file.open('a+b') as lock_stream:
+            lock_stream.seek(0, os.SEEK_END)
+            if lock_stream.tell() == 0:
+                lock_stream.write(b'\0')
+                lock_stream.flush()
+            if os.name == 'nt':
+                while True:
+                    lock_stream.seek(0)
+                    try:
+                        msvcrt.locking(lock_stream.fileno(), msvcrt.LK_NBLCK, 1)
+                    except OSError as exc:
+                        if exc.errno not in (errno.EACCES, errno.EDEADLK):
+                            raise
+                        time.sleep(0.05)
+                    else:
+                        break
+                try:
+                    yield
+                finally:
+                    lock_stream.seek(0)
+                    msvcrt.locking(lock_stream.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                lock_stream.seek(0)
+                fcntl.flock(lock_stream.fileno(), fcntl.LOCK_EX)
+                try:
+                    yield
+                finally:
+                    fcntl.flock(lock_stream.fileno(), fcntl.LOCK_UN)
+
 def _create_action_states_file(file: pathlib.Path, for_recording: bool):
     if file.is_dir():
         file /= _get_action_status_fname(for_recording)
-    action_states = _get_not_run_action_states(for_recording)
-    _write_action_states_to_file(file, action_states)
+    with _action_state_file_lock(file):
+        _create_action_states_file_unlocked(file, for_recording)
 
-def _write_action_states_to_file(file: pathlib.Path, action_states: dict[process.Action, process_pool.State]):
+def _create_action_states_file_unlocked(file: pathlib.Path, for_recording: bool):
+    if file.is_dir():
+        file /= _get_action_status_fname(for_recording)
+    action_states = _get_not_run_action_states(for_recording)
+    _write_action_states_to_file_unlocked(file, action_states)
+
+def _write_action_states_to_file_unlocked(file: pathlib.Path, action_states: dict[process.Action, process_pool.State]):
     action_states = {utils.enum_val_2_str(k):action_states[k] for k in action_states}    # turn key into string so it can be stored in a json file
     json.dump(action_states, file)
 
-def _read_action_states(file: pathlib.Path) -> dict[process.Action, process_pool.State]:
+def _read_action_states_unlocked(file: pathlib.Path) -> dict[process.Action, process_pool.State]:
     if not file.is_file():
         return None
 
     action_states = json.load(file)
     return {process.action_str_to_enum_val(k): process_pool.State(action_states[k]) for k in action_states}  # turn key from string back into enum instance, and same for state value
 
-def _upgrade_action_states(file: pathlib.Path, action_states: dict[process.Action, process_pool.State], for_recording: bool) -> dict[process.Action, process_pool.State]:
+def _upgrade_action_states_unlocked(file: pathlib.Path, action_states: dict[process.Action, process_pool.State], for_recording: bool) -> dict[process.Action, process_pool.State]:
     if file.is_dir():
         file /= _get_action_status_fname(for_recording)
     expected_action_states = _get_not_run_action_states(for_recording)
@@ -374,35 +430,39 @@ def _upgrade_action_states(file: pathlib.Path, action_states: dict[process.Actio
     upgraded_action_states |= {a:expected_action_states[a] for a in expected_action_states if a not in upgraded_action_states}
     # store if anything has changed
     if set(upgraded_action_states.keys())!=set(action_states.keys()):
-        _write_action_states_to_file(file, upgraded_action_states)
+        _write_action_states_to_file_unlocked(file, upgraded_action_states)
     return upgraded_action_states
 
 def get_action_states(working_dir: str|pathlib.Path, for_recording: bool, create_if_missing = False, skip_if_missing=False, upgrade_if_needed=False) -> dict[process.Action, process_pool.State]:
     working_dir = pathlib.Path(working_dir)
     file = working_dir / _get_action_status_fname(for_recording)
-    action_states = _read_action_states(file)
+    with _action_state_file_lock(file):
+        return _get_action_states_unlocked(file, for_recording, create_if_missing, skip_if_missing, upgrade_if_needed)
 
+def _get_action_states_unlocked(file: pathlib.Path, for_recording: bool, create_if_missing: bool, skip_if_missing: bool, upgrade_if_needed: bool):
+    action_states = _read_action_states_unlocked(file)
     if action_states is not None:
         if upgrade_if_needed:
-            action_states = _upgrade_action_states(file, action_states, for_recording)
+            action_states = _upgrade_action_states_unlocked(file, action_states, for_recording)
     else:
         if create_if_missing:
-            _create_action_states_file(file, for_recording)
-            return _read_action_states(file)
+            _create_action_states_file_unlocked(file, for_recording)
+            return _read_action_states_unlocked(file)
         elif not skip_if_missing:
             raise FileNotFoundError(f'Action states file {file} was not found')
     return action_states
 
 def _apply_mutations_and_store(file, action_state_mutations, skip_if_missing=False):
-    action_states = _read_action_states(file)
-    if action_states is None and not skip_if_missing:
-        raise FileNotFoundError(f'Action states file {file} was not found')
+    with _action_state_file_lock(file):
+        action_states = _read_action_states_unlocked(file)
+        if action_states is None and not skip_if_missing:
+            raise FileNotFoundError(f'Action states file {file} was not found')
 
-    # apply mutations
-    for a in action_state_mutations:
-        action_states[a] = action_state_mutations[a]
+        # apply mutations
+        for a in action_state_mutations:
+            action_states[a] = action_state_mutations[a]
 
-    _write_action_states_to_file(file, action_states)
+        _write_action_states_to_file_unlocked(file, action_states)
 
 def update_action_states(working_dir: str|pathlib.Path, action: process.Action, state: process_pool.State, study_config: 'config.Study', skip_if_missing=False, unchanged=False) -> dict[process.Action, process_pool.State]:
     for_recording = not process.is_session_level_action(action)
