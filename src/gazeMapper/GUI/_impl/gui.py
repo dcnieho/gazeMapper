@@ -82,7 +82,7 @@ class GUI:
         self._config_watcher_stop_event : asyncio.Event|None             = None
 
         self.process_pool                                                = process_pool.ProcessPool()
-        self.job_scheduler                                               = process_pool.JobScheduler[utils.JobInfo](self.process_pool, self._check_job_valid)
+        self.job_scheduler                                               = process_pool.JobScheduler[utils.JobInfo](self.process_pool, self._check_job_valid, self._check_job_preconditions)
         self._active_jobs_cache         : dict[utils.JobInfo, int]       = {}
 
         self._window_list                   : list[hello_imgui.DockableWindow]  = []
@@ -656,6 +656,9 @@ class GUI:
         if job in self._active_jobs_cache:
             # already scheduled, nothing to do
             return
+        depends_on = self._get_action_job_dependencies(job, allow_pending=True)
+        if depends_on is None:
+            return
         if action==process.Action.IMPORT:
             # NB: if import fails, remove directory, which removes recording from GUI (automatically thanks to watcher)
             func = self.sessions[sess].import_recording
@@ -677,7 +680,7 @@ class GUI:
         # add to scheduler
         payload = process_pool.JobPayload(func, args, kwargs)
         progress_indicator = self.job_scheduler.get_progress_indicator() if action.has_progress_indication else None
-        self.job_scheduler.add_job(job, payload, self._action_done_callback, exclusive_ids=exclusive_ids, priority=priority, progress_indicator=progress_indicator)
+        self.job_scheduler.add_job(job, payload, self._action_done_callback, exclusive_ids=exclusive_ids, priority=priority, progress_indicator=progress_indicator, depends_on=depends_on)
 
     def _update_jobs_and_process_pool(self):
         pending_warning_popups: list[tuple[int, utils.JobInfo, process_pool.JobWarning]] = []
@@ -715,6 +718,41 @@ class GUI:
         if job.recording and job.recording not in sess.recordings:
             return False
         return True
+
+    def _check_job_preconditions(self, job: utils.JobInfo) -> bool:
+        return self._get_action_job_dependencies(job, allow_pending=False) is not None
+
+    def _get_action_job_dependencies(self, job: utils.JobInfo, allow_pending: bool) -> set[int]|None:
+        sess = self.sessions.get(job.session)
+        if sess is None or (job.recording is not None and job.recording not in sess.recordings):
+            return None
+        if job.action==process.Action.IMPORT:
+            return set()
+
+        cfg = self._get_effective_session_config(job.session) if job.session in self.session_config_overrides else self.study_config
+        if cfg is None:
+            return None
+        rec_states = {job.recording:sess.recordings[job.recording].state} if job.recording is not None else {r:sess.recordings[r].state for r in sess.recordings}
+        actions = process.get_possible_actions(sess.state, rec_states, {job.action}, cfg, allow_pending=allow_pending)
+        action_state = actions.get(job.action)
+        if action_state is None:
+            return None
+        available, prerequisites = action_state
+        if job.recording is None:
+            if not isinstance(available, bool) or not available:
+                return None
+        elif not isinstance(available, list) or job.recording not in available:
+            return None
+
+        dependency_ids = set()
+        for prerequisite, recordings in prerequisites.items():
+            owners = [None] if recordings is None else recordings
+            for recording in owners:
+                dependency_id = self._active_jobs_cache.get(utils.JobInfo(prerequisite, job.session, recording))
+                if dependency_id is None:
+                    return None
+                dependency_ids.add(dependency_id)
+        return dependency_ids
 
     def _get_active_job(self, action: process.Action, session_name: str, recording_name: str=None):
         j = utils.JobInfo(action, session_name, recording_name)
@@ -1619,12 +1657,13 @@ class GUI:
                 imgui.TableFlags_.sizing_fixed_fit |
                 imgui.TableFlags_.no_host_extend_y
             )
-        if imgui.begin_table(f"##processing_queue",columns=5,flags=table_flags):
+        if imgui.begin_table(f"##processing_queue",columns=6,flags=table_flags):
             imgui.table_setup_column("ID", imgui.TableColumnFlags_.default_sort | imgui.TableColumnFlags_.no_hide)  # 0
             imgui.table_setup_column("Status", imgui.TableColumnFlags_.no_hide)  # 1
             imgui.table_setup_column("Session", imgui.TableColumnFlags_.no_hide)  # 2
             imgui.table_setup_column("Recording", imgui.TableColumnFlags_.no_hide)  # 3
             imgui.table_setup_column("Action", imgui.TableColumnFlags_.width_stretch | imgui.TableColumnFlags_.no_hide)  # 4
+            imgui.table_setup_column("Waiting / dependencies", imgui.TableColumnFlags_.width_stretch | imgui.TableColumnFlags_.no_hide)  # 5
             imgui.table_setup_scroll_freeze(0, 1)  # Sticky column headers
 
             # Headers
@@ -1645,6 +1684,8 @@ class GUI:
                         key = lambda idx: (jobs[idx].user_data.recording is None, jobs[idx].user_data.recording)
                     case 4:     # action
                         key = lambda idx: jobs[idx].user_data.action
+                    case 5:     # dependencies
+                        key = lambda idx: tuple(sorted(jobs[idx].depends_on or ()))
 
                 job_ids.sort(key=key, reverse=sort_spec.get_sort_direction()==imgui.SortDirection.descending)
 
@@ -1652,7 +1693,7 @@ class GUI:
             for job_id in job_ids:
                 imgui.table_next_row()
 
-                for ci in range(5):
+                for ci in range(6):
                     if not (imgui.table_get_column_flags(ci) & imgui.TableColumnFlags_.is_enabled):
                         continue
                     imgui.table_set_column_index(ci)
@@ -1692,6 +1733,34 @@ class GUI:
                         case 4:
                             # action
                             imgui.text(jobs[job_id].user_data.action.displayable_name)
+                        case 5:
+                            # wait reasons and dependency states
+                            waiting_reasons = self.job_scheduler.get_waiting_reasons(job_id) if job_states[job_id]==process_pool.State.Pending else []
+                            if waiting_reasons:
+                                imgui.text(waiting_reasons[0])
+                                gt_gui.utils.draw_hover_text('- ' + ('\n- '.join(waiting_reasons)), text='')
+                            for dependency_index, dependency_id in enumerate(sorted(jobs[job_id].depends_on or ())):
+                                if waiting_reasons or dependency_index:
+                                    imgui.same_line()
+                                dependency = jobs.get(dependency_id)
+                                if dependency is None:
+                                    dependency_state = process_pool.State.Failed
+                                    dependency_text = f'Job #{dependency_id}: missing prerequisite'
+                                else:
+                                    dependency_state = dependency.get_state()
+                                    dependency_owner = dependency.user_data
+                                    dependency_text = f'Job #{dependency_id}: {dependency_state.displayable_name} - {dependency_owner.action.displayable_name}, {dependency_owner.session}'
+                                    if dependency_owner.recording:
+                                        dependency_text += f', {dependency_owner.recording}'
+                                dependency_icon = {
+                                    process_pool.State.Completed: ifa6.ICON_FA_CIRCLE_CHECK,
+                                    process_pool.State.Pending: ifa6.ICON_FA_CLOCK,
+                                    process_pool.State.Running: ifa6.ICON_FA_PLAY,
+                                    process_pool.State.Canceled: ifa6.ICON_FA_CIRCLE_XMARK,
+                                    process_pool.State.Failed: ifa6.ICON_FA_TRIANGLE_EXCLAMATION,
+                                }.get(dependency_state, ifa6.ICON_FA_MINUS)
+                                imgui.text(dependency_icon)
+                                gt_gui.utils.draw_hover_text(dependency_text, text='')
 
             imgui.end_table()
 
@@ -2521,7 +2590,7 @@ class GUI:
         actions_running: dict[str, dict[process.Action, bool|list[str]]] = {}
         for s in sess:
             cfg = self._get_effective_session_config(s.name) if s.name in self.session_config_overrides else self.study_config
-            actions[s.name] = process.get_possible_actions(s.state, {r:s.recordings[r].state for r in s.recordings}, {a for a in process.Action if a!=process.Action.IMPORT}, cfg)
+            actions[s.name] = process.get_possible_actions(s.state, {r:s.recordings[r].state for r in s.recordings}, {a for a in process.Action if a!=process.Action.IMPORT}, cfg, allow_pending=True)
             actions[s.name], actions_running[s.name] = self._filter_session_context_menu_actions(s.name, None, actions[s.name])
         # draw actions that can be run
         all_actions = {a for s in actions for a in actions[s]}
@@ -2629,7 +2698,7 @@ class GUI:
         actions_running: dict[str, dict[process.Action, bool|list[str]]] = {}
         for r in recs:
             cfg = self._get_effective_session_config(session_name) if session_name in self.session_config_overrides else self.study_config
-            actions[r] = process.get_possible_actions(sess.state, {r:sess.recordings[r].state}, {a for a in process.Action if a!=process.Action.IMPORT and not process.is_session_level_action(a)}, cfg)
+            actions[r] = process.get_possible_actions(sess.state, {r:sess.recordings[r].state}, {a for a in process.Action if a!=process.Action.IMPORT and not process.is_session_level_action(a)}, cfg, allow_pending=True)
             actions[r], actions_running[r] = self._filter_session_context_menu_actions(sess.name, r, actions[r])
         # draw actions that can be run
         all_actions = {a for r in actions for a in actions[r]}
@@ -2989,7 +3058,7 @@ class GUI:
                 gt_gui.utils.push_popup(self, callbacks.get_folder_picker(self, reason='add_cam_recordings', sessions=[sess.name]))
         session_level_actions = [a for a in self._session_actions if process.is_session_level_action(a)]
         effective_config = self._get_effective_session_config(sess.name)
-        possible_actions = process.get_possible_actions(sess.state, {r:sess.recordings[r].state for r in sess.recordings}, set(session_level_actions), effective_config)
+        possible_actions = process.get_possible_actions(sess.state, {r:sess.recordings[r].state for r in sess.recordings}, set(session_level_actions), effective_config, allow_pending=True)
         menu_actions,menu_actions_running = self._filter_session_context_menu_actions(sess.name, None, possible_actions)
         if session_level_actions and imgui.begin_table(f'##{sess.name}_session_level', 2, imgui.TableFlags_.sizing_fixed_fit):
             for a in session_level_actions:

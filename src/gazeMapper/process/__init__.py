@@ -306,7 +306,7 @@ def action_update_and_invalidate(action: Action, state: process_pool.State, stud
 
     return action_state_mutations
 
-def _is_recording_action_possible(rec: str, action_states: dict[Action, process_pool.State], study_config: 'config.Study', rec_type: 'session.RecordingType', action: Action) -> tuple[bool,list[Action]|None]:
+def _is_recording_action_possible(rec: str, action_states: dict[Action, process_pool.State], study_config: 'config.Study', rec_type: 'session.RecordingType', action: Action, allow_pending: bool = False) -> tuple[bool,list[Action]|None]:
     if not is_action_possible_given_config(action, study_config):
         return False, None
     elif not is_action_possible_for_recording(rec, rec_type, action, study_config):
@@ -381,20 +381,19 @@ def _is_recording_action_possible(rec: str, action_states: dict[Action, process_
             raise NotImplementedError(f'Logic is not implemented for {action.displayable_name} ({action}), major developer oversight! Let him know.')
 
     # check that preconditions are met
-    states = [action_states[p]==process_pool.State.Completed for p in preconditions]
-    missing = [p for p,s in zip(preconditions,states) if not s]
-    return all(states), [p for p in Action if p in missing] # NB: ensure stable order
+    states = [action_states[p] for p in preconditions]
+    missing = [p for p,state in zip(preconditions,states) if state!=process_pool.State.Completed]
+    met = [state==process_pool.State.Completed or (allow_pending and state in [process_pool.State.Pending, process_pool.State.Running]) for state in states]
+    return all(met), [p for p in Action if p in missing] # NB: ensure stable order
 
 def _get_preconditions_test(action: Action) -> str:
-    match action:
-        case Action.EXPORT_TRIALS:
-            return 'or'
-        case _:
-            return 'and'
+    if action == Action.EXPORT_TRIALS:
+        return 'or'
+    return 'and'
 
-def _is_session_action_possible(session_action_states: dict[Action, process_pool.State], recording_action_states: dict[str,dict[Action, process_pool.State]], study_config: 'config.Study', rec_types: dict[str,'session.RecordingType'], action: Action) -> tuple[bool, list[Action]]:
+def _is_session_action_possible(session_action_states: dict[Action, process_pool.State], recording_action_states: dict[str,dict[Action, process_pool.State]], study_config: 'config.Study', rec_types: dict[str,'session.RecordingType'], action: Action, allow_pending: bool = False) -> tuple[bool, dict[Action,list[str]|None]]:
     if not is_action_possible_given_config(action, study_config):
-        return False, None
+        return False, {}
 
     preconditions = set()
     preconditions_test = _get_preconditions_test(action)
@@ -417,25 +416,33 @@ def _is_session_action_possible(session_action_states: dict[Action, process_pool
         case _:
             raise NotImplementedError(f'Logic is not implemented for {action.displayable_name} ({action}), major developer oversight! Let him know.')
 
-    precond_met: dict[Action,tuple[bool,list[str]]] = {}
+    precond_met: dict[Action,bool] = {}
+    dependencies: dict[Action,list[str]|None] = {}
     for p in [p for p in Action if p in preconditions]: # NB: ensure stable order
         if is_session_level_action(p):
-            met = session_action_states[p]==process_pool.State.Completed
-            precond_met[p] = (met,None)
+            state = session_action_states[p]
+            precond_met[p] = state==process_pool.State.Completed or (allow_pending and action!=Action.EXPORT_TRIALS and state in [process_pool.State.Pending, process_pool.State.Running])
+            if state!=process_pool.State.Completed:
+                dependencies[p] = None
         else:
             met1 = [is_action_possible_for_recording(r, rec_types[r], p, study_config) for r in recording_action_states]
-            met2 = [recording_action_states[r][p]==process_pool.State.Completed for r in recording_action_states]
-            met = [m2 for m1,m2 in zip(met1,met2) if m1]  # use m1 to ignore if action isn't possible for that recording
-            all_met = all(met) if met else False
-            precond_met[p] = (all_met, [] if all_met else [r for r,m1,m2 in zip(recording_action_states,met1,met2) if m1 and not m2])
+            applicable = [r for r,m in zip(recording_action_states,met1) if m]
+            states = {r:recording_action_states[r][p] for r in applicable}
+            met = [state==process_pool.State.Completed or (allow_pending and action!=Action.EXPORT_TRIALS and state in [process_pool.State.Pending, process_pool.State.Running]) for state in states.values()]
+            precond_met[p] = bool(met) and (any(met) if preconditions_test=='or' else all(met))
+            waiting = [r for r,state in states.items() if state!=process_pool.State.Completed]
+            if waiting:
+                dependencies[p] = waiting
 
     if preconditions_test=='and':
-        ok = all((precond_met[p][0] for p in precond_met))
+        ok = all(precond_met.values())
     else:
-        ok = any((precond_met[p][0] for p in precond_met))
-    return ok, {p: precond_met[p][1] for p in precond_met if not precond_met[p][0]} if not ok else {}
+        ok = any(precond_met.values())
+    if ok and preconditions_test=='or':
+        dependencies.clear()
+    return ok, dependencies
 
-def get_possible_actions(session_action_states: dict[Action, process_pool.State], recording_action_states: dict[str,dict[Action, process_pool.State]], actions_to_check: set[Action], study_config: 'config.Study') -> dict[Action, tuple[bool|list[str], dict[Action,list[str]]]]:
+def get_possible_actions(session_action_states: dict[Action, process_pool.State], recording_action_states: dict[str,dict[Action, process_pool.State]], actions_to_check: set[Action], study_config: 'config.Study', allow_pending: bool = False) -> dict[Action, tuple[bool|list[str], dict[Action,list[str]|None]]]:
     # determine based on actions_states which actions have all their preconditions met. Return a set containing just
     # those possible actions
     # actions_to_check can be a subset of all actions, if user e.g. knows some actions aren't possible or wanted due to settings
@@ -443,14 +450,14 @@ def get_possible_actions(session_action_states: dict[Action, process_pool.State]
     merged_states = {r:session_action_states|recording_action_states[r] for r in recording_action_states}
     rec_types = {r.name:r.type for r in study_config.session_def.recordings}
 
-    possible_actions: dict[Action,tuple[bool|list[str],dict[Action,list[str]]]] = {}  # per action list if possible/recordings for which its possible, and also which preconditions are unmet
+    possible_actions: dict[Action,tuple[bool|list[str],dict[Action,list[str]|None]]] = {}  # per action list if possible/recordings for which its possible, and also which preconditions are unmet
     for a in actions_to_check:
         if is_session_level_action(a):
-            states = _is_session_action_possible(session_action_states, recording_action_states, study_config, rec_types, a)
+            states = _is_session_action_possible(session_action_states, recording_action_states, study_config, rec_types, a, allow_pending)
             if states[0] or states[1]:
                 possible_actions[a] = states
         else:
-            states = {r:_is_recording_action_possible(r, merged_states[r], study_config, rec_types[r], a) for r in merged_states}
+            states = {r:_is_recording_action_possible(r, merged_states[r], study_config, rec_types[r], a, allow_pending) for r in merged_states}
             possible_recs = [r for r in merged_states if states[r][0]]
             fails = _get_precond_fails_for_rec(states)
             if possible_recs or fails:
@@ -458,21 +465,24 @@ def get_possible_actions(session_action_states: dict[Action, process_pool.State]
 
     return possible_actions
 
-def _get_precond_fails_for_rec(states: dict[str,tuple[bool,list[Action]]]) -> dict[Action,None|list[str]]:
+def _get_precond_fails_for_rec(states: dict[str,tuple[bool,list[Action]|None]]) -> dict[Action,None|list[str]]:
     out: dict[Action,None|list[str]] = {}
     for r in states:
-        if states[r][0] or states[r][1] is None:
+        failed_actions = states[r][1]
+        if failed_actions is None:
             continue
-        for a in states[r][1]:
+        for a in failed_actions:
             if is_session_level_action(a):
                 out[a] = None
-            elif a not in out:
-                out[a] = [r]
             else:
-                out[a].append(r)
+                recordings = out.get(a)
+                if recordings is None:
+                    out[a] = [r]
+                else:
+                    recordings.append(r)
     return out
 
-def get_impossible_reason_text(action: Action, states: dict[str, dict[Action,tuple[bool|list[str],dict[Action,list[str]]]]], study_config: 'config.Study', for_recording=False, for_single=False) -> str:
+def get_impossible_reason_text(action: Action, states: dict[str, dict[Action,tuple[bool|list[str],dict[Action,list[str]|None]]]], study_config: 'config.Study', for_recording=False, for_single=False) -> str:
     if _get_preconditions_test(action)=='and':
         reason = f'Cannot run {action.displayable_name} because required actions have not yet been run'
     else:
@@ -492,13 +502,14 @@ def get_impossible_reason_text(action: Action, states: dict[str, dict[Action,tup
             reason += f'- {s}:\n{_get_impossible_reason_text_impl(ac, s, study_config)}'
     return reason
 
-def _get_impossible_reason_text_impl(fails: dict[Action,list[str]], ref: str, study_config: 'config.Study') -> str:
+def _get_impossible_reason_text_impl(fails: dict[Action,list[str]|None], ref: str, study_config: 'config.Study') -> str:
     reason = ''
     for a in fails:
         if not is_action_possible_given_config(a, study_config):
             continue
         reason += f'  - {a.displayable_name}'
-        if not not fails[a] and (len(fails[a])>1 or fails[a][0]!=ref):
-            reason += f' ({", ".join(fails[a])})'
+        recordings = fails[a]
+        if recordings and (len(recordings)>1 or recordings[0]!=ref):
+            reason += f' ({", ".join(recordings)})'
         reason += '\n'
     return reason
