@@ -2104,7 +2104,7 @@ class GUI:
                 extra = '*'
                 imgui.push_style_color(imgui.Col_.text, colors.error if type_utils.get_error_level(problem_fields)==type_utils.ProblemLevel.Error else colors.warning)
             imgui.push_id(i)
-            if imgui.tree_node_ex(f'{extra}{lbl}##coding_setup_tree', imgui.TreeNodeFlags_.framed):
+            if imgui.tree_node_ex(f'{extra}{lbl}###coding_setup_tree', imgui.TreeNodeFlags_.framed):
                 if has_error:
                     imgui.pop_style_color()
                 changed, new_coding_config, self._coding_setup_dict_type_rec[cs['name']] = settings_editor.draw(
