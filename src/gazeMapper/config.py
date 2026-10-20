@@ -2153,7 +2153,11 @@ def store_overrides_to_json(overrides: tuple[StudyOverride, dict[str, StudyOverr
     else:
         json.dump(to_dump, path)
 
-def load_or_create_override(level: OverrideLevel, override_path: str|pathlib.Path, recording_type: session.RecordingType|None = None) -> tuple[StudyOverride, dict[str,StudyOverride]]:
+def load_or_create_override(level: OverrideLevel, override_path: str|pathlib.Path|None, recording_type: session.RecordingType|None = None) -> tuple[StudyOverride, dict[str,StudyOverride]]:
+    if override_path is None:
+        # path may be None if the recording is in the process of being imported. returning empty puts the GUI in the right state
+        return StudyOverride(level, recording_type), {}
+
     override_path = pathlib.Path(override_path)
     if override_path.is_dir():
         override_path = override_path / StudyOverride.default_json_file_name
