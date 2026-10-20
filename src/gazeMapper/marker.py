@@ -1,10 +1,17 @@
 import typing
 import typeguard
 import inspect
+import pathlib
+import warnings
 
-from glassesTools import aruco, json, marker as gt_marker
+import numpy as np
+
+from glassesTools import aruco, json, marker as gt_marker, process_pool
 
 from . import type_utils
+
+MarkerSequence = list[gt_marker.MarkerID]
+MarkerSequenceList = list[MarkerSequence]
 
 
 class Marker:
@@ -70,3 +77,55 @@ def get_marker_setup(marker: Marker, settings_groups: dict[str, dict]) -> aruco.
 
 def get_setup_for_markers(markers: list[Marker], settings_groups: dict[str, dict]|None = None) -> dict[gt_marker.MarkerID,aruco.MarkerSetup]:
     return {gt_marker.MarkerID(m.id, m.aruco_dict_id): get_marker_setup(m, settings_groups) for m in markers}
+
+def filter_marker_sequences_with_marker_files(event_name: str, working_dir: str | pathlib.Path, sequence_sets: dict[str, MarkerSequenceList]) -> tuple[dict[str, MarkerSequenceList], set[gt_marker.MarkerID]]:
+    """Filter sequences with missing marker files and return their marker IDs."""
+    working_dir = pathlib.Path(working_dir)
+    field_display_names = {
+        'markers': 'marker',
+        'start_markers': 'start marker',
+        'end_markers': 'end marker',
+    }
+
+    valid_sequence_sets: dict[str, MarkerSequenceList] = {}
+    all_marker_ids: set[gt_marker.MarkerID] = set()
+    for field, sequences in sequence_sets.items():
+        valid_sequence_sets[field] = []
+        for sequence in sequences:
+            missing_markers = [marker_id for marker_id in sequence if not gt_marker.get_file_name(marker_id.m_id, marker_id.aruco_dict_id, working_dir).is_file()]
+            if missing_markers:
+                sequence_str = ' -> '.join(gt_marker.marker_ID_to_str(marker_id) for marker_id in sequence)
+                missing_str = '\n- '.join(str(gt_marker.get_file_name(marker_id.m_id, marker_id.aruco_dict_id, None)) for marker_id in missing_markers)
+                warnings.warn(f'{event_name}: Missing marker file(s) for {field_display_names.get(field, field.replace("_", " "))} sequence {sequence_str}:\n- {missing_str}\nSkipping this sequence for auto coding.', process_pool.ProcessingWarning)
+                continue
+            valid_sequence_sets[field].append(sequence)
+            all_marker_ids.update(sequence)
+
+    return valid_sequence_sets, all_marker_ids
+
+
+def get_marker_appearance_starts_ends(
+    marker_ids: set[gt_marker.MarkerID],
+    working_dir: str | pathlib.Path,
+    max_gap_duration: int,
+    min_duration: int,
+) -> tuple[dict[gt_marker.MarkerID, np.ndarray], dict[gt_marker.MarkerID, np.ndarray]]:
+    """Load marker files and find the start and end frames of each marker appearance."""
+    working_dir = pathlib.Path(working_dir)
+    raw_markers = {m: gt_marker.read_dataframe_from_file(m.m_id, m.aruco_dict_id, working_dir) for m in marker_ids}
+    present_markers = {marker_id: gt_marker.code_for_presence(marker_data, allow_failed=True) for marker_id, marker_data in raw_markers.items() if not marker_data.empty}
+    if not present_markers:
+        raise RuntimeError(
+            f'No markers found in the marker detection files for session "{working_dir.parent.name}", '
+            f'recording "{working_dir.name}"'
+        )
+    detected_markers = {marker_id: gt_marker.expand_detection(marker_data, fill_value=False) for marker_id, marker_data in present_markers.items()}
+
+    marker_starts = {marker_id: np.array([], dtype=int) for marker_id in marker_ids}
+    marker_ends = {marker_id: np.array([], dtype=int) for marker_id in marker_ids}
+    for marker_id, marker_data in detected_markers.items():
+        starts, ends = gt_marker.get_appearance_starts_ends(marker_data, max_gap_duration, min_duration)
+        marker_starts[marker_id] = starts
+        marker_ends[marker_id] = ends
+
+    return marker_starts, marker_ends

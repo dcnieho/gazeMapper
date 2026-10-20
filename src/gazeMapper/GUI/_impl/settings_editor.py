@@ -427,7 +427,7 @@ def _start_table(level, first_column_width):
     imgui.table_setup_column("value", imgui.TableColumnFlags_.width_stretch)
     return table_is_started
 
-def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type, o_type_args: tuple[typing.Any, ...], nullable: bool, default: typing.Any|None, parent_obj: _T2|None, problem: tuple[type_utils.ProblemLevel,str], documentation: type_utils.GUIDocInfo|None, fixed: bool, has_remove: bool) -> bool:
+def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type, o_type_args: tuple[typing.Any, ...], nullable: bool, default: typing.Any|None, parent_obj: _T2|None, problem: type_utils.ProblemEntry|bool|None, documentation: type_utils.GUIDocInfo|None, fixed: bool, has_remove: bool) -> bool:
     imgui.table_next_row()
     imgui.table_next_column()
     missing_value = object()
@@ -462,22 +462,23 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
     else:
         if not (is_default or is_none or fixed):
             draw_bold = True
-    if problem:
-        imgui.push_style_color(imgui.Col_.text, colors.error if problem[0]==type_utils.ProblemLevel.Error else colors.warning)
+    problem_level, problem_message = _get_problem_info(problem)
+    if problem_level is not None:
+        imgui.push_style_color(imgui.Col_.text, colors.error if problem_level==type_utils.ProblemLevel.Error else colors.warning)
     if draw_bold:
         imgui_md.render(f'**{field_lbl}**')
     else:
         imgui.align_text_to_frame_padding()
         imgui.text(field_lbl)
-    if problem:
-        if isinstance(problem[1],str):
-            gui_utils.draw_hover_text(problem[1],text='')
+    if problem_level is not None:
+        if problem_message:
+            gui_utils.draw_hover_text(problem_message,text='')
         imgui.pop_style_color()
     if documentation and documentation.doc_str:
         gui_utils.draw_hover_text(documentation.doc_str, text='')
     imgui.table_next_column()
     value_documentation = documentation.children.get(None,{}) or documentation.children if documentation is not None else {}
-    new_val, new_edit, removed = draw_value(field_lbl, val, f_type, o_type_args, nullable, default, parent_val, fixed, value_documentation, has_remove and not is_missing, is_none, base_type)
+    new_val, new_edit, removed = draw_value(field_lbl, val, f_type, o_type_args, nullable, default, parent_val, fixed, value_documentation, has_remove and not is_missing, is_none, base_type, problem)
 
     new_obj = None
     if (changed := new_val!=val or new_edit):
@@ -491,7 +492,29 @@ def _draw_field(field: str, obj: _T, base_type: typing.Type, f_type: typing.Type
 
     return changed, new_obj, removed
 
-def draw_value(field_lbl: str, val: _T, f_type: typing.Type, o_type_args: tuple[typing.Any, ...], nullable: bool, default: _T|None, parent_val: _T|None, fixed: bool, documentation: dict[typing.Any,type_utils.GUIDocInfo], has_remove: bool, is_none=False, base_type: typing.Type|None=None) -> tuple[_T|None, bool, bool]:
+def _get_problem_info(problem: type_utils.ProblemEntry|bool|None) -> tuple[type_utils.ProblemLevel|None, str|None]:
+    if isinstance(problem, tuple):
+        return problem[0], problem[1]
+    if not isinstance(problem, dict):
+        return (type_utils.ProblemLevel.Error, None) if problem else (None, None)
+
+    messages = []
+    def _collect_messages(entry: type_utils.ProblemEntry, path: str = ''):
+        if isinstance(entry, tuple):
+            if entry[1]:
+                messages.append(f'{path}: {entry[1]}' if path else entry[1])
+            return
+        for key, child in entry.items():
+            if key == 'problem_with_this_key':
+                _collect_messages(child, path)
+            else:
+                child_path = f'{path}[{key}]' if path else str(key)
+                _collect_messages(child, child_path)
+
+    _collect_messages(problem)
+    return type_utils.get_error_level(problem), '\n'.join(messages) if messages else None
+
+def draw_value(field_lbl: str, val: _T, f_type: typing.Type, o_type_args: tuple[typing.Any, ...], nullable: bool, default: _T|None, parent_val: _T|None, fixed: bool, documentation: dict[typing.Any,type_utils.GUIDocInfo], has_remove: bool, is_none=False, base_type: typing.Type|None=None, problem: type_utils.ProblemEntry|bool|None=None) -> tuple[_T|None, bool, bool]:
     if base_type is None:
         base_type = _get_base_type(f_type)
     is_default = val==default
@@ -537,7 +560,7 @@ def draw_value(field_lbl: str, val: _T, f_type: typing.Type, o_type_args: tuple[
         case builtins.float:
             new_val = imgui.input_double(f'##{field_lbl}', val)[1]
         case builtins.list | builtins.set:
-            new_val = draw_list_set_editor(field_lbl, val, f_type, o_type_args, documentation)
+            new_val = draw_list_set_editor(field_lbl, val, f_type, o_type_args, documentation, problem)
         case _ if base_type==typing.Literal or (inspect.isclass(base_type) and issubclass(base_type, enum.Enum)):
             if base_type == typing.Literal:
                 values = list(typing.get_args(f_type))
@@ -601,7 +624,50 @@ def _get_str_values(values: list[typing.Any], f_type: typing.Type, o_type_args: 
     tooltips = [documentation[v].doc_str if v in documentation else None for v in values]
     return str_values, tooltips
 
-def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, o_type_args: tuple[typing.Any, ...], documentation: dict[typing.Any,type_utils.GUIDocInfo]):
+def _draw_list_of_lists_editor(field_lbl: str, val: list[list[typing.Any]], sequence_type: typing.Type, sequence_o_type_args: tuple[typing.Any, ...], documentation: dict[typing.Any,type_utils.GUIDocInfo], problems: type_utils.ProblemDict|None=None) -> list[list[typing.Any]]:
+    new_val = [sequence.copy() for sequence in val]
+    to_remove = None
+    to_move = None
+    for i, sequence in enumerate(val):
+        sequence_problem = problems.get(i) if problems else None
+        problem_level, problem_message = _get_problem_info(sequence_problem)
+        if problem_level is not None:
+            imgui.push_style_color(imgui.Col_.text, colors.error if problem_level==type_utils.ProblemLevel.Error else colors.warning)
+        imgui.text(f'{i+1}:')
+        if problem_level is not None:
+            if problem_message:
+                gui_utils.draw_hover_text(problem_message, text='')
+            imgui.pop_style_color()
+        imgui.same_line()
+        button_size = imgui.get_frame_height()
+        num_buttons = 1 + (i > 0) + (i < len(val)-1)
+        button_spacing = imgui.get_style().item_spacing.x
+        reserved_width = num_buttons*button_size + (num_buttons-1)*button_spacing
+        new_val[i] = typing.cast(list[typing.Any], draw_list_set_editor(f'{field_lbl}_sequence_{i}', sequence, sequence_type, sequence_o_type_args, documentation, right_reserved_width=reserved_width+button_spacing))
+        imgui.same_line()
+        if imgui.button(f'{ifa6.ICON_FA_TRASH_CAN}##remove_sequence_{field_lbl}_{i}', size=(button_size, button_size)):
+            to_remove = i
+        gui_utils.draw_hover_text('Remove sequence', text='')
+        if i > 0:
+            imgui.same_line()
+            if imgui.button(f'{ifa6.ICON_FA_ARROW_UP}##move_sequence_up_{field_lbl}_{i}', size=(button_size, button_size)):
+                to_move = (i, i-1)
+            gui_utils.draw_hover_text('Move sequence up', text='')
+        if i < len(val)-1:
+            imgui.same_line()
+            if imgui.button(f'{ifa6.ICON_FA_ARROW_DOWN}##move_sequence_down_{field_lbl}_{i}', size=(button_size, button_size)):
+                to_move = (i, i+1)
+            gui_utils.draw_hover_text('Move sequence down', text='')
+    if imgui.button(f'+ Add sequence##{field_lbl}'):
+        new_val.append([])
+    if to_move is not None:
+        sequence = new_val.pop(to_move[0])
+        new_val.insert(to_move[1], sequence)
+    if to_remove is not None:
+        new_val.pop(to_remove)
+    return new_val
+
+def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, o_type_args: tuple[typing.Any, ...], documentation: dict[typing.Any,type_utils.GUIDocInfo], problem: type_utils.ProblemEntry|bool|None=None, right_reserved_width: float=0.):
     val = val.copy()
     win = imgui.internal.get_current_window()
     if win.skip_items:
@@ -612,6 +678,10 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, o_type_ar
     # get possible values and their order
     v_types = typing.get_args(f_type)
     v_type = v_types[0] if v_types else int # fallback to something, int
+    if isinstance(val, list) and typing.get_origin(v_type) is list:
+        sequence_o_type_args = typing.get_args(o_type_args[0]) if o_type_args and typing.get_origin(o_type_args[0]) is list else typing.get_args(v_type)
+        return _draw_list_of_lists_editor(field_lbl, val, v_type, sequence_o_type_args, documentation, problem if isinstance(problem, dict) else None)
+
     fixed_value_set = True
     if typing.get_origin(v_type)==typing.Literal:
         all_values = typing.get_args(v_type)
@@ -633,7 +703,7 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, o_type_ar
                 if v not in disp_val:
                     disp_val.append(v)
     # get width of drawing space
-    item_w = imgui.calc_item_width()
+    item_w = max(0., imgui.calc_item_width()-right_reserved_width)
     h_edge_spacing = imgui.get_style().cell_padding.x
     # determine items to show
     tsx = imgui.calc_text_size('x')
@@ -677,7 +747,7 @@ def draw_list_set_editor(field_lbl: str, val: _T, f_type: typing.Type, o_type_ar
     pos = imgui.get_cursor_screen_pos()
     n_lines = 1+len(line_break_idxs)
     bb = imgui.internal.ImRect(pos, pos+(item_w, 2*imgui.get_style().frame_padding.y+tsx.y*n_lines+imgui.get_style().item_spacing.y*(n_lines-1)))
-    if imgui.internal.item_add(bb, imgui.get_id('##set_list_editor')):
+    if imgui.internal.item_add(bb, imgui.get_id(f'##set_list_editor_{field_lbl}')):
         imgui.push_clip_rect(bb.min, bb.max, True)
 
         # draw background rect

@@ -7,7 +7,7 @@ import warnings
 
 from glassesTools import annotation, marker as gt_marker, naming as gt_naming, process_pool, timestamps, validation
 
-from .. import config, episode, naming, marker_assembly, process, session
+from .. import config, episode, marker, naming, marker_assembly, process, session
 
 
 def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None, **study_settings):
@@ -36,33 +36,31 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
     for cs in events:
         for m in ('start_markers','end_markers'):
             if m not in cs['auto_code'] or not cs['auto_code'][m]:
-                raise ValueError(f'No {m} configured for auto coding of sync event "{cs["name"]}"')
-        all_marker_ids = set(cs['auto_code']['start_markers']+cs['auto_code']['end_markers'])
-        file_missing   = [not gt_marker.get_file_name(m.m_id, m.aruco_dict_id, working_dir).is_file() for m in all_marker_ids]
-        if any(file_missing):
-            file_missing = [gt_marker.get_file_name(m.m_id, m.aruco_dict_id, None) for m,miss in zip(all_marker_ids,file_missing) if miss]
-            missing_str  = '\n- '.join(file_missing)
-            raise FileNotFoundError(f'The following marker files were not found:\n- {missing_str}')
-        markers = {m: gt_marker.read_dataframe_from_file(m.m_id, m.aruco_dict_id, working_dir) for m in all_marker_ids}
-        # recode so we have a boolean with when markers are present
-        markers = {m: gt_marker.code_for_presence(markers[m], allow_failed=True) for m in markers if not markers[m].empty}
-        # marker presence signal only contains marker detections (True). We need to fill the gaps in between detections with False (not detected) so we have a continuous signal without gaps
-        markers = {m: gt_marker.expand_detection(markers[m], fill_value=False) for m in markers}
-        # now auto code indicated intervals
-        # see where stretches of marker presence start and end
-        marker_starts: dict[gt_marker.MarkerID,list[int]] = {}
-        marker_ends  : dict[gt_marker.MarkerID,list[int]] = {}
-        for m in markers:
-            marker_starts[m], marker_ends[m] = gt_marker.get_appearance_starts_ends(markers[m], cs['auto_code']['max_gap_duration'], cs['auto_code']['min_duration'])
+                raise ValueError(f'No {m} configured for auto coding of event "{cs["name"]}"')
+        filtered_sequences, all_marker_ids = marker.filter_marker_sequences_with_marker_files(cs['name'], working_dir, {'start_markers': cs['auto_code']['start_markers'], 'end_markers': cs['auto_code']['end_markers']})
+        start_marker_sequences = filtered_sequences['start_markers']
+        end_marker_sequences = filtered_sequences['end_markers']
+        if not start_marker_sequences:
+            raise FileNotFoundError(f'None of the configured start marker sequences for auto-coded event "{cs["name"]}" were found, missing files for some markers')
+        if not end_marker_sequences:
+            raise FileNotFoundError(f'None of the configured end marker sequences for auto-coded event "{cs["name"]}" were found, missing files for some markers')
+        marker_starts, marker_ends = marker.get_marker_appearance_starts_ends(all_marker_ids, working_dir, cs['auto_code']['max_gap_duration'], cs['auto_code']['min_duration'])
+
+        def _resolve_sequence_points(sequences: marker.MarkerSequenceList, *, side: str) -> np.ndarray:
+            points: list[int] = []
+            for sequence in sequences:
+                if len(sequence) > 1:
+                    points.extend(gt_marker.get_sequence_interval(marker_starts, marker_ends, sequence, cs['auto_code']['max_intermarker_gap_duration'], side=side))
+                elif side == 'end':
+                    points.extend(marker_ends[sequence[0]])
+                else:
+                    points.extend(marker_starts[sequence[0]])
+            # remove duplicate intervals, remain sorted
+            return np.array(sorted({point for point in points}), dtype=int)
+
         # find potential interval starts and ends
-        if len(cs['auto_code']['start_markers'])>1:
-            starts = gt_marker.get_sequence_interval(marker_starts, marker_ends, cs['auto_code']['start_markers'], cs['auto_code']['max_intermarker_gap_duration'], side='end')
-        else:
-            starts = marker_ends  [cs['auto_code']['start_markers'][0]]
-        if len(cs['auto_code'][ 'end_markers' ])>1:
-            ends   = gt_marker.get_sequence_interval(marker_starts, marker_ends, cs['auto_code'][ 'end_markers' ], cs['auto_code']['max_intermarker_gap_duration'], side='start')
-        else:
-            ends   = marker_starts[cs['auto_code'][ 'end_markers' ][0]]
+        starts = _resolve_sequence_points(start_marker_sequences, side='end')
+        ends   = _resolve_sequence_points(end_marker_sequences, side='start')
         # now match interval starts and ends
         # strategy: run through starts and find latest start that is before first end (discard ends that are before the start)
         # keep pointer into array keeping track of ends and start that have already been discarded or consumed
@@ -97,6 +95,9 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
             # This deals with multiple consecutive marker presentation without intervening segmentation markers. It is assumed that all targets are shown in
             # multiple runs of all individual targets (possibly random) order (so not fully randomized over all target presentations, then can't split).
             # Intervals are then split smaller after each run of all targets has been presented.
+            coding: pd.DataFrame | None = None
+            all_marker_observations_per_target: dict[int, pd.DataFrame] | None = None
+            markers_per_target: dict[int, list[gt_marker.MarkerID]] | None = None
             if (fname:=working_dir/f'{naming.validation_prefix}{cs["name"]}_fixation_assignment_override.tsv').exists():
                 coding = pd.read_csv(fname, delimiter='\t', dtype={'target':int, 'marker_interval':int},index_col=None)
                 has_override = True
@@ -110,6 +111,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
                 has_override = False
             for e in intervals.copy():
                 if not has_override:
+                    assert all_marker_observations_per_target is not None and markers_per_target is not None
                     # make local copy of marker_observations, containing only the current episode
                     marker_observations_per_target = {t:mo.loc[e[0]:e[1],:] for t,mo in all_marker_observations_per_target.items()}
                     # check we have data for at least one of the markers for a given target
@@ -139,6 +141,7 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
                     for _,t in target_observation_map:
                         target_counts[t]+=1
                 else:
+                    assert coding is not None
                     video_ts = timestamps.VideoTimestamps(working_dir / gt_naming.frame_timestamps_fname)
                     target_observation_map = []
                     for _, row in coding.iterrows():

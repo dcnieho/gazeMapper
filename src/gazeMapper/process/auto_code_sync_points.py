@@ -4,7 +4,7 @@ import copy
 
 from glassesTools import annotation, marker as gt_marker, naming as gt_naming, process_pool, timestamps
 
-from .. import config, episode, naming, process, session
+from .. import config, episode, marker, naming, process, session
 
 
 def _get_transition_frames(event_type: annotation.EventType, starts, ends, last_frame: int) -> list[int]:
@@ -52,22 +52,23 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
     for cs in sync_events:
         if 'markers' not in cs['auto_code'] or not cs['auto_code']['markers']:
             raise ValueError(f'No markers configured for auto coding of sync event "{cs["name"]}"')
-        markers = [gt_marker.read_dataframe_from_file(m.m_id, m.aruco_dict_id, working_dir) for m in cs['auto_code']['markers'] if gt_marker.get_file_name(m.m_id, m.aruco_dict_id, working_dir).is_file()]
-        if not markers:
-            missing_str = '\n- '.join([gt_marker.get_file_name(m.m_id, m.aruco_dict_id, None) for m in cs['auto_code']['markers']])
-            raise FileNotFoundError(f'None of the following marker files were found:\n- {missing_str}')
-        # recode so we have a boolean with when markers are present
-        markers = [gt_marker.code_for_presence(m, allow_failed=True) for m in markers if not m.empty]
-        if not markers:
-            raise RuntimeError(f'No markers found in the marker detection files for session "{working_dir.parent.name}", recording "{working_dir.name}"')
-        # marker presence signal only contains marker detections (True). We need to fill the gaps in between detections with False (not detected) so we have a continuous signal without gaps
-        markers = [gt_marker.expand_detection(m, fill_value=False) for m in markers]
-        # Find the configured appearance or disappearance transition frames.
-        marker_transitions = {}
-        for marker_df in markers:
-            starts, ends = gt_marker.get_appearance_starts_ends(marker_df, cs['auto_code']['max_gap_duration'], cs['auto_code']['min_duration'])
+        filtered_sequences, all_marker_ids = marker.filter_marker_sequences_with_marker_files(cs['name'], working_dir, {'markers': cs['auto_code']['markers']})
+        marker_sequences = filtered_sequences['markers']
+        if not marker_sequences:
+            raise FileNotFoundError(f'No configured marker sequence for sync event "{cs["name"]}" has files for all markers')
+        marker_starts, marker_ends = marker.get_marker_appearance_starts_ends(all_marker_ids, working_dir, cs['auto_code']['max_gap_duration'], cs['auto_code']['min_duration'])
+
+        marker_transitions: dict[str, tuple[annotation.EventType, set[int]]] = {}
+        for sequence in marker_sequences:
+            if len(sequence) > 1:
+                starts = gt_marker.get_sequence_interval(marker_starts, marker_ends, sequence, cs['auto_code']['max_intermarker_gap_duration'], side='start')
+                ends   = gt_marker.get_sequence_interval(marker_starts, marker_ends, sequence, cs['auto_code']['max_intermarker_gap_duration'], side='end')
+            else:
+                starts = marker_starts[sequence[0]]
+                ends   = marker_ends  [sequence[0]]
             for name, event_type, transitions in _get_auto_sync_transition_events(cs, starts, ends, last_frame):
                 marker_transitions.setdefault(name, (event_type, set()))[1].update(transitions)
+
         for name, (event_type, transitions) in marker_transitions.items():
             if name not in episodes:
                 episodes[name] = (event_type, [])

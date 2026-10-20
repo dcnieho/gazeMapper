@@ -186,17 +186,79 @@ from .GUI._impl import utils as gui_utils
 
 
 class AutoCodeSyncPoints(typed_dict_defaults.TypedDictDefault, total=False):
-    markers         : set[gt_marker.MarkerID]
-    transition      : Literal['onset','offset','both'] = 'onset'
-    max_gap_duration: int       = 4
-    min_duration    : int       = 6
-
-class AutoCodeEpisodes(typed_dict_defaults.TypedDictDefault, total=False):
-    start_markers               : list[gt_marker.MarkerID]
-    end_markers                 : list[gt_marker.MarkerID]
+    markers                     : marker.MarkerSequenceList
+    transition                  : Literal['onset','offset','both'] = 'onset'
     max_gap_duration            : int       = 4
     max_intermarker_gap_duration: int       = 15
     min_duration                : int       = 6
+
+class AutoCodeEpisodes(typed_dict_defaults.TypedDictDefault, total=False):
+    start_markers               : marker.MarkerSequenceList
+    end_markers                 : marker.MarkerSequenceList
+    max_gap_duration            : int       = 4
+    max_intermarker_gap_duration: int       = 15
+    min_duration                : int       = 6
+
+
+def _to_marker_id(value: int | gt_marker.MarkerID, individual_markers: list[marker.Marker] | None = None) -> int | gt_marker.MarkerID:
+    if isinstance(value, gt_marker.MarkerID):
+        return value
+
+    if individual_markers is None:
+        return value
+
+    # Legacy public configs only stored bare marker ids, so taking the first
+    # matching marker preserves the historical upgrade path for those files.
+    matching_marker = next((m for m in individual_markers if m.id == value), None)
+    if matching_marker is None:
+        return value
+    return gt_marker.MarkerID(matching_marker.id, matching_marker.aruco_dict_id)
+
+
+def _normalize_marker_sequences(value: Any, *, flat_is_multiple_sequences: bool, individual_markers: list[marker.Marker] | None = None) -> Any:
+    if value is None:
+        return None
+
+    if isinstance(value, (int, gt_marker.MarkerID)):
+        items = [value]
+    elif isinstance(value, (list, tuple, set)):
+        items = list(sorted(value) if isinstance(value, set) else value)
+    else:
+        return value
+
+    if not items:
+        return []
+
+    if all(isinstance(item, (int, gt_marker.MarkerID)) for item in items):
+        sequence = [_to_marker_id(item, individual_markers) for item in items]
+        if flat_is_multiple_sequences:
+            return [[item] for item in sequence]
+        return [sequence]
+
+    normalized: list[Any] = []
+    for sequence in items:
+        if isinstance(sequence, (int, gt_marker.MarkerID)):
+            normalized.append([_to_marker_id(sequence, individual_markers)])
+            continue
+        if not isinstance(sequence, (list, tuple, set)):
+            normalized.append(sequence)
+            continue
+
+        sequence_items = list(sorted(sequence) if isinstance(sequence, set) else sequence)
+        normalized.append([_to_marker_id(item, individual_markers) if isinstance(item, (int, gt_marker.MarkerID)) else item for item in sequence_items])
+    return normalized
+
+
+def _normalize_auto_code(auto_code: dict[str, Any] | None, individual_markers: list[marker.Marker] | None = None) -> dict[str, Any] | None:
+    if auto_code is None:
+        return None
+    auto_code = dict(auto_code)
+    if 'markers' in auto_code:
+        auto_code['markers'] = _normalize_marker_sequences(auto_code['markers'], flat_is_multiple_sequences=True, individual_markers=individual_markers)
+    for field in ('start_markers', 'end_markers'):
+        if field in auto_code:
+            auto_code[field] = _normalize_marker_sequences(auto_code[field], flat_is_multiple_sequences=False, individual_markers=individual_markers)
+    return auto_code
 
 class I2MCSettings(typed_dict_defaults.TypedDictDefault, total=False):
     # None where fields are set by code dynamically based on the data. When value applied here, it overrides this dynamic parameter setting
@@ -513,7 +575,7 @@ class Study:
             # ensure correct type and apply defaults for nested typed dicts
             if cs.get('auto_code') is not None:
                 ac_type = AutoCodeSyncPoints if annotation.type_map[cs['event_type']]==annotation.Type.Point else AutoCodeEpisodes
-                cs['auto_code'] = ac_type(cs['auto_code'])
+                cs['auto_code'] = ac_type(_normalize_auto_code(cs['auto_code'], self.individual_markers))
             if cs.get('sync_setup') is not None:
                 cs['sync_setup'] = EtSyncSetup(cs['sync_setup'])
                 if cs['sync_setup'].get('get_cam_movement_function') is not None:
@@ -821,13 +883,31 @@ class Study:
                     type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'auto_code': {k: (type_utils.ProblemLevel.Error, msg) for k, msg in this_problems.items()}}}})
                 else:
                     for f in fields:
-                        missing_markers: list[gt_marker.MarkerID] = []
-                        for m in cs['auto_code'][f]:
-                            if not any([m.m_id==im.id and m.aruco_dict_id==im.aruco_dict_id for im in self.individual_markers]):
-                                missing_markers.append(m)
-                        if missing_markers:
-                            msg = f'Markers "{", ".join([gt_marker.marker_ID_to_str(m) for m in missing_markers])}" specified in auto_code.{f}, but unknown because not present in individual_markers.'
+                        if f not in cs['auto_code'] or not cs['auto_code'][f]:
+                            msg = f'auto_code.{f} cannot be empty for a {annotation.tooltip_map[cs["event_type"]]} episode.'
                             type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'auto_code': {f: (type_utils.ProblemLevel.Error, msg)}}}})
+                        else:
+                            empty_sequences = [seq_idx for seq_idx, seq in enumerate(cs['auto_code'][f]) if not seq]
+                            if empty_sequences:
+                                sequence_problems: type_utils.ProblemDict = {
+                                    seq_idx: (type_utils.ProblemLevel.Error, f'auto_code.{f} marker sequence {seq_idx+1} cannot be empty for a {annotation.tooltip_map[cs["event_type"]]} episode.')
+                                    for seq_idx in empty_sequences
+                                }
+                                field_problems: type_utils.ProblemDict = {f: sequence_problems}
+                                auto_code_problems: type_utils.ProblemDict = {'auto_code': field_problems}
+                                setup_problems: type_utils.ProblemDict = {i: auto_code_problems}
+                                type_utils.merge_problem_dicts(problems, {'coding_setup': setup_problems})
+                                continue
+                            missing_markers: list[str] = []
+                            for sequence in cs['auto_code'][f]:
+                                for m in sequence:
+                                    if not isinstance(m, gt_marker.MarkerID):
+                                        missing_markers.append(str(m))
+                                    elif not any(m.m_id==im.id and m.aruco_dict_id==im.aruco_dict_id for im in self.individual_markers):
+                                        missing_markers.append(gt_marker.marker_ID_to_str(m))
+                            if missing_markers:
+                                msg = f'Markers "{", ".join(missing_markers)}" specified in auto_code.{f}, but unknown because not present in individual_markers.'
+                                type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'auto_code': {f: (type_utils.ProblemLevel.Error, msg)}}}})
 
             # check which_recordings settings
             if cs['event_type'] in (annotation.EventType.Sync_Camera, annotation.EventType.Sync_Camera_Offset):
@@ -882,58 +962,57 @@ class Study:
 
     def _check_auto_markers(self) -> type_utils.ProblemDict:
         problems: type_utils.ProblemDict = {}
-        used_markers: dict[tuple[str,int,annotation.EventType,str],list[gt_marker.MarkerID]] = {}
+        sequences: list[tuple[tuple[int, str, int], tuple[gt_marker.MarkerFamilyID, ...]]] = []
+
+        def _format_key(key: tuple[int, str, int]) -> str:
+            return f'coding_setup[{key[0]}].auto_code.{key[1]}[{key[2]}]'
+
+        def _emit_problem(keys: tuple[tuple[int, str, int], ...], message: str, *, always_error: bool = False):
+            level = type_utils.ProblemLevel.Error if always_error or not self.allow_duplicated_markers else type_utils.ProblemLevel.Warning
+            for key in keys:
+                type_utils.merge_problem_dicts(problems, {'coding_setup': {key[0]: {'auto_code': {key[1]: {key[2]: (level, message)}}}}})
+
         for i, cs in enumerate(self.coding_setup):
             if cs['auto_code'] is None:
                 continue
-            e = cs['event_type']
             if annotation.type_map[cs['event_type']]==annotation.Type.Point and 'markers' in cs['auto_code']:
-                used_markers[('point',i,e,'markers')] = list(cs['auto_code']['markers'])
+                fields = ('markers',)
             elif annotation.type_map[cs['event_type']]==annotation.Type.Interval and 'start_markers' in cs['auto_code'] and 'end_markers' in cs['auto_code']:
-                used_markers[('episode',i,e,'start_markers')] = list(cs['auto_code']['start_markers'])
-                used_markers[('episode',i,e,'end_markers')]   = list(cs['auto_code']['end_markers'])
-        # check if markers or marker sequences are uniquely used:
-        # 1. marker used for auto_code_sync_points cannot appear anywhere else
-        # 2. marker sequences used for auto_code_episodes must be unique (markers can be reused)
-        # first transform marker dict IDs to family so we can properly detect clashes
-        used_markers_fam  : dict[tuple[str,int,annotation.EventType,str],list[gt_marker.MarkerFamilyID]] = {k:[m.to_family() for m in used_markers[k]] for k in used_markers}
-        seen_markers      : set[gt_marker.MarkerFamilyID] = set()
-        seen_markers_sets : set[tuple[gt_marker.MarkerFamilyID, ...]] = set()
-        def _format_key(key: tuple[str,int,annotation.EventType,str]):
-            return f'coding_setup[{key[1]}].auto_code' if key[3]=='markers' else f'coding_setup[{key[1]}].auto_code.{key[3]}'
-        for s in used_markers_fam:
-            # first check if used markers are unique at the family level
+                fields = ('start_markers', 'end_markers')
+            else:
+                continue
+            for field in fields:
+                for seq_idx, sequence in enumerate(cs['auto_code'].get(field, [])):
+                    if not sequence or not all(isinstance(m, gt_marker.MarkerID) for m in sequence):
+                        continue
+                    key = (i, field, seq_idx)
+                    sequences.append((key, tuple(m.to_family() for m in sequence)))
+        seen_by_role: dict[str, dict[tuple[gt_marker.MarkerFamilyID, ...], tuple[int, str, int]]] = {
+            'markers': {},
+            'start_markers': {},
+            'end_markers': {},
+        }
+        for key, sequence in sequences:
             seen: set[gt_marker.MarkerFamilyID] = set()
-            if (duplicates := {x for x in used_markers_fam[s] if x in seen or seen.add(x)}):
-                msg = f'The markers defined for {_format_key(s)} are not unique. ' +('Please resolve' if not self.allow_duplicated_markers else 'There are') + f' the following duplicates: {gt_marker.format_duplicate_markers_msg(duplicates)}'
-                type_utils.merge_problem_dicts(problems, {'coding_setup': {s[1]: {'auto_code': {s[3]: (type_utils.ProblemLevel.Warning if self.allow_duplicated_markers else type_utils.ProblemLevel.Error, msg)}}}})
-            # then check if already used in another setup
-            if seen_markers.intersection(used_markers_fam[s]):
-                # markers not unique, make error. Find exactly where the overlap is
-                # yes, this is bad algorithmic complexity, but it only runs in failure cases
-                for s2 in used_markers_fam:
-                    if s==s2 or s[0]=='episode' and s[0]==s2[0]:
-                        # if both are different entries in 'episode', that is not an error
-                        # for 'episode' we need to check marker sequences are unique, not
-                        # individual entries. e.g. start is 80 81, and end is 81 80 is valid
-                        continue
-                    if (overlap:=set(used_markers_fam[s2]).intersection(used_markers_fam[s])):
-                        msg = f'The following markers are encountered in the setup for both {_format_key(s)} and {_format_key(s2)}: {gt_marker.format_duplicate_markers_msg(overlap)}.' +(' Markers cannot be used more than once, fix this collision.' if not self.allow_duplicated_markers else '')
-                        # emit error message
-                        for sx in (s,s2):
-                            type_utils.merge_problem_dicts(problems, {'coding_setup': {sx[1]: {'auto_code': {sx[3]: (type_utils.ProblemLevel.Warning if self.allow_duplicated_markers else type_utils.ProblemLevel.Error, msg)}}}})
-            seen_markers.update(used_markers_fam[s])
-            # check if marker sequence is already used
-            if seen_markers_sets.intersection((tuple(used_markers_fam[s]),)):
-                for s2 in used_markers_fam:
-                    if s==s2:
-                        continue
-                    if set((tuple(used_markers_fam[s2]),)).intersection((tuple(used_markers_fam[s]),)):
-                        msg = f'The marker sequence {gt_marker.format_marker_sequence_msg(used_markers_fam[s])} specified for {_format_key(s)} has already been used for {_format_key(s2)}.' +(' Markers sequences must be unique, please fix this collision.' if not self.allow_duplicated_markers else '')
-                        # emit error message
-                        for sx in (s,s2):
-                            type_utils.merge_problem_dicts(problems, {'coding_setup': {sx[1]: {'auto_code': {sx[3]: (type_utils.ProblemLevel.Warning if self.allow_duplicated_markers else type_utils.ProblemLevel.Error, msg)}}}})
-            seen_markers_sets.add(tuple(used_markers_fam[s]))
+            if duplicates := {marker_id for marker_id in sequence if marker_id in seen or seen.add(marker_id)}:
+                msg = f'The markers defined for {_format_key(key)} are not unique. ' + ('Please resolve' if not self.allow_duplicated_markers else 'There are') + f' the following duplicates: {gt_marker.format_duplicate_markers_msg(duplicates)}'
+                _emit_problem((key,), msg)
+
+            role_sequences = seen_by_role[key[1]]
+            if sequence in role_sequences:
+                other_key = role_sequences[sequence]
+                msg = f'The marker sequence {gt_marker.format_marker_sequence_msg(list(sequence))} specified for {_format_key(key)} has already been used for {_format_key(other_key)}.'
+                if not self.allow_duplicated_markers:
+                    msg += ' Marker sequences must be unique within this role, please fix this collision.'
+                _emit_problem((key, other_key), msg)
+            else:
+                role_sequences[sequence] = key
+
+            opposite_role = {'start_markers': 'end_markers', 'end_markers': 'start_markers'}.get(key[1])
+            if opposite_role and sequence in seen_by_role[opposite_role]:
+                other_key = seen_by_role[opposite_role][sequence]
+                msg = f'The marker sequence {gt_marker.format_marker_sequence_msg(list(sequence))} specified for {_format_key(key)} has already been used for {_format_key(other_key)}. The same sequence cannot be used for both episode starts and ends.'
+                _emit_problem((key, other_key), msg, always_error=True)
         return problems
 
     def _prepare_individual_marker_settings(self):
@@ -1217,6 +1296,8 @@ class Study:
             d_path = path
         # get kwds
         kwds = json.load(d_path)
+        for obsolete_setting in ('export_output3D', 'export_output2D', 'export_only_code_marker_presence'):
+            kwds.pop(obsolete_setting, None)
 
         # get session def
         s_path = path / 'session_def.json'
@@ -1258,39 +1339,6 @@ class Study:
             # backwards compatibility, rename 'auto_code_trial_episodes'
             if 'auto_code_trial_episodes' in kwds:
                 kwds['auto_code_episodes'] = {annotation.EventType.Trial: kwds.pop('auto_code_trial_episodes')}
-            # backwards compatibility, upgrade markers to markerIDs if they're bare ints
-            if 'auto_code_sync_points' in kwds and kwds['auto_code_sync_points'] is not None and 'markers' in kwds['auto_code_sync_points']:
-                markers = kwds['auto_code_sync_points']['markers']
-                kwds['auto_code_sync_points']['markers'] = set()
-                for m in markers:
-                    if not isinstance(m,int):
-                        kwds['auto_code_sync_points']['markers'].add(m)
-                        continue
-                    # find corresponding marker in individual_markers
-                    im = [im for im in kwds['individual_markers'] if im.id==m]
-                    if not im:
-                        # incorrect setup, referring to a non-existing individual marker. ignore
-                        continue
-                    else:
-                        kwds['auto_code_sync_points']['markers'].add(gt_marker.MarkerID(im[0].id, im[0].aruco_dict_id))
-            if 'auto_code_episodes' in kwds:
-                for e in kwds['auto_code_episodes']:
-                    for f in ('start_markers','end_markers'):
-                        if not f in kwds['auto_code_episodes'][e]:
-                            continue
-                        markers = kwds['auto_code_episodes'][e][f]
-                        kwds['auto_code_episodes'][e][f] = []
-                        for m in markers:
-                            if not isinstance(m,int):
-                                kwds['auto_code_episodes'][e][f].append(m)
-                                continue
-                            # find corresponding marker in individual_markers
-                            im = [im for im in kwds['individual_markers'] if im.id==m]
-                            if not im:
-                                # incorrect setup, referring to a non-existing individual marker. ignore
-                                continue
-                            else:
-                                kwds['auto_code_episodes'][e][f].append(gt_marker.MarkerID(im[0].id, im[0].aruco_dict_id))
             # backwards compatibility for mapped video marker and axes settings
             kwds.pop('mapped_video_process_individual_markers_for_all_frames',None) # setting doesn't exist anymore
             if 'mapped_video_show_detected_markers' in kwds:
@@ -1411,6 +1459,9 @@ class Study:
                     event_setup['sync_setup']['get_cam_movement_method'] = 'assembly'
 
         _migrate_legacy_gaze_styles(kwds)
+        for cs in kwds.get('coding_setup', []):
+            if cs.get('auto_code') is not None:
+                cs['auto_code'] = _normalize_auto_code(cs['auto_code'], kwds.get('individual_markers'))
 
         if 'interpolate_plane_pose_recordings' in kwds and kwds['interpolate_plane_pose_recordings'] is not None and not isinstance(kwds['interpolate_plane_pose_recordings'], set):
             kwds['interpolate_plane_pose_recordings'] = set(kwds['interpolate_plane_pose_recordings'])
@@ -1559,16 +1610,16 @@ event_setup_doc = {
     'which_recordings': type_utils.GUIDocInfo('Which recordings', 'Recordings for which you should code this event. If not set, the event is taken from the reference recording.'),
     'load_from_other_recordings': type_utils.GUIDocInfo('Load from other recordings?', 'If enabled, coding for this event is also allowed to come from another recording, if it is not found in the current recording (or even cannot be coded for the current recording because it is not listed in the "Which recordings" setting).'),
     'auto_code': type_utils.GUIDocInfo('Auto-coding setup', 'Setup for automatically coding this event based on individual marker detections.',{
-        'markers': type_utils.GUIDocInfo('Marker(s)', 'Set of marker IDs whose appearance indicates a synchronization timepoint.'),
+        'markers': type_utils.GUIDocInfo('Marker sequence(s)', 'One or more ordered marker sequences whose appearance indicates synchronization timepoints. Each configured sequence is a list of one or more marker IDs.'),
         'transition': type_utils.GUIDocInfo('Sync marker transition', 'Transition to code for this marker.', {
             None: {
-                'onset': type_utils.GUIDocInfo('Onset', 'Code the first frame in which the marker is visible.'),
-                'offset': type_utils.GUIDocInfo('Offset', 'Code the first frame after the marker was last visible.'),
-                'both': type_utils.GUIDocInfo('Both', 'Code both the onset and offset.'),
+                'onset': type_utils.GUIDocInfo('Onset', 'Code the first frame in which the first marker in a configured sequence is visible.'),
+                'offset': type_utils.GUIDocInfo('Offset', 'Code the first frame after the last marker in a configured sequence was last visible.'),
+                'both': type_utils.GUIDocInfo('Both', 'Code both boundaries for each configured marker sequence.'),
             }
         }),
-        'start_markers': type_utils.GUIDocInfo('Start marker(s)', 'A single marker ID or a sequence of marker IDs that indicate the start of an episode.'),
-        'end_markers': type_utils.GUIDocInfo('End marker(s)', 'A single marker ID or a sequence of marker IDs that indicate the end of an episode.'),
+        'start_markers': type_utils.GUIDocInfo('Start marker sequence(s)', 'One or more ordered marker sequences that mark the start of an episode. The episode interval begins on the frame following the end of a matching sequence.'),
+        'end_markers': type_utils.GUIDocInfo('End marker sequence(s)', 'One or more ordered marker sequences that mark the end of an episode. The episode interval ends on the frame preceding the start of a matching sequence.'),
         'max_gap_duration': type_utils.GUIDocInfo('Maximum gap duration', 'Maximum gap (number of frames) in marker detections that will be filled in (ignored).'),
         'max_intermarker_gap_duration': type_utils.GUIDocInfo('Maximum intermarker gap duration', 'Maximum gap (number of frames) that is allowed between the detection of two markers in a sequence.'),
         'min_duration': type_utils.GUIDocInfo('Minimum duration', 'Minimum duration (number of frames) that a marker should be detected. Shorter runs are removed.')
@@ -1885,6 +1936,8 @@ class StudyOverride:
         if path.is_dir():
             path = path / StudyOverride.default_json_file_name
         kwds = json.load(path)
+        for obsolete_setting in ('export_output3D', 'export_output2D', 'export_only_code_marker_presence'):
+            kwds.pop(obsolete_setting, None)
 
         # help with enum roundtrip
         if 'validate_dq_types' in kwds:
@@ -1973,6 +2026,8 @@ class StudyOverride:
                     for f in cs['gaze_offset_setup']:
                         if 'data_types' in cs['gaze_offset_setup'][f]:
                             cs['gaze_offset_setup'][f]['data_types'] = {_data_types.data_type_val_to_enum_val(d) for d in cs['gaze_offset_setup'][f]['data_types']}
+                if 'auto_code' in cs and cs['auto_code'] is not None:
+                    cs['auto_code'] = _normalize_auto_code(cs['auto_code'])
                 coding_setup_overrides[name] = StudyOverride(level, recording_type, for_event_setup=True, **cs)
         # enum roundtrip
         if 'mapped_video_which_gaze_type_on_plane' in kwds:
@@ -2005,6 +2060,8 @@ class StudyOverride:
     @staticmethod
     def _fix_typing(kwds: dict[str,Any]) -> dict[str,Any]:
         kwds = _migrate_legacy_gaze_styles(kwds, preserve_sparse=True)
+        if 'auto_code' in kwds and kwds['auto_code'] is not None:
+            kwds['auto_code'] = _normalize_auto_code(kwds['auto_code'])
         if 'mapped_video_recording_colors' in kwds and kwds['mapped_video_recording_colors'] is not None:
             kwds['mapped_video_recording_colors'] = {k: None if kwds['mapped_video_recording_colors'][k] is None else drawing.RgbColor(*kwds['mapped_video_recording_colors'][k]) for k in kwds['mapped_video_recording_colors']}
         return kwds
