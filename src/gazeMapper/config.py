@@ -475,10 +475,6 @@ class Study:
                  sync_ref_max_onset_offset_ms               : float                         = 600.,
                  sync_ref_cluster_threshold_ms              : float                         = 0.,
 
-                 export_output3D                            : bool                          = False,
-                 export_output2D                            : bool                          = True,
-                 export_only_code_marker_presence           : bool                          = True,
-
                  mapped_video_make_which                               : set[str]|None                     = None,
                  mapped_video_pixel_format                             : Literal['yuv420p','yuv444p']      = 'yuv420p',
                  mapped_video_recording_colors                         : dict[str,drawing.RgbColor]|None   = None,
@@ -532,10 +528,6 @@ class Study:
         self.sync_ref_average_onset_offset              = sync_ref_average_onset_offset
         self.sync_ref_max_onset_offset_ms               = sync_ref_max_onset_offset_ms
         self.sync_ref_cluster_threshold_ms              = sync_ref_cluster_threshold_ms
-
-        self.export_output3D                            = export_output3D
-        self.export_output2D                            = export_output2D
-        self.export_only_code_marker_presence           = export_only_code_marker_presence
 
         self.mapped_video_make_which                               = mapped_video_make_which
         self.mapped_video_pixel_format                             = mapped_video_pixel_format
@@ -1563,9 +1555,6 @@ study_parameter_doc = {
     'sync_ref_average_onset_offset': type_utils.GUIDocInfo('Synchronization: Average onset and offset?', 'Average each detected sync marker onset and its matching offset into one sync point.'),
     'sync_ref_max_onset_offset_ms': type_utils.GUIDocInfo('Synchronization: Maximum onset-offset duration (ms)', 'Maximum allowed duration between a sync marker onset and offset when averaging them. Ignored unless onset/offset averaging is enabled.'),
     'sync_ref_cluster_threshold_ms': type_utils.GUIDocInfo('Synchronization: Sync event cluster threshold (ms)', 'Group consecutive sync events whose adjacent timestamps are closer than this threshold, and use each cluster mean as one sync point. Set to 0 to disable clustering.'),
-    'export_output3D': type_utils.GUIDocInfo('Mapped data export: include 3D fields', 'Determines whether gaze positions on the plane in the scene camera reference frame are exported when invoking the Export Trials action.'),
-    'export_output2D': type_utils.GUIDocInfo('Mapped data export: include 2D fields', 'Determines whether gaze positions on the plane in the plane\'s reference frame are exported when invoking the Export Trials action.'),
-    'export_only_code_marker_presence': type_utils.GUIDocInfo('Mapped data export: only include marker presence?', 'If enabled, for each marker only a single column is added to the export created by the Export Trials action, indicating whether the given marker was detected or not on a given frame. If not enabled, marker pose information is included in the export.'),
     'mapped_video_make_which': type_utils.GUIDocInfo('Mapped video: Which recordings', 'Indicates one or multiple recordings for which to make videos of the eye tracker scene camera or external camera (synchronized to one of the recordings if there are multiple) showing detected plane origins, detected individual markers and gaze from any other recordings eye tracker recordings. Also shown for eye tracker recordings are gaze on the scene video from the eye tracker, gaze projected to the detected planes. Each only if available, and enabled in the below video generation settings.'),
     'mapped_video_pixel_format': type_utils.GUIDocInfo('Mapped video: Output pixel format', 'Pixel format used by the mapped video encoder.', _video_pixel_format_docs),
     'mapped_video_recording_colors': type_utils.GUIDocInfo('Mapped video: Recording colors', 'Colors used for drawing each recording\'s gaze point, scene camera and gaze vector (depending on settings).'),
