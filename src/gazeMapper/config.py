@@ -196,6 +196,7 @@ class AutoCodeEpisodes(typed_dict_defaults.TypedDictDefault, total=False):
     start_markers               : marker.MarkerSequenceList
     end_markers                 : marker.MarkerSequenceList
     start_sequence_ends_previous: bool      = False
+    whole_recording_as_trial    : bool      = False
     max_gap_duration            : int       = 4
     max_intermarker_gap_duration: int       = 15
     min_duration                : int       = 6
@@ -861,13 +862,19 @@ class Study:
 
             # check auto coding setup
             if cs.get('auto_code') is not None:
+                whole_recording_as_trial = cs['auto_code'].get('whole_recording_as_trial', False)
                 if cs['event_type'] == annotation.EventType.Sync_Camera:
                     transition = cs['auto_code'].get('transition', 'onset')
                     if transition not in ('onset', 'offset', 'both'):
                         msg = 'auto_code.transition should be one of "onset", "offset", or "both".'
                         type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'auto_code': {'transition': (type_utils.ProblemLevel.Error, msg)}}}})
+                if whole_recording_as_trial and cs['event_type'] != annotation.EventType.Trial:
+                    msg = 'auto_code.whole_recording_as_trial can only be enabled for a Trial event.'
+                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'auto_code': {'whole_recording_as_trial': (type_utils.ProblemLevel.Error, msg)}}}})
                 if annotation.type_map[cs['event_type']]==annotation.Type.Point:
                     fields = ['markers']
+                elif whole_recording_as_trial and cs['event_type'] == annotation.EventType.Trial:
+                    fields = []
                 else:
                     fields = ['start_markers']
                     if not cs['auto_code'].get('start_sequence_ends_previous', False) or cs['auto_code'].get('end_markers'):
@@ -907,9 +914,33 @@ class Study:
                     annotation.type_map[cs['event_type']] == annotation.Type.Interval
                     and cs['auto_code'].get('start_sequence_ends_previous', False)
                     and not cs['auto_code'].get('end_markers')
+                    and not whole_recording_as_trial
                 ):
                     msg = 'No end marker sequences are configured. Start sequences will end the previous episode, but the final episode will not be coded without an end sequence.'
                     type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'auto_code': {'end_markers': (type_utils.ProblemLevel.Warning, msg)}}}})
+                if whole_recording_as_trial and cs['event_type'] == annotation.EventType.Trial:
+                    ignored_fields = {}
+                    if cs['auto_code'].get('start_markers'):
+                        ignored_fields['start_markers'] = (
+                            type_utils.ProblemLevel.Warning,
+                            'Start marker sequences are ignored when auto_code.whole_recording_as_trial is enabled.',
+                        )
+                    if cs['auto_code'].get('end_markers'):
+                        ignored_fields['end_markers'] = (
+                            type_utils.ProblemLevel.Warning,
+                            'End marker sequences are ignored when auto_code.whole_recording_as_trial is enabled.',
+                        )
+                    if cs['auto_code'].get('start_sequence_ends_previous', False) is not False:
+                        ignored_fields['start_sequence_ends_previous'] = (
+                            type_utils.ProblemLevel.Warning,
+                            'auto_code.start_sequence_ends_previous is ignored when auto_code.whole_recording_as_trial is enabled.',
+                        )
+                    if ignored_fields:
+                        ignored_fields['whole_recording_as_trial'] = (
+                            type_utils.ProblemLevel.Warning,
+                            'Start and end marker sequences are ignored when auto_code.whole_recording_as_trial is enabled.',
+                        )
+                        type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'auto_code': ignored_fields}}})
 
             # check which_recordings settings
             if cs['event_type'] in (annotation.EventType.Sync_Camera, annotation.EventType.Sync_Camera_Offset):
@@ -976,6 +1007,8 @@ class Study:
 
         for i, cs in enumerate(self.coding_setup):
             if cs['auto_code'] is None:
+                continue
+            if cs['auto_code'].get('whole_recording_as_trial', False):
                 continue
             if annotation.type_map[cs['event_type']]==annotation.Type.Point and 'markers' in cs['auto_code']:
                 fields = ('markers',)
@@ -1620,6 +1653,7 @@ event_setup_doc = {
         'start_markers': type_utils.GUIDocInfo('Start marker sequence(s)', 'One or more ordered marker sequences that mark the start of an episode. The episode interval begins on the frame following the end of a matching sequence.'),
         'end_markers': type_utils.GUIDocInfo('End marker sequence(s)', 'One or more ordered marker sequences that mark the end of an episode. The episode interval ends on the frame preceding the start of a matching sequence.'),
         'start_sequence_ends_previous': type_utils.GUIDocInfo('Start sequence ends previous episode?', 'If enabled, the first frame of each start-marker sequence also ends the previous episode. This allows omitting end marker sequences, but the final episode will not be coded unless it has an explicit end sequence.'),
+        'whole_recording_as_trial': type_utils.GUIDocInfo('Whole recording is one trial?', 'If enabled for a Trial event, the full recording is coded as one interval from its first to its last frame. Marker sequences are not used.'),
         'max_gap_duration': type_utils.GUIDocInfo('Maximum gap duration', 'Maximum gap (number of frames) in marker detections that will be filled in (ignored).'),
         'max_intermarker_gap_duration': type_utils.GUIDocInfo('Maximum intermarker gap duration', 'Maximum gap (number of frames) that is allowed between the detection of two markers in a sequence.'),
         'min_duration': type_utils.GUIDocInfo('Minimum duration', 'Minimum duration (number of frames) that a marker should be detected. Shorter runs are removed.')

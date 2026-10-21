@@ -34,6 +34,22 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
 
     # get marker files
     for cs in events:
+        if cs['auto_code'].get('whole_recording_as_trial', False):
+            if cs['event_type'] != annotation.EventType.Trial:
+                raise ValueError(f'auto_code.whole_recording_as_trial can only be enabled for a Trial event, not "{cs["name"]}"')
+            if (
+                cs['auto_code'].get('start_markers')
+                or cs['auto_code'].get('end_markers')
+                or cs['auto_code'].get('start_sequence_ends_previous', False)
+            ):
+                warnings.warn(
+                    f'{cs["name"]}: Start and end marker sequences are ignored because whole_recording_as_trial is enabled.',
+                    process_pool.ProcessingWarning,
+                )
+            frame_indices = timestamps.VideoTimestamps(working_dir / gt_naming.frame_timestamps_fname).indices
+            episodes[cs['name']] = (cs['event_type'], [int(frame_indices[0]), int(frame_indices[-1])])
+            continue
+
         start_sequence_ends_previous = cs['auto_code'].get('start_sequence_ends_previous', False)
         if not cs['auto_code'].get('start_markers'):
             raise ValueError(f'No start_markers configured for auto coding of event "{cs["name"]}"')

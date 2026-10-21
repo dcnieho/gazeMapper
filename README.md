@@ -720,6 +720,8 @@ For automatic coding of trial, validation, and eye-tracker synchronization episo
 
 Set `auto_code.start_sequence_ends_previous` to `true` to also use the first frame of each start-marker sequence as the end boundary for the previous episode. This allows coding repeated episodes with start sequences alone, but the final episode still requires an explicit end-marker sequence; otherwise it is omitted and a warning is issued.
 
+For a `Trial` event, set `auto_code.whole_recording_as_trial` to `true` to code the entire recording as one trial, from its first through last frame. No marker sequences are required. If start or end marker sequences are also configured, they are ignored and a warning is issued.
+
 When loading configurations, legacy v1 top-level `auto_code_sync_points` and `auto_code_episodes` settings are moved into `coding_setup`. Existing v2 flat marker lists are normalized too: sync marker lists become separate one-marker sequences, while each episode start/end list remains one ordered sequence. New nested marker-sequence lists retain their configured order.
 
 ## Synchronization
@@ -835,6 +837,7 @@ These settings are discussed [here](#automatic-coding-of-episodes).
 |Start marker(s)|`start_markers`||A single marker ID or a sequence (`list`) of marker IDs that indicate the start of an episode.|
 |End marker(s)|`end_markers`||A single marker ID or a sequence (`list`) of marker IDs that indicate the end of an episode.|
 |Start sequence ends previous episode?|`start_sequence_ends_previous`|`false`|If enabled, the first frame of a start-marker sequence ends the previous episode. The final episode still needs an explicit end sequence to be coded.|
+|Whole recording is one trial?|`whole_recording_as_trial`|`false`|For a `Trial` event, code the first through last frame as one trial without marker sequences.|
 |Maximum gap duration|`max_gap_duration`|`4`|Maximum gap (number of frames) in marker detections that will be filled in (ignored).|
 |Maximum intermarker gap duration|`max_intermarker_gap_duration`|`15`|Maximum gap (number of frames) that is allowed between the detection of two markers in a sequence.|
 |Minimum duration|`min_duration`|`6`|Minimum duration (number of frames) that a marker should be detected. Shorter runs are removed.|
