@@ -718,6 +718,8 @@ Configure one `Sync_Camera` event setup and choose its auto-code `transition`: `
 #### Automatic coding of episodes
 For automatic coding of trial, validation, and eye-tracker synchronization episodes, set `auto_code.start_markers` and `auto_code.end_markers` on the interval event setup. Each contains one or more ordered marker sequences, where each sequence is a list of one or more marker IDs; these are alternative ways to detect the start or end. Individual detections are processed with the same gap-filling and minimum-duration rules as for synchronization points. Sequences are matched in configured order with at most `max_intermarker_gap_duration` frames between consecutive markers. The end of a start-marker sequence marks the start of the episode: its interval begins on the frame after the final marker was last visible. The start of an end-marker sequence marks the end of the episode: its interval ends on the frame before the initial marker first becomes visible. These same boundary rules apply to one-marker sequences. Candidate starts and ends from all configured sequences are merged before intervals are paired.
 
+Set `auto_code.start_sequence_ends_previous` to `true` to also use the first frame of each start-marker sequence as the end boundary for the previous episode. This allows coding repeated episodes with start sequences alone, but the final episode still requires an explicit end-marker sequence; otherwise it is omitted and a warning is issued.
+
 When loading configurations, legacy v1 top-level `auto_code_sync_points` and `auto_code_episodes` settings are moved into `coding_setup`. Existing v2 flat marker lists are normalized too: sync marker lists become separate one-marker sequences, while each episode start/end list remains one ordered sequence. New nested marker-sequence lists retain their configured order.
 
 ## Synchronization
@@ -832,6 +834,7 @@ These settings are discussed [here](#automatic-coding-of-episodes).
 | --- | --- | --- | --- |
 |Start marker(s)|`start_markers`||A single marker ID or a sequence (`list`) of marker IDs that indicate the start of an episode.|
 |End marker(s)|`end_markers`||A single marker ID or a sequence (`list`) of marker IDs that indicate the end of an episode.|
+|Start sequence ends previous episode?|`start_sequence_ends_previous`|`false`|If enabled, the first frame of a start-marker sequence ends the previous episode. The final episode still needs an explicit end sequence to be coded.|
 |Maximum gap duration|`max_gap_duration`|`4`|Maximum gap (number of frames) in marker detections that will be filled in (ignored).|
 |Maximum intermarker gap duration|`max_intermarker_gap_duration`|`15`|Maximum gap (number of frames) that is allowed between the detection of two markers in a sequence.|
 |Minimum duration|`min_duration`|`6`|Minimum duration (number of frames) that a marker should be detected. Shorter runs are removed.|

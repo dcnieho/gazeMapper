@@ -34,16 +34,25 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
 
     # get marker files
     for cs in events:
-        for m in ('start_markers','end_markers'):
-            if m not in cs['auto_code'] or not cs['auto_code'][m]:
-                raise ValueError(f'No {m} configured for auto coding of event "{cs["name"]}"')
-        filtered_sequences, all_marker_ids = marker.filter_marker_sequences_with_marker_files(cs['name'], working_dir, {'start_markers': cs['auto_code']['start_markers'], 'end_markers': cs['auto_code']['end_markers']})
+        start_sequence_ends_previous = cs['auto_code'].get('start_sequence_ends_previous', False)
+        if not cs['auto_code'].get('start_markers'):
+            raise ValueError(f'No start_markers configured for auto coding of event "{cs["name"]}"')
+        configured_end_sequences = cs['auto_code'].get('end_markers') or []
+        if not configured_end_sequences and not start_sequence_ends_previous:
+            raise ValueError(f'No end_markers configured for auto coding of event "{cs["name"]}"')
+        filtered_sequences, all_marker_ids = marker.filter_marker_sequences_with_marker_files(cs['name'], working_dir, {'start_markers': cs['auto_code']['start_markers'], 'end_markers': configured_end_sequences})
         start_marker_sequences = filtered_sequences['start_markers']
         end_marker_sequences = filtered_sequences['end_markers']
         if not start_marker_sequences:
             raise FileNotFoundError(f'None of the configured start marker sequences for auto-coded event "{cs["name"]}" were found, missing files for some markers')
-        if not end_marker_sequences:
+        if not end_marker_sequences and not start_sequence_ends_previous:
             raise FileNotFoundError(f'None of the configured end marker sequences for auto-coded event "{cs["name"]}" were found, missing files for some markers')
+        if not end_marker_sequences and start_sequence_ends_previous:
+            warnings.warn(
+                f'{cs["name"]}: No end marker sequences were found. Start sequences will end the previous episode, '
+                'but the final episode will not be coded without an end sequence.',
+                process_pool.ProcessingWarning,
+            )
         marker_starts, marker_ends = marker.get_marker_appearance_starts_ends(all_marker_ids, working_dir, cs['auto_code']['max_gap_duration'], cs['auto_code']['min_duration'])
 
         def _resolve_sequence_points(sequences: marker.MarkerSequenceList, *, side: str) -> np.ndarray:
@@ -61,10 +70,13 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None = None,
         # find potential interval starts and ends
         starts = _resolve_sequence_points(start_marker_sequences, side='end')
         ends   = _resolve_sequence_points(end_marker_sequences, side='start')
+        start_sequence_onsets = _resolve_sequence_points(start_marker_sequences, side='start') if start_sequence_ends_previous else None
         # now match interval starts and ends
         # strategy: run through starts and find latest start that is before first end (discard ends that are before the start)
         # keep pointer into array keeping track of ends and start that have already been discarded or consumed
         # NB: this assumes starts and ends are sorted, which the above procedures should indeed deliver
+        if start_sequence_onsets is not None:
+            ends = np.unique(np.concatenate((ends, start_sequence_onsets)))
         intervals: list[tuple[int,int]] = []
         s_idx = 0
         e_idx = 0

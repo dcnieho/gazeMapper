@@ -195,6 +195,7 @@ class AutoCodeSyncPoints(typed_dict_defaults.TypedDictDefault, total=False):
 class AutoCodeEpisodes(typed_dict_defaults.TypedDictDefault, total=False):
     start_markers               : marker.MarkerSequenceList
     end_markers                 : marker.MarkerSequenceList
+    start_sequence_ends_previous: bool      = False
     max_gap_duration            : int       = 4
     max_intermarker_gap_duration: int       = 15
     min_duration                : int       = 6
@@ -868,7 +869,9 @@ class Study:
                 if annotation.type_map[cs['event_type']]==annotation.Type.Point:
                     fields = ['markers']
                 else:
-                    fields = ['start_markers','end_markers']
+                    fields = ['start_markers']
+                    if not cs['auto_code'].get('start_sequence_ends_previous', False) or cs['auto_code'].get('end_markers'):
+                        fields.append('end_markers')
 
                 this_problems = {k:f'auto_code.{k} should be set for a {annotation.tooltip_map[cs["event_type"]]} episode.' for k in fields if k not in cs['auto_code'] or not cs['auto_code'][k]}
                 if this_problems:
@@ -900,6 +903,13 @@ class Study:
                             if missing_markers:
                                 msg = f'Markers "{", ".join(missing_markers)}" specified in auto_code.{f}, but unknown because not present in individual_markers.'
                                 type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'auto_code': {f: (type_utils.ProblemLevel.Error, msg)}}}})
+                if (
+                    annotation.type_map[cs['event_type']] == annotation.Type.Interval
+                    and cs['auto_code'].get('start_sequence_ends_previous', False)
+                    and not cs['auto_code'].get('end_markers')
+                ):
+                    msg = 'No end marker sequences are configured. Start sequences will end the previous episode, but the final episode will not be coded without an end sequence.'
+                    type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'auto_code': {'end_markers': (type_utils.ProblemLevel.Warning, msg)}}}})
 
             # check which_recordings settings
             if cs['event_type'] in (annotation.EventType.Sync_Camera, annotation.EventType.Sync_Camera_Offset):
@@ -969,8 +979,8 @@ class Study:
                 continue
             if annotation.type_map[cs['event_type']]==annotation.Type.Point and 'markers' in cs['auto_code']:
                 fields = ('markers',)
-            elif annotation.type_map[cs['event_type']]==annotation.Type.Interval and 'start_markers' in cs['auto_code'] and 'end_markers' in cs['auto_code']:
-                fields = ('start_markers', 'end_markers')
+            elif annotation.type_map[cs['event_type']]==annotation.Type.Interval and 'start_markers' in cs['auto_code']:
+                fields = ('start_markers', 'end_markers') if cs['auto_code'].get('end_markers') else ('start_markers',)
             else:
                 continue
             for field in fields:
@@ -1609,6 +1619,7 @@ event_setup_doc = {
         }),
         'start_markers': type_utils.GUIDocInfo('Start marker sequence(s)', 'One or more ordered marker sequences that mark the start of an episode. The episode interval begins on the frame following the end of a matching sequence.'),
         'end_markers': type_utils.GUIDocInfo('End marker sequence(s)', 'One or more ordered marker sequences that mark the end of an episode. The episode interval ends on the frame preceding the start of a matching sequence.'),
+        'start_sequence_ends_previous': type_utils.GUIDocInfo('Start sequence ends previous episode?', 'If enabled, the first frame of each start-marker sequence also ends the previous episode. This allows omitting end marker sequences, but the final episode will not be coded unless it has an explicit end sequence.'),
         'max_gap_duration': type_utils.GUIDocInfo('Maximum gap duration', 'Maximum gap (number of frames) in marker detections that will be filled in (ignored).'),
         'max_intermarker_gap_duration': type_utils.GUIDocInfo('Maximum intermarker gap duration', 'Maximum gap (number of frames) that is allowed between the detection of two markers in a sequence.'),
         'min_duration': type_utils.GUIDocInfo('Minimum duration', 'Minimum duration (number of frames) that a marker should be detected. Shorter runs are removed.')
