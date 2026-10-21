@@ -649,6 +649,7 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
                 imgui.same_line()
                 gt_gui.utils.draw_hover_text(field_doc.doc_str, text='')
 
+            has_individual_markers = bool(g.study_config and g.study_config.individual_markers)
             t_fields = [
                 ff for ff in dataclasses.fields(fld)
                 if ff.name not in ('available', 'do_it', 'sess', 'recs', 'trial_start_marker_sequence_available')
@@ -656,6 +657,11 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
                     f.name == 'plane_gaze'
                     and ff.name == 'include_trial_start_marker_sequence'
                     and not fld.trial_start_marker_sequence_available
+                )
+                and not (
+                    f.name == 'plane_gaze'
+                    and ff.name in {'include_markers', 'markers_only_presence', 'markers_compress'}
+                    and not has_individual_markers
                 )
             ]
             if t_fields and fld.do_it and imgui.tree_node(f'{field_label} settings'):

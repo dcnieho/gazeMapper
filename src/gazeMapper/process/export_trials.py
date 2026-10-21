@@ -554,7 +554,7 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
 
         # if there are individual markers, load them so they can be added later
         # load
-        if export_config.include_markers:
+        if export_config.include_markers and study_config.individual_markers:
             markers = {m.id: gt_marker.read_dataframe_from_file(m.id, m.aruco_dict_id, working_dir/r) for m in study_config.individual_markers if gt_marker.get_file_name(m.id, m.aruco_dict_id, working_dir/r).is_file()}
             # recode to presence/absence if wanted
             if export_config.markers_only_presence:
@@ -575,8 +575,10 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
                         [
                             {"frame_idx": k, "markers": ",".join(map(str, sorted(v)))}
                             for k, v in sorted(observed.items())
-                        ]
+                        ],
+                        columns=['frame_idx', 'markers'],
                     )
+                    markers['frame_idx'] = markers['frame_idx'].astype('int64')
                     column_info['markers'] = 'observed marker ids (comma-separated)'
             else:
                 # rename columns to unique names
@@ -640,7 +642,7 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
             plane_gazes = plane_gazes[keys[0]]
 
             # merge in markers
-            if export_config.include_markers:
+            if export_config.include_markers and study_config.individual_markers:
                 if export_config.markers_only_presence and export_config.markers_compress:
                     plane_gazes = plane_gazes.merge(markers, how='left', on='frame_idx')
                     # replace nan with empty string for frames where no markers are observed
