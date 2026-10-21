@@ -7,6 +7,7 @@ import threading
 import time
 import typeguard
 import shutil
+import typing
 
 if os.name == 'nt':
     import msvcrt
@@ -52,7 +53,7 @@ class RecordingDefinition:
         cal_path.unlink(missing_ok=True)
 
     @staticmethod
-    def from_dict(payload: dict[str]):
+    def from_dict(payload: dict[str, typing.Any]):
         # roundtrip the enums
         if 'type' in payload:
             payload['type'] = RecordingType(payload['type'])
@@ -65,7 +66,7 @@ class RecordingDefinition:
             payload['associated_recording'] = None
         return RecordingDefinition(**payload)
 
-    def to_dict(self) -> dict[str]:
+    def to_dict(self) -> dict[str, typing.Any]:
         out = {'name': self.name, 'type': self.type}
         if self.camera_recording_type is not None:
             out['camera_recording_type'] = self.camera_recording_type
@@ -312,6 +313,7 @@ def get_session_from_directory(path: str|pathlib.Path, session_def: SessionDefin
         config_dir = config.guess_config_dir(path)
         session_def = config.Study.load_from_json(config_dir).session_def
 
+    path = pathlib.Path(path)
     if not path.is_dir():
         raise RuntimeError('The provided path should be a directory')
 
@@ -464,8 +466,9 @@ def _apply_mutations_and_store(file, action_state_mutations, skip_if_missing=Fal
 
         _write_action_states_to_file_unlocked(file, action_states)
 
-def update_action_states(working_dir: str|pathlib.Path, action: process.Action, state: process_pool.State, study_config: 'config.Study', skip_if_missing=False, unchanged=False) -> dict[process.Action, process_pool.State]:
+def update_action_states(working_dir: str|pathlib.Path, action: process.Action, state: process_pool.State, study_config: 'config.Study', skip_if_missing=False, unchanged=False) -> tuple[dict[process.Action, process_pool.State], dict[process.Action, process_pool.State]]:
     for_recording = not process.is_session_level_action(action)
+    working_dir = pathlib.Path(working_dir)
 
     if unchanged:
         # just update state of this task, don't cascade
@@ -476,7 +479,9 @@ def update_action_states(working_dir: str|pathlib.Path, action: process.Action, 
         else:
             file = working_dir / _get_action_status_fname(False)
             _apply_mutations_and_store(file, action_state_mutations, skip_if_missing=skip_if_missing)
-        return
+        if for_recording:
+            return {}, action_state_mutations
+        return action_state_mutations, {}
 
     # determine state mutations
     action_state_mutations = process.action_update_and_invalidate(action, state, study_config)
