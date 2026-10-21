@@ -30,7 +30,7 @@ def _snapshot_export_preferences(export_config: export_trials.ExportConfig) -> d
         action_preferences = {
             setting.name: copy.deepcopy(getattr(action, setting.name))
             for setting in dataclasses.fields(action)
-            if setting.name not in {'available', 'sess', 'recs'}
+            if setting.name not in {'available', 'sess', 'recs', 'trial_start_marker_sequence_available'}
             and not (action_name == 'validation' and setting.name == 'episodes')
         }
         if action_name == 'validation':
@@ -649,7 +649,15 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
                 imgui.same_line()
                 gt_gui.utils.draw_hover_text(field_doc.doc_str, text='')
 
-            t_fields = [ff for ff in dataclasses.fields(fld) if ff.name not in ('available','do_it','sess','recs')]
+            t_fields = [
+                ff for ff in dataclasses.fields(fld)
+                if ff.name not in ('available', 'do_it', 'sess', 'recs', 'trial_start_marker_sequence_available')
+                and not (
+                    f.name == 'plane_gaze'
+                    and ff.name == 'include_trial_start_marker_sequence'
+                    and not fld.trial_start_marker_sequence_available
+                )
+            ]
             if t_fields and fld.do_it and imgui.tree_node(f'{field_label} settings'):
                 right_width = imgui.get_window_dpi_scale()*90
                 if f.name=='validation':

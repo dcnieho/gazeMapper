@@ -4,7 +4,6 @@ import copy
 import numpy as np
 import pandas as pd
 import polars as pl
-import cv2
 from collections import defaultdict
 import dataclasses
 import enum
@@ -17,7 +16,7 @@ from ETDQualitizer import vector_to_Fick
 from glassesTools import annotation, data_types, gaze_headref, gaze_worldref, marker as gt_marker, naming as gt_naming, ocv, process_pool, transforms
 from glassesTools.validation import export as val_export
 
-from .. import config, episode, naming, marker_assembly, process, session, type_utils
+from .. import config, episode, marker, naming, marker_assembly, process, session, type_utils
 from . import _pose_files
 
 
@@ -39,6 +38,8 @@ class HeadRefGazeType(enum.Enum):
 @dataclasses.dataclass
 class PlaneGaze(OptionBase):
     include_unit_header_row: bool = True
+    include_trial_start_marker_sequence: bool = False
+    trial_start_marker_sequence_available: bool = False
     include_head_ref_gaze: bool = True
     include_head_ref_gaze_Fick_angles: bool = False
     head_ref_gaze_types: set[HeadRefGazeType] = dataclasses.field(default_factory=lambda: {HeadRefGazeType.Scene_Video_Position})
@@ -100,9 +101,41 @@ def _invert_plane_poses(rotation_vecs: np.ndarray, translation_vecs: np.ndarray)
     return camera_to_plane.as_rotvec(), inverse_translations, forward_in_plane
 
 
+def _get_trial_start_marker_sequences(working_dir: pathlib.Path, event: config.EventSetup) -> dict[int, str]:
+    auto_code = event.get('auto_code')
+    if event['event_type'] != annotation.EventType.Trial or not auto_code or 'start_markers' not in auto_code:
+        return {}
+    if event.get('which_recordings') is not None and working_dir.name not in event['which_recordings']:
+        return {}
+
+    filtered_sequences, marker_ids = marker.filter_marker_sequences_with_marker_files(
+        event['name'], working_dir, {'start_markers': auto_code['start_markers']}
+    )
+    start_sequences = filtered_sequences['start_markers']
+    if not start_sequences:
+        return {}
+
+    marker_starts, marker_ends = marker.get_marker_appearance_starts_ends(
+        marker_ids, working_dir, auto_code['max_gap_duration'], auto_code['min_duration']
+    )
+    sequences_by_trial_start: dict[int, str] = {}
+    for sequence in start_sequences:
+        if len(sequence) > 1:
+            sequence_ends = gt_marker.get_sequence_interval(
+                marker_starts, marker_ends, sequence, auto_code['max_intermarker_gap_duration'], side='end'
+            )
+        else:
+            sequence_ends = marker_ends[sequence[0]]
+        sequence_label = ','.join(str(marker_id.m_id) for marker_id in sequence)
+        for sequence_end in sequence_ends:
+            sequences_by_trial_start.setdefault(int(sequence_end) + 1, sequence_label)
+    return sequences_by_trial_start
+
+
 export_config_doc = {
     'plane_gaze': type_utils.GUIDocInfo('Mapped gaze data', 'Export gaze mapped to planes, with optional gaze, head-pose, and marker data.', {
         'include_unit_header_row': type_utils.GUIDocInfo('Include units row', 'Add a second header row describing the units or meaning of each column.'),
+        'include_trial_start_marker_sequence': type_utils.GUIDocInfo('Include trial start marker sequence', 'Add a column with the comma-separated marker IDs of the auto-coded sequence that marked each trial start.'),
         'include_head_ref_gaze': type_utils.GUIDocInfo('Include head-referenced gaze fields', 'Append the available head-referenced gaze fields from the eye tracker\'s gaze file to each mapped-gaze export. These are eye-tracker measurements, not gaze positions mapped onto a plane and, depending on availability, include: 2D gaze position on the scene image (gaze_pos_vid), 3D/world gaze point (gaze_pos_3d), and left/right eye gaze direction vectors (gaze_dir_l/r) with their origins (gaze_ori_l/r). Also provided are timestamps and frame indices, including synchronized scene-camera timing when available.'),
         'include_head_ref_gaze_Fick_angles': type_utils.GUIDocInfo('Include head-referenced gaze angles', 'Add azimuth and elevation angles (Fick order) computed from the 2D gaze position on the scene image, relative to straight ahead in the scene camera. Requires eye-tracker gaze fields to be included.'),
         'head_ref_gaze_types': type_utils.GUIDocInfo('Head-referenced gaze types', 'Choose which head-referenced eye-tracker measurements to include. Timestamps and frame indices remain included for alignment.', {
@@ -168,6 +201,14 @@ def prep_export(project_dir: str|pathlib.Path, session_names: list[str], config_
     cs_plane_gaze = [cs for cs in process.get_specific_event_types(study_config, check_specific_fields=['marker_assemblies']) if any(name in plane_names for name in cs['marker_assemblies'])]
     cs_gaze_offset = process.get_specific_event_types(study_config, check_specific_fields=['gaze_offset_setup'])
     cs_validation = process.get_specific_event_types(study_config, annotation.EventType.Validate)
+    auto_coded_trial_event_names = {
+        cs['name']
+        for cs in process.get_specific_event_types(
+            study_config, annotation.EventType.Trial, check_specific_fields=['auto_code']
+        )
+    }
+    auto_coded_trial_events = [cs for cs in cs_plane_gaze if cs['name'] in auto_coded_trial_event_names]
+    auto_coded_trial_events_by_name = {cs['name']: cs for cs in auto_coded_trial_events}
     cs_et_sync = process.get_specific_event_types(study_config, check_specific_fields=['sync_setup'])
     val_sess_recs: list[tuple[str,str]] = []
     got_any = False
@@ -202,6 +243,28 @@ def prep_export(project_dir: str|pathlib.Path, session_names: list[str], config_
             export_config.mapped_gaze_video.recs.extend([r for r in s.recordings])  # NB: even though this is done per session, we want to flag all recordings for export, as there is a video for each recording
 
         for r in s.recordings:
+            if (
+                not export_config.plane_gaze.trial_start_marker_sequence_available
+                and s.recordings[r].state[process.Action.AUTO_CODE_EPISODES] == process_pool.State.Completed
+            ):
+                auto_coded_events_for_recording = {
+                    cs['name']
+                    for cs in auto_coded_trial_events
+                    if cs['which_recordings'] is None or r in cs['which_recordings']
+                }
+                if auto_coded_events_for_recording:
+                    coded_episodes = episode.load_episodes_from_all_recordings(
+                        study_config, project_dir / s.name / r, auto_coded_events_for_recording
+                    )[0]
+                    for event_name in auto_coded_events_for_recording:
+                        intervals = coded_episodes.get(event_name, (None, []))[1]
+                        if intervals:
+                            start_marker_sequences = _get_trial_start_marker_sequences(
+                                project_dir / s.name / r, auto_coded_trial_events_by_name[event_name]
+                            )
+                            if any(int(interval[0]) in start_marker_sequences for interval in intervals):
+                                export_config.plane_gaze.trial_start_marker_sequence_available = True
+                                break
             if s.recordings[r].state[process.Action.COMPUTE_DATA_QUALITY]==process_pool.State.Completed:
                 export_config.trial_data_quality.available = True
                 export_config.trial_data_quality.do_it = True
@@ -529,6 +592,16 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
             this_planes = [p for p in cs['marker_assemblies'] if p in planes]
             if not this_planes:
                 continue
+            include_trial_marker_sequence = (
+                export_config.include_trial_start_marker_sequence
+                and cs['event_type'] == annotation.EventType.Trial
+                and bool(cs.get('auto_code'))
+                and (cs['which_recordings'] is None or r in cs['which_recordings'])
+            )
+            trial_start_marker_sequences = (
+                _get_trial_start_marker_sequences(working_dir / r, cs)
+                if include_trial_marker_sequence else {}
+            )
             plane_gazes = {p:ori_plane_gazes[p].copy() for p in this_planes}
             keys = list(plane_gazes.keys())
             if export_config.include_head_ref_gaze:
@@ -591,9 +664,14 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
             # add trial numbers
             idx = max([cols.index(c) for c in cols if c.startswith('frame_ts')])+1
             plane_gazes.insert(idx,'trial',np.int32(-1))
+            if include_trial_marker_sequence:
+                plane_gazes.insert(idx + 1, 'trial_start_marker_sequence', '')
+                column_info['trial_start_marker_sequence'] = 'comma-separated marker IDs indicating the trial start'
             for i,e in enumerate(episodes[nm][1]):
                 sel = (plane_gazes['frame_idx'] >= e[0]) & (plane_gazes['frame_idx'] <= e[1])
                 plane_gazes.loc[sel,'trial'] = i+1
+                if include_trial_marker_sequence:
+                    plane_gazes.loc[sel, 'trial_start_marker_sequence'] = trial_start_marker_sequences.get(int(e[0]), '')
             column_info['trial'] = 'trial number (-1 means not during trial)'
 
             # store
