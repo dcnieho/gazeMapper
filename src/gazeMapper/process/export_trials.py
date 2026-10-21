@@ -132,6 +132,28 @@ def _get_trial_start_marker_sequences(working_dir: pathlib.Path, event: config.E
     return sequences_by_trial_start
 
 
+def _add_reference_recording_alignment_columns(
+    dataframe: pd.DataFrame,
+    recording_name: str,
+    reference_recording: str | None,
+) -> pd.DataFrame:
+    if recording_name != reference_recording:
+        return dataframe
+
+    columns = dataframe.columns.to_list()
+    timestamp_source = 'timestamp_VOR' if 'timestamp_VOR' in dataframe else 'timestamp'
+    if 'timestamp_ref' not in dataframe and timestamp_source in dataframe:
+        insert_idx = columns.index('frame_idx') if 'frame_idx' in dataframe else columns.index(timestamp_source) + 1
+        dataframe.insert(insert_idx, 'timestamp_ref', dataframe[timestamp_source])
+
+    frame_idx_source = 'frame_idx_VOR' if 'frame_idx_VOR' in dataframe else 'frame_idx'
+    if 'frame_idx_ref' not in dataframe and frame_idx_source in dataframe:
+        columns = dataframe.columns.to_list()
+        dataframe.insert(columns.index(frame_idx_source) + 1, 'frame_idx_ref', dataframe[frame_idx_source])
+
+    return dataframe
+
+
 export_config_doc = {
     'plane_gaze': type_utils.GUIDocInfo('Mapped gaze data', 'Export gaze mapped to planes, with optional gaze, head-pose, and marker data.', {
         'include_unit_header_row': type_utils.GUIDocInfo('Include units row', 'Add a second header row describing the units or meaning of each column.'),
@@ -643,6 +665,9 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
             # add scene and reference camera timestamp info, if present
             ts = pd.read_csv(working_dir / r / gt_naming.frame_timestamps_fname,sep='\t').rename(columns={'timestamp':'frame_ts'})
             plane_gazes = plane_gazes.merge(ts, how="left", on='frame_idx')
+            plane_gazes = _add_reference_recording_alignment_columns(
+                plane_gazes, r, study_config.sync_ref_recording
+            )
             to_move = 1
             if 'frame_idx_VOR' in plane_gazes.columns:
                 ts = ts.rename(columns={'frame_idx':'frame_idx_VOR','frame_ts':'frame_ts_VOR'})
@@ -923,6 +948,9 @@ def export_gaze_offsets(export_path: pathlib.Path, working_dir: pathlib.Path, st
             # add scene and reference camera timestamp info, if present
             ts = pd.read_csv(working_dir / r / gt_naming.frame_timestamps_fname,sep='\t').rename(columns={'timestamp':'frame_ts'})
             gaze_offsets = gaze_offsets.merge(ts, how="left", on='frame_idx')
+            gaze_offsets = _add_reference_recording_alignment_columns(
+                gaze_offsets, r, study_config.sync_ref_recording
+            )
             to_move = 1
             if 'frame_idx_VOR' in gaze_offsets.columns:
                 ts = ts.rename(columns={'frame_idx':'frame_idx_VOR','frame_ts':'frame_ts_VOR'})
