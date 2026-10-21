@@ -182,7 +182,7 @@ export_config_doc = {
         'episodes': type_utils.GUIDocInfo('Coding events', 'Leave empty to export every configured event for which gaze is mapped to a plane.'),
         'include_markers': type_utils.GUIDocInfo('Include individual markers', 'Add detected individual marker data to the export.'),
         'markers_only_presence': type_utils.GUIDocInfo('Export marker presence only', 'Applies only when Include individual markers is enabled. Export only whether each marker was detected, rather than its full pose data.'),
-        'markers_compress': type_utils.GUIDocInfo('Combine marker presence into one column', 'Applies only when Include individual markers and Export marker presence only are enabled. Store detected marker IDs in one comma-separated column instead of as a separate presence column for each marker.'),
+        'markers_compress': type_utils.GUIDocInfo('Combine marker presence into one column', 'Applies only when Include individual markers and Export marker presence only are enabled. Store detected marker IDs in one comma-separated column instead of as separate presence columns for each marker.'),
     }),
     'head_pose': type_utils.GUIDocInfo('Head pose relative to planes', 'Export the scene-camera (head) pose in each configured plane\'s coordinate system at available pose frames. This is the inverse of the stored plane-to-camera pose.', {
         'include_unit_header_row': type_utils.GUIDocInfo('Include units row', 'Add a second header row describing the units or meaning of each column.'),
