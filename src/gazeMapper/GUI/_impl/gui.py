@@ -1854,7 +1854,7 @@ class GUI:
                     return False, 'Recording name cannot be empty'
                 if not pathvalidate.is_valid_filename(new_rec_name, "auto"):
                     return False, 'Recording name is not a valid filename'
-                if any(r.name==new_rec_name for r in self.study_config.session_def.recordings):
+                if any(r.name.casefold()==new_rec_name.casefold() for r in self.study_config.session_def.recordings):
                     return False, 'A recording with this name already exists, choose a unique name'
                 return True, ''
             def _add_rec_popup():
@@ -1980,11 +1980,11 @@ class GUI:
             new_validation_is_dynamic = False
             new_validation_config_file: str = ''
             def _valid_assembly_name():
-                if not new_assembly_name:
+                if not new_assembly_name.strip():
                     return False, 'Plane or marker assembly name cannot be empty'
                 if not pathvalidate.is_valid_filename(new_assembly_name, "auto"):
                     return False, 'Plane or marker assembly name is not a valid filename'
-                if any(p.name==new_assembly_name for p in self.study_config.marker_assemblies):
+                if any(p.name.casefold()==new_assembly_name.casefold() for p in self.study_config.marker_assemblies):
                     return False, 'A plane or marker assembly with this name already exists, choose a unique name'
                 return True, ''
             def _valid_validation_config_file():
@@ -2410,7 +2410,7 @@ class GUI:
             def valid_name():
                 if not new_name.strip():
                     return False, 'Settings group name cannot be empty or contain only whitespace'
-                if new_name.strip() in self.study_config.individual_marker_settings:
+                if any(g.casefold()==new_name.strip().casefold() for g in self.study_config.individual_marker_settings):
                     return False, 'A settings group with this name already exists, choose a unique name'
                 return True, ''
             def draw_new_group():

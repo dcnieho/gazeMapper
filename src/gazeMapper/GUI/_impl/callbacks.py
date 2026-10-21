@@ -445,9 +445,9 @@ def new_session_button(g, notify_func: typing.Callable[[str], None]|None = None)
             return False, 'Session name cannot be empty'
         if not pathvalidate.is_valid_filename(new_sess_name, "auto"):
             return False, 'Session name is not a valid filename'
-        if new_sess_name=='config':
+        if new_sess_name.casefold()=='config'.casefold():
             return False, 'Session name cannot be "config"'
-        if g.sessions.get(new_sess_name, None) is not None:
+        if any(s.casefold()==new_sess_name.casefold() for s in g.sessions):
             return False, f'Session with this name already exists, choose a unique name'
         return True, ''
     def _add_sess_popup():
