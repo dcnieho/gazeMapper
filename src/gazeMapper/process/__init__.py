@@ -226,6 +226,8 @@ def is_action_possible_for_recording(rec: str, rec_type: 'session.RecordingType'
         recs_to_check = [rec]
         if study_config.sync_ref_recording:
             recs_to_check.append(study_config.sync_ref_recording)
+        if action==Action.SYNC_ET_TO_CAM and (replacement_rec := get_replacement_recording_name(study_config, rec)):
+            recs_to_check.append(replacement_rec)
         events = [cs for cs in events if cs['which_recordings'] is None or any(rec in cs['which_recordings'] for rec in recs_to_check)]
         return not not events
     elif action==Action.AUTO_CODE_EPISODES:
@@ -245,13 +247,15 @@ def is_action_possible_for_recording(rec: str, rec_type: 'session.RecordingType'
                 # no sync events to process for this replaced recording, so nothing to do
                 return False
     if action==Action.RUN_SYNC_FUNCTION:
-        is_replaced_recording = study_config.head_attached_recordings_replace_et_scene is not None and any(r.associated_recording==rec for r in study_config.session_def.recordings if r.name in study_config.head_attached_recordings_replace_et_scene)
-        if is_replaced_recording:
-            # Run Sync Function should not be run for recordings whose pose is replaced by that of a head-attached camera
+        if rec_type != session.RecordingType.Eye_Tracker:
             return False
-        # check if there are any sync functions to run for this recording
+        source_rec = get_replacement_recording_name(study_config, rec) or rec
         cs = get_specific_event_types(study_config, check_specific_fields=['sync_setup'])
-        return any(cs['sync_setup']['get_cam_movement_method']=='function' and (cs['which_recordings'] is None or rec in cs['which_recordings']) for cs in cs)
+        return any(
+            cs['sync_setup']['get_cam_movement_method']=='function'
+            and (cs['which_recordings'] is None or source_rec in cs['which_recordings'])
+            for cs in cs
+        )
     return True
 
 def get_actions_for_config(study_config: 'config.Study', exclude_session_level: bool=False) -> set[Action]:
@@ -316,7 +320,7 @@ def action_update_and_invalidate(action: Action, state: process_pool.State, stud
 
     return action_state_mutations
 
-def _is_recording_action_possible(rec: str, action_states: dict[Action, process_pool.State], study_config: 'config.Study', rec_type: 'session.RecordingType', action: Action, allow_pending: bool = False) -> tuple[bool,list[Action]|None]:
+def _is_recording_action_possible(rec: str, action_states: dict[Action, process_pool.State], study_config: 'config.Study', rec_type: 'session.RecordingType', action: Action, allow_pending: bool = False, recording_action_states: dict[str,dict[Action, process_pool.State]]|None=None) -> tuple[bool,list[Action]|None]:
     if not is_action_possible_given_config(action, study_config):
         return False, None
     elif not is_action_possible_for_recording(rec, rec_type, action, study_config):
@@ -351,9 +355,14 @@ def _is_recording_action_possible(rec: str, action_states: dict[Action, process_
         case Action.SYNC_ET_TO_CAM:
             preconditions.update([Action.CODE_EPISODES])
             cs = get_specific_event_types(study_config, check_specific_fields=['sync_setup'])
-            if any(cs['sync_setup']['get_cam_movement_method']=='assembly' and (cs['which_recordings'] is None or rec in cs['which_recordings']) for cs in cs):
+            recs_to_check = [rec]
+            if study_config.sync_ref_recording:
+                recs_to_check.append(study_config.sync_ref_recording)
+            if replacement_rec := get_replacement_recording_name(study_config, rec):
+                recs_to_check.append(replacement_rec)
+            if any(cs['sync_setup']['get_cam_movement_method']=='assembly' and (cs['which_recordings'] is None or any(r in cs['which_recordings'] for r in recs_to_check)) for cs in cs):
                 preconditions.add(Action.DETECT_MARKERS)
-            if any(cs['sync_setup']['get_cam_movement_method']=='function' and (cs['which_recordings'] is None or rec in cs['which_recordings']) for cs in cs):
+            if any(cs['sync_setup']['get_cam_movement_method']=='function' and (cs['which_recordings'] is None or any(r in cs['which_recordings'] for r in recs_to_check)) for cs in cs):
                 preconditions.add(Action.RUN_SYNC_FUNCTION)
         case Action.INTERPOLATE_PLANE_POSE:
             preconditions.add(Action.DETECT_MARKERS)
@@ -390,8 +399,21 @@ def _is_recording_action_possible(rec: str, action_states: dict[Action, process_
         case _:
             raise NotImplementedError(f'Logic is not implemented for {action.displayable_name} ({action}), major developer oversight! Let him know.')
 
+    # Check source-recording prerequisites when the eye-tracker scene is replaced.
+    replacement_rec = get_replacement_recording_name(study_config, rec)
+    source_rec_for_precondition: dict[Action, str] = {}
+    if replacement_rec:
+        if Action.CODE_EPISODES in preconditions and action in [Action.RUN_SYNC_FUNCTION, Action.SYNC_ET_TO_CAM]:
+            source_rec_for_precondition[Action.CODE_EPISODES] = replacement_rec
+        if Action.DETECT_MARKERS in preconditions and action in [Action.GAZE_TO_PLANE, Action.INTERPOLATE_PLANE_POSE, Action.SYNC_ET_TO_CAM]:
+            source_rec_for_precondition[Action.DETECT_MARKERS] = replacement_rec
+
     # check that preconditions are met
-    states = [action_states[p] for p in preconditions]
+    states = [
+        (recording_action_states or {}).get(source_rec_for_precondition[p], action_states).get(p, process_pool.State.Not_Run)
+        if p in source_rec_for_precondition else action_states[p]
+        for p in preconditions
+    ]
     missing = [p for p,state in zip(preconditions,states) if state!=process_pool.State.Completed]
     met = [state==process_pool.State.Completed or (allow_pending and state in [process_pool.State.Pending, process_pool.State.Running]) for state in states]
     return all(met), [p for p in Action if p in missing] # NB: ensure stable order
@@ -467,7 +489,10 @@ def get_possible_actions(session_action_states: dict[Action, process_pool.State]
             if states[0] or states[1]:
                 possible_actions[a] = states
         else:
-            states = {r:_is_recording_action_possible(r, merged_states[r], study_config, rec_types[r], a, allow_pending) for r in merged_states}
+            states = {
+                r:_is_recording_action_possible(r, merged_states[r], study_config, rec_types[r], a, allow_pending, recording_action_states)
+                for r in merged_states
+            }
             possible_recs = [r for r in merged_states if states[r][0]]
             fails = _get_precond_fails_for_rec(states)
             if possible_recs or fails:
