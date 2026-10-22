@@ -33,6 +33,7 @@ from . import callbacks, image_helper, session_lister, settings_editor, utils
 # add formatter for Marker IDs (marker id + aruco dict pairs)
 settings_editor.register_formatter(gt_marker.MarkerID, gt_marker.marker_ID_to_str)
 
+
 class GUI:
     def __init__(self):
         self.popup_stack = []
@@ -43,7 +44,7 @@ class GUI:
         self.study_config     : config.Study|None                                           = None
         self.assembly_configs : dict[str,gt_marker_assembly.MarkerAssembly|Exception|None]  = {}
         self.cam_calibrations : dict[str,camera_calibration.Inspection]                     = {}
-        self._dict_type_rec   : dict[str, typing.Type]|None             = None
+        self._dict_type_rec   : dict[str, typing.Type]|None                                 = None
         self._coding_setup_dict_type_rec: dict[str, dict[typing.Any, typing.Type]]          = {}
 
         self.sessions                           : dict[str, session.Session]                        = {}
