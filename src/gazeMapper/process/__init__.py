@@ -150,6 +150,16 @@ def get_specific_event_types(study_config: 'config.Study', specific_event_type: 
 def _config_has_et_sync(study_config: 'config.Study') -> bool:
     return not not get_specific_event_types(study_config, annotation.EventType.Sync_ET_Data, ['sync_setup'])
 
+def get_replacement_recording_name(study_config: 'config.Study', rec: str) -> str|None:
+    replacements = getattr(study_config, 'head_attached_recordings_replace_et_scene', None)
+    if not replacements:
+        return None
+    return next(
+        (recording.name for recording in study_config.session_def.recordings
+         if recording.name in replacements and recording.associated_recording == rec),
+        None,
+    )
+
 def config_has_plane_pose_interpolation(study_config: 'config.Study', rec: str|None=None) -> bool:
     if not study_config.interpolate_plane_pose_recordings:
         return False
