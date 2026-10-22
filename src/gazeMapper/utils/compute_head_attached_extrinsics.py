@@ -130,29 +130,30 @@ camera_calibs = {r:ocv.CameraParams.read_from_file(session_dir/r/gt_naming.scene
 # get episodes involving the marker assembly
 codings = {cs['name']:cs for cs in study_config.coding_setup if assembly_name in cs.get('marker_assemblies',[])}
 ref_episodes = episode.list_to_marker_dict(episode.read_list_from_file(session_dir/study_config.sync_ref_recording/naming.coding_file), list(codings.keys()))
-videos_ts = {r:timestamps.VideoTimestamps(session_dir / r / gt_naming.frame_timestamps_fname) for r in [et_rec_name, ha_rec_name]}
-to_sync = ha_rec_name if et_rec_name==study_config.sync_ref_recording else et_rec_name
-
-# for each frame in the reference recording, get corresponding frame in the to_sync recording
-sync = synchronization.get_sync_for_recs(session_dir, [to_sync], study_config.sync_ref_recording, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings)
-to_sync_frame_idxs = synchronization.reference_frames_to_video(to_sync, sync, videos_ts[study_config.sync_ref_recording].indices,
-                                                               videos_ts[to_sync].timestamps, videos_ts[study_config.sync_ref_recording].timestamps,
-                                                               study_config.sync_ref_do_time_stretch, study_config.sync_ref_stretch_which)
+videos_ts = {r: timestamps.VideoTimestamps(session_dir / r / gt_naming.frame_timestamps_fname) for r in [et_rec_name, ha_rec_name, study_config.sync_ref_recording]}
+ref_rec = study_config.sync_ref_recording
+ref_video_ts = videos_ts[ref_rec]
+all_recs = [r.name for r in study_config.session_def.recordings if r.name != ref_rec]
+sync = synchronization.get_sync_for_recs(session_dir, all_recs, ref_rec, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings)
+frame_maps = {
+    r: (
+        ref_video_ts.indices if r == ref_rec
+        else synchronization.reference_frames_to_video(r, sync, ref_video_ts.indices, videos_ts[r].timestamps, ref_video_ts.timestamps, study_config.sync_ref_do_time_stretch, study_config.sync_ref_stretch_which)
+    )
+    for r in [et_rec_name, ha_rec_name]
+}
 
 # collect matching poses
 frame_idxs = {r:[] for r in [et_rec_name, ha_rec_name]}
 for c in ref_episodes:
     for e in ref_episodes[c]:
-        frame_idxs[study_config.sync_ref_recording].extend(range(e[0], e[1]+1))
-        # get corresponding frames in to_sync recording
-        to_sync_frames = [to_sync_frame_idxs[f_idx] for f_idx in range(e[0], e[1]+1) if f_idx<len(to_sync_frame_idxs)]
-        # check that these are in the expected range (just a sanity check)
-        expected_range = synchronization.reference_frames_to_video(to_sync, sync, e,
-                                                                   videos_ts[to_sync].timestamps, videos_ts[study_config.sync_ref_recording].timestamps,
-                                                                   study_config.sync_ref_do_time_stretch, study_config.sync_ref_stretch_which)
-        if min(to_sync_frames)<expected_range[0] or max(to_sync_frames)>expected_range[1]:
-            raise ValueError('Computed frame indices for the to-sync recording are outside the expected range, cannot proceed')
-        frame_idxs[to_sync].extend(to_sync_frames)
+        for ref_frame_idx in range(e[0], e[1]+1):
+            if ref_frame_idx < 0:
+                continue
+            mapped_frames = {rec: frame_maps[rec][ref_frame_idx] for rec in [et_rec_name, ha_rec_name] if ref_frame_idx < len(frame_maps[rec])}
+            if et_rec_name in mapped_frames and ha_rec_name in mapped_frames and mapped_frames[et_rec_name] >= 0 and mapped_frames[ha_rec_name] >= 0:
+                frame_idxs[et_rec_name].append(mapped_frames[et_rec_name])
+                frame_idxs[ha_rec_name].append(mapped_frames[ha_rec_name])
 
 matched_poses: list[tuple[gt_pose.Pose, gt_pose.Pose]] = []
 for f_idx_ref, f_idx_sync in zip(frame_idxs[ha_rec_name], frame_idxs[et_rec_name]):
