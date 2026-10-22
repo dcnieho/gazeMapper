@@ -64,6 +64,9 @@ class GUI:
         self._recording_listers         : dict[str, gt_gui.recording_table.RecordingTable]          = {}
         self._recording_calibrations    : dict[tuple[str, str], camera_calibration.Inspection]      = {}
         self._selected_recordings       : dict[str, dict[str, bool]]                                = {}
+        self._pending_session_removals  : set[str]                                                   = set()
+        self._pending_recording_removals: set[tuple[str, str]]                                       = set()
+        self._pending_session_pane_removals: set[str]                                                = set()
 
         self._possible_value_getters                : dict[str, typing.Callable]    = {}
 
@@ -324,6 +327,7 @@ class GUI:
         self.running = True
         self._check_project_setup_state()
         self._update_jobs_and_process_pool()
+        pending_session_pane_removals = self._process_pending_session_updates()
         if self._need_set_window_title:
             self._set_window_title()
 
@@ -336,6 +340,10 @@ class GUI:
             # check if any session detail windows were closed. Those should be removed from the list
             hello_imgui.get_runner_params().docking_params.dockable_windows = \
                 [w for w in hello_imgui.get_runner_params().docking_params.dockable_windows if w.is_visible or self._window_identity(w.label) in ['main:Project settings', 'main:Processing queue']]
+        if pending_session_pane_removals:
+            runner_params = hello_imgui.get_runner_params()
+            pane_ids = {f'session_view:{sess}' for sess in pending_session_pane_removals}
+            runner_params.docking_params.dockable_windows = [window for window in runner_params.docking_params.dockable_windows if self._window_identity(window.label) not in pane_ids]
         self._update_problem_tab_labels()
         current_window_ids = {self._window_identity(w.label) for w in hello_imgui.get_runner_params().docking_params.dockable_windows}
         # some cleanup may be needed for some of the closed windows
@@ -505,7 +513,7 @@ class GUI:
         self._selected_sessions.pop(sess, None)
         for key in [key for key in self._recording_calibrations if key[0]==sess]:
             self._recording_calibrations.pop(key, None)
-        self._window_list = [w for w in hello_imgui.get_runner_params().docking_params.dockable_windows if self._window_identity(w.label) != f'session_view:{sess}']
+        self._pending_session_pane_removals.add(sess)
         self._request_session_sort()
 
     def _remove_recording_from_gui(self, sess: str, rec: str):
@@ -520,6 +528,20 @@ class GUI:
             self._invalidate_recording_override_state(sess, rec)
         self._request_recording_sort(sess)
         self._request_session_sort()
+
+    def _process_pending_session_updates(self) -> set[str]:
+        with self._sessions_lock:
+            for sess in self._pending_session_removals:
+                if sess in self.sessions:
+                    self._remove_session_from_gui(sess)
+            self._pending_session_removals.clear()
+            for sess, rec in self._pending_recording_removals:
+                if sess in self.sessions:
+                    self._remove_recording_from_gui(sess, rec)
+            self._pending_recording_removals.clear()
+            pane_removals = self._pending_session_pane_removals.copy()
+            self._pending_session_pane_removals.clear()
+        return pane_removals
 
     def _add_recording_to_gui(self, sess: str, rec: str):
         session_obj = self.sessions[sess]
@@ -889,10 +911,8 @@ class GUI:
             # remove working directory if this was an import task
             async_thread.run(callbacks.remove_recording_working_dir(self.project_dir, job.session, job.recording))
             # also update GUI state, might be needed if there was no working directory yet for instance
-            if sess:=self.sessions.get(job.session,None):
-                sess.recordings.pop(job.recording,None)
-                self._request_recording_sort(job.session)
-                self._request_session_sort()
+            if job.session in self.sessions:
+                self._remove_recording_from_gui(job.session, job.recording)
             return
         # get final task state when completed, load from file. Need to do this because change listener may fire before task
         # completes, and its output is then overwritten in _update_jobs_and_process_pool()
@@ -909,6 +929,7 @@ class GUI:
                 # hold in memory. NB: must be loaded from file as recording update is run in a different process
                 rec_info = sess.load_recording_info(job.recording)
                 sess.update_recording_info(job.recording, rec_info)
+                self._load_recording_calibration(job.session, rec)
             rec.load_action_states(False, False)
             self._request_recording_sort(job.session)
             self._request_session_sort()
@@ -1535,6 +1556,12 @@ class GUI:
         self._recording_listers.clear()
         self._recording_calibrations.clear()
         self._selected_recordings.clear()
+        self._pending_session_removals.clear()
+        self._pending_recording_removals.clear()
+        self._pending_session_pane_removals.clear()
+        self._pending_session_removals.clear()
+        self._pending_recording_removals.clear()
+        self._pending_session_pane_removals.clear()
         self._assembly_preview_cache.clear()
         self._marker_preview_cache.clear()
         self._problems_cache.clear()
@@ -2735,6 +2762,8 @@ class GUI:
                 for r in (r for r in s.recordings if s.name in actions_running and process.Action.IMPORT in actions_running[s.name] and r in actions_running[s.name][process.Action.IMPORT]):
                     self.job_scheduler.cancel_job(actions_running[s.name][process.Action.IMPORT][r])
                 callbacks.remove_folder(self, s.working_directory)
+                if s.working_directory is not None and not s.working_directory.is_dir():
+                    self._pending_session_removals.add(s.name)
             changed = True
         changed |= self._draw_context_menu_items_for_recording_folders(sess, None, actions_running)
         return changed
@@ -2840,16 +2869,18 @@ class GUI:
             for s in source_directories:
                 callbacks.open_folder(self, s)
         changed = False
-        working_directories = [wd for s,r in recs if (wd:=sess[s].recordings[r].info.working_directory) and wd.is_dir()]
-        if working_directories and imgui.selectable(ifa6.ICON_FA_FOLDER_OPEN + " Open recording working folder"+plural, False)[0]:
-            for s,r in recs:
-                callbacks.open_folder(self, sess[s].recordings[r].info.working_directory)
-        if working_directories and imgui.selectable(ifa6.ICON_FA_TRASH_CAN + " Delete recording"+plural, False)[0]:
-            for s,r in recs:
+        working_recordings = [(s, r, working_directory) for s, r in recs if (working_directory := sess[s].recordings[r].info.working_directory) and working_directory.is_dir()]
+        if working_recordings and imgui.selectable(ifa6.ICON_FA_FOLDER_OPEN + " Open recording working folder"+plural, False)[0]:
+            for _, _, working_directory in working_recordings:
+                callbacks.open_folder(self, working_directory)
+        if working_recordings and imgui.selectable(ifa6.ICON_FA_TRASH_CAN + " Delete recording"+plural, False)[0]:
+            for s, r, working_directory in working_recordings:
                 # if an import action is currently running, cancel that first
                 if sess[s].name in actions_running and process.Action.IMPORT in actions_running[sess[s].name] and r in actions_running[sess[s].name][process.Action.IMPORT]:
                     self.job_scheduler.cancel_job(actions_running[s.name][process.Action.IMPORT][r])
-                callbacks.remove_folder(self, sess[s].recordings[r].info.working_directory)
+                callbacks.remove_folder(self, working_directory)
+                if not working_directory.is_dir():
+                    self._pending_recording_removals.add((sess[s].name, r))
             changed = True
         return changed
     def _filter_session_context_menu_actions(self, session_name: str, rec_name: str|None, actions: dict[process.Action,bool|list[str]]) -> tuple[dict[process.Action,bool|list[str]], dict[process.Action,int|dict[str,int]]]:
