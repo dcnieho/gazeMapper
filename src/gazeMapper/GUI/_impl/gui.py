@@ -86,7 +86,7 @@ class GUI:
         self._active_jobs_cache         : dict[utils.JobInfo, int]       = {}
 
         self._window_list                   : list[hello_imgui.DockableWindow]  = []
-        self._to_dock                                                           = []
+        self._to_dock: list[str]                                                = []
         self._to_focus                                                          = None
         self._after_window_update_callback  : Callable[[],None]|None            = None
         self._need_set_window_title                                             = False
@@ -255,15 +255,64 @@ class GUI:
         self.close_project()
         self.running = False
 
-    def _make_main_space_window(self, name: str, gui_func: Callable[[],None], can_be_closed=False, is_visible=True):
+    def _make_main_space_window(self, name: str, gui_func: Callable[[],None], can_be_closed=False, is_visible=True, window_id: str|None=None):
         main_space_view = hello_imgui.DockableWindow()
-        main_space_view.label = name
+        main_space_view.label = f'{name}###{window_id or self._window_identity_for_name(name)}'
         main_space_view.dock_space_name = "MainDockSpace"
         main_space_view.gui_function = gui_func
         main_space_view.can_be_closed = can_be_closed
         main_space_view.is_visible = is_visible
         main_space_view.remember_is_visible = False
         return main_space_view
+
+    @staticmethod
+    def _window_identity(label: str) -> str:
+        return label.split('###', 1)[1] if '###' in label else label
+
+    @staticmethod
+    def _window_identity_for_name(name: str) -> str:
+        return f'main:{name}'
+
+    @staticmethod
+    def _problem_indicator(level: type_utils.ProblemLevel|None) -> str:
+        if level == type_utils.ProblemLevel.Error:
+            return ifa6.ICON_FA_CIRCLE_XMARK + ' '
+        if level == type_utils.ProblemLevel.Warning:
+            return ifa6.ICON_FA_TRIANGLE_EXCLAMATION + ' '
+        return ''
+
+    @classmethod
+    def _window_label(cls, name: str, identity: str, level: type_utils.ProblemLevel|None=None) -> str:
+        return f'{cls._problem_indicator(level)}{name}###{identity}'
+
+    def _set_window_problem_indicator(self, window: hello_imgui.DockableWindow, name: str, identity: str, level: type_utils.ProblemLevel|None):
+        window.label = self._window_label(name, identity, level)
+
+    def _update_problem_tab_labels(self):
+        project_problem_levels = (type_utils.get_error_level(self._problems_cache), self.setup_recordings_error_level, self.setup_assembly_error_level, self.setup_coding_error_level, self.setup_individual_markers_error_level)
+        project_problem_level = max((level for level in project_problem_levels if level is not None), key=lambda level: level.value, default=None)
+        project_pane_levels = {
+            'Session definition': self.setup_recordings_error_level,
+            'Plane & 3D Assembly Editor': self.setup_assembly_error_level,
+            'Individual marker editor': self.setup_individual_markers_error_level,
+            'Coding setup': self.setup_coding_error_level,
+        }
+        windows = hello_imgui.get_runner_params().docking_params.dockable_windows
+        for window in windows:
+            identity = self._window_identity(window.label)
+            if identity == 'main:Sessions':
+                self._set_window_problem_indicator(window, 'Sessions', identity, None)
+            elif identity == 'main:Project settings':
+                self._set_window_problem_indicator(window, 'Project settings', identity, project_problem_level)
+            elif identity.startswith('project_pane:'):
+                name = identity.removeprefix('project_pane:')
+                if name in project_pane_levels:
+                    self._set_window_problem_indicator(window, name, identity, project_pane_levels[name])
+            elif identity.startswith('session_view:'):
+                sess_name = identity.removeprefix('session_view:')
+                if (sess := self.sessions.get(sess_name)) is not None:
+                    level = self._problem_entries_level([(problem_level, diagnostic) for problem_level, diagnostic, _ in self._session_problem_entries(sess)])
+                    self._set_window_problem_indicator(window, sess_name, identity, level)
 
     def _update_windows(self):
         if not self.running:
@@ -279,20 +328,21 @@ class GUI:
             self._set_window_title()
 
         # update windows to be shown
-        old_window_labels = {w.label for w in hello_imgui.get_runner_params().docking_params.dockable_windows}
+        old_window_ids = {self._window_identity(w.label) for w in hello_imgui.get_runner_params().docking_params.dockable_windows}
         if self._window_list:
             hello_imgui.get_runner_params().docking_params.dockable_windows = self._window_list
             self._window_list = []
         else:
             # check if any session detail windows were closed. Those should be removed from the list
             hello_imgui.get_runner_params().docking_params.dockable_windows = \
-                [w for w in hello_imgui.get_runner_params().docking_params.dockable_windows if w.is_visible or w.label in ['Project settings', 'Processing queue']]
-        current_windows = {w.label for w in hello_imgui.get_runner_params().docking_params.dockable_windows}
+                [w for w in hello_imgui.get_runner_params().docking_params.dockable_windows if w.is_visible or self._window_identity(w.label) in ['main:Project settings', 'main:Processing queue']]
+        self._update_problem_tab_labels()
+        current_window_ids = {self._window_identity(w.label) for w in hello_imgui.get_runner_params().docking_params.dockable_windows}
         # some cleanup may be needed for some of the closed windows
-        if (removed:=old_window_labels-current_windows):
+        if (removed:=old_window_ids-current_window_ids):
             for r in removed:
-                if r.endswith('##session_view'):
-                    sess_name = r.removesuffix('##session_view')
+                if r.startswith('session_view:'):
+                    sess_name = r.removeprefix('session_view:')
                     # cleanup
                     self.session_config_overrides.pop(sess_name)
                     self._session_effective_config_cache.pop(sess_name, None)
@@ -307,8 +357,10 @@ class GUI:
 
         # we also handle docking requests here
         if self._to_dock and self._main_dock_node_id:
-            for w in self._to_dock:
-                imgui.internal.dock_builder_dock_window(w, self._main_dock_node_id)
+            for identity in self._to_dock:
+                window = next((w for w in hello_imgui.get_runner_params().docking_params.dockable_windows if self._window_identity(w.label)==identity), None)
+                if window is not None:
+                    imgui.internal.dock_builder_dock_window(window.label, self._main_dock_node_id)
             self._to_dock = []
 
         # handle focus requests, which apparently need to be delayed
@@ -320,7 +372,7 @@ class GUI:
                 self._to_focus[1] -= 1
             else:
                 for w in hello_imgui.get_runner_params().docking_params.dockable_windows:
-                    if w.label==self._to_focus[0]:
+                    if self._window_identity(w.label)==self._to_focus[0]:
                         w.focus_window_at_next_frame = True
                 self._to_focus = None
 
@@ -453,7 +505,7 @@ class GUI:
         self._selected_sessions.pop(sess, None)
         for key in [key for key in self._recording_calibrations if key[0]==sess]:
             self._recording_calibrations.pop(key, None)
-        self._window_list = [w for w in hello_imgui.get_runner_params().docking_params.dockable_windows if w.label!=f'{sess}##session_view']
+        self._window_list = [w for w in hello_imgui.get_runner_params().docking_params.dockable_windows if self._window_identity(w.label) != f'session_view:{sess}']
         self._request_session_sort()
 
     def _remove_recording_from_gui(self, sess: str, rec: str):
@@ -924,7 +976,7 @@ class GUI:
         self._action_list_pane.is_visible = True
         # trigger update so visibility change is honored
         self._window_list = [self._sessions_pane, self._project_settings_pane, self._action_list_pane]
-        self._to_focus = self._sessions_pane.label  # ensure sessions pane remains focused
+        self._to_focus = self._window_identity(self._sessions_pane.label)  # ensure sessions pane remains focused
 
     def _get_possible_value_getter_for_event(self, event: str):
         cs = [cs for cs in self.study_config.coding_setup if cs['name']==event]
@@ -1139,7 +1191,7 @@ class GUI:
             self._draw_calibration_status(level, diagnostic, extra_info=extra_info)
             return
         level = max((entry[0] for entry in entries), key=lambda item: item.value)
-        icon = ifa6.ICON_FA_CIRCLE_XMARK if level == type_utils.ProblemLevel.Error else ifa6.ICON_FA_TRIANGLE_EXCLAMATION
+        icon = self._problem_indicator(level).strip()
         color = colors.error if level == type_utils.ProblemLevel.Error else colors.warning
         imgui.text_colored(color, icon)
         self._draw_calibration_tooltip_entries([
@@ -1505,7 +1557,7 @@ class GUI:
             imgui.text_colored(colors.error, 'Finish the setup in the')
             imgui.same_line()
             if imgui.button('Project settings##button'):
-                self._to_focus = self._project_settings_pane.label
+                self._to_focus = self._window_identity(self._project_settings_pane.label)
             imgui.same_line()
             imgui.text_colored(colors.error, 'tab before you can import and process recording sessions.')
             return
@@ -1588,13 +1640,16 @@ class GUI:
             imgui.pop_style_color(3)
 
         if new_win_params is not None:
-            if not any((w.label==new_win_params[0] for w in hello_imgui.get_runner_params().docking_params.dockable_windows)):
-                new_win = self._make_main_space_window(*new_win_params, can_be_closed=True)
+            pane_id = f'project_pane:{new_win_params[0]}'
+            windows = hello_imgui.get_runner_params().docking_params.dockable_windows
+            new_win = next((w for w in windows if self._window_identity(w.label)==pane_id), None)
+            if new_win is None:
+                new_win = self._make_main_space_window(*new_win_params, can_be_closed=True, window_id=pane_id)
                 if not self._window_list:
-                    self._window_list = hello_imgui.get_runner_params().docking_params.dockable_windows
+                    self._window_list = windows
                 self._window_list.append(new_win)
-                self._to_dock.append(new_win_params[0])
-            self._to_focus = new_win_params[0]
+                self._to_dock.append(pane_id)
+            self._to_focus = pane_id
 
         # rest of settings handled here in a settings tree
         if any((k not in ['session_def', 'marker_assemblies', 'coding_setup', 'individual_markers'] for k in self._problems_cache)):
@@ -2993,17 +3048,16 @@ class GUI:
 
     def _open_session_detail(self, sess: session.Session):
         sess_name = sess.name
-        win_name = f'{sess_name}##session_view'
-        if win := hello_imgui.get_runner_params().docking_params.dockable_window_of_name(win_name):
+        window_id = f'session_view:{sess_name}'
+        windows = hello_imgui.get_runner_params().docking_params.dockable_windows
+        if win := next((w for w in windows if self._window_identity(w.label)==window_id), None):
             win.focus_window_at_next_frame = True
         else:
-            window_list = hello_imgui.get_runner_params().docking_params.dockable_windows
-            window_list.append(
-                self._make_main_space_window(win_name, lambda sess_name=sess_name: self._session_detail_GUI(sess_name), can_be_closed=True)
-            )
+            window_list = windows
+            window_list.append(self._make_main_space_window(sess_name, lambda sess_name=sess_name: self._session_detail_GUI(sess_name), can_be_closed=True, window_id=window_id))
             self._window_list = window_list
-            self._to_dock = [win_name]
-            self._to_focus= win_name
+            self._to_dock = [window_id]
+            self._to_focus = window_id
             self._selected_recordings[sess_name] = {k:False for k in sess.recordings}
             self._recording_listers[sess_name] = gt_gui.recording_table.RecordingTable(sess.recordings, self._sessions_lock, self._selected_recordings[sess_name], None, lambda r: r.info, item_context_callback=lambda rec_name, sess_name=sess_name: self._recording_context_menu(sess_name, rec_name))
             self._recording_listers[sess_name].dont_show_empty = True
