@@ -59,6 +59,24 @@ def _mapped_gaze_styles_for_recording(styles: gaze_worldref.MappedGazeStyles, ga
         style_field: style,
     })
 
+def _get_gaze_point_and_styles(styles: gaze_worldref.MappedGazeStyles|None, gaze: gaze_worldref.Gaze, gaze_type: gaze_worldref.Type, color: drawing.RgbColor | None, allow_fallback: bool) -> tuple[np.ndarray|None, gaze_worldref.Type, gaze_worldref.MappedGazeStyles]:
+    styles = styles or gaze_worldref.DEFAULT_MAPPED_GAZE_STYLES
+    gaze_point = gaze.get_gaze_point(gaze_type)
+    effective_type = gaze_type
+    styles = _mapped_gaze_styles_for_recording(styles, gaze_type, color)
+    if gaze_point is None:
+        fallback_type = gaze_worldref.Type.Scene_Video_Position
+        if allow_fallback:
+            gaze_point = gaze.get_gaze_point(fallback_type)
+            if gaze_point is not None:
+                effective_type = fallback_type
+                styles = _mapped_gaze_styles_for_recording(styles, effective_type, color)
+        else:
+            raise RuntimeError(f'Gaze of type {gaze_type.value} was requested, but is not available. Select a different gaze type or set allow_fallback to True.')
+    if getattr(styles, _style_fields[effective_type]) is None:
+        raise RuntimeError(f'Gaze of type {effective_type.value} was requested, but no style is defined for it. Define a style for this gaze type in the study configuration.')
+    return gaze_point, effective_type, styles
+
 def _needs_live_estimator(rec: str, rec_type: session.RecordingType, study_config: config.Study, output_recs: set[str]) -> bool:
     # determine if we need an estimator for the current recording. It is only needed for recordings
     # that can affect a visible output: an output video, the sync reference, whole-video plane
@@ -252,14 +270,6 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
                     raise RuntimeError(f'Camera sync points found for recording {r} ({episodes_as_ref_flat[r][nm]}) that do not occur among the reference recordings sync points ({study_config.sync_ref_recording}, {episodes_as_ref_flat[study_config.sync_ref_recording][nm]}). That means the sync logic must have failed')
 
     output_recs = set(study_config.mapped_video_make_which)
-    mapped_gaze_styles = {
-        rec: _mapped_gaze_styles_for_recording(
-            study_config.mapped_video_gaze_styles,
-            study_config.mapped_video_which_gaze_type_on_plane,
-            study_config.mapped_video_recording_colors[rec],
-        )
-        for rec in output_recs
-    }
     logical_estimator_recs = {
         rec for rec in recs
         if _needs_live_estimator(rec, session_info.recordings[rec].definition.type, study_config, output_recs)
@@ -515,7 +525,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
 
                         # draw on current video
                         if study_config.mapped_video_show_gaze_on_plane_in_which is not None and v in study_config.mapped_video_show_gaze_on_plane_in_which:
-                            plane_gazes[best[0]][2].draw_on_world_video(frame[v], camera_params[v], ROI_offsets[v], sub_pixel_fac, poses_this[best[0]], styles=mapped_gaze_styles[v])
+                            plane_gaze = plane_gazes[best[0]][2]
+                            _, _, styles = _get_gaze_point_and_styles(study_config.mapped_video_gaze_styles, plane_gaze, study_config.mapped_video_which_gaze_type_on_plane, study_config.mapped_video_recording_colors[v], study_config.mapped_video_which_gaze_type_on_plane_allow_fallback)
+                            plane_gaze.draw_on_world_video(frame[v], camera_params[v], ROI_offsets[v], sub_pixel_fac, poses_this[best[0]], styles=styles)
 
                         # also draw on other recordings, if so configured
                         # depending on configuration also includes gaze vector with origin at the camera
@@ -674,21 +686,12 @@ def draw_gaze_on_other_video(frame_other, ROI_offset, pose_this: pose.Pose, pose
         # nothing to do
         return
 
-    # determine the gaze point to draw
-    gaze_point_plane = plane_gaze.get_gaze_point(which_gaze_on_plane)
-    gaze_point_plane_type = which_gaze_on_plane
-    if gaze_point_plane is None:
-        if which_gaze_on_plane_allow_fallback:
-            gaze_point_plane = plane_gaze.get_gaze_point(gaze_worldref.Type.Scene_Video_Position)
-            gaze_point_plane_type = gaze_worldref.Type.Scene_Video_Position
-        else:
-            raise RuntimeError(f'Gaze of type {which_gaze_on_plane.value} was requested, but is not available. Select a different gaze type or set allow_fallback to True.')
+    gaze_point_plane, gaze_point_plane_type, styles = _get_gaze_point_and_styles(styles, plane_gaze, which_gaze_on_plane, recording_color, which_gaze_on_plane_allow_fallback)
     if gaze_point_plane is None:
         return
 
     # get style in which to draw the gaze point
-    styles = styles or gaze_worldref.DEFAULT_MAPPED_GAZE_STYLES
-    style  = _style_with_recording_color(getattr(styles, _style_fields[gaze_point_plane_type]), recording_color)
+    style = getattr(styles, _style_fields[gaze_point_plane_type])
 
     if not pose_this.pose_successful() or not pose_other.pose_successful():
         if not do_draw_gaze or style is None:

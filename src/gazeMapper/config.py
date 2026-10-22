@@ -1200,6 +1200,22 @@ class Study:
         type_utils.merge_problem_dicts(problems, self._check_recordings('mapped_video_show_gaze_on_plane_in_which'))
         type_utils.merge_problem_dicts(problems, self._check_recordings('mapped_video_show_camera_in_which'))
         type_utils.merge_problem_dicts(problems, self._check_recordings('mapped_video_show_gaze_vec_in_which'))
+        selected_gaze_style_field = {
+            gaze_worldref.Type.Scene_Video_Position: 'video_position',
+            gaze_worldref.Type.World_3D_Point: 'world_position',
+            gaze_worldref.Type.Left_Eye_Gaze_Vector: 'left_eye',
+            gaze_worldref.Type.Right_Eye_Gaze_Vector: 'right_eye',
+            gaze_worldref.Type.Average_Gaze_Vector: 'average',
+        }[self.mapped_video_which_gaze_type_on_plane]
+        selected_gaze_style = getattr(self.mapped_video_gaze_styles, selected_gaze_style_field)
+        if selected_gaze_style is None:
+            msg = f'The selected gaze type ({self.mapped_video_which_gaze_type_on_plane.value}) has no configured style. Mapped videos use the configured style for the selected gaze type, but replacing colors with the recording color. A style should thus be defined, or the selected gaze will not be drawn.'
+            type_utils.merge_problem_dicts(problems, {'mapped_video_gaze_styles': {selected_gaze_style_field: (type_utils.ProblemLevel.Error, msg)}})
+        else:
+            for field in ('edge_color', 'fill_color'):
+                if getattr(selected_gaze_style, field) is not None:
+                    msg = f'Note that mapped videos use the recording color for the selected gaze type ({self.mapped_video_which_gaze_type_on_plane.value}), so this color will be overridden.'
+                    type_utils.merge_problem_dicts(problems, {'mapped_video_gaze_styles': {selected_gaze_style_field: {field: (type_utils.ProblemLevel.Warning, msg)}}})
         if self.mapped_video_make_which:
             # check have colors for all eye tracker recordings
             all_recs = {r.name for r in self.session_def.recordings if r.type==session.RecordingType.Eye_Tracker}
@@ -1638,7 +1654,7 @@ study_parameter_doc = {
     'mapped_video_gaze_vector_style': type_utils.GUIDocInfo('Mapped video: Gaze-vector style', 'Appearance of the line connecting a recording camera position to its projected gaze point. If the color is not set, the recording color is used.', _line_style_docs),
     'mapped_video_show_camera_in_which': type_utils.GUIDocInfo('Mapped video: Videos on which to draw camera position(s)', 'For the listed recordings, the position of the cameras of other recordings is marked in the generated video.'),
     'mapped_video_camera_position_style': type_utils.GUIDocInfo('Mapped video: Camera-position style', 'Appearance of camera positions projected onto another recording. If neither fill nor edge color is set, the recording color is used for the edge.', _gaze_point_style_docs),
-    'mapped_video_which_gaze_type_on_plane': type_utils.GUIDocInfo('Mapped video: Which gaze on plane to show?', 'Sets which available gaze-on-plane type is drawn in the recording color and across all output videos where possible. Other available types are drawn, only on the video of their recording, using their configured gaze-style colors. Unset their colors to not draw them.', _gaze_type_doc),
+    'mapped_video_which_gaze_type_on_plane': type_utils.GUIDocInfo('Mapped video: Which gaze on plane to show?', 'Sets which available gaze-on-plane type is drawn in the recording color and across all output videos where possible. Any configured color for the selected type is overridden by the recording color. Other available types are drawn, only on the video of their recording, using their configured gaze-style colors. Unset their colors or their entire style to not draw them.', _gaze_type_doc),
     'mapped_video_which_gaze_type_on_plane_allow_fallback': type_utils.GUIDocInfo('Mapped video: Allow fallback to scene-video-derived gaze on plane?', 'If the selected gaze-on-plane type is unavailable, use the gaze position mapped onto the plane from the scene-video gaze and highlight it in the recording color.'),
     'mapped_video_gaze_to_plane_margin': type_utils.GUIDocInfo('Mapped video: Gaze position margin','Gaze position more than this factor outside a defined plane will not be drawn.'),
     'gui_num_workers': type_utils.GUIDocInfo('Number of workers','Each action is processed by a worker and each worker can handle one action at a time. Having more workers means more actions are processed simultaneously, but having too many will not provide any gain and might freeze the program and your whole computer. Since much of the processing utilizes more than one processor thread, set this value to significantly less than the number of threads available in your system. NB: If you currently have running or enqueued jobs, changes to the number of workers will only take effect once all jobs have completed or have been cancelled.'),
