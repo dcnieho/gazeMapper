@@ -22,7 +22,7 @@ import OpenGL.GL as gl
 import ETDQualitizer
 
 import glassesTools
-from glassesTools import annotation, aruco, camera_recording, gui as gt_gui, naming as gt_naming, marker as gt_marker, marker_assembly as gt_marker_assembly, ocv, plane as gt_plane, platform as gt_platform, process_pool, utils as gt_utils
+from glassesTools import annotation, aruco, camera_recording, gui as gt_gui, naming as gt_naming, marker as gt_marker, marker_assembly as gt_marker_assembly, plane as gt_plane, platform as gt_platform, process_pool, utils as gt_utils
 from glassesTools.gui import colors
 
 from ... import camera_calibration, config, marker, marker_assembly, process, project_watcher, session, type_utils, version
@@ -280,7 +280,7 @@ class GUI:
     @staticmethod
     def _problem_indicator(level: type_utils.ProblemLevel|None) -> str:
         if level == type_utils.ProblemLevel.Error:
-            return ifa6.ICON_FA_CIRCLE_XMARK + ' '
+            return ifa6.ICON_FA_SQUARE_XMARK + ' '
         if level == type_utils.ProblemLevel.Warning:
             return ifa6.ICON_FA_TRIANGLE_EXCLAMATION + ' '
         return ''
@@ -1230,7 +1230,7 @@ class GUI:
     def _draw_calibration_status(self, level: type_utils.ProblemLevel, details: str, label: str | None = None, extra_info: str | None = None):
         match level:
             case type_utils.ProblemLevel.Error:
-                icon, color = ifa6.ICON_FA_CIRCLE_XMARK, colors.error
+                icon, color = ifa6.ICON_FA_SQUARE_XMARK, colors.error
             case type_utils.ProblemLevel.Warning:
                 icon, color = ifa6.ICON_FA_TRIANGLE_EXCLAMATION, colors.warning
             case _:
@@ -1830,7 +1830,7 @@ class GUI:
                                     process_pool.State.Completed: ifa6.ICON_FA_CIRCLE_CHECK,
                                     process_pool.State.Pending: ifa6.ICON_FA_CLOCK,
                                     process_pool.State.Running: ifa6.ICON_FA_PLAY,
-                                    process_pool.State.Canceled: ifa6.ICON_FA_CIRCLE_XMARK,
+                                    process_pool.State.Canceled: ifa6.ICON_FA_SQUARE_XMARK,
                                     process_pool.State.Failed: ifa6.ICON_FA_TRIANGLE_EXCLAMATION,
                                 }.get(dependency_state, ifa6.ICON_FA_MINUS)
                                 imgui.text(dependency_icon)
