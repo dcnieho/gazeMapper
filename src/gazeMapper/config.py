@@ -963,7 +963,19 @@ class Study:
                     if this_problems:
                         type_utils.merge_problem_dicts(problems, {'coding_setup': {i: this_problems}})
                     # check it makes sense to be defined for a given episode type
-                    if cs['event_type'] in [annotation.EventType.Validate, annotation.EventType.Sync_ET_Data] and (problem_recs := [r for r in cs['which_recordings'] if any(r==rec.name and rec.type==session.RecordingType.Camera for rec in self.session_def.recordings)]):
+                    if cs['event_type'] in [annotation.EventType.Validate, annotation.EventType.Sync_ET_Data] and (problem_recs := [
+                        r for r in cs['which_recordings']
+                        if any(
+                            r == rec.name
+                            and rec.type == session.RecordingType.Camera
+                            and not (
+                                cs['event_type'] == annotation.EventType.Sync_ET_Data
+                                and r in (self.head_attached_recordings_replace_et_scene or set())
+                                and rec.camera_recording_type == camera_recording.Type.Head_attached
+                            )
+                            for rec in self.session_def.recordings
+                        )
+                    ]):
                         msg = f'which_recordings should not include camera recordings for a {annotation.tooltip_map[cs["event_type"]]} episode. Offending recording(s): {problem_recs[0] if len(problem_recs)==1 else problem_recs}'
                         type_utils.merge_problem_dicts(problems, {'coding_setup': {i: {'which_recordings': (type_utils.ProblemLevel.Error, msg)}}})
             # check load_from_other_recordings settings
