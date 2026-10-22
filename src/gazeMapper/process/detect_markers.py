@@ -1,6 +1,8 @@
 import pathlib
 import cv2
+import numpy as np
 import warnings
+import typing
 
 from glassesTools import annotation, aruco, drawing, marker as gt_marker, marker_assembly as gt_marker_assembly, naming as gt_naming, pose, process_pool, propagating_thread, ocv, timestamps
 from glassesTools.camera_recording import Type as CameraRecordingType
@@ -14,6 +16,30 @@ def _without_id_label_background(styles: drawing.MarkerStyles) -> drawing.Marker
         category: style._replace(id_style=style.id_style._replace(background_opacity=0))
         for category, style in styles._asdict().items()
     })
+
+def _transform_pose_vectors(rotation_vec: np.ndarray, translation: np.ndarray, camera_params: ocv.CameraParams) -> tuple[np.ndarray, np.ndarray]:
+    if (not camera_params.has_extrinsics() or camera_params.rotation_vec is None or camera_params.position is None):
+        raise ValueError('The replacement camera calibration does not include extrinsics.')
+    if rotation_vec is None or translation is None:
+        raise ValueError('Cannot transform an incomplete pose.')
+    rotation = cv2.Rodrigues(np.ascontiguousarray(camera_params.rotation_vec, dtype=np.float64))[0]
+    pose_rotation = cv2.Rodrigues(rotation_vec)[0]
+    scene_rotation = rotation @ pose_rotation
+    scene_translation = (rotation @ translation).flatten() + camera_params.position
+    return cv2.Rodrigues(scene_rotation)[0].flatten(), scene_translation
+
+_T = typing.TypeVar('_T', bound=pose.Pose)
+def _transform_pose_to_scene_camera(pose_estimate: _T, camera_params: ocv.CameraParams, frame_idx: int) -> _T:
+    if not pose_estimate.pose_successful() or pose_estimate.pose_R_vec is None or pose_estimate.pose_T_vec is None:
+        return type(pose_estimate)(frame_idx=frame_idx)
+    scene_rotation, scene_translation = _transform_pose_vectors(pose_estimate.pose_R_vec, pose_estimate.pose_T_vec, camera_params)
+    return type(pose_estimate)(frame_idx=frame_idx, pose_R_vec=scene_rotation, pose_T_vec=scene_translation, pose_N_points=pose_estimate.pose_N_points, pose_reprojection_error=pose_estimate.pose_reprojection_error)
+
+def _transform_marker_pose_to_scene_camera(pose_estimate: gt_marker.Pose, camera_params: ocv.CameraParams, frame_idx: int) -> gt_marker.Pose:
+    if not pose_estimate.pose_successful() or pose_estimate.R_vec is None or pose_estimate.T_vec is None:
+        return gt_marker.Pose(frame_idx=frame_idx)
+    scene_rotation, scene_translation = _transform_pose_vectors(pose_estimate.R_vec, pose_estimate.T_vec, camera_params)
+    return gt_marker.Pose(frame_idx=frame_idx, R_vec=scene_rotation, T_vec=scene_translation)
 
 
 def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None=None, show_visualization=False, visualization_show_rejected_markers=False, progress_indicator: process_pool.JobProgress|None=None, **study_settings):
@@ -128,7 +154,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
     # if so, write a pose file for that camera also
     is_head_attached_camera_recording = rec_def.type==session.RecordingType.Camera and rec_def.camera_recording_type==CameraRecordingType.Head_attached
     if is_head_attached_camera_recording and study_config.head_attached_recordings_replace_et_scene is not None and rec_name in study_config.head_attached_recordings_replace_et_scene:
-        to_replace = [r for r in study_config.session_def.recordings if r.name==rec_name][0].associated_recording   # don't need to check it exists, thats a config error check much earlier
+        to_replace = rec_def.associated_recording
+        if to_replace is None:
+            raise ValueError(f'Head-attached recording "{rec_name}" has no associated eye-tracker recording.')
         # we need to have camera sync for the head-attached camera recording to be able to replace the eye tracker scene camera poses
         sync = synchronization.get_sync_for_recs(working_dir.parent, [to_replace], rec_name, study_config.sync_ref_do_time_stretch, study_config.sync_ref_average_recordings, missing_ref_coding_ok=True)
         if sync is not None:
@@ -142,27 +170,32 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
             poses = {pl:{p.frame_idx:p for p in poses[pl]} for pl in poses}
             # use camera extrinsics to make new poses for the eye tracker scene camera
             cam_params = ocv.CameraParams.read_from_file(working_dir / gt_naming.scene_camera_calibration_fname)
-            Rmat = cv2.Rodrigues(cam_params.rotation_vec)[0]
             # now, per assembly, transform head-attached camera poses into eye tracker scene camera poses and store
             for pl in poses:
                 # get poses
                 is_3d_assembly = isinstance(assembly_definitions[pl], marker_assembly.Definition_MarkerAssembly_3D)
-                pose_type = pose.Pose if is_3d_assembly else pose.PlanePose
                 replaced_poses: list[pose.Pose] = []
                 for frep in frame_map:
                     if frame_map[frep] in poses[pl]:
                         ha_pose = poses[pl][frame_map[frep]]
-                        R_ha = cv2.Rodrigues(ha_pose.pose_R_vec)[0]
-                        t_ha = ha_pose.pose_T_vec
-                        R_et = Rmat @ R_ha
-                        t_et = (Rmat @ t_ha).flatten() + cam_params.position
-                        rvec_et = cv2.Rodrigues(R_et)[0].flatten()
-                        replaced_poses.append(pose_type(frame_idx=frep, pose_R_vec=rvec_et, pose_T_vec=t_et, pose_N_points=ha_pose.pose_N_points))
+                        replaced_poses.append(_transform_pose_to_scene_camera(ha_pose, cam_params, frep))
                 # store to file
                 if is_3d_assembly:
                     pose.write_list_to_file(replaced_poses, working_dir.parent/to_replace/f'{naming.pose_prefix}{pl}.tsv', skip_failed=True)
                 else:
                     pose.write_plane_list_to_file(replaced_poses, working_dir.parent/to_replace/f'{naming.plane_pose_prefix}{pl}.tsv', skip_failed=True)
+            for marker_id, marker_poses in individual_markers.items():
+                poses_by_frame = {marker_pose.frame_idx: marker_pose for marker_pose in marker_poses}
+                replaced_marker_poses = [
+                    _transform_marker_pose_to_scene_camera(poses_by_frame[frame_map[frame_idx]], cam_params, frame_idx)
+                    for frame_idx in frame_map
+                    if frame_map[frame_idx] in poses_by_frame
+                ]
+                gt_marker.write_list_to_file(
+                    replaced_marker_poses,
+                    gt_marker.get_file_name(marker_id.m_id, marker_id.aruco_dict_id, working_dir.parent/to_replace),
+                    skip_failed=False,
+                )
         else:
             warnings.warn(f'Cannot replace eye tracker scene camera poses with head-attached camera poses: missing camera synchronization between head-attached camera recording "{rec_name}" and eye tracker scene camera recording "{to_replace}". Run Auto Coding if you have this set up, or manually code at least one sync point for both recordings, and then run the Detect Markers action again.', process_pool.ProcessingWarning)
 
