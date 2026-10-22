@@ -154,9 +154,13 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
     planes = {v for cs in study_config.coding_setup for v in cs['marker_assemblies'] if v in plane_names}
     if rec_def.type==session.RecordingType.Camera:
         has_gaze, has_plane_gaze = False, False
-        # unless head-attached and this is the reference recording, no Sync_ET_Data or Validate events for camera recordings, remove
-        if not (study_config.sync_ref_recording==rec_def.name and rec_def.camera_recording_type==CameraRecordingType.Head_attached):
-            study_config.coding_setup = [cs for cs in study_config.coding_setup if cs['event_type'] not in (annotation.EventType.Sync_ET_Data, annotation.EventType.Validate)]
+        is_head_attached_reference = study_config.sync_ref_recording==rec_def.name and rec_def.camera_recording_type==CameraRecordingType.Head_attached
+        is_replacement_camera = rec_def.name in (study_config.head_attached_recordings_replace_et_scene or set())
+        if not is_head_attached_reference:
+            disallowed_events = {annotation.EventType.Validate}
+            if not is_replacement_camera:
+                disallowed_events.add(annotation.EventType.Sync_ET_Data)
+            study_config.coding_setup = [cs for cs in study_config.coding_setup if cs['event_type'] not in disallowed_events]
     elif rec_def.type==session.RecordingType.Eye_Tracker:
         # Read gaze data
         has_gaze = True
