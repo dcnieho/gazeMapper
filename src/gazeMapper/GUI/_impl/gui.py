@@ -2131,6 +2131,10 @@ class GUI:
             }
             gt_gui.utils.push_popup(self, lambda: gt_gui.utils.popup("Add plane or assembly", _add_marker_assembly_popup, buttons=buttons, button_keymap={0:imgui.Key.enter}, outside=False))
 
+    @staticmethod
+    def _selectable_coding_event_types() -> list[annotation.EventType]:
+        return [event_type for event_type in annotation.event_types if event_type not in annotation.internal_types]
+
     def _coding_setup_pane_drawer(self):
         if self.setup_coding_error_level is not None:
             if self.setup_coding_error_level==type_utils.ProblemLevel.Error:
@@ -2198,6 +2202,7 @@ class GUI:
         if imgui.button('+ new coding'):
             new_coding_name = ''
             new_coding_type: annotation.EventType|None = None
+            selectable_event_types = self._selectable_coding_event_types()
             def _valid_coding_name():
                 if not new_coding_name:
                     return False, 'Coding name cannot be empty'
@@ -2236,9 +2241,9 @@ class GUI:
                         imgui.pop_style_color()
                     imgui.table_next_column()
                     imgui.set_next_item_width(-1)
-                    c_idx = annotation.event_types.index(new_coding_type) if new_coding_type is not None else -1
-                    _,c_idx = imgui.combo("##coding_type_selector", c_idx, [annotation.tooltip_map[c] for c in annotation.event_types if c not in annotation.internal_types])
-                    new_coding_type = None if c_idx==-1 else annotation.event_types[c_idx]
+                    c_idx = selectable_event_types.index(new_coding_type) if new_coding_type is not None else -1
+                    _,c_idx = imgui.combo("##coding_type_selector", c_idx, [annotation.tooltip_map[c] for c in selectable_event_types])
+                    new_coding_type = None if c_idx==-1 else selectable_event_types[c_idx]
                     imgui.end_table()
                 valid, reason = _valid_coding_name()
                 if not valid:
