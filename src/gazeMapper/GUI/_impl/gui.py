@@ -1420,7 +1420,7 @@ class GUI:
         self._session_actions = process.get_actions_for_config(self.study_config, exclude_session_level=False)
         lister.set_actions_to_show(self._session_actions)
 
-    def _recording_lister_set_actions_to_show(self, lister: gt_gui.recording_table.RecordingTable, sess: str):
+    def _recording_lister_columns_to_show(self, sess: str) -> list[gt_gui.recording_table.ColumnSpec]:
         cfg = self._get_effective_session_config(sess)
         actions = process.get_actions_for_config(cfg, exclude_session_level=True)
         def _draw_status(action: process.Action, item: session.Recording):
@@ -1445,7 +1445,10 @@ class GUI:
         ]+[
             gt_gui.recording_table.ColumnSpec(3+c, a.displayable_name, imgui.TableColumnFlags_.angled_header, lambda rec, a=a: _draw_status(a, rec), lambda iid, a=a: _get_sort_value(a, iid)) for c,a in enumerate(actions)
         ]
-        lister.build_columns(columns)
+        return columns
+
+    def _recording_lister_set_actions_to_show(self, lister: gt_gui.recording_table.RecordingTable, sess: str):
+        lister.build_columns(self._recording_lister_columns_to_show(sess))
 
     def _update_shown_actions_for_config(self):
         self._invalidate_project_setup_state()
@@ -3096,8 +3099,6 @@ class GUI:
             self._to_dock = [window_id]
             self._to_focus = window_id
             self._selected_recordings[sess_name] = {k:False for k in sess.recordings}
-            self._recording_listers[sess_name] = gt_gui.recording_table.RecordingTable(sess.recordings, self._sessions_lock, self._selected_recordings[sess_name], None, lambda r: r.info, item_context_callback=lambda rec_name, sess_name=sess_name: self._recording_context_menu(sess_name, rec_name))
-            self._recording_listers[sess_name].dont_show_empty = True
             self.session_config_overrides[sess_name] = config.load_or_create_override(config.OverrideLevel.Session, sess.working_directory)
             self._session_dict_type_rec[sess_name] = {-1: {}}
             self.recording_config_overrides[sess_name] = {}
@@ -3108,7 +3109,8 @@ class GUI:
             self._refresh_session_override_state(sess)
             effective_config_for_session = self._get_effective_session_config(sess.name)
             self._refresh_recording_override_state(sess, effective_config_for_session)
-            self._recording_lister_set_actions_to_show(self._recording_listers[sess_name], sess_name)
+            self._recording_listers[sess_name] = gt_gui.recording_table.RecordingTable(sess.recordings, self._sessions_lock, self._selected_recordings[sess_name], self._recording_lister_columns_to_show(sess_name), lambda r: r.info, item_context_callback=lambda rec_name, sess_name=sess_name: self._recording_context_menu(sess_name, rec_name))
+            self._recording_listers[sess_name].dont_show_empty = True
 
     def _session_detail_GUI(self, sess_name: str):
         with self._sessions_lock:

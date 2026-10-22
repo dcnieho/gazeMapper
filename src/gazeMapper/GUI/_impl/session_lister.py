@@ -4,6 +4,7 @@ import typing
 import natsort
 
 import glassesTools
+from glassesTools.gui import utils as gt_gui_utils
 
 from ... import process, session
 
@@ -39,6 +40,8 @@ class List:
 
         self.display_actions: list[process.Action] = []
         self._view_column_count = None
+        self._column_layout_signature: tuple[tuple[str, str|process.Action|None], ...]|None = None
+        self._column_layout_changed = False
 
         self._extra_columns: list[ColumnSpec] = None
 
@@ -79,7 +82,12 @@ class List:
         self._require_sort = True
 
     def _determine_column_count(self):
-        self._view_column_count = len(self._column_layout())
+        column_layout = self._column_layout()
+        signature = tuple((kind, value.name if isinstance(value, ColumnSpec) else value) for kind, value in column_layout)
+        if self._column_layout_signature is not None and signature != self._column_layout_signature:
+            self._column_layout_changed = True
+        self._column_layout_signature = signature
+        self._view_column_count = len(column_layout)
 
     def draw(self, limit_outer_size=False):
         with self.items_lock:
@@ -114,6 +122,9 @@ class List:
                 else:
                     column = typing.cast(ColumnSpec, value)
                     imgui.table_setup_column(column.name, column.flags)
+
+            if self._column_layout_changed and gt_gui_utils.reset_table_display_order(len(column_layout)):
+                self._column_layout_changed = False
 
             # Sticky column headers and selector row
             if imgui.table_get_column_flags(0) & imgui.TableColumnFlags_.is_enabled:
