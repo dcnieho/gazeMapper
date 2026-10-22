@@ -9,11 +9,11 @@ import typing
 
 from ffpyplayer.writer import MediaWriter
 
-from glassesTools import annotation, aruco, drawing, gaze_headref, gaze_worldref, marker_assembly as gt_marker_assembly, naming as gt_naming, ocv, plane as gt_plane, pose, process_pool, propagating_thread, timestamps, utils, video_utils
+from glassesTools import annotation, aruco, drawing, gaze_headref, gaze_worldref, marker as gt_marker, marker_assembly as gt_marker_assembly, naming as gt_naming, ocv, plane as gt_plane, pose, process_pool, propagating_thread, timestamps, utils, video_utils
 from glassesTools.gui import video_player
 
 from .. import config, episode, marker, naming, process, session, synchronization
-from .detect_markers import _get_assembly_setup
+from .detect_markers import _get_assembly_setup, _transform_marker_pose_to_scene_camera, _transform_pose_to_scene_camera
 from .run_sync_function import _get_sync_function
 
 def _flatten_episodes(episodes: episode.EpisodeMap) -> dict[str, tuple[annotation.EventType, list[int]]]:
@@ -148,6 +148,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
     vid_info        : dict[str, tuple[int, int, float]]                 = {}
     assemblies      : dict[str, gt_marker_assembly.MarkerAssembly]      = {}
     planes          : dict[str, gt_plane.Plane]                         = {}
+    individual_marker_poses: dict[str, dict[gt_marker.MarkerID, gt_marker.Pose] | None] = {}
     recs = set(session_info.recordings)
     sync = None
     ref_frame_idxs: dict[str, list[int]] = {}
@@ -176,6 +177,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
 
         # get camera calibration info
         camera_params[rec] = ocv.CameraParams.read_from_file(rec_working_dir / gt_naming.scene_camera_calibration_fname)
+        in_videos[rec] = session.read_recording_info(rec_working_dir, rec_def.type)[1]
 
         # get frame timestamps
         videos_ts[rec] = timestamps.VideoTimestamps(rec_working_dir / gt_naming.frame_timestamps_fname)
@@ -258,17 +260,23 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
         )
         for rec in output_recs
     }
-    estimator_recs = {
+    logical_estimator_recs = {
         rec for rec in recs
         if _needs_live_estimator(rec, session_info.recordings[rec].definition.type, study_config, output_recs)
     }
+    pose_source_for_rec = {
+        rec: process.get_replacement_recording_name(study_config, rec) or rec
+        for rec in logical_estimator_recs
+    }
+    estimator_recs = set(pose_source_for_rec.values())
+    proc_recs = logical_estimator_recs | estimator_recs
+    output_video_readers: dict[str, ocv.CV2VideoReader] = {}
 
     # build pose estimator
     for rec in session_info.recordings:
         if rec not in estimator_recs:
             continue
         rec_def = session_info.recordings[rec].definition
-        in_videos[rec] = session.read_recording_info(working_dir / rec, rec_def.type)[1]
         pose_estimators[rec] = pose.Estimator(in_videos[rec], videos_ts[rec], camera_params[rec])
         pose_estimators[rec].set_allow_early_exit(False)    # make sure we run through the whole video
         # first, register all ArUco marker assemblies and individual markers with ArUco manager, which
@@ -293,7 +301,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
         aruco_manager.set_visualization_styles(study_config.mapped_video_marker_styles, study_config.mapped_video_recovered_assembly_marker_color, study_config.mapped_video_rejected_marker_color)
         aruco_manager.register_with_estimator(pose_estimators[rec])
         # other setup of estimator
-        sync_target_functions, function_frames  = _get_sync_function(recording_config, rec_def, episodes[rec])
+        sync_target_functions, function_frames  = _get_sync_function(recording_config, rec_def, episodes[rec], camera_params[rec])
         if sync_target_functions:
             for sfe in sync_target_functions:
                 pose_estimators[rec].register_extra_processing_fun(f'sync_{sfe}', function_frames[sfe], *sync_target_functions[sfe])
@@ -315,9 +323,16 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
             else:
                 vid_info[rec] = (*vid_info[rec][:2], 1000/videos_ts[rec].get_IFI(timestamps.Type.Normal))
 
+    for rec in output_recs:
+        if rec not in pose_source_for_rec or pose_source_for_rec[rec] == rec:
+            continue
+        reader = ocv.CV2VideoReader(in_videos[rec], videos_ts[rec].timestamps)
+        output_video_readers[rec] = reader
+        vid_info[rec] = (int(reader.get_prop(cv2.CAP_PROP_FRAME_WIDTH)), int(reader.get_prop(cv2.CAP_PROP_FRAME_HEIGHT)), 1000 / videos_ts[rec].get_IFI(timestamps.Type.Stretched if videos_ts[rec].has_stretched else timestamps.Type.Normal))
+
     video_sets: list[tuple[str, set[str], set[str]]] = []
     if study_config.sync_ref_recording:
-        video_sets.append((study_config.sync_ref_recording,{r for r in study_config.mapped_video_make_which if r!=study_config.sync_ref_recording}, estimator_recs))
+        video_sets.append((study_config.sync_ref_recording,{r for r in study_config.mapped_video_make_which if r!=study_config.sync_ref_recording}, proc_recs))
     else:
         video_sets.extend((r, set(), {r}) for r in study_config.mapped_video_make_which)
 
@@ -385,7 +400,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
         while True:
             if should_exit:
                 break
-            status, apose[lead_vid], _, _, (frame[lead_vid], frame_idx[lead_vid], frame_ts[lead_vid], frame_info[lead_vid]) = \
+            status, apose[lead_vid], individual_marker_poses[lead_vid], _, (frame[lead_vid], frame_idx[lead_vid], frame_ts[lead_vid], frame_info[lead_vid]) = \
                 pose_estimators[lead_vid].process_one_frame()
             # TODO: if there is a discontinuity, fill in the missing frames so audio stays in sync
             # check if we're done
@@ -395,17 +410,42 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
             lead_frame_idx = typing.cast(int, frame_idx[lead_vid])
             lead_frame_ts = typing.cast(float, frame_ts[lead_vid])
 
-            for v in proc_vids-set([lead_vid]):
+            for v in (proc_vids & estimator_recs)-{lead_vid}:
                 # find corresponding frame
                 fr_idx_this = ref_frame_idxs[v][lead_frame_idx]
 
                 if fr_idx_this==-1:
-                    _, apose[v], _, _, (frame[v], frame_idx[v], frame_ts[v], frame_info[v]) = \
+                    _, apose[v], individual_marker_poses[v], _, (frame[v], frame_idx[v], frame_ts[v], frame_info[v]) = \
                         None, None, None, None, (None, None, None, None)
                 else:
                     # read it
-                    _, apose[v], _, _, (frame[v], frame_idx[v], frame_ts[v], frame_info[v]) = \
+                    _, apose[v], individual_marker_poses[v], _, (frame[v], frame_idx[v], frame_ts[v], frame_info[v]) = \
                         pose_estimators[v].process_one_frame(fr_idx_this)
+
+            for v in logical_estimator_recs-estimator_recs:
+                source_rec = pose_source_for_rec[v]
+                frame_idx_this = ref_frame_idxs[v][lead_frame_idx]
+                source_frame_idx = lead_frame_idx if source_rec == lead_vid else ref_frame_idxs[source_rec][lead_frame_idx]
+                if frame_idx_this == -1 or source_frame_idx == -1 or apose[source_rec] is None:
+                    apose[v] = None
+                    individual_marker_poses[v] = None
+                    frame[v], frame_idx[v], frame_ts[v], frame_info[v] = None, None, None, None
+                    continue
+                apose[v] = {name: _transform_pose_to_scene_camera(pose_estimate, camera_params[source_rec], frame_idx_this) for name, pose_estimate in apose[source_rec].items()}
+                source_marker_poses = individual_marker_poses[source_rec]
+                individual_marker_poses[v] = None if source_marker_poses is None else {marker_id: _transform_marker_pose_to_scene_camera(marker_pose, camera_params[source_rec], frame_idx_this) for marker_id, marker_pose in source_marker_poses.items()}
+
+            for v in write_vids:
+                if v not in output_video_readers:
+                    continue
+                frame_idx_this = ref_frame_idxs[v][lead_frame_idx]
+                if frame_idx_this == -1:
+                    frame[v], frame_idx[v], frame_ts[v], frame_info[v] = None, None, None, None
+                    continue
+                done, out_frame, out_frame_idx, out_frame_ts, out_frame_info = output_video_readers[v].read_frame(wanted_frame_idx=frame_idx_this)
+                if done:
+                    raise RuntimeError(f'Could not read output frame {frame_idx_this} from replaced eye-tracker video "{v}"')
+                frame[v], frame_idx[v], frame_ts[v], frame_info[v] = out_frame, out_frame_idx, out_frame_ts, out_frame_info
 
             # prepare frame for annotation and writing
             for v in write_vids:
@@ -421,6 +461,17 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
                 else (0,0)
                 for v in write_vids
             }
+
+            # if there are pose for the video derived from a head-attached replacement camera, draw it now
+            for v in write_vids:
+                if v not in output_video_readers:
+                    continue
+                for assembly_pose in (apose[v] or {}).values():
+                    if assembly_pose.pose_successful() and study_config.mapped_video_assembly_axis_arm_length:
+                        assembly_pose.draw_frame_axis(frame[v], camera_params[v], study_config.mapped_video_assembly_axis_arm_length, 3, sub_pixel_fac=sub_pixel_fac, ROI_offset=ROI_offsets[v])
+                for marker_pose in (individual_marker_poses[v] or {}).values():
+                    if marker_pose.pose_successful() and study_config.mapped_video_individual_marker_axis_arm_length:
+                        marker_pose.draw_frame_axis(frame[v], camera_params[v], study_config.mapped_video_individual_marker_axis_arm_length, sub_pixel_fac=sub_pixel_fac, ROI_offset=ROI_offsets[v])
 
             # draw gaze on the video
             for v in proc_vids:
