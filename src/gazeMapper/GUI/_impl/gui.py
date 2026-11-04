@@ -1683,7 +1683,8 @@ class GUI:
             self._to_focus = pane_id
 
         # rest of settings handled here in a settings tree
-        if any((k not in ['session_def', 'marker_assemblies', 'coding_setup', 'individual_markers'] for k in self._problems_cache)):
+        other_setup_problems = {k: v for k, v in self._problems_cache.items() if k not in ['session_def', 'marker_assemblies', 'coding_setup', 'individual_markers']}
+        if type_utils.get_error_level(other_setup_problems)==type_utils.ProblemLevel.Error:
             imgui.text_colored(colors.error,'*There are problems in the below setup that need to be resolved.\nHover over red text to get information about the error')
 
         fields = [k for k in config.study_parameter_types.keys() if k in config.study_defaults and k != 'individual_marker_settings']
