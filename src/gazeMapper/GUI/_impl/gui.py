@@ -78,6 +78,7 @@ class GUI:
         self.can_accept_sessions                                                    = False
         self._session_actions                       : set[process.Action]           = set()
         self._problems_cache                        : type_utils.ProblemDict        = {}
+        self._setup_state_lock                      : threading.Lock                = threading.Lock()
         self._setup_state_dirty                     : bool                          = True
 
         self._session_watcher           : concurrent.futures.Future|None = None
@@ -478,9 +479,9 @@ class GUI:
                 pls = [pl for pl in self.study_config.marker_assemblies if pl.name==assembly_name]
                 if pls: # may already have been removed
                     self._remove_marker_assembly(pls[0])
-            return
+                return
 
-        # for all addition or change events, reload the concerned marker assembly
+        # Reload the assembly for all addition and change events, as well as data-file changes (including deletions).
         i = [i for i in range(len(self.study_config.marker_assemblies)) if self.study_config.marker_assemblies[i].name==assembly_name]
         try:
             p_def = marker_assembly.Definition.load_from_json(change_path.parent)
@@ -1028,48 +1029,50 @@ class GUI:
         self._session_lister_set_extra_columns_to_show()    # only place we have to add this. Adding or deleting a session def from the study config triggers the current function
 
     def _reload_marker_assemblies(self):
-        self._invalidate_project_setup_state()
         self.assembly_configs.clear()
         self._assembly_preview_cache.clear()
         for p_def in self.study_config.marker_assemblies:
             self._load_marker_assembly(p_def)
-    def _load_marker_assembly(self, p_def: marker_assembly.Definition, defer_image_upload=False):
         self._invalidate_project_setup_state()
+    def _load_marker_assembly(self, p_def: marker_assembly.Definition, defer_image_upload=False):
         config_dir = config.guess_config_dir(self.study_config.working_directory)
         if not p_def.has_complete_setup(config_dir / p_def.name):
             self.assembly_configs[p_def.name] = None
             self._assembly_preview_cache.pop(p_def.name,None)
+            self._invalidate_project_setup_state()
             return
 
         try:
             self.assembly_configs[p_def.name] = marker_assembly.get_marker_assembly_from_definition(p_def, config_dir/p_def.name)
         except Exception as exc:
             self.assembly_configs[p_def.name] = exc
-        else:
-            if isinstance(self.assembly_configs[p_def.name], gt_marker_assembly.MarkerAssembly):
-                if defer_image_upload:
-                    self._assembly_preview_cache[p_def.name] = 'needs_upload'
-                else:
-                    self._assembly_preview_cache[p_def.name] = utils.load_image_with_helper(self.assembly_configs[p_def.name].get_ref_image(as_RGB=True))
+        self._invalidate_project_setup_state()
+
+        # finally, generate preview if possible (or mark for generation if needs to be deferred)
+        if isinstance(self.assembly_configs[p_def.name], gt_marker_assembly.MarkerAssembly):
+            if defer_image_upload:
+                self._assembly_preview_cache[p_def.name] = 'needs_upload'
+            else:
+                self._assembly_preview_cache[p_def.name] = utils.load_image_with_helper(self.assembly_configs[p_def.name].get_ref_image(as_RGB=True))
     def _upload_assembly_image(self, p_def: marker_assembly.Definition):
         self._assembly_preview_cache[p_def.name] = utils.load_image_with_helper(self.assembly_configs[p_def.name].get_ref_image(as_RGB=True))
     def _remove_marker_assembly(self, p_def: marker_assembly.Definition):
-        self._invalidate_project_setup_state()
         callbacks.delete_marker_assembly(self.study_config, p_def)
         self.study_config.marker_assemblies = [p for p in self.study_config.marker_assemblies if p.name!=p_def.name]
         self.assembly_configs.pop(p_def.name, None)
         self._assembly_preview_cache.pop(p_def.name, None)
+        self._invalidate_project_setup_state()
 
     def _reload_calibrations(self):
-        self._invalidate_project_setup_state()
         self.cam_calibrations.clear()
         for r in self.study_config.session_def.recordings:
             self._load_calibration(r)
         self._reload_recording_calibrations()
-    def _load_calibration(self, r_def: session.RecordingDefinition):
         self._invalidate_project_setup_state()
+    def _load_calibration(self, r_def: session.RecordingDefinition):
         cal_path = config.guess_config_dir(self.study_config.working_directory) / f'{r_def.name}_{session.RecordingDefinition.cal_file_name}'
         self.cam_calibrations[r_def.name] = camera_calibration.inspect(cal_path, self._calibration_requires_extrinsics(r_def))
+        self._invalidate_project_setup_state()
     def _remove_calibration(self, r_def: session.RecordingDefinition):
         self._load_calibration(r_def)
 
@@ -1293,18 +1296,21 @@ class GUI:
 
     def _invalidate_project_setup_state(self):
         self._invalidate_session_problem_cache()
-        self._setup_state_dirty = True
+        with self._setup_state_lock:
+            self._setup_state_dirty = True
 
     def _check_project_setup_state(self):
-        if not self._setup_state_dirty:
-            return
+        with self._setup_state_lock:
+            if not self._setup_state_dirty:
+                return
+            # Consume the current invalidation so any concurrent (async) updates (e.g. from the file watchers) remain pending.
+            self._setup_state_dirty = False
 
         if self.study_config is None:
             self._problems_cache = {}
             self.setup_recordings_error_level = type_utils.ProblemLevel.Error
             self.setup_assembly_error_level = self.setup_coding_error_level = self.setup_individual_markers_error_level = None
             self.can_accept_sessions = False
-            self._setup_state_dirty = False
             return
 
         self._problems_cache = self.study_config.field_problems()
@@ -1346,7 +1352,6 @@ class GUI:
         self.can_accept_sessions = type_utils.ProblemLevel.Error not in (
             type_utils.get_error_level(self._problems_cache), self.setup_recordings_error_level,
             self.setup_assembly_error_level, self.setup_coding_error_level, self.setup_individual_markers_error_level)
-        self._setup_state_dirty = False
 
     @typing.overload
     def _get_markers(self, use_family: typing.Literal[False] = False) -> dict[str,dict[str|int,list[gt_marker.MarkerID]]]: ...
