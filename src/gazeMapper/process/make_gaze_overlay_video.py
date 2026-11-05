@@ -1,9 +1,10 @@
 import pathlib
 
-from glassesTools import gaze_overlay_video, naming as gt_naming, process_pool, propagating_thread, timestamps
+from glassesTools import gaze_headref, gaze_overlay_video, naming as gt_naming, process_pool, propagating_thread, timestamps
 from glassesTools.gui import video_player
 
 from .. import config, process, session
+from ..gaze_sample_selection import reduce_gaze_samples
 
 
 def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None=None, show_visualization=False, progress_indicator: process_pool.JobProgress|None=None, **study_settings):
@@ -52,7 +53,12 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
     video_ts = timestamps.VideoTimestamps(working_dir / gt_naming.frame_timestamps_fname)
 
     # set up gaze overlay video maker and run it
-    video_maker = gaze_overlay_video.VideoMaker(working_dir, in_video, video_ts, working_dir / gt_naming.scene_camera_calibration_fname, working_dir / gt_naming.gaze_data_fname, study_config.overlay_video_pixel_format)
+    gaze_data_file = working_dir / gt_naming.gaze_data_fname
+    gaze_data: pathlib.Path|dict[int,list[gaze_headref.Gaze]] = gaze_data_file
+    if study_config.overlay_video_gaze_sample_method!='all':
+        gaze_data = gaze_headref.read_dict_from_file(gaze_data_file, ts_column_suffixes=['VOR', ''])[0]
+        gaze_data = {frame_idx: reduce_gaze_samples(gazes, study_config.overlay_video_gaze_sample_method, video_ts.get_timestamp(frame_idx)) for frame_idx, gazes in gaze_data.items()}
+    video_maker = gaze_overlay_video.VideoMaker(working_dir, in_video, video_ts, working_dir / gt_naming.scene_camera_calibration_fname, gaze_data, study_config.overlay_video_pixel_format)
     video_maker.set_gaze_styles(study_config.overlay_video_gaze_styles)
     video_maker.attach_gui(gui)
     if gui is not None:

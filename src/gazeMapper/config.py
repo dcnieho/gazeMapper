@@ -467,6 +467,7 @@ class Study:
                  interpolate_plane_pose_max_missing_frames  : int                           = 0,
 
                  overlay_video_gaze_styles                  : gaze_headref.OverlayGazeStyles = gaze_headref.DEFAULT_OVERLAY_GAZE_STYLES,
+                 overlay_video_gaze_sample_method           : Literal['all','mean','median','middle','closest_time'] = 'all',
                  overlay_video_pixel_format                 : Literal['yuv420p','yuv444p']  = 'yuv420p',
 
                  sync_ref_recording                         : str|None                      = None,
@@ -481,6 +482,7 @@ class Study:
                  mapped_video_pixel_format                             : Literal['yuv420p','yuv444p']      = 'yuv420p',
                  mapped_video_recording_colors                         : dict[str,drawing.RgbColor]|None   = None,
                  mapped_video_gaze_styles                              : gaze_worldref.MappedGazeStyles    = gaze_worldref.DEFAULT_MAPPED_GAZE_STYLES,
+                 mapped_video_gaze_sample_method                       : Literal['all','mean','median','middle','closest_time'] = 'all',
                  mapped_video_marker_styles                            : drawing.MarkerStyles              = drawing.DEFAULT_MAPPED_MARKER_STYLES,
                  mapped_video_process_marker_assemblies_for_all_frames : bool                              = False,
                  mapped_video_process_annotations_for_all_recordings   : bool                              = True,
@@ -521,6 +523,7 @@ class Study:
         self.interpolate_plane_pose_max_missing_frames  = interpolate_plane_pose_max_missing_frames
 
         self.overlay_video_gaze_styles                  = overlay_video_gaze_styles
+        self.overlay_video_gaze_sample_method           = overlay_video_gaze_sample_method
         self.overlay_video_pixel_format                 = overlay_video_pixel_format
 
         self.sync_ref_recording                         = sync_ref_recording
@@ -535,6 +538,7 @@ class Study:
         self.mapped_video_pixel_format                             = mapped_video_pixel_format
         self.mapped_video_recording_colors                         = mapped_video_recording_colors
         self.mapped_video_gaze_styles                              = mapped_video_gaze_styles
+        self.mapped_video_gaze_sample_method                       = mapped_video_gaze_sample_method
         self.mapped_video_marker_styles                            = mapped_video_marker_styles
         self.mapped_video_process_marker_assemblies_for_all_frames = mapped_video_process_marker_assemblies_for_all_frames  # if True, all marker assemblies are processed for all frames, if False, only according to the marker_assemblies_per_episode setup and the coding
         self.mapped_video_process_annotations_for_all_recordings   = mapped_video_process_annotations_for_all_recordings    # if True, all coded episodes for all marker assemblies of all recordings are processed
@@ -1601,6 +1605,14 @@ _marker_styles_docs = {
     field: type_utils.GUIDocInfo(label, label + ' marker appearance.', _marker_style_docs)
     for field, label in (('assembly', 'Assembly'), ('individual', 'Individual'), ('unexpected', 'Unexpected'))
 }
+_gaze_sample_method_docs = {
+    'all': type_utils.GUIDocInfo('All samples', 'Draw every gaze sample assigned to the video frame.'),
+    'mean': type_utils.GUIDocInfo('Average position', 'Draw one gaze using the component-wise mean of available gaze positions.'),
+    'median': type_utils.GUIDocInfo('Median position', 'Draw one gaze using the component-wise median of available gaze positions.'),
+    'middle': type_utils.GUIDocInfo('Middle sample', 'Draw the middle gaze sample in sequence order. For an even number of samples, the later middle sample is used.'),
+    'closest_time': type_utils.GUIDocInfo('Closest to frame timestamp', 'Draw the sample whose gaze timestamp is closest to the video frame timestamp.'),
+}
+
 study_parameter_doc = {
     'individual_marker_settings': type_utils.GUIDocInfo('Marker detection settings', 'Named detector parameter groups managed in the individual-marker setup pane.'),
     'allow_duplicated_markers': type_utils.GUIDocInfo('Allow duplicated markers?', 'If enabled, the same marker can be used in multiple places in the coding setup (e.g. for auto coding and/or in planes). If disabled, each marker can only be used once. Enabling this may be ok, if the duplicate markers never occur at the same time. Still, use at your own risk.'),
@@ -1614,6 +1626,7 @@ study_parameter_doc = {
         'video_position': type_utils.GUIDocInfo('Scene-video gaze position', 'Appearance of gaze positions on the scene video.', _gaze_point_style_docs),
         'world_position': type_utils.GUIDocInfo('3D gaze position', 'Appearance of recorded 3D gaze positions.', _gaze_point_style_docs),
     }),
+    'overlay_video_gaze_sample_method': type_utils.GUIDocInfo('Gaze overlay video: Gaze samples per frame', 'How to draw multiple gaze samples assigned to one frame.', _gaze_sample_method_docs),
     'overlay_video_pixel_format': type_utils.GUIDocInfo('Gaze overlay video: Output pixel format', 'Pixel format used by the gaze overlay video encoder.', _video_pixel_format_docs),
     'sync_ref_recording': type_utils.GUIDocInfo('Synchronization: Reference recording', 'If there are multiple recordings, sets to which recording all other recordings will be synchronized.'),
     'sync_ref_do_time_stretch': type_utils.GUIDocInfo('Synchronization: Do time stretch?', 'If enabled, multiple sync points are used to calculate a time stretch factor to compensate for clock drift when synchronizing multiple recordings.'),
@@ -1641,6 +1654,7 @@ study_parameter_doc = {
             ('average', 'Projected average gaze', 'Average of left and right gaze vectors projected to a plane.'),
         )
     }),
+    'mapped_video_gaze_sample_method': type_utils.GUIDocInfo('Mapped video: Gaze samples per frame', 'How to draw multiple gaze samples assigned to one frame.', _gaze_sample_method_docs),
     'mapped_video_marker_styles': type_utils.GUIDocInfo('Mapped video: Marker styles', 'Border, corner, and ID-label appearance by marker category.', _marker_styles_docs),
     'mapped_video_process_marker_assemblies_for_all_frames': type_utils.GUIDocInfo('Mapped video: Process all marker assemblies (e.g., planes) for all frames?', 'If enabled, shows detection results for all marker assemblies for all frames. If not enabled, detection of each assembly is only shown during the episode(s) to which it is assigned.'),
     'mapped_video_process_annotations_for_all_recordings': type_utils.GUIDocInfo('Mapped video: Process all annotations for all recordings?', 'Episode annotations are shown in a bar on the bottom of the screen. If enabled, annotations for not only the recording for which the video is made, but also for the other recordings are shown in this bar.'),

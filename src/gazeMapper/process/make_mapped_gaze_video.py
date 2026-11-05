@@ -13,6 +13,7 @@ from glassesTools import annotation, aruco, drawing, gaze_headref, gaze_worldref
 from glassesTools.gui import video_player
 
 from .. import config, episode, marker, naming, process, session, synchronization
+from ..gaze_sample_selection import reduce_gaze_samples
 from .detect_markers import _get_assembly_setup, _transform_marker_pose_to_scene_camera, _transform_pose_to_scene_camera
 from .run_sync_function import _get_sync_function
 
@@ -493,7 +494,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: video_
                 poses_this = apose[v]
                 # draw gaze associated with this recording. As wanted, drawn on this but also other videos
                 if v in gazes_head and lead_frame_idx in gazes_head[v]:
-                    for g in gazes_head[v][lead_frame_idx]:
+                    frame_gazes = reduce_gaze_samples(gazes_head[v][lead_frame_idx], study_config.mapped_video_gaze_sample_method, lead_frame_ts)
+                    for g in frame_gazes:
                         if v in write_vids:
                             g.draw(frame[v], sub_pixel_fac=sub_pixel_fac, styles=gaze_headref.OverlayGazeStyles(original_scene_video_style, None))
 
