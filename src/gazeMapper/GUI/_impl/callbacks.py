@@ -192,18 +192,55 @@ def try_load_project(g, path: str|pathlib.Path, action='loading'):
         else:
             gt_gui.utils.push_popup(g, gt_gui.msg_box.msgbox, "Project opening error", "The selected folder is not a project folder. Cannot open.", gt_gui.msg_box.MsgBox.error)
     else:
-        def init_project_and_ask():
-            utils.init_project_folder(path)
+        def init_project_and_ask(template: typing.Literal['glassesValidator']|None=None):
+            utils.init_project_folder(path, template)
             buttons = {
                 ifa6.ICON_FA_CHECK+" Yes": lambda: g.load_project(path),
                 ifa6.ICON_FA_CIRCLE_XMARK+" No": None
             }
             gt_gui.utils.push_popup(g, gt_gui.msg_box.msgbox, "Open new project", "Do you want to open the new project folder?", gt_gui.msg_box.MsgBox.question, buttons)
+
+        def ask_for_project_template():
+            selected_template = 0
+            template_names = ["Empty project", "GlassesValidator template"]
+            template_identifiers = [None, 'glassesValidator']
+            template_tooltips = [
+                "Creates a minimal project with no recording definitions, planes, or episodes.",
+                "Creates a project set up for doing only a glassesValidator validation on a single eye tracker recording per session.",
+            ]
+
+            def _choose_template_popup():
+                nonlocal selected_template
+                question = "How would you like to start your project?"
+                sz = imgui.calc_text_size(question)
+                imgui.dummy((sz.x + imgui.get_style().frame_padding.x * 2, 0))
+                imgui.text_wrapped(question)
+                imgui.spacing()
+                imgui.text("Project template")
+                imgui.set_next_item_width(-1)
+                _, selected_template = gt_gui.utils.tooltip_combo(
+                    "##project_template",
+                    selected_template,
+                    template_names,
+                    template_tooltips,
+                    popup_max_height_in_items=len(template_names),
+                )
+                imgui.spacing()
+
+            def _create_project_from_template():
+                init_project_and_ask(template_identifiers[selected_template])
+
+            buttons = {
+                ifa6.ICON_FA_CHECK+" Create project": _create_project_from_template,
+                ifa6.ICON_FA_CIRCLE_XMARK+" Cancel": None
+            }
+            gt_gui.utils.push_popup(g, gt_gui.msg_box.msgbox, "Create new project", _choose_template_popup, gt_gui.msg_box.MsgBox.question, buttons)
+
         if action=='creating':
-            init_project_and_ask()
+            ask_for_project_template()
         else:
             buttons = {
-                ifa6.ICON_FA_CHECK+" Yes": lambda: init_project_and_ask(),
+                ifa6.ICON_FA_CHECK+" Yes": ask_for_project_template,
                 ifa6.ICON_FA_CIRCLE_XMARK+" No": None
             }
             gt_gui.utils.push_popup(g, gt_gui.msg_box.msgbox, "Create new project", "The selected folder is empty. Do you want to use it as a new project folder?", gt_gui.msg_box.MsgBox.warn, buttons)
