@@ -83,24 +83,21 @@ def inspect(path: str | pathlib.Path | None, require_extrinsics: bool = False) -
 
     rotation = parameters.rotation_vec
     position = parameters.position
-    has_any_extrinsics = rotation is not None or position is not None
-    if has_any_extrinsics:
-        if rotation is None or position is None:
-            problems.append('Extrinsics require both rotation and position.')
-        else:
-            rotation = np.asarray(rotation)
-            position = np.asarray(position)
-            if rotation.size != 3 or not np.isfinite(rotation).all():
-                problems.append('rotation must contain three finite values.')
-            if position.size != 3 or not np.isfinite(position).all():
-                problems.append('position must contain three finite values.')
-    elif require_extrinsics:
+    if rotation is not None:
+        rotation = np.asarray(rotation)
+        if rotation.size != 3 or not np.isfinite(rotation).all():
+            problems.append('rotation must contain three finite values.')
+    if position is not None:
+        position = np.asarray(position)
+        if position.size != 3 or not np.isfinite(position).all():
+            problems.append('position must contain three finite values.')
+    if require_extrinsics and (rotation is None or position is None):
         problems.append(
-            "The provided calibration file does not include camera extrinsics "
+            "The provided calibration file does not include complete camera extrinsics "
             "(transformation between this head-attached camera and the scene camera "
-            "of the associated eye tracker recording), but these are required because "
-            "the recording is configured to replace the eye tracker recording's scene "
-            "camera (see the head_attached_recordings_replace_et_scene setting)."
+            "of the associated eye tracker recording). These (both rotation and position) are "
+            "required because the recording is configured to replace the eye tracker" \
+            "recording's scene camera (see the head_attached_recordings_replace_et_scene setting)."
         )
 
     level = type_utils.ProblemLevel.Error if problems else type_utils.ProblemLevel.Information
