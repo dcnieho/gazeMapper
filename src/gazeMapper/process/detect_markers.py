@@ -93,8 +93,8 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
         if not sync_events:
             raise RuntimeError(f'Detect Markers should not be run for recording "{rec_name}" as its pose is replaced by that of a head-attached camera and there are no camera sync events to process')
 
-        sync_markers = {m for e in sync_events for m in e['auto_code'].get('markers', [])}
-        individual_markers_to_process = [m for m in study_config.individual_markers if (m.id,m.aruco_dict_id) in sync_markers]
+        sync_markers = {m for e in sync_events for sequence in e['auto_code'].get('markers', []) for m in sequence}
+        individual_markers_to_process = [m for m in study_config.individual_markers if gt_marker.MarkerID(m.id, m.aruco_dict_id) in sync_markers]
         assemblies_setup, _, episodes = {}, {}, {}
     else:
         # get coded interval(s) with assemblies, if any. Just to show in GUI, if attached
