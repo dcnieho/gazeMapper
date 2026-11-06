@@ -85,16 +85,34 @@ def merge_aruco_settings(parent: dict, overrides: dict) -> dict:
 
 
 def remove_defaults(value: dict, defaults: dict | None = None) -> dict:
-    """Return plain dictionaries with default-valued fields omitted."""
+    """Return dictionaries with default-valued fields omitted, including types such as namedtuples."""
     if defaults is None:
         defaults = type(value)._field_defaults if typed_dict_defaults.is_typeddictdefault(type(value)) else {}
     defaults = {k: v.default_factory() if isinstance(v, typed_dict_defaults.Field) else v for k, v in defaults.items()}
 
-    def compact(item):
+    def compact(item, default=None):
         if isinstance(item, dict):
-            return remove_defaults(item)
+            return remove_defaults(item, default if isinstance(default, dict) else None)
         if isinstance(item, list):
-            return [compact(v) for v in item]
+            default_items = default if isinstance(default, list) else []
+            return [compact(v, default_items[i] if i < len(default_items) else None) for i, v in enumerate(item)]
+        if isinstance(item, tuple) and hasattr(item, '_asdict'):
+            encoded = json.json_encoder(item)
+            type_name, fields = next(iter(encoded.items()))
+            if not isinstance(fields, dict):
+                return {type_name: compact(fields)}
+            values = item._asdict()
+            default_values = default._asdict() if type(default) is type(item) else getattr(type(item), '_field_defaults', {})
+            compacted_fields = {
+                name: compact(serialized_value, default_values.get(name))
+                for name, serialized_value in fields.items()
+                if name not in default_values
+                or name not in values
+                or values[name] != default_values[name]
+            }
+            if type(default) is type(item) and fields.keys() == values.keys():
+                return compacted_fields
+            return {type_name: compacted_fields}
         return copy.deepcopy(item)
 
     result = {}
@@ -110,7 +128,7 @@ def remove_defaults(value: dict, defaults: dict | None = None) -> dict:
                 continue
             result[name] = filtered
         else:
-            result[name] = compact(item)
+            result[name] = compact(item, defaults.get(name))
     return result
 
 
@@ -1527,6 +1545,9 @@ class Study:
                     event_setup['sync_setup']['get_cam_movement_method'] = 'assembly'
 
         _migrate_legacy_gaze_styles(kwds)
+        for name, value in kwds.items():
+            if name in study_defaults:
+                kwds[name] = json.restore_defaults(value, study_defaults[name])
         for cs in kwds.get('coding_setup', []):
             if cs.get('auto_code') is not None:
                 cs['auto_code'] = _normalize_auto_code(cs['auto_code'], kwds.get('individual_markers'))
