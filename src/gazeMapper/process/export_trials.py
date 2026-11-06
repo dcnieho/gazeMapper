@@ -219,7 +219,7 @@ def prep_export(project_dir: str|pathlib.Path, session_names: list[str], config_
 
     # for the sessions, see what we have to export
     export_config = ExportConfig()
-    plane_names = {definition.name for definition in study_config.marker_assemblies if isinstance(definition, marker_assembly.Definition_Plane_Aruco)}
+    plane_names = {definition.name for definition in study_config.marker_assemblies if marker_assembly.is_plane(definition.type)}
     cs_plane_gaze = [cs for cs in process.get_specific_event_types(study_config, check_specific_fields=['marker_assemblies']) if any(name in plane_names for name in cs['marker_assemblies'])]
     cs_gaze_offset = process.get_specific_event_types(study_config, check_specific_fields=['gaze_offset_setup'])
     cs_validation = process.get_specific_event_types(study_config, annotation.EventType.Validate)
@@ -477,7 +477,7 @@ def get_head_pose_episode_options(coding_setup: list[config.EventSetup], assembl
 
 
 def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, study_config: config.Study, export_config: PlaneGaze):
-    plane_definitions = {definition.name: definition for definition in study_config.marker_assemblies if isinstance(definition, marker_assembly.Definition_Plane_Aruco)}
+    plane_definitions = {definition.name: definition for definition in study_config.marker_assemblies if marker_assembly.is_plane(definition.type)}
     plane_names = set(plane_definitions)
     cs_plane_gaze = [cs for cs in study_config.coding_setup if any(name in plane_names for name in cs['marker_assemblies'])]
     if export_config.episodes:
@@ -716,7 +716,7 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
                 plane_gazes.write_csv(f, separator='\t', null_value='nan', float_precision=8, include_header=False)
 
 def export_head_pose(export_path: pathlib.Path, working_dir: pathlib.Path, study_config: config.Study, export_config: HeadPose):
-    plane_definitions = {definition.name: definition for definition in study_config.marker_assemblies if isinstance(definition, marker_assembly.Definition_Plane_Aruco)}
+    plane_definitions = {definition.name: definition for definition in study_config.marker_assemblies if marker_assembly.is_plane(definition.type)}
     plane_names = sorted(plane_definitions)
     if export_config.planes:
         plane_names = [name for name in plane_names if name in export_config.planes]

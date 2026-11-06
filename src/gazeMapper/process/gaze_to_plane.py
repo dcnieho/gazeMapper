@@ -62,7 +62,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
 
     # get planes we should process
     mapping_setup: dict[str, list[list[int]]] = {}
-    plane_names = {definition.name for definition in study_config.marker_assemblies if isinstance(definition, marker_assembly.Definition_Plane_Aruco)}
+    plane_names = {definition.name for definition in study_config.marker_assemblies if marker_assembly.is_plane(definition.type)}
     for cs in episodes_to_proc:
         for p in cs['marker_assemblies']:
             if p not in plane_names:

@@ -174,7 +174,7 @@ def is_action_possible_given_config(action: Action, study_config: 'config.Study'
             # if there is any form of config beyond a session definition, these will be possible (whether config is complete is handled by error messages so no need to worry about that here)
             return not not study_config.marker_assemblies or not not study_config.coding_setup or not not study_config.individual_markers
         case Action.GAZE_TO_PLANE:
-            plane_names = {definition.name for definition in study_config.marker_assemblies if isinstance(definition, marker_assembly.Definition_Plane_Aruco)}
+            plane_names = {definition.name for definition in study_config.marker_assemblies if marker_assembly.is_plane(definition.type)}
             return any(plane_names.intersection(cs['marker_assemblies']) for cs in get_specific_event_types(study_config, [annotation.EventType.Trial, annotation.EventType.Validate], ['marker_assemblies']))
         case Action.RUN_SYNC_FUNCTION:
             cs = get_specific_event_types(study_config, check_specific_fields=['sync_setup'])
@@ -390,7 +390,7 @@ def _is_recording_action_possible(rec: str, action_states: dict[Action, process_
                 and bool(set((cs.get('trial_data_quality_setup') or {}).get('planes') or ()) & {
                     definition.name
                     for definition in study_config.marker_assemblies
-                    if isinstance(definition, marker_assembly.Definition_Plane_Aruco)
+                    if marker_assembly.is_plane(definition.type)
                 })
                 for cs in get_specific_event_types(study_config, annotation.EventType.Trial)
             )

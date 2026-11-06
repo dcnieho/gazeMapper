@@ -44,7 +44,7 @@ def run(working_dir: str | pathlib.Path, config_dir: str | pathlib.Path | None =
     }
     intervals_per_plane: dict[str, list[list[int]]] = defaultdict(list)
     plane_unit_to_mm = {}
-    plane_defs = {plane.name: plane for plane in study_config.marker_assemblies}
+    plane_defs = {plane.name: plane for plane in study_config.marker_assemblies if marker_assembly.is_plane(plane.type)}
     for event_name, setup in event_setups.items():
         for plane_name in setup['planes']:
             intervals_per_plane[plane_name].extend(episodes[event_name][1])

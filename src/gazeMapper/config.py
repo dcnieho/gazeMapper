@@ -806,11 +806,7 @@ class Study:
                 assigned_planes = {
                     p for p in cs['marker_assemblies']
                     if any(
-                        plane.name == p and plane.type in (
-                            marker_assembly.Type.Plane_2D,
-                            marker_assembly.Type.Target_Plane_2D,
-                            marker_assembly.Type.GlassesValidator,
-                        )
+                        plane.name == p and marker_assembly.is_plane(plane.type)
                         for plane in self.marker_assemblies
                     )
                 }
@@ -830,7 +826,7 @@ class Study:
                         if plane_def is None:
                             plane_problems[p] = (type_utils.ProblemLevel.Error, f'Plane "{p}" is not defined in the study.')
                             continue
-                        if plane_def.type not in (marker_assembly.Type.Plane_2D, marker_assembly.Type.Target_Plane_2D, marker_assembly.Type.GlassesValidator):
+                        if not marker_assembly.is_plane(plane_def.type):
                             plane_problems[p] = (type_utils.ProblemLevel.Error, f'Assembly "{p}" is not a plane and cannot be used for trial data-loss metrics.')
                             continue
                         unit = units.normalize_unit(plane_def.unit)

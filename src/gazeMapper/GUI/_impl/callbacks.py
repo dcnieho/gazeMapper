@@ -638,7 +638,7 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
 
     configured_planes = {
         definition.name for definition in g.study_config.marker_assemblies
-        if isinstance(definition, marker_assembly.Definition_Plane_Aruco)
+        if marker_assembly.is_plane(definition.type)
     }
     plane_gaze_events = [
         event for event in process.get_specific_event_types(g.study_config, check_specific_fields=['marker_assemblies'])
