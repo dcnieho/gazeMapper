@@ -72,6 +72,8 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None=None, s
 
 
 def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|None, visualization_show_rejected_markers: bool, progress_indicator: process_pool.JobProgress|None, **study_settings):
+    has_gui = gui is not None
+
     # progress indicator
     if progress_indicator is None:
         progress_indicator = process_pool.JobProgress(printer=lambda x: print(x))
@@ -86,6 +88,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
     rec_def = study_config.session_def.get_recording_def(rec_name)
     in_video = session.read_recording_info(working_dir, rec_def.type)[1]
 
+    episodes = {}
     # check whether this recording's pose is replaced by that of a head-attached camera. If so, we only have to run any camera sync detections here
     is_replaced_recording = study_config.head_attached_recordings_replace_et_scene is not None and any(r.associated_recording==rec_name for r in study_config.session_def.recordings if r.name in study_config.head_attached_recordings_replace_et_scene)
     if is_replaced_recording:
@@ -95,11 +98,12 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
 
         sync_markers = {m for e in sync_events for sequence in e['auto_code'].get('markers', []) for m in sequence}
         individual_markers_to_process = [m for m in study_config.individual_markers if gt_marker.MarkerID(m.id, m.aruco_dict_id) in sync_markers]
-        assemblies_setup, _, episodes = {}, {}, {}
+        assemblies_setup, _ = {}, {}
     else:
         # get coded interval(s) with assemblies, if any. Just to show in GUI, if attached
-        wanted_episodes = {cs['name'] for cs in study_config.coding_setup if cs.get('marker_assemblies',[])}
-        episodes = episode.load_episodes_from_all_recordings(study_config, working_dir, wanted_episodes, missing_other_coding_ok=True)[0]
+        if has_gui:
+            wanted_episodes = {cs['name'] for cs in study_config.coding_setup if cs.get('marker_assemblies',[])}
+            episodes = episode.load_episodes_from_all_recordings(study_config, working_dir, wanted_episodes, missing_other_coding_ok=True, ignore_sync_errors=True)[0]
 
         assemblies_setup, _, _ = _get_assembly_setup(study_config, config_dir)  # we don't need to know for which frames to run the detection, we always process all frames
 
@@ -125,7 +129,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI|No
     aruco_manager.consolidate_setup(study_config.allow_duplicated_markers)
     aruco_manager.register_with_estimator(estimator)
     estimator.attach_gui(gui)
-    if gui is not None:
+    if has_gui:
         gui.set_show_timeline(True, timestamps.VideoTimestamps(working_dir / gt_naming.frame_timestamps_fname), annotation.flatten_annotation_dict(episodes), window_id=gui.main_window_id)
         styles = _without_id_label_background(study_config.mapped_video_marker_styles)
         recovered_color = study_config.mapped_video_recovered_assembly_marker_color or drawing.RgbColor(0, 255, 255)
