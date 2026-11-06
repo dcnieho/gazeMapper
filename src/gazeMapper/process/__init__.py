@@ -436,7 +436,7 @@ def _is_session_action_possible(session_action_states: dict[Action, process_pool
             if _config_has_et_sync(study_config):
                 preconditions.add(Action.SYNC_ET_TO_CAM)
         case Action.EXPORT_TRIALS:
-            preconditions.update([Action.MAKE_GAZE_OVERLAY_VIDEO, Action.GAZE_TO_PLANE, Action.VALIDATE, Action.MAKE_MAPPED_GAZE_VIDEO, Action.COMPUTE_DATA_QUALITY])
+            preconditions.update([Action.MAKE_GAZE_OVERLAY_VIDEO, Action.DETECT_MARKERS, Action.GAZE_TO_PLANE, Action.VALIDATE, Action.MAKE_MAPPED_GAZE_VIDEO, Action.COMPUTE_DATA_QUALITY])
         case Action.MAKE_MAPPED_GAZE_VIDEO:
             preconditions.update([Action.CODE_EPISODES])
             # NB: even if automatic coding of sync points is defined, user may decide to code sync manually. So don't add Action.AUTO_CODE_SYNC to preconditions
