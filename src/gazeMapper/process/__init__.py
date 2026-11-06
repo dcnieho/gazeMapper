@@ -224,9 +224,9 @@ def is_action_possible_for_recording(rec: str, rec_type: 'session.RecordingType'
         events = get_specific_event_types(study_config, event_types)
         # remove events that are not configured for this recording
         recs_to_check = [rec]
-        if study_config.sync_ref_recording:
+        if study_config.sync_ref_recording and study_config.sync_ref_recording not in recs_to_check:
             recs_to_check.append(study_config.sync_ref_recording)
-        if action==Action.SYNC_ET_TO_CAM and (replacement_rec := get_replacement_recording_name(study_config, rec)):
+        if action==Action.SYNC_ET_TO_CAM and (replacement_rec := get_replacement_recording_name(study_config, rec)) and replacement_rec not in recs_to_check:
             recs_to_check.append(replacement_rec)
         events = [cs for cs in events if cs['which_recordings'] is None or any(rec in cs['which_recordings'] for rec in recs_to_check)]
         return not not events
