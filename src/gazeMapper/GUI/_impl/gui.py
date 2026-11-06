@@ -2022,6 +2022,7 @@ class GUI:
             assembly_problems = self._problems_cache.get('marker_assemblies', {})
             problem_fields = assembly_problems.get(p.name, {}) if isinstance(assembly_problems, dict) else {}
             fixed_fields   = p.fixed_fields()
+            is_plane       = marker_assembly.is_plane(p.type)
             load_error     = self.assembly_configs[p.name] if p.name in self.assembly_configs and isinstance(self.assembly_configs[p.name], Exception) else None
             extra = ''
             lbl = f'{p.name} ({p.type.value})'
@@ -2042,7 +2043,8 @@ class GUI:
                     if new_p.type==marker_assembly.Type.GlassesValidator and not new_p.use_default:
                         callbacks.glasses_validator_plane_check_or_deploy_config(self.study_config, new_p)
                     # NB: reloading of marker assembly happens in change watcher
-                if imgui.button(ifa6.ICON_FA_FOLDER_OPEN+' open marker assembly configuration folder'):
+                folder_label = 'open plane configuration folder' if is_plane else 'open marker assembly configuration folder'
+                if imgui.button(ifa6.ICON_FA_FOLDER_OPEN+f' {folder_label}'):
                     callbacks.open_folder(self, assembly_dir)
                 imgui.same_line()
                 if p.type==marker_assembly.Type.GlassesValidator:
@@ -2059,7 +2061,8 @@ class GUI:
                         elif not p.use_default and imgui.button(ifa6.ICON_FA_CLIPBOARD_LIST+f' deploy default config'):
                             callbacks.glasses_validator_deploy_config(self, p)
                 imgui.same_line()
-                if imgui.button(ifa6.ICON_FA_TRASH_CAN+f' delete plane or 3D marker assembly###{lbl}'):
+                delete_label = 'delete plane' if is_plane else 'delete 3D marker assembly'
+                if imgui.button(ifa6.ICON_FA_TRASH_CAN+f' {delete_label}###{lbl}'):
                     self._remove_marker_assembly(p)
                 imgui.tree_pop()
             else:

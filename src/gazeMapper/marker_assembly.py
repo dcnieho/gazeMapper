@@ -32,8 +32,12 @@ type_display_names = {
 }
 
 
+def is_plane(definition_type: Type) -> bool:
+    return definition_type in (Type.GlassesValidator, Type.Plane_2D, Type.Target_Plane_2D)
+
 def unit_to_mm(unit: str) -> float:
     return _units.conversion_factor(unit, 'mm')
+
 
 class Definition:
     @typeguard.typechecked(collection_check_strategy=typeguard.CollectionCheckStrategy.ALL_ITEMS)
