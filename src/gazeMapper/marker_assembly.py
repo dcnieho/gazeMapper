@@ -227,7 +227,12 @@ class Definition_Plane_2D(Definition_Plane_Aruco):
         # Restore coordinates after their JSON roundtrip.
         for k in ['plane_size', 'origin']:
             if k in kwds:
-                kwds[k] = _gt_plane.Coordinate(*kwds[k])
+                value = kwds[k]
+                # backward compatibility with older versions that stored coordinates as plain lists or dicts
+                if isinstance(value, dict):
+                    kwds[k] = _gt_plane.Coordinate(**value)
+                elif not isinstance(value, _gt_plane.Coordinate):
+                    kwds[k] = _gt_plane.Coordinate(*value)
         return kwds
 
     def field_problems(self, config_path: str|pathlib.Path|None = None) -> type_utils.ProblemDict:

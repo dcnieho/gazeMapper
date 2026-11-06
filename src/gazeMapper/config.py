@@ -112,7 +112,7 @@ def remove_defaults(value: dict, defaults: dict | None = None) -> dict:
                 or name not in values
                 or values[name] != default_values[name]
             }
-            if type(default) is type(item) and fields.keys() == values.keys():
+            if type(default) is type(item) and fields.keys() == values.keys() and not always_export_all_fields:
                 return compacted_fields
             return {type_name: compacted_fields}
         return copy.deepcopy(item)
