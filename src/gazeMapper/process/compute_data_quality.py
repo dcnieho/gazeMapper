@@ -55,11 +55,7 @@ def run(working_dir: str | pathlib.Path, config_dir: str | pathlib.Path | None =
     for plane_name, intervals in intervals_per_plane.items():
         if intervals:
             gaze_file = working_dir / f'{naming.world_gaze_prefix}{plane_name}.tsv'
-            plane_gazes[plane_name] = gaze_worldref.read_dict_from_file(
-                gaze_file,
-                episodes=intervals,
-                ts_column_suffixes=['VOR', ''],
-            )
+            plane_gazes[plane_name] = gaze_worldref.read_dict_from_file(gaze_file, episodes=intervals, ts_column_suffixes=['VOR', ''])
         else:
             plane_gazes[plane_name] = {}
 
