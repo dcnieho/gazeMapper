@@ -101,12 +101,14 @@ def remove_defaults(value: dict, defaults: dict | None = None) -> dict:
             type_name, fields = next(iter(encoded.items()))
             if not isinstance(fields, dict):
                 return {type_name: compact(fields)}
+            always_export_all_fields = json.get_type_entry(item).always_export_all_fields
             values = item._asdict()
             default_values = default._asdict() if type(default) is type(item) else getattr(type(item), '_field_defaults', {})
             compacted_fields = {
                 name: compact(serialized_value, default_values.get(name))
                 for name, serialized_value in fields.items()
-                if name not in default_values
+                if always_export_all_fields
+                or name not in default_values
                 or name not in values
                 or values[name] != default_values[name]
             }
