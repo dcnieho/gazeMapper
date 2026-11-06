@@ -9,7 +9,8 @@
     {
       "__session.RecordingDefinition__": {
         "name": "overview",
-        "type": "Camera"
+        "type": "Camera",
+        "camera_recording_type": "External"
       }
     }
   ]

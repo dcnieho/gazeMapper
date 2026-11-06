@@ -1,87 +1,94 @@
 {
-  "planes_per_episode": [
-    [
-      "Trial",
-      {
-        "builtin.set": [
-          "screen"
-        ]
-      }
-    ],
-    [
-      "Sync ET Data",
-      {
-        "builtin.set": [
-          "validate"
-        ]
-      }
-    ],
-    [
-      "Validate",
-      {
-        "builtin.set": [
-          "validate"
-        ]
-      }
-    ]
-  ],
-  "episodes_to_code": {
-    "builtin.set": [
-      "Sync ET Data",
-      "Trial",
-      "Validate"
-    ]
-  },
   "individual_markers": [
     {
       "__marker.Marker__": {
         "id": 80,
+        "aruco_dict": "DICT_4X4_250",
         "detect_only": true
       }
     },
     {
       "__marker.Marker__": {
         "id": 81,
+        "aruco_dict": "DICT_4X4_250",
         "detect_only": true
       }
     }
   ],
-  "get_cam_movement_for_et_sync_method": "plane",
-  "auto_code_episodes": [
-    [
-      "Trial",
-      {
+  "coding_setup": [
+    {
+      "event_type": "Sync ET Data",
+      "name": "Sync ET Data",
+      "description": "Eye tracker synchronization episode",
+      "hotkey": "e",
+      "marker_assemblies": {
+        "builtin.set": [
+          "validate"
+        ]
+      },
+      "sync_setup": {}
+    },
+    {
+      "event_type": "Validate",
+      "name": "Validate",
+      "description": "Validation episode",
+      "hotkey": "v",
+      "marker_assemblies": {
+        "builtin.set": [
+          "validate"
+        ]
+      },
+      "validation_setup": {}
+    },
+    {
+      "event_type": "Trial",
+      "name": "Trial",
+      "description": "Trial episode",
+      "hotkey": "t",
+      "marker_assemblies": {
+        "builtin.set": [
+          "screen"
+        ]
+      },
+      "auto_code": {
         "start_markers": [
-          {
-            "__config.MarkerID__": {
-              "m_id": 80,
-              "aruco_dict_id": "DICT_4X4_250"
+          [
+            {
+              "__config.MarkerID__": {
+                "m_id": 80,
+                "aruco_dict": "DICT_4X4_250"
+              }
+            },
+            {
+              "__config.MarkerID__": {
+                "m_id": 81,
+                "aruco_dict": "DICT_4X4_250"
+              }
             }
-          },
-          {
-            "__config.MarkerID__": {
-              "m_id": 81,
-              "aruco_dict_id": "DICT_4X4_250"
-            }
-          }
+          ]
         ],
         "end_markers": [
-          {
-            "__config.MarkerID__": {
-              "m_id": 81,
-              "aruco_dict_id": "DICT_4X4_250"
+          [
+            {
+              "__config.MarkerID__": {
+                "m_id": 81,
+                "aruco_dict": "DICT_4X4_250"
+              }
+            },
+            {
+              "__config.MarkerID__": {
+                "m_id": 80,
+                "aruco_dict": "DICT_4X4_250"
+              }
             }
-          },
-          {
-            "__config.MarkerID__": {
-              "m_id": 80,
-              "aruco_dict_id": "DICT_4X4_250"
-            }
-          }
+          ]
         ]
       }
-    ]
+    }
   ],
+  "individual_marker_settings": {
+    "general": {}
+  },
   "mapped_video_make_which": {
     "builtin.set": [
       "eye tracker"
@@ -89,14 +96,18 @@
   },
   "mapped_video_recording_colors": {
     "eye tracker": {
-      "__config.RgbColor__": {
+      "__glassesTools.drawing.RgbColor__": {
         "r": 255,
         "g": 127,
         "b": 0
       }
     }
   },
-  "mapped_video_projected_world_pos_color": null,
+  "mapped_video_gaze_styles": {
+    "world_position": {
+      "fill_color": null
+    }
+  },
   "mapped_video_show_gaze_on_plane_in_which": {
     "builtin.set": [
       "eye tracker"

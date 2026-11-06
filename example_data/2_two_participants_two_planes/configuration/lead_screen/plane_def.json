@@ -1,11 +1,13 @@
 {
   "type": "Plane 2D",
   "marker_file": "markerPositions.csv",
+  "unit": "mm",
   "marker_size": 41.25,
   "plane_size": {
-    "builtin.tuple": [
-      528.0,
-      296.9997
-    ]
-  }
+    "__glassesTools.plane.Coordinate__": {
+      "x": 528.0,
+      "y": 296.9997
+    }
+  },
+  "aruco_dict": "DICT_4X4_250"
 }

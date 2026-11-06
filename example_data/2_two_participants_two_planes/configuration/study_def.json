@@ -1,109 +1,140 @@
 {
-  "planes_per_episode": [
-    [
-      "Sync ET Data",
-      {
-        "builtin.set": [
-          "validate"
-        ]
-      }
-    ],
-    [
-      "Trial",
-      {
-        "builtin.set": [
-          "lead_screen",
-          "follow_screen"
-        ]
-      }
-    ],
-    [
-      "Validate",
-      {
-        "builtin.set": [
-          "validate"
-        ]
-      }
-    ]
-  ],
-  "episodes_to_code": {
-    "builtin.set": [
-      "Sync ET Data",
-      "Trial",
-      "Sync Camera",
-      "Validate"
-    ]
-  },
   "individual_markers": [
     {
       "__marker.Marker__": {
         "id": 50,
+        "aruco_dict": "DICT_4X4_250",
         "detect_only": true
       }
     },
     {
       "__marker.Marker__": {
         "id": 80,
+        "aruco_dict": "DICT_4X4_250",
         "detect_only": true
       }
     },
     {
       "__marker.Marker__": {
         "id": 81,
+        "aruco_dict": "DICT_4X4_250",
         "detect_only": true
       }
     }
   ],
-  "get_cam_movement_for_et_sync_method": "plane",
-  "sync_ref_recording": "lead",
-  "sync_ref_do_time_stretch": false,
-  "auto_code_sync_points": {
-    "markers": {
-      "builtin.set": [
-        {
-          "__config.MarkerID__": {
-            "m_id": 50,
-            "aruco_dict_id": "DICT_4X4_250"
-          }
-        }
-      ]
-    }
-  },
-  "auto_code_episodes": [
-    [
-      "Trial",
-      {
-        "start_markers": [
-          {
-            "__config.MarkerID__": {
-              "m_id": 80,
-              "aruco_dict_id": "DICT_4X4_250"
+  "coding_setup": [
+    {
+      "event_type": "Sync Camera",
+      "name": "Sync Camera",
+      "description": "Camera sync point",
+      "hotkey": "c",
+      "auto_code": {
+        "markers": [
+          [
+            {
+              "__config.MarkerID__": {
+                "m_id": 50,
+                "aruco_dict": "DICT_4X4_250"
+              }
             }
-          },
-          {
-            "__config.MarkerID__": {
-              "m_id": 81,
-              "aruco_dict_id": "DICT_4X4_250"
-            }
-          }
-        ],
-        "end_markers": [
-          {
-            "__config.MarkerID__": {
-              "m_id": 81,
-              "aruco_dict_id": "DICT_4X4_250"
-            }
-          },
-          {
-            "__config.MarkerID__": {
-              "m_id": 80,
-              "aruco_dict_id": "DICT_4X4_250"
-            }
-          }
+          ]
         ]
       }
-    ]
+    },
+    {
+      "event_type": "Sync ET Data",
+      "name": "Sync ET Data",
+      "description": "Eye tracker synchronization episode",
+      "hotkey": "e",
+      "marker_assemblies": {
+        "builtin.set": [
+          "validate"
+        ]
+      },
+      "which_recordings": {
+        "builtin.set": [
+          "lead",
+          "follow"
+        ]
+      },
+      "sync_setup": {}
+    },
+    {
+      "event_type": "Validate",
+      "name": "Validate",
+      "description": "Validation episode",
+      "hotkey": "v",
+      "marker_assemblies": {
+        "builtin.set": [
+          "validate"
+        ]
+      },
+      "which_recordings": {
+        "builtin.set": [
+          "lead",
+          "follow"
+        ]
+      },
+      "validation_setup": {}
+    },
+    {
+      "event_type": "Trial",
+      "name": "Trial",
+      "description": "Trial episode",
+      "hotkey": "t",
+      "marker_assemblies": {
+        "builtin.set": [
+          "follow_screen",
+          "lead_screen"
+        ]
+      },
+      "which_recordings": {
+        "builtin.set": [
+          "lead"
+        ]
+      },
+      "load_from_other_recordings": true,
+      "auto_code": {
+        "start_markers": [
+          [
+            {
+              "__config.MarkerID__": {
+                "m_id": 80,
+                "aruco_dict": "DICT_4X4_250"
+              }
+            },
+            {
+              "__config.MarkerID__": {
+                "m_id": 81,
+                "aruco_dict": "DICT_4X4_250"
+              }
+            }
+          ]
+        ],
+        "end_markers": [
+          [
+            {
+              "__config.MarkerID__": {
+                "m_id": 81,
+                "aruco_dict": "DICT_4X4_250"
+              }
+            },
+            {
+              "__config.MarkerID__": {
+                "m_id": 80,
+                "aruco_dict": "DICT_4X4_250"
+              }
+            }
+          ]
+        ]
+      }
+    }
   ],
+  "individual_marker_settings": {
+    "general": {}
+  },
+  "sync_ref_recording": "lead",
+  "sync_ref_do_time_stretch": false,
   "mapped_video_make_which": {
     "builtin.set": [
       "lead",
@@ -112,21 +143,25 @@
   },
   "mapped_video_recording_colors": {
     "follow": {
-      "__config.RgbColor__": {
+      "__glassesTools.drawing.RgbColor__": {
         "r": 0,
         "g": 95,
         "b": 191
       }
     },
     "lead": {
-      "__config.RgbColor__": {
+      "__glassesTools.drawing.RgbColor__": {
         "r": 255,
         "g": 127,
         "b": 0
       }
     }
   },
-  "mapped_video_projected_world_pos_color": null,
+  "mapped_video_gaze_styles": {
+    "world_position": {
+      "fill_color": null
+    }
+  },
   "mapped_video_show_gaze_on_plane_in_which": {
     "builtin.set": [
       "lead",
