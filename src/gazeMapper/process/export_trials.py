@@ -160,7 +160,7 @@ export_config_doc = {
         'include_trial_start_marker_sequence': type_utils.GUIDocInfo('Include trial start marker sequence', 'Add a column with the comma-separated marker IDs of the auto-coded sequence that marked each trial start.'),
         'include_head_ref_gaze': type_utils.GUIDocInfo('Include head-referenced gaze fields', 'Append the available head-referenced gaze fields from the eye tracker\'s gaze file to each mapped-gaze export. These are eye-tracker measurements, not gaze positions mapped onto a plane and, depending on availability, include: 2D gaze position on the scene image (gaze_pos_vid), 3D/world gaze point (gaze_pos_3d), and left/right eye gaze direction vectors (gaze_dir_l/r) with their origins (gaze_ori_l/r). Also provided are timestamps and frame indices, including synchronized scene-camera timing when available.'),
         'include_head_ref_gaze_Fick_angles': type_utils.GUIDocInfo('Include head-referenced gaze angles', 'Add azimuth and elevation angles (Fick order) computed from the 2D gaze position on the scene image, relative to straight ahead in the scene camera. Requires eye-tracker gaze fields to be included.'),
-        'head_ref_gaze_types': type_utils.GUIDocInfo('Head-referenced gaze types', 'Choose which head-referenced eye-tracker measurements to include. Timestamps and frame indices remain included for alignment.', {
+        'head_ref_gaze_types': type_utils.GUIDocInfo('Head-referenced gaze types', 'Choose which head-referenced eye-tracker measurements to include.', {
             HeadRefGazeType.Scene_Video_Position: type_utils.GUIDocInfo('Scene video position', '2D gaze position on the scene image.'),
             HeadRefGazeType.World_3D_Point: type_utils.GUIDocInfo('3D gaze point', 'Gaze point in 3D camera/world coordinates.'),
             HeadRefGazeType.Left_Eye_Gaze_Direction: type_utils.GUIDocInfo('Left-eye gaze direction', 'Left-eye gaze direction vector.'),
@@ -168,7 +168,7 @@ export_config_doc = {
             HeadRefGazeType.Right_Eye_Gaze_Direction: type_utils.GUIDocInfo('Right-eye gaze direction', 'Right-eye gaze direction vector.'),
             HeadRefGazeType.Right_Eye_Gaze_Origin: type_utils.GUIDocInfo('Right-eye gaze origin', 'Origin of the right-eye gaze vector.'),
         }),
-        'include_plane_pose': type_utils.GUIDocInfo('Include plane pose', 'Add each mapped plane\'s stored pose to this gaze export. Translation and gaze coordinates are converted to millimeters.'),
+        'include_plane_pose': type_utils.GUIDocInfo('Include plane pose', 'Add each mapped plane\'s stored pose to this gaze export.'),
         'include_2D': type_utils.GUIDocInfo('Include 2D gaze positions', 'Include gaze positions in each plane\'s 2D coordinate system.'),
         'include_3D': type_utils.GUIDocInfo('Include 3D gaze positions', 'Include gaze positions in the scene-camera 3D coordinate system.'),
         'plane_gaze_types': type_utils.GUIDocInfo('Gaze types', 'Choose which gaze-point-on-plane estimates to include in the export.', {
