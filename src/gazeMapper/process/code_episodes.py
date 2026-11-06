@@ -20,6 +20,28 @@ from glassesTools.validation import assign_intervals
 
 from .. import config, episode, naming, marker_assembly, process, session
 
+
+def _read_assembly_poses(working_dir: pathlib.Path, assembly_definitions: list[marker_assembly.Definition]) -> dict[str, dict[int, gt_pose.Pose]]:
+    poses = {}
+    for definition in assembly_definitions:
+        is_plane = marker_assembly.is_plane(definition.type)
+        prefix = naming.plane_pose_prefix if is_plane else naming.pose_prefix
+        pose_file = working_dir / f'{prefix}{definition.name}.tsv'
+        if pose_file.is_file():
+            read_poses = gt_pose.read_plane_dict_from_file if is_plane else gt_pose.read_dict_from_file
+            poses[definition.name] = read_poses(pose_file)
+    return poses
+
+def _draw_assembly_origins(frame, frame_idx: int, poses: dict[str, dict[int, gt_pose.Pose]], cam_params, ROI_offset, sub_pixel_fac: int):
+    for pose_by_frame in poses.values():
+        if frame_idx not in pose_by_frame:
+            continue
+        origin = pose_by_frame[frame_idx].get_origin_on_image(cam_params, ROI_offset)
+        drawing.openCVCircle(frame, origin, 3, (0,255,0), -1, sub_pixel_fac)
+        drawing.openCVLine(frame, (origin[0],origin[1]-10), (origin[0],origin[1]+10), (0,255,0), 1, sub_pixel_fac)
+        drawing.openCVLine(frame, (origin[0]-10,origin[1]), (origin[0]+10,origin[1]), (0,255,0), 1, sub_pixel_fac)
+
+
 # This script shows a video player that is used to indicate the interval(s)
 # during which the poster should be found in the video and in later
 # steps data quality computed. So this interval/these intervals would for
@@ -64,7 +86,7 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
         coding_setup = config.get_coding_setup_with_auto_sync_offsets(study_config.coding_setup)
         hotkeys = {cs['name']:cs['hotkey'] for cs in coding_setup if cs['hotkey'] is not None}
         descriptions = {cs['name']:cs['description'] for cs in coding_setup if cs['description'] is not None}
-        plane_points = {0: np.zeros((1,2))}
+        plane_points = {}
     else:
         # code target occurrences on a validation plane
         evts = [cs for cs in study_config.coding_setup if cs['name']==val_coding_event]
@@ -183,10 +205,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
     frame_info_file = in_video.parent / (in_video.stem+gt_naming.frame_info_suffix)
     frame_info = ocv.FrameInfoHandler(frame_info_file)
 
-    # Read plane poses, if available
-    plane_files = [working_dir/f'{naming.plane_pose_prefix}{p}.tsv' for p in planes]
-    poses = {p:gt_pose.read_plane_dict_from_file(f) for p,f in zip(planes,plane_files) if f.is_file()}
-    has_plane_pose = not not poses
+    # Read poses for all configured assemblies, if available
+    poses = _read_assembly_poses(working_dir, study_config.marker_assemblies)
+    has_poses = bool(poses)
 
     # get camera calibration info
     cam_params = ocv.CameraParams.read_from_file(working_dir / gt_naming.scene_camera_calibration_fname)
@@ -231,8 +252,12 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
                 if 'offset_x' in info and 'offset_y' in info:
                     ROI_offset = [info['offset_x'], info['offset_y']]
 
-            # if we have plane pose, draw plane origin or targets on video
-            if has_plane_pose:
+            # Draw assembly origins
+            if has_poses:
+                _draw_assembly_origins(frame, frame_idx, poses, cam_params, ROI_offset, sub_pixel_fac)
+
+            # draw plane targets (when coding validation targets)
+            if plane_points:
                 for p in planes:
                     if val_coding_event and p!=val_p_def.name:
                         continue
