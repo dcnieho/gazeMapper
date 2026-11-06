@@ -1,3 +1,3 @@
-event	start_frame	end_frame
-Sync Camera	434	nan
-Sync Camera	7021	nan
+event	event_type	start_frame	end_frame
+Sync Camera	Sync Camera	434	nan
+Sync Camera	Sync Camera	7021	nan

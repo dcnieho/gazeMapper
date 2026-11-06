@@ -1,6 +1,6 @@
-event	start_frame	end_frame
-Validate	141	308
-Sync ET Data	322	520
-Trial	551	720
-Trial	794	970
-Trial	1044	1232
+event	event_type	start_frame	end_frame
+Validate	Validate	141	308
+Sync ET Data	Sync ET Data	322	520
+Trial	Trial	552	719
+Trial	Trial	795	969
+Trial	Trial	1045	1231
