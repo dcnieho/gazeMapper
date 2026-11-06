@@ -295,7 +295,7 @@ def prep_export(project_dir: str|pathlib.Path, session_names: list[str], config_
             rec_dir = project_dir / s.name / r
             if any(_pose_files.get_preferred_plane_pose_file(rec_dir, p)[0].is_file() for p in plane_names):
                 export_config.head_pose.available = True
-                export_config.head_pose.do_it = True
+                export_config.head_pose.do_it = False  # NB: by default no head pose export
                 export_config.head_pose.sess.append(s.name)
                 export_config.head_pose.recs.append(r)
 
