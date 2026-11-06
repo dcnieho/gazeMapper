@@ -20,6 +20,19 @@ from .. import config, episode, marker, naming, marker_assembly, process, sessio
 from . import _pose_files
 
 
+# For mapping from OpenCV to standard convention in 3D eye/head kinematics
+# (positive x forward, y leftward, z upward, cf. Haslwanter, 1995), the
+# three columns of the transformation matrix are:
+# forwardObj = [0 0 1];     % +x (forward) = +z (OpenCV)
+# leftObj    = [-1 0 0];    % +y (left)    = -x (OpenCV)
+# upObj      = [0 -1 0];    % +z (up)      = -y (OpenCV)
+_HASLWANTER_AXES_IN_OPENCV = np.array([
+    [0., -1., 0.],
+    [0., 0., -1.],
+    [1., 0., 0.],
+])
+
+
 @dataclasses.dataclass
 class OptionBase:
     available: bool
@@ -55,8 +68,9 @@ class PlaneGaze(OptionBase):
 @dataclasses.dataclass
 class HeadPose(OptionBase):
     include_unit_header_row: bool = True
-    include_Fick_angles: bool = True
+    include_orientation_angles: bool = True
     assemblies: set[str] = dataclasses.field(default_factory=set)
+    assemblies_not_to_invert: set[str] = dataclasses.field(default_factory=set)
     episodes: set[str] = dataclasses.field(default_factory=set)
 @dataclasses.dataclass
 class GazeOffset(OptionBase):
@@ -92,13 +106,19 @@ class ExportConfig:
     mapped_gaze_video: OptionBase = dataclasses.field(default_factory=lambda: OptionBase(False, False, [], []))
 
 
-def _invert_assembly_poses(rotation_vecs: np.ndarray, translation_vecs: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def _invert_assembly_poses(rotation_vecs: np.ndarray, translation_vecs: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     rotation_vecs = np.asarray(rotation_vecs, dtype=float).reshape(-1, 3)
     translation_vecs = np.asarray(translation_vecs, dtype=float).reshape(-1, 3)
     camera_to_assembly = Rotation.from_rotvec(rotation_vecs).inv()
     inverse_translations = camera_to_assembly.apply(-translation_vecs)
-    forward_in_assembly = camera_to_assembly.apply(np.broadcast_to([0., 0., 1.], rotation_vecs.shape))
-    return camera_to_assembly.as_rotvec(), inverse_translations, forward_in_assembly
+    return camera_to_assembly.as_rotvec(), inverse_translations
+
+
+def _rotation_to_orientation_angles(rotation_vecs: np.ndarray) -> np.ndarray:
+    """Return yaw, pitch, and roll after remapping OpenCV axes to Haslwanter axes."""
+    rotations = Rotation.from_rotvec(np.array(rotation_vecs, dtype=float, copy=True).reshape(-1, 3))
+    remapped_matrices = _HASLWANTER_AXES_IN_OPENCV.T @ rotations.as_matrix()
+    return Rotation.from_matrix(remapped_matrices).as_euler('ZYX', degrees=True)
 
 
 def _get_trial_start_marker_sequences(working_dir: pathlib.Path, event: config.EventSetup) -> dict[int, str]:
@@ -184,10 +204,11 @@ export_config_doc = {
         'markers_only_presence': type_utils.GUIDocInfo('Export marker presence only', 'Applies only when Include individual markers is enabled. Export only whether each marker was detected, rather than its full pose data.'),
         'markers_compress': type_utils.GUIDocInfo('Combine marker presence into one column', 'Applies only when Include individual markers and Export marker presence only are enabled. Store detected marker IDs in one comma-separated column instead of as separate presence columns for each marker.'),
     }),
-    'head_pose': type_utils.GUIDocInfo('Head pose relative to assemblies', 'Export the scene-camera (head) pose in each configured marker assembly\'s coordinate system at available pose frames. This is the inverse of the stored assembly-to-camera pose.', {
+    'head_pose': type_utils.GUIDocInfo('Head pose relative to assemblies', 'Export the scene-camera (head) pose in each configured marker assembly\'s coordinate system at available pose frames. By default, this is the inverse of the assembly pose in the camera frame that gazeMapper determines.', {
         'include_unit_header_row': type_utils.GUIDocInfo('Include units row', 'Add a second header row describing the units or meaning of each column.'),
-        'include_Fick_angles': type_utils.GUIDocInfo('Include angles', 'Include azimuth and elevation (Fick order) of the scene-camera forward direction, expressed in each assembly\'s coordinate system.'),
+        'include_orientation_angles': type_utils.GUIDocInfo('Include orientation angles', 'Include yaw, pitch, and roll in degrees in the Fick angle convention described by Haslwanter (1995).'),
         'assemblies': type_utils.GUIDocInfo('Marker assemblies', 'Leave empty to export a pose file for every configured marker assembly.'),
+        'assemblies_not_to_invert': type_utils.GUIDocInfo('Assemblies not to invert', 'For these assemblies, export the assembly pose in the camera\'s frame, instead of its inverse (the camera pose in the assembly\'s frame).'),
         'episodes': type_utils.GUIDocInfo('Coding events', 'Leave empty to export every configured event with a marker assembly. Each event file includes all available pose frames with trial numbers marking coded intervals.'),
     }),
     'gaze_offsets': type_utils.GUIDocInfo('Gaze offsets', 'Export computed gaze offsets for configured episodes and planes.', {
@@ -603,8 +624,10 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
                 for c in rename:
                     if c in column_info:
                         column_info[rename[c]] = column_info[c]
-                        if c.startswith('pose_T_vec_'):
-                            column_info[rename[c]] = 'plane position in scene-camera coordinates (mm)'
+                        if c.startswith('pose_R_vec_'):
+                            column_info[rename[c]] = f'orientation of {p} in scene-camera frame (rotation-vector component, rad)'
+                        elif c.startswith('pose_T_vec_'):
+                            column_info[rename[c]] = f'position of {p} in scene-camera frame (mm)'
 
         # for the rest, make a file per coding stream
         ori_plane_gazes = copy.deepcopy(plane_gazes)
@@ -773,24 +796,22 @@ def export_head_pose(export_path: pathlib.Path, working_dir: pathlib.Path, study
             source_translations = source_df[translation_columns].to_numpy(dtype=float)
             inverse_rotations = np.full_like(source_rotations, np.nan)
             inverse_translations = np.full_like(source_translations, np.nan)
-            forward_in_assembly = np.full_like(source_rotations, np.nan)
-            inverse_rotations[valid_pose], inverse_translations[valid_pose], forward_in_assembly[valid_pose] = _invert_assembly_poses(
+            inverse_rotations[valid_pose], inverse_translations[valid_pose] = _invert_assembly_poses(
                 source_rotations[valid_pose],
                 source_translations[valid_pose],
             )
             pose_df = source_df.copy()
-            pose_df[rotation_columns] = inverse_rotations
-            pose_df[translation_columns] = inverse_translations
+            invert_pose = assembly_name not in export_config.assemblies_not_to_invert
+            if invert_pose:
+                pose_df[rotation_columns] = inverse_rotations
+                pose_df[translation_columns] = inverse_translations
             pose_df = _scale_pose_translations_to_mm(pose_df, assembly_definitions[assembly_name].unit)
-            if export_config.include_Fick_angles:
-                pose_df['pose_azimuth'] = np.nan
-                pose_df['pose_elevation'] = np.nan
-                azimuth, elevation = vector_to_Fick(
-                    forward_in_assembly[valid_pose, 0],
-                    forward_in_assembly[valid_pose, 1],
-                    forward_in_assembly[valid_pose, 2],
+            if export_config.include_orientation_angles:
+                angle_columns = ['pose_yaw', 'pose_pitch', 'pose_roll']
+                pose_df[angle_columns] = np.nan
+                pose_df.loc[valid_pose, angle_columns] = _rotation_to_orientation_angles(
+                    pose_df.loc[valid_pose, rotation_columns].to_numpy(dtype=float)
                 )
-                pose_df.loc[valid_pose, ['pose_azimuth', 'pose_elevation']] = np.column_stack((azimuth, elevation))
             processed_assembly_frames[assembly_name] = pose_df
 
         for event, intervals in events_with_intervals:
@@ -826,11 +847,21 @@ def export_head_pose(export_path: pathlib.Path, working_dir: pathlib.Path, study
                         rename[col] = f'pose_{assembly_name}_{col[5:]}'
                         suffix = col[5:]
                         if suffix.startswith('R_vec_'):
-                            column_info[rename[col]] = f'camera-to-{assembly_name} rotation-vector component (rad)'
+                            if assembly_name in export_config.assemblies_not_to_invert:
+                                column_info[rename[col]] = f'orientation of {assembly_name} in scene-camera frame (rotation-vector component, rad)'
+                            else:
+                                column_info[rename[col]] = f'orientation of scene camera in {assembly_name} frame (rotation-vector component, rad)'
                         elif suffix.startswith('T_vec_'):
-                            column_info[rename[col]] = f'scene-camera position in {assembly_name} coordinates (mm)'
-                        elif suffix in ('azimuth', 'elevation'):
-                            column_info[rename[col]] = 'deg (Fick)'
+                            if assembly_name in export_config.assemblies_not_to_invert:
+                                column_info[rename[col]] = f'position of {assembly_name} in scene-camera frame (mm)'
+                            else:
+                                column_info[rename[col]] = f'position of scene camera in {assembly_name} frame (mm)'
+                        elif suffix == 'yaw':
+                            column_info[rename[col]] = 'deg (Haslwanter yaw about +z; positive leftward)'
+                        elif suffix == 'pitch':
+                            column_info[rename[col]] = 'deg (Haslwanter pitch about +y; positive downward)'
+                        elif suffix == 'roll':
+                            column_info[rename[col]] = 'deg (Haslwanter roll about +x; positive clockwise looking along +x)'
                     elif col in temporal_fields and col not in shared_temporal:
                         rename[col] = f'{col}_{assembly_name}'
                         column_info[rename[col]] = column_info.get(col, '')

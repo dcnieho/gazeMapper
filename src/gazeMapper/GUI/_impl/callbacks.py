@@ -650,6 +650,7 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
         },
         'head_pose': {
             'assemblies': sorted(configured_assemblies),
+            'assemblies_not_to_invert': sorted(configured_assemblies),
             'episodes': export_trials.get_head_pose_episode_options(g.study_config.coding_setup, g.study_config.marker_assemblies),
         },
         'gaze_offsets': {
