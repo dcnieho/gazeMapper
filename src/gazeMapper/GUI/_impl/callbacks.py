@@ -636,10 +636,8 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
         gt_gui.utils.push_popup(g, gt_gui.msg_box.msgbox, "Nothing to export", "No data available for export.", gt_gui.msg_box.MsgBox.error)
         return
 
-    configured_planes = {
-        definition.name for definition in g.study_config.marker_assemblies
-        if marker_assembly.is_plane(definition.type)
-    }
+    configured_assemblies = {definition.name for definition in g.study_config.marker_assemblies}
+    configured_planes     = {definition.name for definition in g.study_config.marker_assemblies if marker_assembly.is_plane(definition.type)}
     plane_gaze_events = [
         event for event in process.get_specific_event_types(g.study_config, check_specific_fields=['marker_assemblies'])
         if any(plane in configured_planes for plane in event['marker_assemblies'])
@@ -651,7 +649,7 @@ def show_export_config(g, path: str|pathlib.Path, sessions: list[str]):
             'episodes': sorted(event['name'] for event in plane_gaze_events),
         },
         'head_pose': {
-            'planes': sorted(configured_planes),
+            'assemblies': sorted(configured_assemblies),
             'episodes': export_trials.get_head_pose_episode_options(g.study_config.coding_setup, g.study_config.marker_assemblies),
         },
         'gaze_offsets': {

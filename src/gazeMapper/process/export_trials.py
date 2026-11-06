@@ -56,7 +56,7 @@ class PlaneGaze(OptionBase):
 class HeadPose(OptionBase):
     include_unit_header_row: bool = True
     include_Fick_angles: bool = True
-    planes: set[str] = dataclasses.field(default_factory=set)
+    assemblies: set[str] = dataclasses.field(default_factory=set)
     episodes: set[str] = dataclasses.field(default_factory=set)
 @dataclasses.dataclass
 class GazeOffset(OptionBase):
@@ -92,13 +92,13 @@ class ExportConfig:
     mapped_gaze_video: OptionBase = dataclasses.field(default_factory=lambda: OptionBase(False, False, [], []))
 
 
-def _invert_plane_poses(rotation_vecs: np.ndarray, translation_vecs: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def _invert_assembly_poses(rotation_vecs: np.ndarray, translation_vecs: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     rotation_vecs = np.asarray(rotation_vecs, dtype=float).reshape(-1, 3)
     translation_vecs = np.asarray(translation_vecs, dtype=float).reshape(-1, 3)
-    camera_to_plane = Rotation.from_rotvec(rotation_vecs).inv()
-    inverse_translations = camera_to_plane.apply(-translation_vecs)
-    forward_in_plane = camera_to_plane.apply(np.broadcast_to([0., 0., 1.], rotation_vecs.shape))
-    return camera_to_plane.as_rotvec(), inverse_translations, forward_in_plane
+    camera_to_assembly = Rotation.from_rotvec(rotation_vecs).inv()
+    inverse_translations = camera_to_assembly.apply(-translation_vecs)
+    forward_in_assembly = camera_to_assembly.apply(np.broadcast_to([0., 0., 1.], rotation_vecs.shape))
+    return camera_to_assembly.as_rotvec(), inverse_translations, forward_in_assembly
 
 
 def _get_trial_start_marker_sequences(working_dir: pathlib.Path, event: config.EventSetup) -> dict[int, str]:
@@ -184,11 +184,11 @@ export_config_doc = {
         'markers_only_presence': type_utils.GUIDocInfo('Export marker presence only', 'Applies only when Include individual markers is enabled. Export only whether each marker was detected, rather than its full pose data.'),
         'markers_compress': type_utils.GUIDocInfo('Combine marker presence into one column', 'Applies only when Include individual markers and Export marker presence only are enabled. Store detected marker IDs in one comma-separated column instead of as separate presence columns for each marker.'),
     }),
-    'head_pose': type_utils.GUIDocInfo('Head pose relative to planes', 'Export the scene-camera (head) pose in each configured plane\'s coordinate system at available pose frames. This is the inverse of the stored plane-to-camera pose.', {
+    'head_pose': type_utils.GUIDocInfo('Head pose relative to assemblies', 'Export the scene-camera (head) pose in each configured marker assembly\'s coordinate system at available pose frames. This is the inverse of the stored assembly-to-camera pose.', {
         'include_unit_header_row': type_utils.GUIDocInfo('Include units row', 'Add a second header row describing the units or meaning of each column.'),
-        'include_Fick_angles': type_utils.GUIDocInfo('Include angles', 'Include azimuth and elevation (Fick order) of the scene-camera forward direction, expressed in each plane\'s coordinate system.'),
-        'planes': type_utils.GUIDocInfo('Planes', 'Leave empty to export a pose file for every configured plane.'),
-        'episodes': type_utils.GUIDocInfo('Coding events', 'Leave empty to export every configured event with a plane. Each event file includes all available pose frames with trial numbers marking coded intervals.'),
+        'include_Fick_angles': type_utils.GUIDocInfo('Include angles', 'Include azimuth and elevation (Fick order) of the scene-camera forward direction, expressed in each assembly\'s coordinate system.'),
+        'assemblies': type_utils.GUIDocInfo('Marker assemblies', 'Leave empty to export a pose file for every configured marker assembly.'),
+        'episodes': type_utils.GUIDocInfo('Coding events', 'Leave empty to export every configured event with a marker assembly. Each event file includes all available pose frames with trial numbers marking coded intervals.'),
     }),
     'gaze_offsets': type_utils.GUIDocInfo('Gaze offsets', 'Export computed gaze offsets for configured episodes and planes.', {
         'include_unit_header_row': type_utils.GUIDocInfo('Include units row', 'Add a second header row describing the units or meaning of each column.'),
@@ -219,7 +219,8 @@ def prep_export(project_dir: str|pathlib.Path, session_names: list[str], config_
 
     # for the sessions, see what we have to export
     export_config = ExportConfig()
-    plane_names = {definition.name for definition in study_config.marker_assemblies if marker_assembly.is_plane(definition.type)}
+    assembly_definitions = {definition.name: definition for definition in study_config.marker_assemblies}
+    plane_names = {name for name, definition in assembly_definitions.items() if marker_assembly.is_plane(definition.type)}
     cs_plane_gaze = [cs for cs in process.get_specific_event_types(study_config, check_specific_fields=['marker_assemblies']) if any(name in plane_names for name in cs['marker_assemblies'])]
     cs_gaze_offset = process.get_specific_event_types(study_config, check_specific_fields=['gaze_offset_setup'])
     cs_validation = process.get_specific_event_types(study_config, annotation.EventType.Validate)
@@ -293,7 +294,7 @@ def prep_export(project_dir: str|pathlib.Path, session_names: list[str], config_
                 export_config.trial_data_quality.sess.append(s.name)
                 export_config.trial_data_quality.recs.append(r)
             rec_dir = project_dir / s.name / r
-            if any(_pose_files.get_preferred_plane_pose_file(rec_dir, p)[0].is_file() for p in plane_names):
+            if any(_pose_files.get_preferred_pose_file(rec_dir, name, definition.type)[0].is_file() for name, definition in assembly_definitions.items()):
                 export_config.head_pose.available = True
                 export_config.head_pose.do_it = False  # NB: by default no head pose export
                 export_config.head_pose.sess.append(s.name)
@@ -716,17 +717,17 @@ def export_plane_gaze(export_path: pathlib.Path, working_dir: pathlib.Path, stud
                 plane_gazes.write_csv(f, separator='\t', null_value='nan', float_precision=8, include_header=False)
 
 def export_head_pose(export_path: pathlib.Path, working_dir: pathlib.Path, study_config: config.Study, export_config: HeadPose):
-    plane_definitions = {definition.name: definition for definition in study_config.marker_assemblies if marker_assembly.is_plane(definition.type)}
-    plane_names = sorted(plane_definitions)
-    if export_config.planes:
-        plane_names = [name for name in plane_names if name in export_config.planes]
+    assembly_definitions = {definition.name: definition for definition in study_config.marker_assemblies}
+    assembly_names = sorted(assembly_definitions)
+    if export_config.assemblies:
+        assembly_names = [name for name in assembly_names if name in export_config.assemblies]
     coding_events = [
         event for event in study_config.coding_setup
         if (not export_config.episodes or event['name'] in export_config.episodes)
-        and any(plane in plane_names for plane in event['marker_assemblies'])
+        and any(assembly in assembly_names for assembly in event['marker_assemblies'])
     ]
     if not coding_events:
-        raise ValueError('No coding events with selected planes are configured for head-pose export')
+        raise ValueError('No coding events with selected marker assemblies are configured for head-pose export')
     temporal_fields = ('timestamp', 'timestamp_VOR', 'frame_idx_VOR', 'timestamp_ori', 'frame_idx_ori')
 
     for rec_name in export_config.recs:
@@ -742,29 +743,29 @@ def export_head_pose(export_path: pathlib.Path, working_dir: pathlib.Path, study
             warnings.warn(f'No {annotation.tooltip_map[annotation.EventType.Trial]} events found in the coding file for recording {rec_name} in session {working_dir.name}. Skipping head-pose export...', process_pool.ProcessingWarning)
             continue
 
-        needed_plane_names = sorted({
-            plane
+        needed_assembly_names = sorted({
+            assembly
             for event, _ in events_with_intervals
-            for plane in event['marker_assemblies']
-            if plane in plane_names
+            for assembly in event['marker_assemblies']
+            if assembly in assembly_names
         })
-        plane_frames = {}
-        for plane_name in needed_plane_names:
-            pose_file, _ = _pose_files.get_preferred_plane_pose_file(rec_dir, plane_name)
+        assembly_frames = {}
+        for assembly_name in needed_assembly_names:
+            pose_file, _ = _pose_files.get_preferred_pose_file(rec_dir, assembly_name, assembly_definitions[assembly_name].type)
             if pose_file.is_file():
-                plane_frames[plane_name] = pd.read_csv(pose_file, sep='\t')
-        if not plane_frames:
-            warnings.warn(f'No plane pose files found for recording {rec_name} in session {working_dir.name}. Skipping head-pose export...', process_pool.ProcessingWarning)
+                assembly_frames[assembly_name] = pd.read_csv(pose_file, sep='\t')
+        if not assembly_frames:
+            warnings.warn(f'No marker assembly pose files found for recording {rec_name} in session {working_dir.name}. Skipping head-pose export...', process_pool.ProcessingWarning)
             continue
 
         timestamps = pd.read_csv(rec_dir / gt_naming.frame_timestamps_fname, sep='\t').rename(columns={'timestamp': 'frame_ts'})
         rotation_columns = ['pose_R_vec_x', 'pose_R_vec_y', 'pose_R_vec_z']
         translation_columns = ['pose_T_vec_x', 'pose_T_vec_y', 'pose_T_vec_z']
-        processed_plane_frames = {}
-        for plane_name, source_df in plane_frames.items():
+        processed_assembly_frames = {}
+        for assembly_name, source_df in assembly_frames.items():
             missing_columns = [col for col in rotation_columns + translation_columns if col not in source_df.columns]
             if missing_columns:
-                warnings.warn(f'Plane pose file for plane {plane_name} in recording {rec_name} is missing pose columns {missing_columns}. Skipping this plane...', process_pool.ProcessingWarning)
+                warnings.warn(f'Pose file for marker assembly {assembly_name} in recording {rec_name} is missing pose columns {missing_columns}. Skipping this assembly...', process_pool.ProcessingWarning)
                 continue
 
             valid_pose = source_df[rotation_columns + translation_columns].notna().all(axis=1).to_numpy()
@@ -772,35 +773,35 @@ def export_head_pose(export_path: pathlib.Path, working_dir: pathlib.Path, study
             source_translations = source_df[translation_columns].to_numpy(dtype=float)
             inverse_rotations = np.full_like(source_rotations, np.nan)
             inverse_translations = np.full_like(source_translations, np.nan)
-            forward_in_plane = np.full_like(source_rotations, np.nan)
-            inverse_rotations[valid_pose], inverse_translations[valid_pose], forward_in_plane[valid_pose] = _invert_plane_poses(
+            forward_in_assembly = np.full_like(source_rotations, np.nan)
+            inverse_rotations[valid_pose], inverse_translations[valid_pose], forward_in_assembly[valid_pose] = _invert_assembly_poses(
                 source_rotations[valid_pose],
                 source_translations[valid_pose],
             )
             pose_df = source_df.copy()
             pose_df[rotation_columns] = inverse_rotations
             pose_df[translation_columns] = inverse_translations
-            pose_df = _scale_pose_translations_to_mm(pose_df, plane_definitions[plane_name].unit)
+            pose_df = _scale_pose_translations_to_mm(pose_df, assembly_definitions[assembly_name].unit)
             if export_config.include_Fick_angles:
                 pose_df['pose_azimuth'] = np.nan
                 pose_df['pose_elevation'] = np.nan
                 azimuth, elevation = vector_to_Fick(
-                    forward_in_plane[valid_pose, 0],
-                    forward_in_plane[valid_pose, 1],
-                    forward_in_plane[valid_pose, 2],
+                    forward_in_assembly[valid_pose, 0],
+                    forward_in_assembly[valid_pose, 1],
+                    forward_in_assembly[valid_pose, 2],
                 )
                 pose_df.loc[valid_pose, ['pose_azimuth', 'pose_elevation']] = np.column_stack((azimuth, elevation))
-            processed_plane_frames[plane_name] = pose_df
+            processed_assembly_frames[assembly_name] = pose_df
 
         for event, intervals in events_with_intervals:
             event_name = event['name']
-            event_planes = [plane for plane in sorted(event['marker_assemblies']) if plane in processed_plane_frames]
-            if not event_planes:
+            event_assemblies = [name for name in sorted(event['marker_assemblies']) if name in processed_assembly_frames]
+            if not event_assemblies:
                 continue
 
-            shared_temporal = [field for field in temporal_fields if all(field in plane_frames[plane].columns for plane in event_planes)]
+            shared_temporal = [field for field in temporal_fields if all(field in assembly_frames[name].columns for name in event_assemblies)]
             merge_cols = ['frame_idx', *shared_temporal]
-            per_plane_exports = {}
+            per_assembly_exports = {}
             column_info = {
                 'frame_idx': 'frame number',
                 'frame_ts': 'scene camera frame timestamp (ms)',
@@ -811,8 +812,8 @@ def export_head_pose(export_path: pathlib.Path, working_dir: pathlib.Path, study
                 'frame_idx_ori': 'original frame number',
             }
 
-            for plane_name in event_planes:
-                pose_df = processed_plane_frames[plane_name]
+            for assembly_name in event_assemblies:
+                pose_df = processed_assembly_frames[assembly_name]
                 payload_columns = [
                     col for col in pose_df.columns
                     if col not in merge_cols
@@ -822,25 +823,25 @@ def export_head_pose(export_path: pathlib.Path, working_dir: pathlib.Path, study
                 rename = {}
                 for col in payload_columns:
                     if col.startswith('pose_'):
-                        rename[col] = f'pose_{plane_name}_{col[5:]}'
+                        rename[col] = f'pose_{assembly_name}_{col[5:]}'
                         suffix = col[5:]
                         if suffix.startswith('R_vec_'):
-                            column_info[rename[col]] = 'camera-to-plane rotation-vector component (rad)'
+                            column_info[rename[col]] = f'camera-to-{assembly_name} rotation-vector component (rad)'
                         elif suffix.startswith('T_vec_'):
-                            column_info[rename[col]] = 'scene-camera position in plane coordinates (mm)'
+                            column_info[rename[col]] = f'scene-camera position in {assembly_name} coordinates (mm)'
                         elif suffix in ('azimuth', 'elevation'):
                             column_info[rename[col]] = 'deg (Fick)'
                     elif col in temporal_fields and col not in shared_temporal:
-                        rename[col] = f'{col}_{plane_name}'
+                        rename[col] = f'{col}_{assembly_name}'
                         column_info[rename[col]] = column_info.get(col, '')
-                per_plane_exports[plane_name] = pose_df[merge_cols + payload_columns].rename(columns=rename)
+                per_assembly_exports[assembly_name] = pose_df[merge_cols + payload_columns].rename(columns=rename)
 
-            if not per_plane_exports:
+            if not per_assembly_exports:
                 continue
-            plane_export_tables = list(per_plane_exports.values())
-            head_pose = plane_export_tables[0]
-            for plane_df in plane_export_tables[1:]:
-                head_pose = head_pose.merge(plane_df, how='outer', on=merge_cols)
+            assembly_export_tables = list(per_assembly_exports.values())
+            head_pose = assembly_export_tables[0]
+            for assembly_df in assembly_export_tables[1:]:
+                head_pose = head_pose.merge(assembly_df, how='outer', on=merge_cols)
             head_pose = head_pose.merge(timestamps[['frame_idx', 'frame_ts']], how='left', on='frame_idx')
             head_pose = head_pose.sort_values('frame_idx').reset_index(drop=True)
 

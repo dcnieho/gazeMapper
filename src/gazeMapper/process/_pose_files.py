@@ -2,15 +2,25 @@ import pathlib
 
 from glassesTools import pose as gt_pose
 
-from .. import naming
+from .. import marker_assembly, naming
+
+
+def get_preferred_pose_file(
+    working_dir: str|pathlib.Path,
+    assembly_name: str,
+    definition_type: marker_assembly.Type,
+) -> tuple[pathlib.Path, bool]:
+    working_dir = pathlib.Path(working_dir)
+    if marker_assembly.is_plane(definition_type):
+        interpolated = working_dir / f'{naming.plane_pose_interpolated_prefix}{assembly_name}.tsv'
+        if interpolated.is_file():
+            return interpolated, True
+        return working_dir / f'{naming.plane_pose_prefix}{assembly_name}.tsv', False
+    return working_dir / f'{naming.pose_prefix}{assembly_name}.tsv', False
 
 
 def get_preferred_plane_pose_file(working_dir: str|pathlib.Path, plane_name: str) -> tuple[pathlib.Path, bool]:
-    working_dir = pathlib.Path(working_dir)
-    interpolated = working_dir / f'{naming.plane_pose_interpolated_prefix}{plane_name}.tsv'
-    if interpolated.is_file():
-        return interpolated, True
-    return working_dir / f'{naming.plane_pose_prefix}{plane_name}.tsv', False
+    return get_preferred_pose_file(working_dir, plane_name, marker_assembly.Type.Plane_2D)
 
 
 def read_preferred_plane_pose(working_dir: str|pathlib.Path, plane_name: str, episodes: list[list[int]]|None=None):
