@@ -132,15 +132,15 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
             if val_p_def.is_dynamic and val_coding_event in e:
                 # dynamic plane but no coding yet, try and prepopulate the coding based on ArUco marker detections (c.f. run_validation)
                 marker_observations_per_target, markers_per_target = validation.dynamic.get_marker_observations(pl, working_dir, val_coding_event, missing_ok=True)
-                for idx,_ in enumerate(e[val_coding_event][1]):
+                for validation_episode_frame_range in e[val_coding_event][1]:
                     selected_intervals, _ = assign_intervals.dynamic_markers(marker_observations_per_target,
                                                 markers_per_target,
                                                 working_dir/gt_naming.frame_timestamps_fname,
-                                                e[val_coding_event][1][idx],
-                                                cs['validation_setup']['dynamic_skip_first_duration'],
-                                                cs['validation_setup']['dynamic_max_gap_duration'],
-                                                cs['validation_setup']['dynamic_min_duration'],
-                                                val_coding_event,
+                                                skip_first_duration=cs['validation_setup']['dynamic_skip_first_duration'],
+                                                max_gap_duration=cs['validation_setup']['dynamic_max_gap_duration'],
+                                                min_duration=cs['validation_setup']['dynamic_min_duration'],
+                                                validation_episode_frame_range=validation_episode_frame_range,
+                                                name=val_coding_event,
                                                 allow_missing=True)
                     for t in targets:
                         target_name = _get_target_name(t)
@@ -361,23 +361,23 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
                                 'end_timestamp'  :video_ts.get_timestamp(interval[1])})
         coding = pd.DataFrame.from_records(records, columns=['target','start_timestamp','end_timestamp'])
         coding = coding.sort_values(by=['start_timestamp']).reset_index(drop=True)
-        # attempt to set marker_intervals. Can be wrong if user didn't code all target intervals
+        # Attempt to group target windows by validation episode. This can be wrong if not all targets were coded.
         # each interval should have all targets once, so either after all targets seen, or when a target repeats, increment
-        current_interval = 1
+        current_validation_episode_number = 1
         seen_targets = []
-        marker_intervals = []
+        validation_episode_numbers = []
         for idx,row in coding.iterrows():
             if row['target'] not in seen_targets:
                 seen_targets.append(row['target'])
-                marker_intervals.append(current_interval)
+                validation_episode_numbers.append(current_validation_episode_number)
             else:
-                current_interval += 1
+                current_validation_episode_number += 1
                 seen_targets = [row['target']]
-                marker_intervals.append(current_interval)
+                validation_episode_numbers.append(current_validation_episode_number)
             if len(seen_targets)==len(targets):
-                current_interval += 1
+                current_validation_episode_number += 1
                 seen_targets = []
-        coding.insert(1, 'marker_interval', marker_intervals)
+        coding.insert(1, 'marker_interval', validation_episode_numbers)
         coding.to_csv(fname, sep='\t', index=False)
 
     # update state

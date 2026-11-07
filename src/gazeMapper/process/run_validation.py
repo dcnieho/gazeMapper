@@ -67,12 +67,14 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None=None, p
         background_image = (validation_plane.get_ref_image(as_RGB=True),
                             np.array([validation_plane.bbox[x] for x in (0,2,3,1)]))
         targets = {t_id: np.append(validation_plane.targets[t_id].center, 0.) for t_id in validation_plane.targets}   # get centers of targets
+        validation_episode_frame_ranges = episodes[e][1]
 
         # use user-coded intervals if available else find intervals
         has_override = False
         fname_override = working_dir/f'{naming.validation_prefix}{e}_fixation_assignment_override.tsv'
         if fname_override.exists():
             target_coding = pd.read_csv(fname_override, delimiter='\t', dtype={'target':int, 'marker_interval':int},index_col='target')
+            target_coding = target_coding.rename(columns={'marker_interval': 'validation_episode_number'})
             has_override = True
         elif validation_plane.is_dynamic():
             marker_observations_per_target, markers_per_target = validation.dynamic.get_marker_observations(validation_plane, working_dir, e)
@@ -86,23 +88,24 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None=None, p
         progress_indicator.update()
 
         # assign intervals
-        for idx,_ in enumerate(episodes[e][1]):
+        for validation_episode_index, validation_episode_frame_range in enumerate(validation_episode_frame_ranges):
+            validation_episode_number = validation_episode_index + 1
             if has_override:
                 other_intervals = None
-                selected_intervals = target_coding[target_coding['marker_interval']==idx+1].copy()
+                selected_intervals = target_coding[target_coding['validation_episode_number']==validation_episode_number].copy()
                 selected_intervals = selected_intervals.rename(columns={'start_timestamp':'startT', 'end_timestamp':'endT'})
             elif validation_plane.is_dynamic():
                 selected_intervals, other_intervals = \
                     assign_intervals.dynamic_markers(marker_observations_per_target,
                                                     markers_per_target,
                                                     working_dir/gt_naming.frame_timestamps_fname,
-                                                    episodes[e][1][idx],
-                                                    cs['validation_setup']['dynamic_skip_first_duration'],
-                                                    cs['validation_setup']['dynamic_max_gap_duration'],
-                                                    cs['validation_setup']['dynamic_min_duration'],
-                                                    e)
+                                                    skip_first_duration=cs['validation_setup']['dynamic_skip_first_duration'],
+                                                    max_gap_duration=cs['validation_setup']['dynamic_max_gap_duration'],
+                                                    min_duration=cs['validation_setup']['dynamic_min_duration'],
+                                                    validation_episode_frame_range=validation_episode_frame_range,
+                                                    name=e)
             else:
-                fix_file = working_dir / f'{naming.validation_prefix}{e}{naming.val_fixation_infix}{idx+1:02d}.tsv'
+                fix_file = working_dir / f'{naming.validation_prefix}{e}{naming.val_fixation_infix}{validation_episode_number:02d}.tsv'
                 selected_intervals, other_intervals = \
                     assign_intervals.distance(targets,
                                             fix_file,
@@ -111,14 +114,14 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None=None, p
             progress_indicator.update()
 
             # plot output
-            assign_intervals.plot(selected_intervals,
-                                other_intervals,
-                                targets,
-                                working_dir/f'{naming.world_gaze_prefix}{p}.tsv',
-                                episodes[e][1][idx],
-                                working_dir,
+            assign_intervals.plot(selected_intervals=selected_intervals,
+                                other_intervals=other_intervals,
+                                targets=targets,
+                                gazes=working_dir/f'{naming.world_gaze_prefix}{p}.tsv',
+                                validation_episode_frame_range=validation_episode_frame_range,
+                                output_directory=working_dir,
                                 filename_stem=f'{naming.validation_prefix}{e}_fixation_assignment',
-                                iteration=idx,
+                                validation_episode_index=validation_episode_index,
                                 background_image=background_image,
                                 plot_limits=plot_limits)
             progress_indicator.update()
@@ -127,16 +130,16 @@ def run(working_dir: str|pathlib.Path, config_dir: str|pathlib.Path|None=None, p
             assign_intervals.to_tsv(selected_intervals,
                                     working_dir,
                                     filename_stem=f'{naming.validation_prefix}{e}_fixation_assignment',
-                                    iteration=idx)
+                                    validation_episode_index=validation_episode_index)
             progress_indicator.update()
 
-        compute_offsets.compute(working_dir/f'{naming.world_gaze_prefix}{p}.tsv',
-                                _pose_files.get_preferred_plane_pose_file(working_dir, p)[0],
-                                working_dir/f'{naming.validation_prefix}{e}_fixation_assignment{("_override" if has_override else "")}.tsv',
-                                episodes[e][1],
-                                targets,
-                                validation_plane.config['distance']*10.,    # cm -> mm
-                                working_dir,
+        compute_offsets.compute(gazes=working_dir/f'{naming.world_gaze_prefix}{p}.tsv',
+                                poses=_pose_files.get_preferred_plane_pose_file(working_dir, p)[0],
+                                target_sample_windows=working_dir/f'{naming.validation_prefix}{e}_fixation_assignment{("_override" if has_override else "")}.tsv',
+                                validation_episode_frame_ranges=validation_episode_frame_ranges,
+                                targets=targets,
+                                distance_mm_for_homography=validation_plane.config['distance']*10.,    # cm -> mm
+                                output_directory=working_dir,
                                 filename=f'{naming.validation_prefix}{e}_data_quality.tsv',
                                 d_types=cs['validation_setup']['data_types'],
                                 allow_data_type_fallback=cs['validation_setup']['allow_data_type_fallback'],
