@@ -4,7 +4,7 @@
 [![Citation Badge](https://img.shields.io/endpoint?url=https%3A%2F%2Fapi.juleskreuer.eu%2Fcitation-badge.php%3Fshield%26doi%3D10.3758%2Fs13428-025-02704-4&color=blue)](https://scholar.google.com/citations?view_op=view_citation&citation_for_view=uRUYoVgAAAAJ:wbdj-CoPYUoC)
 [![DOI](https://img.shields.io/badge/DOI-10.3758%2Fs13428--025--02704--4-blue.svg)](https://doi.org/10.3758/s13428-025-02704-4)
 
-# gazeMapper v1.8.4
+# gazeMapper v2.0.0
 Tool for automated world-based analysis of wearable eye tracker data.
 gazeMapper is an open-source tool for automated mapping and processing of eye-tracking data to enable automated world-based analysis.
 gazeMapper can:
