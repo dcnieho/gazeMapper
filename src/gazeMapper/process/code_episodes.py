@@ -247,10 +247,9 @@ def do_the_work(working_dir: pathlib.Path, config_dir: pathlib.Path, gui: GUI, v
             # the audio is my shepherd and nothing shall I lack :-)
             frame_idx = video_ts.find_frame(pts*1000)  # pts is in seconds, our frame timestamps are in ms
             ROI_offset = [0., 0.]
-            if frame_info.data is not None:
-                info = frame_info.get_frame_info(frame_idx)
-                if 'offset_x' in info and 'offset_y' in info:
-                    ROI_offset = [info['offset_x'], info['offset_y']]
+            info = frame_info.get_frame_info(frame_idx)
+            if 'offset_x' in info and 'offset_y' in info:
+                ROI_offset = [info['offset_x'], info['offset_y']]
 
             # Draw assembly origins
             if has_poses:
