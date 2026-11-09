@@ -78,7 +78,7 @@ Example where gazeMapper has been used to map head-centered eye tracking data fr
 - [Citation](#citation)
 
 # How to acquire
-GazeMapper is available from `https://github.com/dcnieho/gazeMapper`, and supports Python 3.11 on Windows, MacOS and Linux (newer versions of Python should work fine but are not tested).
+GazeMapper is available from `https://github.com/dcnieho/gazeMapper`, and supports Python 3.11 and later on Windows, MacOS and Linux (newer versions of Python should work fine but are not tested).
 Complete installation instruction for using the gazeMapper GUI on [Windows](#complete-instructions-for-windows), [MacOS](#complete-instructions-for-macos) and [Linux](#complete-instructions-for-linux) users are available below.
 
 For users on Windows, Mac (14 Sonoma or later) or Linux who wish to use gazeMapper *in their Python code*, the easiest way to acquire
